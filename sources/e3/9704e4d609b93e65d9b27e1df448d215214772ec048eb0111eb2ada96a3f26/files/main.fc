@@ -1,0 +1,15 @@
+() recv_internal (int msg_value, cell in_msg_full, slice in_msg_body) {
+    int n = in_msg_body~load_uint(16);
+    if (n > 0) {
+        send_raw_message(
+            begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(my_address())
+                .store_coins(msg_value)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(n - 1, 16)
+            .end_cell(),
+            2
+        );
+    }
+}
