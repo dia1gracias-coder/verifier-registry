@@ -1,0 +1,606 @@
+;; Jetton Minter interacting with Rate Oracle by @delpydoc
+
+{-
+    Storage
+    total_supply:Coins
+    ^settings[
+        oracle_address:MsgIntAddress
+        admin_address:MsgIntAddress
+        ^sell_params[
+            enabled?:bool
+            price:uint32 (1000 = 1 USD)
+            remaining_amount:Coins
+            freeze_timer:uint64 (seconds)
+            lock_parts_count:uint16
+            lock_time:uint64 (seconds)
+        ]
+        ^stable_jettons:dict[
+            jetton_wallet_address:uint256 (only hashpart)
+            /
+            allowed?:bool
+        ]
+    ]
+    ^content
+    ^jetton_wallet_code
+    ^pending_swaps:dict[
+        query_id(uint64):^[
+            issuer_address:MsgIntAddress
+            amount:Coins
+        ]
+    ]
+-}
+
+#pragma version >=0.3.0;
+
+#include "op-codes.fc";
+#include "send-modes.fc";
+#include "msg.fc";
+#include "params.fc";
+#include "jetton-utils.fc";
+
+const int maximum_supply = 100000000; ;; 100 million tokens
+
+global int store::total_supply;
+global slice store::oracle_address;
+global slice store::admin_address;
+global cell store::sell_params;
+global cell store::stable_jettons;
+global cell store::content;
+global cell store::jetton_wallet_code;
+global cell store::pending_swaps;
+
+() load_data() impure inline {
+    slice gs = get_data().begin_parse();
+    store::total_supply = gs~load_coins();
+
+    slice ss = gs~load_ref().begin_parse();
+    store::oracle_address = ss~load_msg_addr();
+    store::admin_address = ss~load_msg_addr();
+    store::sell_params = ss~load_ref();
+    store::stable_jettons = ss~load_ref();
+
+    store::content = gs~load_ref();
+    store::jetton_wallet_code = gs~load_ref();
+    store::pending_swaps = gs.slice_refs() > 0 ? gs~load_ref() : new_dict();
+}
+
+() save_data() impure inline {
+    set_data(
+        begin_cell()
+            .store_coins(store::total_supply)
+            .store_ref(
+                begin_cell()
+                    .store_slice(store::oracle_address)
+                    .store_slice(store::admin_address)
+                    .store_ref(store::sell_params)
+                    .store_ref(store::stable_jettons)
+                    .end_cell()
+            )
+            .store_ref(store::content)
+            .store_ref(store::jetton_wallet_code)
+            .store_dict(store::pending_swaps)
+            .end_cell()
+    );
+}
+
+{-
+    int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+    src:MsgAddress dest:MsgAddressInt
+    value:CurrencyCollection ihr_fee:Grams fwd_fee:Grams
+    created_lt:uint64 created_at:uint32 = CommonMsgInfoRelaxed;
+    message$_ {X:Type} info:CommonMsgInfoRelaxed
+    init:(Maybe (Either StateInit ^StateInit))
+    body:(Either X ^X) = MessageRelaxed X;
+-}
+() send_to_jetton_wallet(slice to_address, cell jetton_wallet_code, int amount, cell master_msg, int need_state_init) impure {
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var msg = begin_cell()
+        .store_uint(0x18, 6)            ;; 0b011000 tag - 0, ihr_disabled - 1, bounce - 1, bounced - 0, src = adr_none$00
+        .store_slice(to_wallet_address)
+        .store_coins(amount)
+        ;; 1 + 4 + 4 + 64 + 32 zeroes - zeroed extracurrency, ihr_fee, fwd_fee, created_lt and created_at
+        ;; then either 0b111 - 0b11 for Maybe Either^ state init   and 0b1 for Either^ body
+        ;; or
+        ;; 0b0 for no-Maybe init and 0b1 for Either^ body
+        .store_uint(need_state_init ? (4 + 2 + 1) : 1, need_state_init ? (1 + 4 + 4 + 64 + 32 + 1 + 1 + 1) : (1 + 4 + 4 + 64 + 32 + 1 + 1));
+
+    if (need_state_init) {
+        msg = msg.store_ref(state_init);
+    }
+
+    msg = msg.store_ref(master_msg);
+
+    send_raw_message(msg.end_cell(), REVERT_ON_ERRORS | PAY_FEES_SEPARATELY);
+}
+
+() send_tokens(slice jetton_wallet_address, slice to_address, int amount) impure inline {
+    cell msg_body = begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(0, 64)
+        .store_coins(amount)
+        .store_slice(to_address)
+        .store_slice(my_address())
+        .store_uint(0, 1)
+        .store_coins(1000000)
+        .store_uint(0, 1).end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(jetton_wallet_address)
+        .store_coins(50000000)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body).end_cell();
+
+    send_raw_message(msg, REVERT_ON_ERRORS | PAY_FEES_SEPARATELY);
+}
+
+() cancel_swap(int query_id, slice reason) impure inline {
+    (cell pending_swaps, slice value, int success) = store::pending_swaps.udict_delete_get?(64, query_id);
+    slice value = value~load_ref().begin_parse();
+    slice issuer_address = value~load_msg_addr();
+    int stored_amount = value~load_coins();
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(issuer_address)
+        .store_coins(stored_amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(0, 32)
+        .store_slice(reason);
+
+    send_raw_message(msg.end_cell(), REVERT_ON_ERRORS | PAY_FEES_SEPARATELY);
+
+    store::pending_swaps = pending_swaps;
+}
+
+() submit_swap(int query_id, int rate) impure inline {
+    (cell pending_swaps, slice value, int success) = store::pending_swaps.udict_delete_get?(64, query_id);
+    slice value = value~load_ref().begin_parse();
+    slice issuer_address = value~load_msg_addr();
+    int stored_amount = value~load_coins();
+
+    slice sp = store::sell_params.begin_parse();
+    throw_unless(error::invalid_op, sp~load_int(1));
+    int jetton_price = sp~load_uint(32); ;; in USD
+    int ico_remaining_amount = sp~load_coins();
+    int freeze_timer = sp~load_uint(64);
+    int lock_parts_count = sp~load_uint(16);
+    int lock_time = sp~load_uint(64);
+
+    int jetton_amount = min(
+        (stored_amount - 40000000) * decimals / rate * 1000 / jetton_price,
+        ico_remaining_amount
+    );
+    jetton_amount = (store::total_supply + jetton_amount > maximum_supply) ? maximum_supply - store::total_supply : jetton_amount;
+    int used_amount = jetton_amount * rate * jetton_price / 1000 / decimals;
+    raw_reserve(used_amount, 0);
+    int remain_amount = stored_amount - used_amount;
+    throw_if(857, remain_amount < 0);
+    ifnot ((remain_amount >= 20000000) | (jetton_amount > 0)) {
+        cancel_swap(query_id, msg::unknown_error());
+        save_data();
+        return();
+    }
+
+    if (jetton_amount > 0) {
+        remain_amount -= 40000000;
+
+        var master_msg = begin_cell() ;; internal_transfer
+            .store_uint(0x178d4519, 32)
+            .store_uint(query_id, 64)
+            .store_coins(jetton_amount)
+            .store_slice(my_address())
+            .store_slice(my_address())
+            .store_coins(10000000) ;; 0.01 TON
+            .store_uint(1, 1)
+            .store_ref( ;; lockup params
+                begin_cell()
+                    .store_uint(freeze_timer, 64)
+                    .store_uint(lock_parts_count, 16)
+                    .store_uint(lock_time, 64)
+                    .end_cell()
+            )
+            .store_uint(0, 1).end_cell();
+
+        send_to_jetton_wallet(issuer_address, store::jetton_wallet_code, 30000000, master_msg, true);
+
+        ico_remaining_amount -= jetton_amount;
+        store::sell_params = begin_cell()
+            .store_int(true, 1)
+            .store_uint(jetton_price, 32)
+            .store_coins(ico_remaining_amount)
+            .store_uint(freeze_timer, 64)
+            .store_uint(lock_parts_count, 16)
+            .store_uint(lock_time, 64).end_cell();
+
+        store::total_supply += jetton_amount;
+        throw_if(844, store::total_supply > maximum_supply);
+    }
+
+    if (remain_amount >= 20000000) {
+        var msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(issuer_address)
+            .store_coins(remain_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+            .store_slice(msg::swap_remain_amount());
+
+        send_raw_message(msg.end_cell(), REVERT_ON_ERRORS);
+    }
+
+    store::pending_swaps = pending_swaps;
+}
+
+() create_swap(slice issuer_address, int amount) impure inline {
+    throw_if(792, amount < 50000000); ;; 0.05 TON
+
+    slice sp = store::sell_params.begin_parse();
+    int sale_enabled? = sp~load_int(1);
+    sp~skip_bits(32);
+    int ico_remaining_amount = sp~load_coins();
+    if ((~ sale_enabled?) | (ico_remaining_amount <= 0)) {
+        send_raw_message(
+            begin_cell()
+                .store_uint(0x10, 6)
+                .store_slice(issuer_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(0, 32)
+                .store_slice(msg::ico_paused())
+                .end_cell(),
+            REVERT_ON_ERRORS | CARRY_REMAINING_GAS
+        );
+        return ();
+    }
+
+    int query_id = rand(1 << 64) + 1;
+    (_, int found?) = store::pending_swaps.udict_get?(64, query_id);
+    throw_if(793, found?);
+
+    cell pending_swaps = store::pending_swaps.udict_set_ref(
+        64, query_id, begin_cell()
+            .store_slice(issuer_address) ;; issuer_address
+            .store_coins(amount).end_cell() ;; msg_value
+    );
+    store::pending_swaps = pending_swaps;
+
+    ;; send async request get_rate to oracle
+    var msg_body = begin_cell()
+        .store_uint(op::get_rate, 32)
+        .store_uint(query_id, 64);
+
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(store::oracle_address)
+        .store_coins(mint_gas_consumption)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_builder(msg_body);
+
+    send_raw_message(msg.end_cell(), REVERT_ON_ERRORS | PAY_FEES_SEPARATELY);
+}
+
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; process only mint bounces
+        in_msg_body~skip_bits(32);
+        int op = in_msg_body~load_uint(32);
+        if (op == op::internal_transfer) {
+            in_msg_body~skip_bits(64); ;; query_id
+            int jetton_amount = in_msg_body~load_coins();
+            load_data();
+            store::total_supply -= jetton_amount;
+            save_data();
+        }
+        elseif (op == op::get_rate) {
+            int query_id = in_msg_body~load_uint(64);
+            load_data();
+            cancel_swap(query_id, msg::expired_value());
+            save_data();
+        }
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = muldiv(cs~load_coins(), 3, 2); ;; we use message fwd_fee for estimation of provide_wallet_address cost
+
+    load_data();
+    if (slice_empty?(in_msg_body)) { ;; SWAP (TON -> JETTON)
+        create_swap(sender_address, msg_value - mint_gas_consumption * 2);
+        save_data();
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::text_comment) {
+        if (slice_empty?(in_msg_body)) { ;; SWAP (TON -> JETTON)
+            create_swap(sender_address, msg_value - mint_gas_consumption * 2);
+            save_data();
+            return ();
+        }
+
+        if (in_msg_body.slice_bits() == 56) {
+            if (in_msg_body~load_uint(56) == 0x6465706f736974) { ;; deposit
+                return ();
+            }
+        }
+
+        throw(error::wrong_op);
+        return ();
+    }
+
+    if ((op == op::topup) | (op == op::excesses)) { return (); }
+
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::transfer_notification) {
+        int stable_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+
+        (int wc, int hashpart) = parse_std_addr(sender_address);
+        throw_unless(error::wrong_workchain, wc == 0);
+        (slice value, int found?) = store::stable_jettons.udict_get?(256, hashpart);
+        throw_unless(error::not_owner, found?);
+        throw_unless(error::not_owner, value~load_int(1));
+
+        int stable_decimals = value~load_uint(64); ;; like 10**9
+        throw_unless(error::invalid_op, stable_amount >= 2 * stable_decimals);
+        stable_amount -= stable_decimals; ;; we need to keep at least 1 stable for gas
+
+        slice sp = store::sell_params.begin_parse();
+        throw_unless(error::invalid_op, sp~load_int(1));
+        int jetton_price = sp~load_uint(32); ;; in USD
+        int ico_remaining_amount = sp~load_coins();
+        int freeze_timer = sp~load_uint(64);
+        int lock_parts_count = sp~load_uint(16);
+        int lock_time = sp~load_uint(64);
+
+        int jetton_amount = min(
+            stable_amount * decimals * 1000 / jetton_price / stable_decimals,
+            ico_remaining_amount
+        );
+        jetton_amount = (store::total_supply + jetton_amount > maximum_supply) ? maximum_supply - store::total_supply : jetton_amount;
+        int used_stables = jetton_amount * stable_decimals * jetton_price / 1000 / decimals;
+        int remain_stables = stable_amount - used_stables;
+        throw_if(857, remain_stables < 0);
+
+        if (jetton_amount > 0) {
+            var master_msg = begin_cell() ;; internal_transfer
+                .store_uint(0x178d4519, 32)
+                .store_uint(query_id, 64)
+                .store_coins(jetton_amount)
+                .store_slice(my_address())
+                .store_slice(my_address())
+                .store_coins(10000000) ;; 0.01 TON
+                .store_uint(1, 1)
+                .store_ref( ;; lockup params
+                    begin_cell()
+                        .store_uint(freeze_timer, 64)
+                        .store_uint(lock_parts_count, 16)
+                        .store_uint(lock_time, 64)
+                        .end_cell()
+                )
+                .store_uint(0, 1).end_cell();
+
+            send_to_jetton_wallet(from_address, store::jetton_wallet_code, 30000000, master_msg, true);
+
+            ico_remaining_amount -= jetton_amount;
+            store::sell_params = begin_cell()
+                .store_int(true, 1)
+                .store_uint(jetton_price, 32)
+                .store_coins(ico_remaining_amount)
+                .store_uint(freeze_timer, 64)
+                .store_uint(lock_parts_count, 16)
+                .store_uint(lock_time, 64).end_cell();
+
+            store::total_supply += jetton_amount;
+            throw_if(844, store::total_supply > maximum_supply);
+        }
+
+        if (remain_stables >= stable_decimals) {
+            send_tokens(sender_address, from_address, remain_stables);
+        }
+
+        save_data();
+        return ();
+    }
+    if (op == op::burn_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(error::not_valid_wallet,
+            equal_slices(calculate_user_jetton_wallet_address(from_address, my_address(), store::jetton_wallet_code), sender_address)
+        );
+
+        store::total_supply -= jetton_amount;
+        save_data();
+
+        slice response_address = in_msg_body~load_msg_addr();
+        if (response_address.preload_uint(2) != 0) {
+            var msg = begin_cell()
+                .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+                .store_slice(response_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::excesses, 32)
+                .store_uint(query_id, 64);
+
+            send_raw_message(msg.end_cell(), IGNORE_ERRORS | CARRY_REMAINING_GAS);
+        }
+        return ();
+    }
+
+    if (op == op::get_rate) {
+        throw_unless(error::not_owner, equal_slices(sender_address, store::oracle_address));
+        int rate = in_msg_body~load_coins();
+        submit_swap(query_id, rate);
+        save_data();
+        return ();
+    }
+
+    if (op == op::mint) {
+        throw_unless(error::not_owner, equal_slices(sender_address, store::admin_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        force_chain(to_address);
+        int amount = in_msg_body~load_coins();
+        throw_unless(error::invalid_op, amount >= mint_gas_consumption + fwd_fee);
+        cell master_msg = in_msg_body~load_ref();
+        slice master_msg_cs = master_msg.begin_parse();
+        throw_unless(error::invalid_op, master_msg_cs~load_uint(32) == op::internal_transfer);
+        master_msg_cs~skip_bits(64); ;; query_id
+        int jetton_amount = master_msg_cs~load_coins();
+        master_msg_cs~load_msg_addr();
+        master_msg_cs~load_msg_addr();
+        master_msg_cs~load_coins();
+        master_msg_cs~load_maybe_ref();
+        if (master_msg_cs~load_int(1)) {
+            master_msg_cs~load_ref();
+        }
+        master_msg_cs.end_parse();
+        send_to_jetton_wallet(to_address, store::jetton_wallet_code, amount, master_msg, true);
+        store::total_supply += jetton_amount;
+        throw_if(844, store::total_supply > maximum_supply);
+        save_data();
+        return ();
+    }
+
+    if (op == op::provide_wallet_address) {
+        throw_unless(75, msg_value > fwd_fee + provide_address_gas_consumption);
+
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_uint(1);
+
+        cell included_address = include_address?
+                ? begin_cell().store_slice(owner_address).end_cell()
+                : null();
+
+        var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(sender_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::take_wallet_address, 32)
+                .store_uint(query_id, 64);
+
+        if (is_resolvable?(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), store::jetton_wallet_code));
+        } else {
+            msg = msg.store_uint(0, 2); ;; addr_none
+        }
+        send_raw_message(msg.store_maybe_ref(included_address).end_cell(), REVERT_ON_ERRORS | CARRY_REMAINING_GAS);
+        return ();
+    }
+
+    if (op == op::change_admin) {
+        throw_unless(error::not_owner, equal_slices(sender_address, store::admin_address));
+        store::admin_address = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+
+    if (op == op::edit_content) {
+        throw_unless(error::not_owner, equal_slices(sender_address, store::admin_address));
+        store::content = in_msg_body~load_ref();
+        save_data();
+        return ();
+    }
+
+    if (op == op::set_oracle) {
+        throw_unless(error::not_owner, equal_slices(sender_address, store::admin_address));
+        store::oracle_address = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+
+    if (op == op::update_sell) {
+        throw_unless(error::not_owner, equal_slices(sender_address, store::admin_address));
+        cell new_sell_params = in_msg_body~load_ref();
+        slice sps = new_sell_params.begin_parse();
+        sps~load_int(1);
+        sps~load_uint(32);
+        sps~load_coins();
+        sps~load_uint(64);
+        sps~load_uint(16);
+        sps~load_uint(64);
+        sps.end_parse();
+        store::sell_params = new_sell_params;
+        store::stable_jettons = in_msg_body~load_ref();
+        save_data();
+        return ();
+    }
+
+    if (op == op::withdraw) {
+        throw_unless(error::not_owner, equal_slices(sender_address, store::admin_address));
+        slice target_address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        cell msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(target_address)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::withdraw, 32)
+            .end_cell();
+        send_raw_message(msg, 0);
+        return ();
+    }
+    if (op == op::withdraw_jettons) {
+        throw_unless(error::not_owner, equal_slices(sender_address, store::admin_address));
+        slice wallet_address = in_msg_body~load_msg_addr();
+        slice target_address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        send_tokens(wallet_address, target_address, amount);
+        return ();
+    }
+
+    throw(error::wrong_op);
+}
+
+() recv_external(slice in_msg) impure {
+    accept_message();
+    return ();
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    load_data();
+    return (store::total_supply, -1, store::admin_address, store::content, store::jetton_wallet_code);
+}
+
+(slice, cell, cell) get_settings() method_id {
+    load_data();
+    return (store::oracle_address, store::sell_params, store::stable_jettons);
+}
+
+(int, int, int, int, int, int) get_sale_settings() method_id {
+    load_data();
+    slice sps = store::sell_params.begin_parse();
+    return (
+        sps~load_int(1),
+        sps~load_uint(32),
+        sps~load_coins(),
+        sps~load_uint(64),
+        sps~load_uint(16),
+        sps~load_uint(64)
+    );
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    load_data();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), store::jetton_wallet_code);
+}
+
+(slice, int) get_pending_swap(int query_id) {
+    load_data();
+    (cell pending_swaps, slice value, int success) = store::pending_swaps.udict_delete_get?(64, query_id);
+    slice value = value~load_ref().begin_parse();
+    slice issuer_address = value~load_msg_addr();
+    int stored_amount = value~load_coins();
+    return (issuer_address, stored_amount);
+}
+
