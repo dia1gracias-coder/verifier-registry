@@ -1,0 +1,110 @@
+;; (~TONUSD) rate oracle by @psylopunk
+
+#pragma version >=0.3.0;
+
+#include "op-codes.fc";
+#include "send-modes.fc";
+
+const value_timeout = 4500; ;; 75 minutes
+
+
+{-
+    Storage
+    stored_value:Coins (? nanoTON = 1 USD)
+    last_update:uint64
+    public_key:uint256
+-}
+
+(int, int, int, int) load_data() impure {
+    var ds = get_data().begin_parse();
+    return (ds~load_coins(), ds~load_uint(64), ds~load_uint(32), ds~load_uint(256));
+}
+
+() save_data(int new_value, int last_update, int seqno, int public_key) impure {
+    set_data(
+        begin_cell()
+            .store_coins(new_value)
+            .store_uint(last_update, 64)
+            .store_uint(seqno, 32)
+            .store_uint(public_key, 256)
+            .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { return (); } ;; ignore all bounced messages
+    slice sender_address = cs~load_msg_addr();
+
+    throw_if(401, msg_value < 20000000); ;; 0.02 TON
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::get_rate) {
+        (int stored_value, int last_update, int seqno, int public_key) = load_data();
+        throw_unless(error::expired_value, last_update + value_timeout > now());
+        int query_id = in_msg_body~load_uint(64);
+
+        builder msg_body = begin_cell()
+            .store_uint(op::get_rate, 32)
+            .store_uint(query_id, 64)
+            .store_coins(stored_value);
+
+        var msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_builder(msg_body);
+
+        send_raw_message(msg.end_cell(), REVERT_ON_ERRORS | PAY_FEES_SEPARATELY | CARRY_REMAINING_GAS);
+        return ();
+    }
+
+    throw(error::wrong_op);
+}
+
+() recv_external(slice in_msg) impure {
+    slice signature = in_msg~load_bits(512);
+    var cs = in_msg;
+    (int valid_until, int seqno) = (cs~load_uint(64), cs~load_uint(32));
+    throw_if(32, valid_until <= now());
+    (int stored_value, int last_update, int stored_seqno, int public_key) = load_data();
+    throw_unless(33, seqno == stored_seqno);
+    throw_unless(35, check_signature(slice_hash(in_msg), signature, public_key));
+;;     throw_unless(33, last_update + 180 < now()); ;; min 3 min between updates
+    accept_message();
+    cs~touch();
+
+    int op = cs~load_uint(32);
+    if (op == op::delivery_rate) {
+        save_data(cs~load_coins(), now(), stored_seqno + 1, public_key);
+        return ();
+    }
+    elseif (op == op::edit_owner) {
+        save_data(stored_value, last_update, stored_seqno + 1, cs~load_uint(256));
+        return ();
+    }
+
+    save_data(stored_value, last_update, stored_seqno + 1, public_key);
+    return();
+}
+
+;; Get methods
+
+int get_seqno() method_id {
+    (_, _, int seqno, _) = load_data();
+    return seqno;
+}
+
+int get_public_key() method_id {
+    (_, _, _, int public_key) = load_data();
+    return public_key;
+}
+
+(int, int) get_rate() method_id {
+    (int stored_value, int last_update, _, _) = load_data();
+    return (stored_value, last_update);
+}
+
+
