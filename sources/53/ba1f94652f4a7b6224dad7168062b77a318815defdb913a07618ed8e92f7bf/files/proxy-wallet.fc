@@ -1,0 +1,78 @@
+;; xJetSwap proxy wallet contract by github.com/delpydoc
+
+const op::send = 0x27ce1d1;
+const op::upgrade = 0x7fef947;
+const op::transfer_notification = 0x7362d09c;
+
+global slice store::platform_address;
+global cell store::user_id;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    store::platform_address = ds~load_msg_addr();
+    store::user_id = ds~load_ref();
+    ds.end_parse();
+}
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_slice(store::platform_address)
+            .store_ref(store::user_id)
+            .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { return (); } ;; ignore all bounced messages
+    slice sender_address = cs~load_msg_addr();
+
+    load_data();
+    int op = slice_bits(in_msg_body) >= 32 ? in_msg_body~load_uint(32) : 0;
+
+    if (equal_slices(sender_address, store::platform_address)) {
+        if (op == op::send) {
+            while (in_msg_body.slice_refs()) {
+                var mode = in_msg_body~load_uint(8);
+                send_raw_message(in_msg_body~load_ref(), mode);
+            }
+            return ();
+        }
+
+        if (op == op::upgrade) {
+            cell new_code = in_msg_body~load_ref();
+            cell new_data = in_msg_body~load_ref();
+            set_code(new_code);
+            set_data(new_data);
+            return ();
+        }
+
+        return();
+    }
+
+    if (op != op::transfer_notification) {
+        cell msg_body = begin_cell()
+            .store_uint(0x746f6e73, 32)
+            .store_uint(my_balance, 64)
+            .store_ref(store::user_id)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(store::platform_address)
+            .store_coins(0)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body);
+
+        send_raw_message(msg.end_cell(), 2 + 128);
+    }
+
+    return();
+}
+
+;; Get methods
+int codebase_version() method_id {
+    return 101;
+}
