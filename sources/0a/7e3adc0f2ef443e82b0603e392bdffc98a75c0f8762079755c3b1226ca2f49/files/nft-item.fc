@@ -1,0 +1,72 @@
+int threshold() asm "3000000000 PUSHINT"; ;; 3 TON
+
+(int, int, slice, slice, slice) load_data() {
+    slice ds = get_data().begin_parse();
+    var (index, collection_address) = (ds~load_uint(64), ds~load_msg_addr());
+    if (ds.slice_bits() > 0) {
+      return (-1, index, collection_address, ds~load_msg_addr(), ds~load_msg_addr());
+    } else {
+      return (0, index, collection_address, null(), null()); ;; nft not initialized yet
+    }
+}
+
+() store_data(int index, slice collection_address, slice owner_address, slice operator_address) impure {
+    set_data(
+        begin_cell()
+            .store_uint(index, 64)
+            .store_slice(collection_address)
+            .store_slice(owner_address)
+            .store_slice(operator_address)
+            .end_cell()
+    );
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    (int init?, int index, slice collection_address, slice owner_address, slice operator_address) = load_data();
+
+    if (~ init?) {
+        throw_unless(405, equal_slices(collection_address, sender_address));
+        store_data(index, collection_address, in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr());
+        return ();
+    }
+
+    throw_unless(404, equal_slices(owner_address, sender_address));
+    throw_unless(400, msg_value >= threshold());
+
+    ;; HERE IF YOU SENT MORE THAN 3 TON TO THIS CONTRACT
+    ;; IT WILL BE SELF-DESTRUCTED
+
+    cell msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(operator_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(0, 32)
+               .end_cell();
+
+    send_raw_message(msg, 128 + 32); ;; send all and self-destroy
+    return ();
+}
+
+;;
+;;  GET Methods
+;;
+
+(int, int, slice, slice, cell) get_nft_data() method_id {
+    (int init?, int index, slice collection_address, slice owner_address, _) = load_data();
+
+    cell content = begin_cell()
+                     .store_slice("meta.json")
+                   .end_cell();
+
+    return (init?, index, collection_address, owner_address, content);
+}
