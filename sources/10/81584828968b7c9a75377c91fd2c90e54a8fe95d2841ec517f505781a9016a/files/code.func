@@ -1,0 +1,23 @@
+int workchains_equal?(slice addr1, slice addr2) asm "REWRITESTDADDR DROP SWAP REWRITESTDADDR DROP EQUAL";
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  slice cs = in_msg_full.begin_parse();
+  int flags = cs~load_uint(4);
+
+  if (flags & 1) { ;; ignore all bounced messages
+      return ();
+  }
+
+  slice sender = cs~load_msg_addr();
+
+  throw_if(666, workchains_equal?(sender, my_address()));
+
+  raw_reserve(1000000000, 0);
+
+  builder msg = begin_cell()
+    .store_uint(0x18, 6)
+    .store_slice(sender)
+    .store_uint(1, 4 + 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; first 4 bit - 0 Gram; last 2 bits == 01 -> init:(Maybe (Either StateInit ^StateInit)) body:(Either X ^X)
+    .store_ref(begin_cell().store_slice(in_msg_body).end_cell());
+  send_raw_message(msg.end_cell(), 128);
+}
