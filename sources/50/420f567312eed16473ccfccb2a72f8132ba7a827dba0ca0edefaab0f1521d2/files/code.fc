@@ -1,0 +1,486 @@
+;; Constants
+const app:owner_wallet = "EQDoIA20MF1qEcSPtROdCu5ukGx9dVjgMeJh1oQ4A4cf_Jif"a;
+const app:echo_contract = "kf-Dfdg-YQXaR2Q97gZJ4fGBtmV1DHOU1y1RPyyZZtRy_Ikh"a;
+const app:guaranteed_prize = 310800;
+const app:owner_fee_withdrawal = 250;
+const app:owner_fee = 10;
+
+const bet:062 =    1; const bet:072 =     5; const bet:082 =    15; const bet:092 =    35; const bet:102 =    70;
+const bet:063 =    5; const bet:073 =    23; const bet:083 =    65; const bet:093 =   145; const bet:103 =   280;
+const bet:064 =   30; const bet:074 =   110; const bet:084 =   266; const bet:094 =   530; const bet:104 =   940;
+const bet:065 = 2000; const bet:075 =  4150; const bet:085 =  6500; const bet:095 =  9110; const bet:105 = 12050;
+const bet:066 =    0; const bet:076 = 12000; const bet:086 = 24450; const bet:096 = 37450; const bet:106 = 51115;
+
+const bet:112 =   126; const bet:122 =   210; const bet:132 =   330; const bet:142 =    495; const bet:152 =    715;
+const bet:113 =   490; const bet:123 =   798; const bet:133 =  1230; const bet:143 =   1815; const bet:153 =   2585;
+const bet:114 =  1540; const bet:124 =  2380; const bet:134 =  3516; const bet:144 =   5010; const bet:154 =   6930;
+const bet:115 = 15400; const bet:125 = 19250; const bet:135 = 23700; const bet:145 =  28860; const bet:155 =  34850;
+const bet:116 = 65575; const bet:126 = 80975; const bet:136 = 97475; const bet:146 = 115250; const bet:156 = 134490;
+
+const bet:162 =   1001;
+const bet:163 =   3575;
+const bet:164 =   9350;
+const bet:165 =  41800;
+const bet:166 = 155400;
+
+const app:max_bet = 45;
+
+int workchains_equal?(slice addr1, slice addr2) asm "REWRITESTDADDR DROP SWAP REWRITESTDADDR DROP EQUAL";
+int slices_equal?(slice s1, slice s2) asm "SDEQ";
+
+
+int balance() inline_ref method_id {
+    return get_balance().pair_first();
+}
+
+(int, int, int, int, int, int) load_data() inline {
+    var ds = get_data().begin_parse();
+    var guaranteed_prize = ds~load_uint(256);
+    var owner_fee = ds~load_uint(64);
+    var game_played = ds~load_uint(64);
+    var out_amount = ds~load_uint(256);
+    var hash = ds~load_uint(256);
+    var bet = ds~load_uint(64);
+    return (guaranteed_prize, owner_fee, game_played, out_amount, hash, bet);
+}
+
+
+int getGuaranteedPrize() method_id {
+    var (guaranteed_prize, owner_fee, game_played, out_amount, hash, bet) = load_data();
+    return guaranteed_prize;
+}
+
+int getOwnerFee() method_id {
+    var (guaranteed_prize, owner_fee, game_played, out_amount, hash, bet) = load_data();
+    return owner_fee;
+}
+
+int getGamePlayed() method_id {
+    var (guaranteed_prize, owner_fee, game_played, out_amount, hash, bet) = load_data();
+    return game_played;
+}
+
+int getOutAmount() method_id {
+    var (guaranteed_prize, owner_fee, game_played, out_amount, hash, bet) = load_data();
+    return out_amount;
+}
+
+int getBet() method_id {
+    var (guaranteed_prize, owner_fee, game_played, out_amount, hash, bet) = load_data();
+    return bet;
+}
+
+int fact(int x) {
+    if (x == 0) {
+        return 1;
+    }
+    var y = 1;
+    var res = 1;
+    while (y != x + 1) {
+        res *= y;
+        y += 1;
+    }
+    return res;
+}
+
+() recv_internal (int contract_balance, int msg_value, cell in_msg_full, slice in_msg) impure {
+    var cs = in_msg_full.begin_parse();
+    int msg_hash = slice_hash(cs);
+    var flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    var (guaranteed_prize, owner_fee, game_played, out_amount, hash, bet) = load_data();
+    var new_bet = bet;
+    if (slices_equal?(sender_address, app:owner_wallet)) {
+        new_bet = msg_value;
+        set_data(
+                begin_cell()
+                        .store_uint(guaranteed_prize, 256)
+                        .store_uint(owner_fee, 64)
+                        .store_uint(game_played, 64)
+                        .store_uint(out_amount, 256)
+                        .store_uint(hash, 256)
+                        .store_uint(new_bet, 64)
+                        .end_cell()
+        );
+        return ();
+    }
+    if (slices_equal?(sender_address, app:echo_contract)) {
+        var true_sender = in_msg~load_msg_addr();
+        var true_value = in_msg~load_coins();
+        var op = in_msg~load_uint(32);
+
+        var new_guaranteed_prize = guaranteed_prize;
+        var current_owner_fee = true_value ^/ app:owner_fee;
+        var new_owner_fee = owner_fee + current_owner_fee;
+        var cur_balance = contract_balance;
+        if (guaranteed_prize < (app:guaranteed_prize * bet)) {
+            var fee_for_guaranteed_prize = current_owner_fee ^/ app:owner_fee;
+            new_guaranteed_prize = guaranteed_prize + fee_for_guaranteed_prize;
+            new_owner_fee -= fee_for_guaranteed_prize;
+        }
+        if ((new_owner_fee > (app:owner_fee_withdrawal * bet)) & (cur_balance - new_owner_fee > 0)) {
+            cell msg = begin_cell()
+                    .store_uint(0x18, 6)
+                    .store_slice(app:owner_wallet)
+                    .store_grams(new_owner_fee)
+                    .store_uint(0, 107)
+                    .end_cell();
+
+            accept_message();
+            send_raw_message(msg, 0);
+            cur_balance -= new_owner_fee;
+            new_owner_fee = 0;
+        }
+
+        hash = cell_hash(begin_cell()
+                .store_uint(hash, 256)
+                .store_uint(msg_hash, 256)
+                .store_uint(cur_lt(), 64)
+                .store_uint(now(), 64)
+                .end_cell()
+        );
+
+        if (true_value >= bet) {
+
+            randomize(hash);
+
+            var (c1, c2, c3, c4, c5, c6, pc1, pc2, pc3, pc4, pc5, pc6) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+            c1 = rand(app:max_bet) + 1;
+            pc1 = c1;
+            while ((c2 == 0) | (c2 == c1)) {
+                c2 = rand(app:max_bet) + 1;
+                pc2 = c2;
+            }
+            while ((c3 == 0) | (c3 == c1) | (c3 == c2)) {
+                c3 = rand(app:max_bet) + 1;
+                pc3 = c3;
+            }
+            while ((c4 == 0) | (c4 == c3) | (c4 == c2) | (c4 == c1)) {
+                c4 = rand(app:max_bet) + 1;
+                pc4 = c4;
+            }
+            while ((c5 == 0) | (c5 == c4) | (c5 == c3) | (c5 == c2) | (c5 == c1)) {
+                c5 = rand(app:max_bet) + 1;
+                pc5 = c5;
+            }
+            while ((c6 == 0) | (c6 == c5) | (c6 == c4) | (c6 == c3) | (c6 == c2) | (c6 == c1)) {
+                c6 = rand(app:max_bet) + 1;
+                pc6 = c6;
+            }
+
+            var size = slice_bits(in_msg);
+
+            var count_bits = size + 8;
+
+            if (count_bits % 24 == 0) {
+
+                var count = count_bits / 24;
+
+                if ((count > 5) & (count < 17)) {
+
+                    if ((bet * (fact(count) / fact(6) / fact(count - 6)) <= true_value)) {
+
+                        var res = 0;
+                        var true_num = 0;
+                        repeat ((size + 8) / 24) {
+                            var first = in_msg~load_uint(8);
+                            var second = in_msg~load_uint(8);
+                            res = ((first - 48) * 10) + (second - 48);
+                            if ((res == c1) & ((c1 == 0) == false)) {
+                                true_num += 1;
+                                c1 = 0;
+                            }
+                            if ((res == c2) & ((c2 == 0) == false)) {
+                                true_num += 1;
+                                c2 = 0;
+                            }
+                            if ((res == c3) & ((c3 == 0) == false)) {
+                                true_num += 1;
+                                c3 = 0;
+                            }
+                            if ((res == c4) & ((c4 == 0) == false)) {
+                                true_num += 1;
+                                c4 = 0;
+                            }
+                            if ((res == c5) & ((c5 == 0) == false)) {
+                                true_num += 1;
+                                c5 = 0;
+                            }
+                            if ((res == c6) & ((c6 == 0) == false)) {
+                                true_num += 1;
+                                c6 = 0;
+                            }
+                            if (slice_empty?(in_msg) == false) {
+                                in_msg~load_uint(8);
+                            }
+                        }
+
+                        cell msg_body_cell = begin_cell()
+                                .store_uint(0, 32)
+                                .store_uint((pc1 / 10) + 48, 8)
+                                .store_uint((pc1 % 10) + 48, 8)
+                                .store_uint(32, 8)
+                                .store_uint((pc2 / 10) + 48, 8)
+                                .store_uint((pc2 % 10) + 48, 8)
+                                .store_uint(32, 8)
+                                .store_uint((pc3 / 10) + 48, 8)
+                                .store_uint((pc3 % 10) + 48, 8)
+                                .store_uint(32, 8)
+                                .store_uint((pc4 / 10) + 48, 8)
+                                .store_uint((pc4 % 10) + 48, 8)
+                                .store_uint(32, 8)
+                                .store_uint((pc5 / 10) + 48, 8)
+                                .store_uint((pc5 % 10) + 48, 8)
+                                .store_uint(32, 8)
+                                .store_uint((pc6 / 10) + 48, 8)
+                                .store_uint((pc6 % 10) + 48, 8)
+                                .store_uint(32, 8)
+                                .store_uint(true_num + 48, 8)
+                                .store_uint(47, 8)
+                                .store_uint(6 + 48, 8)
+                                .end_cell();
+
+                        var prize = 0;
+                        if (true_num == 2) {
+                            if (count == 6) {
+                                prize = bet:062 * bet;
+                            }
+                            if (count == 7) {
+                                prize = bet:072 * bet;
+                            }
+                            if (count == 8) {
+                                prize = bet:082 * bet;
+                            }
+                            if (count == 9) {
+                                prize = bet:092 * bet;
+                            }
+                            if (count == 10) {
+                                prize = bet:102 * bet;
+                            }
+                            if (count == 11) {
+                                prize = bet:112 * bet;
+                            }
+                            if (count == 12) {
+                                prize = bet:122 * bet;
+                            }
+                            if (count == 13) {
+                                prize = bet:132 * bet;
+                            }
+                            if (count == 14) {
+                                prize = bet:142 * bet;
+                            }
+                            if (count == 15) {
+                                prize = bet:152 * bet;
+                            }
+                            if (count == 16) {
+                                prize = bet:162 * bet;
+                            }
+                        }
+                        if (true_num == 3) {
+                            if (count == 6) {
+                                prize = bet:063 * bet;
+                            }
+                            if (count == 7) {
+                                prize = bet:073 * bet;
+                            }
+                            if (count == 8) {
+                                prize = bet:083 * bet;
+                            }
+                            if (count == 9) {
+                                prize = bet:093 * bet;
+                            }
+                            if (count == 10) {
+                                prize = bet:103 * bet;
+                            }
+                            if (count == 11) {
+                                prize = bet:113 * bet;
+                            }
+                            if (count == 12) {
+                                prize = bet:123 * bet;
+                            }
+                            if (count == 13) {
+                                prize = bet:133 * bet;
+                            }
+                            if (count == 14) {
+                                prize = bet:143 * bet;
+                            }
+                            if (count == 15) {
+                                prize = bet:153 * bet;
+                            }
+                            if (count == 16) {
+                                prize = bet:163 * bet;
+                            }
+                        }
+                        if (true_num == 4) {
+                            if (count == 6) {
+                                prize = bet:064 * bet;
+                            }
+                            if (count == 7) {
+                                prize = bet:074 * bet;
+                            }
+                            if (count == 8) {
+                                prize = bet:084 * bet;
+                            }
+                            if (count == 9) {
+                                prize = bet:094 * bet;
+                            }
+                            if (count == 10) {
+                                prize = bet:104 * bet;
+                            }
+                            if (count == 11) {
+                                prize = bet:114 * bet;
+                            }
+                            if (count == 12) {
+                                prize = bet:124 * bet;
+                            }
+                            if (count == 13) {
+                                prize = bet:134 * bet;
+                            }
+                            if (count == 14) {
+                                prize = bet:144 * bet;
+                            }
+                            if (count == 15) {
+                                prize = bet:154 * bet;
+                            }
+                            if (count == 16) {
+                                prize = bet:164 * bet;
+                            }
+                        }
+                        if (true_num == 5) {
+                            if (count == 6) {
+                                prize = bet:065 * bet;
+                            }
+                            if (count == 7) {
+                                prize = bet:075 * bet;
+                            }
+                            if (count == 8) {
+                                prize = bet:085 * bet;
+                            }
+                            if (count == 9) {
+                                prize = bet:095 * bet;
+                            }
+                            if (count == 10) {
+                                prize = bet:105 * bet;
+                            }
+                            if (count == 11) {
+                                prize = bet:115 * bet;
+                            }
+                            if (count == 12) {
+                                prize = bet:125 * bet;
+                            }
+                            if (count == 13) {
+                                prize = bet:135 * bet;
+                            }
+                            if (count == 14) {
+                                prize = bet:145 * bet;
+                            }
+                            if (count == 15) {
+                                prize = bet:155 * bet;
+                            }
+                            if (count == 16) {
+                                prize = bet:165 * bet;
+                            }
+                        }
+                        if (true_num == 6) {
+                            if (count == 6) {
+                                prize = bet:066 * bet;
+                            }
+                            if (count == 7) {
+                                prize = bet:076 * bet;
+                            }
+                            if (count == 8) {
+                                prize = bet:086 * bet;
+                            }
+                            if (count == 9) {
+                                prize = bet:096 * bet;
+                            }
+                            if (count == 10) {
+                                prize = bet:106 * bet;
+                            }
+                            if (count == 11) {
+                                prize = bet:116 * bet;
+                            }
+                            if (count == 12) {
+                                prize = bet:126 * bet;
+                            }
+                            if (count == 13) {
+                                prize = bet:136 * bet;
+                            }
+                            if (count == 14) {
+                                prize = bet:146 * bet;
+                            }
+                            if (count == 15) {
+                                prize = bet:156 * bet;
+                            }
+                            if (count == 16) {
+                                prize = bet:166 * bet;
+                            }
+                        }
+
+                        var jackpot = cur_balance - new_guaranteed_prize - new_owner_fee;
+                        var mode = 1;
+                        if (true_num == 6) {
+                            var max = jackpot;
+                            if (jackpot < app:guaranteed_prize * bet) {
+                                max = app:guaranteed_prize * bet;
+                            }
+                            prize += max;
+                        }
+                        if (prize >= jackpot) {
+                            mode = 0;
+                            var need = prize - jackpot;
+                            if (new_guaranteed_prize >= need) {
+                                new_guaranteed_prize -= need;
+                            } else {
+                                new_guaranteed_prize = 0;
+                                prize = prize - need + new_guaranteed_prize;
+                            }
+                        }
+
+
+                        var msg = begin_cell()
+                                .store_uint(0x18, 6)
+                                .store_slice(true_sender)
+                                .store_grams(prize)
+                                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+                                .store_uint(1, 1)
+                                .store_ref(msg_body_cell)
+                                .end_cell();
+
+                        accept_message();
+                        send_raw_message(msg, mode);
+
+                        set_data(
+                                begin_cell()
+                                        .store_uint(new_guaranteed_prize, 256)
+                                        .store_uint(new_owner_fee, 64)
+                                        .store_uint(game_played + 1, 64)
+                                        .store_uint(out_amount + prize, 256)
+                                        .store_uint(hash, 256)
+                                        .store_uint(new_bet, 64)
+                                        .end_cell()
+                        );
+                    }
+                }
+            }
+        }
+        return ();
+    }
+    throw_unless(111, workchains_equal?(sender_address, my_address()));
+    if (msg_value >= bet) {
+        builder msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(app:echo_contract)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_slice(sender_address)
+                .store_coins(msg_value)
+                .store_slice(in_msg);
+        accept_message();
+        send_raw_message(msg.end_cell(), 64);
+    }
+}
