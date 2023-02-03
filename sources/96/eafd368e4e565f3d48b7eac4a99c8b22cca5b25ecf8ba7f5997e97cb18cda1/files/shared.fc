@@ -1,0 +1,30 @@
+int workchain() asm "0 PUSHINT";
+
+int slice_data_equal?(slice a, slice b) asm "SDEQ";
+
+() force_chain(slice addr) impure {
+	(int wc, _) = parse_std_addr(addr);
+	throw_unless(333, wc == workchain());
+}
+
+;; cell construct_internal_transfer_message(
+;; 	int query_id, int jetton_amount,
+;; 	slice owner_address, slice response_address,
+;; 	int forward_ton_amount, slice either_forward_payload
+;; ) inline {
+;; 	return begin_cell()
+;; 		.store_uint(op::internal_transfer(), 32)
+;; 		.store_uint(query_id, 64)
+;; 		.store_grams(jetton_amount)
+;; 		.store_slice(owner_address)
+;; 		.store_slice(response_address)
+;; 		.store_grams(forward_ton_amount)
+;; 		.store_slice(either_forward_payload)
+;; 		.end_cell();
+;; }
+
+;; var msg_body = construct_internal_transfer_message(
+;; 	query_id, jetton_amount,
+;; 	owner_address, response_address,
+;; 	forward_ton_amount, either_forward_payload
+;; );
