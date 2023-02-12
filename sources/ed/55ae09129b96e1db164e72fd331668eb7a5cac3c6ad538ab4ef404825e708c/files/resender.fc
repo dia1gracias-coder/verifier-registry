@@ -1,0 +1,71 @@
+#include "stdlib.fc";
+
+;; resender contract v1.1 by @LogPi
+
+;; storage
+global slice admin;  ;; admin address (owner)
+global int rent;  ;; fee management
+() load_data() impure inline {
+	;; init admin address and rent
+	slice ds = get_data().begin_parse();
+	admin = ds~load_msg_addr();
+	rent = ds~load_coins();
+	ds.end_parse();
+}
+() save_data(slice admin, int rent) impure inline {
+	;; change init data
+	begin_cell().store_slice(admin).store_coins(rent).end_cell().set_data();
+}
+() send_grams(slice address, int amount) impure inline {
+	;; normal transfer
+	begin_cell().store_uint(0x18, 6).store_slice(address).store_coins(amount).store_uint(0, 107).end_cell().send_raw_message(3);
+}
+
+;; message
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+	;; bounced messages
+	slice full = in_msg_full.begin_parse();
+	if (full~load_uint(4) & 1) {
+		return ();
+	}
+	
+	load_data();
+	int amount = my_balance - rent;
+	if (amount <= 0) {
+		return ();  ;; ignore
+	}
+	
+	;; admin
+	if (equal_slice_bits(full~load_msg_addr(), admin) & (~ in_msg_body.slice_empty?())) {
+		int op = in_msg_body~load_uint(32);
+		if (op == 1) {
+			;; change admin address
+			slice admin' = in_msg_body~load_msg_addr();
+			save_data(admin', rent);
+			send_grams(admin', amount);
+		}
+		if (op == 2) {
+			;; change rent fee
+			int rent' = in_msg_body~load_coins();
+			save_data(admin, rent');
+			send_grams(admin, my_balance - rent');
+		}
+		return ();  ;; accept coins if op was sth else
+	}
+	
+	send_grams(admin, amount);
+}
+
+;; getters
+slice owner() method_id {
+	load_data();
+	return admin;
+}
+int fee() method_id {
+	load_data();
+	return rent;
+}
+int meaning_of_life() method_id {
+	return 815;  ;; hope you undrestand the joke XD
+}
+
