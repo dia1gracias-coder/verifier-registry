@@ -1,0 +1,92 @@
+#include "stdlib.fc";
+
+;; coin multiplier contract v2.1 by @LogPi
+
+;; storage
+global slice admin; ;; owner address
+global int risk;  ;; fraction of pool available to use
+global int tax;  ;; fee management
+() load() impure inline {
+	;; init global variables
+	slice ds = get_data().begin_parse();
+	admin = ds~load_msg_addr();
+	risk = ds~load_uint(8);
+	tax = ds~load_coins();
+	ds.end_parse();
+}
+() save(slice admin, int risk, int tax) impure inline {
+	;; update data stored in blockchain
+	begin_cell().store_slice(admin)
+		.store_uint(risk, 8)
+		.store_coins(tax)
+		.end_cell().set_data();
+}
+() send(slice address, int amount) impure inline {
+	;; simple money transfer
+	begin_cell().store_uint(0x18, 6).store_slice(address)
+		.store_coins(amount)
+		.store_uint(0, 107).end_cell().send_raw_message(3);
+}
+
+;; messages
+() recv_internal(int balance, int value, cell full, slice body) impure {
+	;; bounced messages
+	slice s = full.begin_parse();
+	if (s~load_uint(4) & 1) {
+		return ();
+	}
+	
+	;; main
+	load();
+	int amount = value - tax;
+	slice sender = s~load_msg_addr();
+	if (amount <= 0) {
+		return ();  ;; ignore
+	}
+	if (body.slice_empty?()) {
+		if (amount <= (balance - value) / risk) {
+			if (rand(2)) {
+				;; rand(2) -> 0 or 1
+				send(sender, amount * 2);
+			}
+			return ();  ;; finished
+		}
+		send(sender, amount);  ;; send money back
+		return();
+	}
+	
+	;; admin
+	if (sender.equal_slice_bits(admin)) {
+		int op = body~load_uint(32);
+		if (op == 1) {
+			;; withdrow
+			send(admin, body~load_coins() + amount);
+		}
+		if (op == 2) {
+			;; change data
+			slice admin' = body~load_msg_addr();
+			save(admin', body~load_uint(8), body~load_coins());
+			send(admin', amount);
+		}
+	}
+}
+
+;; getters
+slice owner() method_id {
+	load();
+	return admin;
+}
+int maxbet() method_id {
+	;; this amount can change anytime
+	load();
+	var [balance, _] = get_balance();
+	return balance / risk;
+}
+int fee() method_id {
+	load();
+	return tax;
+}
+int test() method_id {
+	;; test your luck before doing it
+	return rand(2);
+}
