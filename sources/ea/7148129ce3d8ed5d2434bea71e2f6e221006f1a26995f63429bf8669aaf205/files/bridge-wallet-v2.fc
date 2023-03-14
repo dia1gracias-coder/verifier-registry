@@ -1,0 +1,141 @@
+;; v2 bridge wallet based on highload wallet
+;; Highload wallet description:
+;; Heavy-duty wallet for mass transfers (e.g., for cryptocurrency exchanges)
+;; accepts orders for up to 254 internal messages (transfers) in one external message
+;; this version does not use seqno for replay protection; instead, it remembers all recent query_ids
+;; in this way several external messages with different query_id can be sent in parallel
+
+#include "imports/stdlib.fc";
+
+const msg_validity_excno = 35;
+const body_length = 344;
+const short_body_length = 328;
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    var cs = in_msg_cell.begin_parse();
+    var flags = cs~load_uint(4); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+    if (flags & 1) {
+        return (); ;; ignore messages with bounced flag
+    }
+    if (in_msg.slice_bits() < 32) {
+        throw(msg_validity_excno);
+    }
+    int op = in_msg~load_uint(32);
+    if (op == 0x00000000) { ;; simple transfer with msg_body
+        int bits_length = in_msg.slice_bits();
+        throw_if(
+                msg_validity_excno,
+                (bits_length != body_length) &
+                (in_msg.slice_bits() != short_body_length)
+        );
+    }
+    return ();
+}
+
+;; extra#_ amount:Grams = Extra;
+;; addr_std$10 anycast:(## 1) {anycast = 0}
+;;       workchain_id:int8 address:bits256 = MsgAddrSmpl;
+;;
+;; transfer#_ mode:uint8 message:^(Message Any) = Transfer;
+;; in_msg#_ signature:bits512 subwallet_id:uint32 query_id:uint64
+;;    dict:(Hashmap 16 Transfer)
+;; c4#_ subwallet_id:uint32 last_cleaned:uint64 public_key:uint256
+;;      old_queries:(Hashmap 64 Empty)
+() recv_external(slice in_msg) impure {
+    var signature = in_msg~load_bits(512);
+    var cs = in_msg;
+    var (subwallet_id, query_id) =
+            (cs~load_uint(32), cs~load_uint(64));
+    var bound = (now() << 32);
+    throw_if(msg_validity_excno, query_id < bound);
+    var ds = get_data().begin_parse();
+    var (
+            stored_subwallet,
+            last_cleaned,
+            public_key,
+            old_queries
+    ) = (
+            ds~load_uint(32),
+            ds~load_uint(64),
+            ds~load_uint(256),
+            ds~load_dict()
+    );
+    ds.end_parse();
+    (_, var found?) = old_queries.udict_get?(64, query_id);
+    throw_if(32, found?);
+    throw_unless(34, subwallet_id == stored_subwallet);
+    throw_unless(
+            msg_validity_excno,
+            check_signature(
+                    slice_hash(in_msg),
+                    signature,
+                    public_key
+            )
+    );
+    var dict = cs~load_dict();
+    cs.end_parse();
+    accept_message();
+
+    ;; send messages
+    int i = -1;
+    do {
+        (i, var cs, var f) = dict.idict_get_next?(16, i);
+        if (f) {
+            var mode = cs~load_uint(8);
+            send_raw_message(cs~load_ref(), mode);
+        }
+    } until (~ f);
+
+    ;; clean up records expired more than 64 seconds ago
+    bound -= (64 << 32);
+    old_queries~udict_set_builder(64, query_id, begin_cell());
+    do {
+        var (old_queries', i, _, f) =
+                old_queries.udict_delete_get_min(64);
+        f~touch();
+        if (f) {
+            f = (i < bound);
+        }
+        if (f) {
+            old_queries = old_queries';
+            last_cleaned = i;
+        }
+    } until (~ f);
+
+    set_data(
+            begin_cell()
+            .store_uint(stored_subwallet, 32)
+            .store_uint(last_cleaned, 64)
+            .store_uint(public_key, 256)
+            .store_dict(old_queries)
+            .end_cell()
+    );
+}
+
+;; Get methods
+
+;; returns -1 for processed queries, 0 for unprocessed, 1 for unknown (forgotten)
+int processed?(int query_id) method_id {
+    var ds = get_data().begin_parse();
+    var (
+            _,
+            last_cleaned,
+            _,
+            old_queries
+    ) = (
+            ds~load_uint(32),
+            ds~load_uint(64),
+            ds~load_uint(256),
+            ds~load_dict()
+    );
+    ds.end_parse();
+    (_, var found) = old_queries.udict_get?(64, query_id);
+    return found ? true : - (query_id <= last_cleaned);
+}
+
+int get_public_key() method_id {
+    return get_data()
+            .begin_parse()
+            .skip_bits(32 + 64)
+            .preload_uint(256);
+}
