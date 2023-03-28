@@ -1,0 +1,852 @@
+const transfer_notification = 0x7362d09c;
+const int admin_w = 21542072284314865024506139043836950460176571023900388522981538411426827232543;
+const int commission_getter_w = 21542072284314865024506139043836950460176571023900388522981538411426827232543;
+
+const int time_plus = 86400;
+const workchain = 0;
+const int  maximum_numbs = 999999;
+const int  minimum_numbs = 100000;
+
+;; получение текущего баланса TON
+int balance() inline_ref method_id {
+    return get_balance().pair_first();
+}
+
+;;базовая ячейка памяти
+() save_data(int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+  cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) impure inline_ref
+{
+  set_data( begin_cell()
+    .store_int( statused , 16)
+    .store_uint( time_fin , 32)
+    .store_uint( round_number_now , 32)
+    .store_grams( price_ticket )
+    .store_uint( win_combo, 32)
+    .store_dict(utils_info)
+    .store_dict(ticket_users)
+    .store_dict(payment_info_cl)
+    .store_dict(history_rounds)
+
+  .end_cell());
+}
+
+;;распаковка базовой ячейки памяти
+_ unpack_data() inline_ref {
+  var ds = begin_parse(get_data());
+  var res = (
+    ds~load_int(16),      ;; statused
+    ds~load_uint(32),     ;; time_fin
+    ds~load_uint(32),     ;; round_number_now
+    ds~load_grams(),      ;; price_ticket
+    ds~load_uint(32),     ;; win_combo
+    ds~load_dict(),       ;; utils_info
+    ds~load_dict(),       ;; ticket_users
+    ds~load_dict(),       ;; payment_info_cl
+    ds~load_dict()        ;; history_rounds
+  );
+  ds.end_parse();
+  return res;
+}
+
+builder pack_utils_info(cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) inline_ref {
+  return begin_cell()
+    .store_dict(jetton_info)
+    .store_dict(discount_list)
+    .store_coins(jetton_balance)
+    .store_slice(commission_getter_sl);
+}
+
+(cell, cell, int, slice) unpack_utils_info(slice utils_info_sl) inline_ref {
+  return (
+    utils_info_sl~load_dict(), ;; jetton_info
+    utils_info_sl~load_dict(), ;; discount_list
+    utils_info_sl~load_coins(), ;; jetton_balance
+    utils_info_sl~load_msg_addr() ;; commission_getter_sl
+  );
+}
+
+builder pack_jetton_info(slice jetton_master_address, cell jetton_wallet_code) inline_ref {
+  return begin_cell()
+    .store_slice(jetton_master_address)
+    .store_dict(jetton_wallet_code);
+}
+
+(slice, cell) unpack_jetton_info(slice jetton_info_sl) inline_ref {
+  return (
+    jetton_info_sl~load_msg_addr(),  ;; jetton_master_address
+    jetton_info_sl~load_dict()  ;; jetton_wallet_code
+  );
+}
+
+cell pack_jetton_wallet_data(int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+   return  begin_cell()
+            .store_coins(balance)
+            .store_slice(owner_address)
+            .store_slice(jetton_master_address)
+            .store_ref(jetton_wallet_code)
+           .end_cell();
+}
+
+cell calculate_jetton_wallet_state_init(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(jetton_wallet_code)
+          .store_dict(pack_jetton_wallet_data(0, owner_address, jetton_master_address, jetton_wallet_code))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_jetton_wallet_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(workchain, 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+slice calculate_user_jetton_wallet_address(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+  return calculate_jetton_wallet_address(calculate_jetton_wallet_state_init(owner_address, jetton_master_address, jetton_wallet_code));
+}
+
+int send_jettons( int jetton_amount, slice sender_addr) impure inline {
+
+        (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+        cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+        (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+
+        (slice jetton_master_address, cell jetton_wallet_code) =  unpack_jetton_info(begin_parse(jetton_info));
+        slice jetton_addr_sender_addr = calculate_user_jetton_wallet_address( sender_addr, jetton_master_address, jetton_wallet_code);
+        slice jetton_addr_contract = calculate_user_jetton_wallet_address( my_address(), jetton_master_address, jetton_wallet_code);
+
+        if(jetton_balance - jetton_amount > 0 | (jetton_balance - jetton_amount == 0)) {
+
+            cell body = begin_cell()
+                .store_uint(0xf8a7ea5, 32)
+                .store_uint(now(), 64)
+                .store_coins(jetton_amount)
+                .store_slice(sender_addr)
+                .store_slice(jetton_addr_sender_addr )
+                .store_int(0, 1)
+                .store_coins(100000) ;; 100000
+                .store_uint(0, 1)
+                .end_cell();
+
+            cell msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(jetton_addr_contract)
+                .store_coins(150000000) ;; 60000000
+                .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_ref(body)
+                .end_cell();
+
+            send_raw_message(msg, 3);
+
+            jetton_balance -= jetton_amount;
+        }
+        return jetton_balance;
+
+}
+
+builder pack_user_ticket( int ticket, int address_user, slice address_users_sl, int coincidences_count, int user_pay) inline_ref {
+    return begin_cell()
+        .store_int(ticket, 32)
+        .store_uint(address_user, 256)
+        .store_slice(address_users_sl)
+        .store_uint(coincidences_count, 32)
+        .store_grams(user_pay);
+}
+
+(int, int, slice, int, int) unpack_user_ticket(slice ticket_users_sl) inline_ref {
+    return (
+        ticket_users_sl~load_int(32),       ;; ticket
+        ticket_users_sl~load_uint(256),     ;; address_user
+        ticket_users_sl~load_msg_addr(),    ;; address_users_sl
+        ticket_users_sl~load_uint(32),      ;; coincidences_count
+        ticket_users_sl~load_grams()        ;; user_pay
+    );
+}
+
+builder pack_payment_info_round(int id_start, int cc_1, int cc_2, int cc_3, int cc_4, int cc_5, int cc_6, cell payment_info) inline_ref {
+    return begin_cell()
+    .store_uint(id_start, 32)
+    .store_uint(cc_1, 32)
+    .store_uint(cc_2, 32)
+    .store_uint(cc_3, 32)
+    .store_uint(cc_4, 32)
+    .store_uint(cc_5, 32)
+    .store_uint(cc_6, 32)
+    .store_dict(payment_info);
+}
+
+(int, int, int, int, int, int, int, cell) unpack_payment_info_round(slice payment_info_round_sl) inline_ref {
+    return (
+        payment_info_round_sl~load_uint(32),        ;; id_start
+        payment_info_round_sl~load_uint(32),        ;; cc_1
+        payment_info_round_sl~load_uint(32),        ;; cc_2
+        payment_info_round_sl~load_uint(32),        ;; cc_3
+        payment_info_round_sl~load_uint(32),        ;; cc_4
+        payment_info_round_sl~load_uint(32),        ;; cc_5
+        payment_info_round_sl~load_uint(32),        ;; cc_6
+        payment_info_round_sl~load_dict()          ;; payment_info
+    );
+}
+
+() send_grams(int addr, int grams, var messages) impure inline_ref {
+  var message = begin_cell()
+        .store_uint(196, 9)
+        .store_int(0, 8)
+        .store_uint(addr, 256)
+        .store_grams(grams)
+        .store_uint(0, 107)
+        .store_uint(0, 32)
+        .store_slice(messages)
+        .end_cell();
+
+  send_raw_message(message, 3);
+}
+
+;; получение баланса jetton
+int get_jetton_balance() method_id {
+    (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+    cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+    (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+
+    return jetton_balance;
+}
+
+;; получение скидки юзера
+int get_discount_user(int wallet_addr) method_id {
+    (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+        cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+    (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+    var (discount_obj, found?) = discount_list.udict_get?(256, wallet_addr);
+    if(found?) {
+        return discount_obj~load_uint(32);
+    } else {
+        return 0;
+    }
+}
+
+;; генерация одного номера билета
+int generate_number_ones(int coef) inline_ref method_id {
+    int flgs = 0;
+    int ticker_0 = 0;
+
+    while(flgs == 0) {
+        randomize(coef + now() + balance());
+        ticker_0 = rand(maximum_numbs);
+        if(ticker_0 <= maximum_numbs){
+            if (ticker_0 - minimum_numbs < 0) {
+                ticker_0 = (ticker_0 + minimum_numbs) * -1;
+            }
+            flgs = 1;
+        }
+    }
+    return ticker_0;
+}
+
+;; генерация пака билетов
+var generate_tickets(int coef, int count) inline_ref method_id {
+    var lis_t = empty_tuple();
+    int count_m = count;
+    int coef_0 = coef;
+    if(count > 254) {
+        count_m = 254;
+    }
+    while(count_m > 0) {
+        randomize(coef_0 + now() + balance() + count_m);
+        int ticker_0 = generate_number_ones(coef_0);
+        coef_0 = ticker_0 + 999999;
+        lis_t~tpush(ticker_0);
+        count_m -= 1;
+    }
+    return lis_t;
+}
+
+;; инициализация
+() initialization(slice jetton_master_address, cell jetton_wallet_code, int jetton_balance, slice commission_getter_sl_0 ) impure {
+  cell jetton_info = pack_jetton_info( jetton_master_address,  jetton_wallet_code).end_cell();
+
+  cell utils_info = pack_utils_info( jetton_info, new_dict(),0, commission_getter_sl_0).end_cell();
+  save_data( 0, now() + time_plus, 1, 70000000, 0,
+    utils_info, new_dict(), new_dict(), new_dict());
+
+}
+
+(int, int, int, int, int, int, int, cell) get_cc_count_results(cell payment_info_cl) inline_ref {
+    int id_start = 0;
+    int cc_1 = 0;
+    int cc_2 = 0;
+    int cc_3 = 0;
+    int cc_4 = 0;
+    int cc_5 = 0;
+    int cc_6 = 0;
+    cell payment_amnt_cl = new_dict();
+
+    ifnot (cell_null?(payment_info_cl)) {
+        ( id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl) = unpack_payment_info_round(begin_parse(payment_info_cl));
+    }
+
+    return (id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl);
+}
+
+;;  расчет совпадений номеров билета к win номеру
+var check_ticket_coincidences(int user_ticket, int win_ticket) inline_ref method_id  {
+    int count = 0;
+    int i = 0;
+
+    int win_combo_sv = win_ticket;
+    int usr_combo_sv = user_ticket;
+
+    int negative_win = 0;
+    int negative_user = 0;
+
+    if(win_ticket < 0) {
+        negative_win = 1;
+        win_combo_sv = win_ticket * -1;
+    }
+    if(user_ticket < 0) {
+        negative_user = 1;
+        usr_combo_sv = user_ticket * -1;
+    }
+
+    while(i < 6) {
+        (int com_i_w, int res_w ) = win_combo_sv /% 10;
+        (int com_i_u, int res_u ) = usr_combo_sv /% 10;
+        usr_combo_sv = com_i_u;
+        win_combo_sv = com_i_w;
+
+        if(res_w == res_u){
+            if(i == 5) {
+                if(negative_user == negative_win) {
+                    count += 1;
+                }
+            } else {
+                count += 1;
+            }
+        }
+        i  += 1;
+    }
+    return count;
+}
+
+int admin_controll( int addr, slice in_msg_body) impure {
+  if(addr == admin_w) {
+    int comand_code = in_msg_body~load_uint(32);
+    ;; инициализация
+      if(comand_code == 1000) {
+        slice jetton_master_address = in_msg_body~load_msg_addr();
+        cell jetton_wallet_code = in_msg_body~load_dict();
+        slice commission_getter_sl = in_msg_body~load_msg_addr();
+        initialization(jetton_master_address, jetton_wallet_code, 0, commission_getter_sl);
+      } else {
+           (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+          cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+          ;; добавление и обновление скидок юзеров
+            if(comand_code == 1001){
+                var list_c = in_msg_body~load_dict();
+                (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+
+                var id = -1;
+                do {
+                    (id, var cs, var f) = list_c.udict_get_next?(32, id);
+                    if (f) {
+                        var (wallet_user, count_discount) = (cs~load_msg_addr(), cs~load_uint(32));
+                        (int wallet_wc, int wallet_addr) = parse_std_addr(wallet_user);
+                        discount_list~udict_set_builder(256, wallet_addr, begin_cell().store_uint(count_discount, 32));
+                    }
+                } until (~ f);
+                    cell utils_info_n  = pack_utils_info( jetton_info, discount_list, jetton_balance, commission_getter_sl).end_cell();
+                    save_data( statused, time_fin, round_number_now, price_ticket, win_combo,
+                    utils_info_n, ticket_users, payment_info_cl, history_rounds);
+                return 0;
+            }
+
+            ;; апдейт стоимости билета
+            if(comand_code == 1002){
+              int new_price_tickets = in_msg_body~load_coins();
+              save_data( statused, time_fin, round_number_now, new_price_tickets, win_combo,
+                    utils_info, ticket_users, payment_info_cl, history_rounds);
+                return 0;
+            }
+
+            ;; миграция баланса IDU контракта
+            if(comand_code == 1004){
+              int out_amount_jetton = in_msg_body~load_coins();
+
+              (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+
+              jetton_balance = send_jettons( out_amount_jetton, commission_getter_sl);
+              cell utils_info_n =  pack_utils_info( jetton_info, discount_list, jetton_balance,  commission_getter_sl).end_cell();
+              save_data( statused, time_fin, round_number_now, price_ticket, win_combo,
+                    utils_info_n, ticket_users, payment_info_cl, history_rounds);
+                    return 0;
+            }
+
+            ;; миграция баланса ТОН контракта
+            if(comand_code == 1005){
+              send_grams(admin_w, balance() - 10000000, "Migrate Lotteton");
+              return 0;
+            }
+
+            ;; апдейт суммы пула из api команды
+            if(comand_code == 1006) {
+                int new_jetton_balance = in_msg_body~load_coins();
+                (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+
+                cell utils_info_n = pack_utils_info( jetton_info, discount_list, new_jetton_balance,  commission_getter_sl).end_cell();
+                save_data( statused, time_fin, round_number_now, price_ticket, win_combo,
+                    utils_info_n, ticket_users, payment_info_cl, history_rounds);
+                  return 0;
+            }
+
+            if(comand_code == 1007) {
+                int new_status = in_msg_body~load_uint(32); ;; 0, 1, 2, 3, 4
+                var time_now = now();
+
+                save_data(0, time_now + time_plus, round_number_now + 1, price_ticket, 0,
+                    utils_info, new_dict(), new_dict(), history_rounds);
+
+                return 0;
+            }
+      }
+  }
+  return 1;
+}
+
+() recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+
+    ifnot (in_msg_body.slice_empty?()) {
+
+        var cs = in_msg_full.begin_parse();
+        cs~skip_bits(4);
+        slice sender_address = cs~load_msg_addr();
+        (int src_wc, int src_addr) = parse_std_addr(sender_address);
+
+        if (admin_controll(src_addr, in_msg_body) == 1) {
+            (int op, int query_id) = (in_msg_body~load_uint(32), in_msg_body~load_uint(64));
+
+        ;; пополнение кошелька jetton баланса пула
+        if (op == transfer_notification) {
+
+            (int jetton_amount, slice from_user, cell ref_cs) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_ref());
+            slice ref_ds = ref_cs.begin_parse();
+
+            (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+            cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+            (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+            jetton_balance += jetton_amount; ;; ап баланса токена на пуле
+
+            cell utils_info_n = pack_utils_info( jetton_info, discount_list, jetton_balance, commission_getter_sl).end_cell();
+
+            save_data( statused, time_fin, round_number_now, price_ticket, win_combo,
+                utils_info_n, ticket_users, payment_info_cl, history_rounds);
+
+            ;; получение максимального айдишника среди уже сохраненных билетов
+            int id_u = 0;
+            var (max_id, id_max, f_max_id) = ticket_users.udict_get_max?(32);
+            if(f_max_id) {
+                id_u = max_id;
+            }
+
+            slice usrs_addres_sl = ref_ds~load_msg_addr();
+            slice buyer_addres_sl = ref_ds~load_msg_addr();
+            var list_c = ref_ds~load_dict();
+
+            (int buyer_wc, int src_buyer_addr) = parse_std_addr(buyer_addres_sl);
+            (int src_wc, int src_addr) = parse_std_addr(usrs_addres_sl);
+            int price_ticket_p = price_ticket;
+
+            int discount_count = get_discount_user(src_buyer_addr);
+
+            if(discount_count > 0) {
+                price_ticket_p = price_ticket - ( price_ticket * discount_count ~/ 100);
+            }
+
+            (int count_ticket, int back_gramm ) =  jetton_amount /% price_ticket_p;
+
+            if(count_ticket > 0 ) {
+                var id = -1;
+                do {
+                    (id, var cs, var f) = list_c.udict_get_next?(32, id);
+                    if (f) {
+                        if(count_ticket > -1) {
+                            var ticket_u = cs~load_int(32);
+                            builder user_pack_0 = pack_user_ticket( ticket_u, src_addr, usrs_addres_sl, 0, price_ticket_p);
+                            id_u += 1;
+                            ticket_users~udict_set_builder(32, id_u, user_pack_0);
+                            count_ticket -= 1;
+                        }
+                    }
+                } until (~ f);
+            } else {
+                send_grams(admin_w, 1000000, "count_ticket  == 0test 001");
+            }
+
+            save_data( statused, time_fin, round_number_now, price_ticket, win_combo,
+                utils_info_n, ticket_users, payment_info_cl, history_rounds);
+        }
+    }
+  }
+}
+
+
+() recv_external(slice in_msg) impure {
+  ;; pre settings
+  int coef = in_msg~load_uint(32);
+  var time_now = now();
+  (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+  cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+  throw_if(35, time_fin >= time_now);
+    accept_message();
+
+  if(statused == 0 ) {
+        win_combo = generate_number_ones(coef);
+
+        save_data(1, time_fin, round_number_now, price_ticket, win_combo,
+            utils_info, ticket_users, payment_info_cl, history_rounds);
+        commit();
+  }
+
+  if (statused == 1) { ;; подсчет количества выигрыша на совпадения
+        var (max_id, id_max_cs, f_max_id) = ticket_users.udict_get_max?(32);
+
+        if(f_max_id) {
+            var (id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl) = get_cc_count_results(payment_info_cl);
+
+            var id = id_start + 1;
+
+            var (user_combo, found?) = ticket_users.udict_get?(32, id);
+
+            if(found?) {
+                ( int ticket_user, int address_user, slice address_users_sl, int coincidences_count, int user_pay) = unpack_user_ticket(user_combo);
+                int ticket_coincidences_count = check_ticket_coincidences(ticket_user, win_combo);
+
+                if(ticket_coincidences_count > 0) {
+                    ticket_users~udict_set_builder(32, id, pack_user_ticket(ticket_user, address_user, address_users_sl, ticket_coincidences_count, user_pay));
+                } else {
+                    ticket_users~udict_delete?(32, id);
+                }
+
+                if(ticket_coincidences_count == 1) { cc_1 += 1; }
+
+                if (ticket_coincidences_count == 2) { cc_2 += 1;}
+
+                if (ticket_coincidences_count == 3) { cc_3 += 1;}
+
+                if (ticket_coincidences_count == 4) { cc_4 += 1; }
+
+                if(ticket_coincidences_count == 5) { cc_5 += 1; }
+
+                if(ticket_coincidences_count == 6) { cc_6 += 1; }
+
+                cell payment_info_cl_rb = pack_payment_info_round(id, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl).end_cell();
+
+                save_data(1, time_fin, round_number_now, price_ticket, win_combo,
+                utils_info, ticket_users, payment_info_cl_rb, history_rounds);
+                commit();
+
+            } else {
+                     ;; расчет выплат на совпадения
+                    (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+
+                    if(jetton_balance > 0) {
+                        int full_balance_c01 = jetton_balance;
+                        int admin_pull_fee_c01 = (full_balance_c01 * 10) ~/ 100;
+                        int users_win_pull_c01 = full_balance_c01 - admin_pull_fee_c01;
+                        send_jettons( admin_pull_fee_c01, commission_getter_sl);
+
+                        int pay_cc_1 = 0;
+                        int pay_cc_2 = 0;
+                        int pay_cc_3 = 0;
+                        int pay_cc_4 = 0;
+                        int pay_cc_5 = 0;
+                        int pay_cc_6 = 0;
+
+                        pay_cc_1 = price_ticket;
+
+                        if(cc_2 != 0) {
+                            pay_cc_2 = ((users_win_pull_c01 * 5) ~/ 100) ~/ cc_2;
+                        } else {
+                            pay_cc_2 = ((users_win_pull_c01 * 5) ~/ 100) ~/ 1;
+                        }
+
+                        if(cc_3 != 0) {
+                            pay_cc_3 = ((users_win_pull_c01 * 10) ~/ 100) ~/ cc_3;
+                        } else {
+                            pay_cc_3 = ((users_win_pull_c01 * 10) ~/ 100) ~/ 1;
+                        }
+
+                        if(cc_4 != 0) {
+                            pay_cc_4 = ((users_win_pull_c01 * 15) ~/ 100) ~/ cc_4;
+                        } else {
+                            pay_cc_4 = ((users_win_pull_c01 * 15) ~/ 100) ~/ 1;
+                        }
+
+                        if(cc_5 != 0) {
+                            pay_cc_5 = ((users_win_pull_c01 * 25) ~/ 100) ~/ cc_5;
+                        } else {
+                            pay_cc_5 = ((users_win_pull_c01 * 25) ~/ 100) ~/ 1;
+                        }
+
+                        if(cc_6 != 0) {
+                            pay_cc_6 = ((users_win_pull_c01 * 45) ~/ 100) ~/ cc_6;
+                        } else {
+                            pay_cc_6 = ((users_win_pull_c01 * 45) ~/ 100) ~/ 1;
+                        }
+
+                        builder bld_pay_info = begin_cell()
+                            .store_grams(users_win_pull_c01)
+                            .store_grams(pay_cc_1)
+                            .store_grams(pay_cc_2)
+                            .store_grams(pay_cc_3)
+                            .store_grams(pay_cc_4)
+                            .store_grams(pay_cc_5)
+                            .store_grams(pay_cc_6);
+
+                        cell payment_amnt_cl_rb = bld_pay_info.end_cell();
+
+                        payment_info_cl = pack_payment_info_round(0, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl_rb).end_cell();
+                        utils_info = pack_utils_info( jetton_info, discount_list, users_win_pull_c01, commission_getter_sl).end_cell();
+                    }
+
+                    save_data(2, time_fin, round_number_now, price_ticket, win_combo,
+                    utils_info, ticket_users, payment_info_cl, history_rounds);
+                    commit();
+                }
+        } else {
+            (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+            int full_balance_c01 = jetton_balance;
+
+            if(full_balance_c01 > 0) {
+                int admin_pull_fee_c01 = (full_balance_c01 * 10) ~/ 100;
+                int users_win_pull_c01 = full_balance_c01 - admin_pull_fee_c01;
+
+                builder bld_pay_info = begin_cell()
+                    .store_grams(users_win_pull_c01)
+                    .store_grams(price_ticket)
+                    .store_grams(((users_win_pull_c01 * 5) ~/ 100) ~/ 1)
+                    .store_grams(((users_win_pull_c01 * 10) ~/ 100) ~/ 1)
+                    .store_grams(((users_win_pull_c01 * 15) ~/ 100) ~/ 1)
+                    .store_grams(((users_win_pull_c01 * 25) ~/ 100) ~/ 1)
+                    .store_grams(((users_win_pull_c01 * 45) ~/ 100) ~/ 1);
+
+                cell payment_amnt_cl_rb = bld_pay_info.end_cell();
+
+                payment_info_cl = pack_payment_info_round(0, 0, 0, 0, 0, 0, 0, payment_amnt_cl_rb).end_cell();
+                utils_info = pack_utils_info( jetton_info, discount_list, jetton_balance, commission_getter_sl).end_cell();
+
+            }
+
+            save_data(2, time_fin, round_number_now, price_ticket, win_combo,
+            utils_info, ticket_users, payment_info_cl, history_rounds);
+            commit();
+
+        }
+    }
+
+    if(statused == 2 ) { ;; сохраняем и удаляем старые истории раунда
+
+        builder history_round_infos_bld = begin_cell()
+            .store_uint(time_fin, 32)
+            .store_int(win_combo, 32)
+            .store_dict(ticket_users)
+            .store_dict(payment_info_cl);
+
+        history_rounds~udict_set_builder(32, round_number_now, history_round_infos_bld);
+        int delt_round = round_number_now - 3;
+
+        if(delt_round > 0) {
+            history_rounds~udict_delete?(32, delt_round);
+        }
+
+        save_data(3, time_fin, round_number_now, price_ticket, win_combo,
+        utils_info, ticket_users, payment_info_cl, history_rounds);
+        commit();
+    }
+
+     if(statused == 3 ) { ;; рассылка
+
+        var (min_id_tickets_users, val_min_tickets_users, f_min_val_tickets_users) = ticket_users.udict_get_min?(32);
+        cell utils_info_n = utils_info;
+
+        if(f_min_val_tickets_users) {
+            var (id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl) = get_cc_count_results(payment_info_cl);
+            slice payment_amnt_sl = begin_parse(payment_amnt_cl);
+
+            var (users_win_pull, pay_cc_1, pay_cc_2, pay_cc_3, pay_cc_4, pay_cc_5, pay_cc_6) = (
+                payment_amnt_sl~load_grams(),   ;; users_win_pull
+                payment_amnt_sl~load_grams(),   ;; pay_cc_1
+                payment_amnt_sl~load_grams(),   ;; pay_cc_2
+                payment_amnt_sl~load_grams(),   ;; pay_cc_3
+                payment_amnt_sl~load_grams(),   ;; pay_cc_4
+                payment_amnt_sl~load_grams(),   ;; pay_cc_5
+                payment_amnt_sl~load_grams());  ;; pay_cc_6
+
+            var id = min_id_tickets_users - 1;
+
+            (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info_n));
+
+            do {
+                (id, var cs, var f) = ticket_users.udict_get_next?(32, id);
+                if (f) {
+                    ( int ticket, int address_user, slice address_users_sl, int coincidences_count, int user_pay) = unpack_user_ticket(cs);
+
+                    int pay_win_amount = 0;
+                    if(coincidences_count == 1 & (cc_2 == 0) & (cc_3 == 0) & (cc_4 == 0) & (cc_5 == 0) & (cc_6 == 0)) {
+                        pay_win_amount = user_pay;
+                    } else {
+                        if(coincidences_count == 2 ) {
+                            pay_win_amount = pay_cc_2;
+                        }
+                        if(coincidences_count == 3 ) {
+                            pay_win_amount = pay_cc_3;
+                        }
+                        if(coincidences_count == 4 ) {
+                            pay_win_amount = pay_cc_4;
+                        }
+                        if(coincidences_count == 5 ) {
+                            pay_win_amount = pay_cc_5;
+                        }
+                        if(coincidences_count == 6 ) {
+                            pay_win_amount = pay_cc_6;
+                        }
+                    }
+
+                    if(pay_win_amount > 0) {
+                        jetton_balance =  send_jettons( pay_win_amount, address_users_sl);
+                    }
+                }
+            } until (~ f);
+
+            utils_info_n = pack_utils_info( jetton_info, discount_list, jetton_balance,  commission_getter_sl).end_cell();
+        }
+
+        save_data(4, time_fin, round_number_now, price_ticket, win_combo,
+          utils_info_n, ticket_users, payment_info_cl, history_rounds);
+
+        commit();
+    }
+
+    if(statused == 4 ) { ;; переключаем раунд
+      save_data(0, time_now + time_plus, round_number_now + 1, price_ticket, 0,
+          utils_info, new_dict(), new_dict(), history_rounds);
+      commit();
+    }
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; method_id
+
+;; получение базовой инфы раунда текущего
+var round_info_main() method_id {
+    (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+    cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+    var (max_id, id_max, f_max_id) = ticket_users.udict_get_max?(32);
+    int id_u_max = 0;
+    if(f_max_id) {
+        id_u_max = max_id;
+    }
+
+    (cell jetton_info, cell discount_list, int jetton_balance, slice commission_getter_sl) = unpack_utils_info(begin_parse(utils_info));
+
+    return [ statused, time_fin, round_number_now, price_ticket, win_combo, id_u_max, jetton_balance];
+}
+
+;; получение списка текущих билетов раунда до 250
+var get_ticket_users_250(int startIndexes) method_id {
+      (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+  cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+    var lis_t = empty_tuple();
+    int stops_ids = startIndexes + 250;
+    int sees_id = startIndexes;
+
+    do {
+        (sees_id, var cs_tickets, var f) = ticket_users.udict_get_next?(32, sees_id);
+        if (f) {
+            if(sees_id < (stops_ids + 1)) {
+                ( int ticket_user, int address_user, slice address_users_sl, int coincidences_count, int user_pay) = unpack_user_ticket(cs_tickets);
+                lis_t~tpush([ sees_id, ticket_user, address_user, coincidences_count, user_pay]);
+            } else {
+                return lis_t;
+            }
+        }
+    } until (~ f);
+
+    return lis_t;
+}
+
+;; получение информации о соотношении win билетов раунде из истории
+var get_history_amnt_round(int round_fnd) method_id {
+      (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+  cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+    var (history_round_sl, found_history_round?) = history_rounds.udict_get?(32, round_fnd);
+
+    if(found_history_round?) {
+        var (time_fin_h, win_combo_h, ticket_users, payment_info_cl) = (
+            history_round_sl~load_uint(32),
+            history_round_sl~load_int(32),
+            history_round_sl~load_dict(),
+            history_round_sl~load_dict()
+        );
+
+        ifnot (cell_null?(payment_info_cl)) {
+            var (id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl) = get_cc_count_results(payment_info_cl);
+            slice payment_amnt_sl = begin_parse(payment_amnt_cl);
+
+            var (users_win_pull, pay_cc_1, pay_cc_2, pay_cc_3, pay_cc_4, pay_cc_5, pay_cc_6) = (
+                payment_amnt_sl~load_grams(),   ;; users_win_pull
+                payment_amnt_sl~load_grams(),   ;; pay_cc_1
+                payment_amnt_sl~load_grams(),   ;; pay_cc_2
+                payment_amnt_sl~load_grams(),   ;; pay_cc_3
+                payment_amnt_sl~load_grams(),   ;; pay_cc_4
+                payment_amnt_sl~load_grams(),   ;; pay_cc_5
+                payment_amnt_sl~load_grams());  ;; pay_cc_6
+
+            return [[round_fnd, time_fin_h, win_combo_h],[users_win_pull, pay_cc_1, pay_cc_2, pay_cc_3, pay_cc_4, pay_cc_5, pay_cc_6], [cc_1, cc_2, cc_3, cc_4, cc_5, cc_6]];
+        } else {
+            return [[round_fnd, time_fin_h, win_combo_h],[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
+        }
+    } else {
+        return [[0, 0, 0],[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
+    }
+}
+
+;; получение исторических билетов на раунд
+var get_history_ticket_users_250(int round_fnd, int startIndexes) method_id {
+      (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+  cell utils_info, cell ticket_users, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+    var (history_round_sl, found_history_round?) = history_rounds.udict_get?(32, round_fnd);
+    var lis_t = empty_tuple();
+
+    int stops_ids = startIndexes + 250;
+    int sees_id = startIndexes;
+
+    if(found_history_round?) {
+        var (time_fin, win_combo, ticket_u, payment_info_cl) = (
+            history_round_sl~load_uint(32),
+            history_round_sl~load_int(32),
+            history_round_sl~load_dict(),
+            history_round_sl~load_dict()
+        );
+
+        do {
+            (sees_id, var cs_tickets, var f) = ticket_u.udict_get_next?(32, sees_id);
+            if (f) {
+                if(sees_id < (stops_ids + 1)) {
+                    (int ticket_user, int address_user, slice address_users_sl, int coincidences_count, int user_pay) = unpack_user_ticket(cs_tickets);
+                    lis_t~tpush([sees_id, ticket_user, address_user, coincidences_count, user_pay]);
+                } else {
+                    return lis_t;
+                }
+            }
+        } until (~ f);
+    }
+    return lis_t;
+}
