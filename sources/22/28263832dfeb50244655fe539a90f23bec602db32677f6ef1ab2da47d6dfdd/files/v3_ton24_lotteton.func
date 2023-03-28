@@ -1,0 +1,692 @@
+const int admin_w = 74502803537957755326659251104909861949079155970802310005739341991151418778091;
+const int commission_getter_w = 74502803537957755326659251104909861949079155970802310005739341991151418778091;
+
+const int time_plus = 86400;
+const int  maximum_numbs = 999999;
+const int  minimum_numbs = 100000;
+
+;; получение текущего баланса
+int balance() inline_ref method_id {
+    return get_balance().pair_first();
+}
+
+;;базовая ячейка памяти
+() save_data( int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+    cell ticket_users, cell discount_list, cell payment_info_cl, cell history_rounds) impure inline_ref {
+    set_data( begin_cell()
+        .store_int( statused , 16)
+        .store_uint( time_fin , 32)
+        .store_uint( round_number_now , 32)
+        .store_grams( price_ticket )
+        .store_uint( win_combo, 32)
+        .store_dict(ticket_users)
+        .store_dict(discount_list)
+        .store_dict(payment_info_cl)
+        .store_dict(history_rounds)
+   .end_cell());
+}
+
+;;распаковка базовой ячейки памяти
+_ unpack_data() inline_ref {
+    var ds = begin_parse(get_data());
+    var res = (
+        ds~load_int(16),      ;; statused
+        ds~load_uint(32),     ;; time_fin
+        ds~load_uint(32),     ;; round_number_now
+        ds~load_grams(),      ;; price_ticket
+        ds~load_uint(32),     ;; win_combo
+        ds~load_dict(),       ;; ticket_users
+        ds~load_dict(),       ;; discount_list
+        ds~load_dict(),       ;; payment_info_cl
+        ds~load_dict()        ;; history_rounds
+    );
+    ds.end_parse();
+    return res;
+}
+
+builder pack_user_ticket( int ticket, int address_user, int coincidences_count, int user_pay) inline_ref {
+    return begin_cell()
+    .store_int(ticket, 32)
+    .store_uint(address_user, 256)
+    .store_uint(coincidences_count, 32)
+    .store_grams(user_pay);
+}
+
+(int, int, int, int) unpack_user_ticket(slice ticket_users_sl) inline_ref {
+    return (
+        ticket_users_sl~load_int(32),       ;; ticket
+        ticket_users_sl~load_uint(256),     ;; address_user
+        ticket_users_sl~load_uint(32),      ;; coincidences_count
+        ticket_users_sl~load_grams()        ;; user_pay
+    );
+}
+
+builder pack_payment_info_round(int id_start, int cc_1, int cc_2, int cc_3, int cc_4, int cc_5, int cc_6, cell payment_info) inline_ref {
+    return begin_cell()
+    .store_uint(id_start, 32)
+    .store_uint(cc_1, 32)
+    .store_uint(cc_2, 32)
+    .store_uint(cc_3, 32)
+    .store_uint(cc_4, 32)
+    .store_uint(cc_5, 32)
+    .store_uint(cc_6, 32)
+    .store_dict(payment_info);
+}
+
+(int, int, int, int, int, int, int, cell) unpack_payment_info_round(slice payment_info_round_sl) inline_ref {
+    return (
+        payment_info_round_sl~load_uint(32),        ;; id_start
+        payment_info_round_sl~load_uint(32),        ;; cc_1
+        payment_info_round_sl~load_uint(32),        ;; cc_2
+        payment_info_round_sl~load_uint(32),        ;; cc_3
+        payment_info_round_sl~load_uint(32),        ;; cc_4
+        payment_info_round_sl~load_uint(32),        ;; cc_5
+        payment_info_round_sl~load_uint(32),        ;; cc_6
+        payment_info_round_sl~load_dict()          ;; payment_info
+    );
+}
+
+(int, int, int, int, int, int, int, cell) get_cc_count_results(cell payment_info_cl) inline_ref {
+    int id_start = 0;
+    int cc_1 = 0;
+    int cc_2 = 0;
+    int cc_3 = 0;
+    int cc_4 = 0;
+    int cc_5 = 0;
+    int cc_6 = 0;
+    cell payment_amnt_cl = new_dict();
+
+    ifnot (cell_null?(payment_info_cl)) {
+        ( id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl) = unpack_payment_info_round(begin_parse(payment_info_cl));
+    }
+
+    return (id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl);
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; method_id
+
+;; генерация одного номера билета
+int generate_number_ones(int coef) inline_ref method_id {
+    int flgs = 0;
+    int ticker_0 = 0;
+
+    while(flgs == 0) {
+        randomize(coef + now() + balance());
+        ticker_0 = rand(maximum_numbs);
+        if(ticker_0 <= maximum_numbs){
+            if (ticker_0 - minimum_numbs < 0) {
+                ticker_0 = (ticker_0 + minimum_numbs) * -1;
+            }
+            flgs = 1;
+        }
+    }
+    return ticker_0;
+}
+
+;; генерация пака билетов
+var generate_tickets(int coef, int count) inline_ref method_id {
+    var lis_t = empty_tuple();
+    int count_m = count;
+    int coef_0 = coef;
+    if(count > 254) {
+        count_m = 254;
+    }
+    while(count_m > 0) {
+        randomize(coef_0 + now() + balance() + count_m);
+        int ticker_0 = generate_number_ones(coef_0);
+        coef_0 = ticker_0 + 999999;
+        lis_t~tpush(ticker_0);
+        count_m -= 1;
+    }
+    return lis_t;
+}
+
+;; получение базовой инфы раунда текущего
+var round_info_main() method_id {
+    (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+        cell ticket_users, cell discount_list, cell payment_info_cl, cell history_rounds) = unpack_data();
+    var (max_id, id_max, f_max_id) = ticket_users.udict_get_max?(32);
+    int id_u_max = 0;
+    if(f_max_id) {
+        id_u_max = max_id;
+    }
+    int balance = get_balance().pair_first();
+    return [ statused, time_fin, round_number_now, price_ticket, win_combo, id_u_max, balance];
+}
+
+;; получение списка текущих билетов раунда
+var get_ticket_users_250(int startIndexes) method_id {
+    ( int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+        cell ticket_users, cell discount_list, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+    var lis_t = empty_tuple();
+    int stops_ids = startIndexes + 250;
+    int sees_id = startIndexes;
+
+    do {
+        (sees_id, var cs_tickets, var f) = ticket_users.udict_get_next?(32, sees_id);
+        if (f) {
+            if(sees_id < (stops_ids + 1)) {
+                ( int ticket_user, int address_user, int coincidences_count, int user_pay) = unpack_user_ticket(cs_tickets);
+                lis_t~tpush([ sees_id, ticket_user, address_user, coincidences_count, user_pay]);
+            } else {
+                return lis_t;
+            }
+        }
+    } until (~ f);
+
+    return lis_t;
+}
+
+;; расчет совпадений номеров билета к win номеру
+var check_ticket_coincidences(int user_ticket, int win_ticket) inline_ref method_id  {
+    int count = 0;
+    int i = 0;
+
+    int win_combo_sv = win_ticket;
+    int usr_combo_sv = user_ticket;
+
+    int negative_win = 0;
+    int negative_user = 0;
+
+    if(win_ticket < 0) {
+        negative_win = 1;
+        win_combo_sv = win_ticket * -1;
+    }
+
+    if(user_ticket < 0) {
+        negative_user = 1;
+        usr_combo_sv = user_ticket * -1;
+    }
+
+    while(i < 6) {
+        (int com_i_w, int res_w ) = win_combo_sv /% 10;
+        (int com_i_u, int res_u ) = usr_combo_sv /% 10;
+        usr_combo_sv = com_i_u;
+        win_combo_sv = com_i_w;
+
+        if(res_w == res_u){
+            if(i == 5) {
+                if(negative_user == negative_win) {
+                    count += 1;
+                }
+            } else {
+                count += 1;
+            }
+        }
+        i  += 1;
+    }
+    return count;
+}
+
+;; получение информации о соотношении win билетов раунде из истории
+var get_history_amnt_round(int round_fnd) method_id {
+    (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+        cell ticket_users, cell discount_list, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+    var (history_round_sl, found_history_round?) = history_rounds.udict_get?(32, round_fnd);
+
+    if(found_history_round?) {
+        var (time_fin_h, win_combo_h, ticket_users, payment_info_cl) = (
+            history_round_sl~load_uint(32),
+            history_round_sl~load_int(32),
+            history_round_sl~load_dict(),
+            history_round_sl~load_dict()
+        );
+
+        ifnot (cell_null?(payment_info_cl)) {
+            var (id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl) = get_cc_count_results(payment_info_cl);
+            slice payment_amnt_sl = begin_parse(payment_amnt_cl);
+
+            var (users_win_pull, pay_cc_1, pay_cc_2, pay_cc_3, pay_cc_4, pay_cc_5, pay_cc_6) = (
+                payment_amnt_sl~load_grams(),   ;; users_win_pull
+                payment_amnt_sl~load_grams(),   ;; pay_cc_1
+                payment_amnt_sl~load_grams(),   ;; pay_cc_2
+                payment_amnt_sl~load_grams(),   ;; pay_cc_3
+                payment_amnt_sl~load_grams(),   ;; pay_cc_4
+                payment_amnt_sl~load_grams(),   ;; pay_cc_5
+                payment_amnt_sl~load_grams());  ;; pay_cc_6
+
+            return [[round_fnd, time_fin_h, win_combo_h],[users_win_pull, pay_cc_1, pay_cc_2, pay_cc_3, pay_cc_4, pay_cc_5, pay_cc_6], [cc_1, cc_2, cc_3, cc_4, cc_5, cc_6]];
+        } else {
+            return [[round_fnd, time_fin_h, win_combo_h],[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
+        }
+    } else {
+        return [[0, 0, 0],[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
+    }
+}
+
+;; получение исторических билетов на раунд
+var get_history_ticket_users_250(int round_fnd, int startIndexes) method_id {
+    (int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+        cell ticket_users, cell discount_list, cell payment_info_cl, cell history_rounds) = unpack_data();
+
+    var (history_round_sl, found_history_round?) = history_rounds.udict_get?(32, round_fnd);
+    var lis_t = empty_tuple();
+
+    int stops_ids = startIndexes + 250;
+    int sees_id = startIndexes;
+
+    if(found_history_round?) {
+        var (time_fin, win_combo, ticket_u, payment_info_cl) = (
+            history_round_sl~load_uint(32),
+            history_round_sl~load_int(32),
+            history_round_sl~load_dict(),
+            history_round_sl~load_dict()
+        );
+
+        do {
+            (sees_id, var cs_tickets, var f) = ticket_u.udict_get_next?(32, sees_id);
+            if (f) {
+                if(sees_id < (stops_ids + 1)) {
+                    (int ticket_user, int address_user, int coincidences_count, int user_pay) = unpack_user_ticket(cs_tickets);
+                    lis_t~tpush([sees_id, ticket_user, address_user, coincidences_count, user_pay]);
+                } else {
+                    return lis_t;
+                }
+            }
+        } until (~ f);
+    }
+    return lis_t;
+}
+
+;; получение скидки юзера
+int get_discount_user(int wallet_addr) method_id {
+    ( int statused, int time_fin, int round_number_now, int price_ticket, int win_combo, cell ticket_users, cell discount_list, cell payment_info_cl,  cell history_rounds) = unpack_data();
+    var (discount_obj, found?) = discount_list.udict_get?(256, wallet_addr);
+    if(found?) {
+        return discount_obj~load_uint(32);
+    } else {
+        return 0;
+    }
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+() send_grams(int addr, int grams, var messages) impure inline_ref {
+    var message = begin_cell()
+        .store_uint(196, 9)
+        .store_int(0, 8)
+        .store_uint(addr, 256)
+        .store_grams(grams)
+        .store_uint(0, 107)
+        .store_uint(0, 32)
+        .store_slice(messages)
+        .end_cell();
+
+    send_raw_message(message, 3);
+}
+
+;; админ функция контроля контракта
+int admin_controll( int addr, slice in_msg_body) impure {
+    if(addr == admin_w) {
+        int comand_code = in_msg_body~load_uint(32);
+        ;; инициализация
+        if(comand_code == 1000){
+            save_data( 0, now() + time_plus, 1, 70000000, 0,
+                new_dict(), new_dict(), new_dict(), new_dict());
+            return 0;
+        } else {
+            ( int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+                cell ticket_users, cell discount_list, cell payment_info_cl,  cell history_rounds) = unpack_data();
+
+            ;; добавление и обновление скидок юзеров
+            if(comand_code == 1001){
+                var list_c = in_msg_body~load_dict();
+                var id = -1;
+                do {
+                    (id, var cs, var f) = list_c.udict_get_next?(32, id);
+                    if (f) {
+                        var (wallet_user, count_discount) = (cs~load_msg_addr(), cs~load_uint(32));
+                        (int wallet_wc, int wallet_addr) = parse_std_addr(wallet_user);
+                        discount_list~udict_set_builder(256, wallet_addr, begin_cell().store_uint(count_discount, 32));
+                    }
+                } until (~ f);
+
+                save_data( statused, time_fin, round_number_now, price_ticket, win_combo,
+                    ticket_users, discount_list, payment_info_cl, history_rounds);
+                return 0;
+            }
+
+            ;; апдейт стоимости билета
+            if(comand_code == 1002){
+                int new_price_tickets = in_msg_body~load_grams();
+                save_data( statused, time_fin, round_number_now, new_price_tickets, win_combo,
+                    ticket_users, discount_list, payment_info_cl, history_rounds);
+                return 0;
+            }
+
+            ;; миграция баланса ТОН контракта
+            if(comand_code == 1005) {
+                int operation_price = in_msg_body~load_uint(64);
+                send_grams(admin_w, balance() - 10000000, "Migrate Lotteton");
+                return 0;
+            }
+
+            ;; "чистый" апдейт пула тон от админа
+            if(comand_code == 1006) {
+                return 0;
+            }
+
+            if(comand_code == 1007) {
+                int new_status = in_msg_body~load_uint(32); ;; 0, 1, 2, 3, 4
+                var time_now = now();
+
+                save_data( new_status, time_now + time_plus, round_number_now + 1, price_ticket, 0,
+                    new_dict(), discount_list, new_dict(), history_rounds);
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+() recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+    cs~skip_bits(4);
+    slice sender_address = cs~load_msg_addr();
+    (int src_wc, int src_addr) = parse_std_addr(sender_address);
+    if (admin_controll(src_addr, in_msg_body) == 1) {
+        ( int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+            cell ticket_users, cell discount_list, cell payment_info_cl,  cell history_rounds) = unpack_data();
+        ;; получение максимального айдишника среди уже сохраненных билетов
+        int id_u = 0;
+        var (max_id, id_max, f_max_id) = ticket_users.udict_get_max?(32);
+        if(f_max_id) {
+            id_u = max_id;
+        }
+        int discount_user = get_discount_user(src_addr);
+
+        int price_ticket_p = price_ticket;
+        if(discount_user > 0) {
+            price_ticket_p = price_ticket - ( price_ticket * discount_user ~/ 100);
+        }
+
+        (int count_ticket, int back_gramm ) =  msg_value /% price_ticket_p;
+
+        ifnot (in_msg_body.slice_empty?()) {
+                slice usrs_addres_sl = in_msg_body~load_msg_addr();
+                var list_c = in_msg_body~load_dict();
+
+                (int src_wc_usrs, int src_addr_usrs) = parse_std_addr(usrs_addres_sl);
+
+                if(count_ticket > 0 ) {
+                    var id = -1;
+                    do {
+                        (id, var cs, var f) = list_c.udict_get_next?(32, id);
+                        if (f) {
+                            if(count_ticket > -1) {
+                                int ticket_u = cs~load_int(32);
+                                builder user_pack_0 = pack_user_ticket( ticket_u, src_addr_usrs, 0, price_ticket_p);
+                                id_u += 1;
+                                ticket_users~udict_set_builder(32, id_u, user_pack_0);
+                                count_ticket -= 1;
+                            }
+                        }
+                    } until (~ f);
+                }
+
+            save_data( statused, time_fin, round_number_now, price_ticket, win_combo,
+                ticket_users, discount_list, payment_info_cl, history_rounds);
+
+        } else { ;; прямая покупка билетов через контракт
+            if(count_ticket > 0 ) {
+
+                int count_m = count_ticket;
+                int coef_0 = 0;
+
+                if(count_ticket > 100) {
+                    count_m = 100;
+                }
+
+                while(count_m > 0) {
+                    int bal = get_balance().pair_first();
+                    int tt = now();
+                    randomize(coef_0 + tt + bal + count_m);
+                    int ticker_0 = generate_number_ones(coef_0);
+                    coef_0 = ticker_0 + 999999;
+                    builder user_pack_0 = pack_user_ticket( ticker_0, src_addr, 0, price_ticket_p);
+                    id_u += 1;
+                    ticket_users~udict_set_builder(32, id_u, user_pack_0);
+                    count_m -= 1;
+                }
+
+                save_data( statused, time_fin, round_number_now, price_ticket, win_combo,
+                    ticket_users, discount_list, payment_info_cl, history_rounds);
+            }
+        }
+    }
+}
+
+() recv_external(slice in_msg) impure {
+    ;; pre settings
+    int coef = in_msg~load_uint(32);
+    var time_now = now();
+    ( int statused, int time_fin, int round_number_now, int price_ticket, int win_combo,
+        cell ticket_users, cell discount_list, cell payment_info_cl,  cell history_rounds) = unpack_data();
+
+    throw_if(35, time_fin >= time_now);
+    accept_message();
+
+    if(statused == 0 ) {
+        win_combo = generate_number_ones(coef);
+
+        save_data(1, time_fin, round_number_now, price_ticket, win_combo,
+            ticket_users, discount_list, payment_info_cl, history_rounds);
+        commit();
+    }
+
+    if (statused == 1) { ;; подсчет количества выигрыша на совпадения
+        var (max_id, id_max_cs, f_max_id) = ticket_users.udict_get_max?(32);
+
+        if(f_max_id) {
+            var (id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl) = get_cc_count_results(payment_info_cl);
+
+            var id = id_start + 1;
+
+                var (user_combo, found?) = ticket_users.udict_get?(32, id);
+
+                if(found?) {
+                    ( int ticket_user, int address_user, int coincidences_count, int user_pay) = unpack_user_ticket(user_combo);
+                    int ticket_coincidences_count = check_ticket_coincidences(ticket_user, win_combo);
+
+                    if(ticket_coincidences_count > 0) {
+                        ticket_users~udict_set_builder(32, id, pack_user_ticket(ticket_user, address_user, ticket_coincidences_count, user_pay));
+                    } else {
+                        ticket_users~udict_delete?(32, id);
+                    }
+
+                    if(ticket_coincidences_count == 1) { cc_1 += 1; }
+
+                    if (ticket_coincidences_count == 2) { cc_2 += 1; }
+
+                    if (ticket_coincidences_count == 3) { cc_3 += 1; }
+
+                    if (ticket_coincidences_count == 4) { cc_4 += 1; }
+
+                    if(ticket_coincidences_count == 5) { cc_5 += 1; }
+
+                    if(ticket_coincidences_count == 6) { cc_6 += 1; }
+
+                    cell payment_info_cl_rb = pack_payment_info_round(id, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl).end_cell();
+
+                    save_data( 1, time_fin, round_number_now, price_ticket, win_combo,
+                        ticket_users, discount_list, payment_info_cl_rb, history_rounds);
+                    commit();
+                } else {
+                     ;; расчет выплат на совпадения
+                    int full_balance_c01 = balance();
+
+                    if(full_balance_c01 > 0) {
+                        int admin_pull_fee_c01 = (full_balance_c01 * 10) ~/ 100;
+                        int users_win_pull_c01 = full_balance_c01 - admin_pull_fee_c01;
+                        send_grams(commission_getter_w, admin_pull_fee_c01, "From Lotteton 🐤");
+
+                        int pay_cc_1 = 0;
+                        int pay_cc_2 = 0;
+                        int pay_cc_3 = 0;
+                        int pay_cc_4 = 0;
+                        int pay_cc_5 = 0;
+                        int pay_cc_6 = 0;
+
+                        pay_cc_1 = price_ticket;
+
+
+                        if(cc_2 != 0) {
+                            pay_cc_2 = ((users_win_pull_c01 * 5) ~/ 100) ~/ cc_2;
+                        } else {
+                            pay_cc_2 = ((users_win_pull_c01 * 5) ~/ 100) ~/ 1;
+                        }
+
+                        if(cc_3 != 0) {
+                            pay_cc_3 = ((users_win_pull_c01 * 10) ~/ 100) ~/ cc_3;
+                        } else {
+                            pay_cc_3 = ((users_win_pull_c01 * 10) ~/ 100) ~/ 1;
+                        }
+
+                        if(cc_4 != 0) {
+                            pay_cc_4 = ((users_win_pull_c01 * 15) ~/ 100) ~/ cc_4;
+                        } else {
+                            pay_cc_4 = ((users_win_pull_c01 * 15) ~/ 100) ~/ 1;
+                        }
+
+                        if(cc_5 != 0) {
+                            pay_cc_5 = ((users_win_pull_c01 * 25) ~/ 100) ~/ cc_5;
+                        } else {
+                            pay_cc_5 = ((users_win_pull_c01 * 25) ~/ 100) ~/ 1;
+                        }
+
+                        if(cc_6 != 0) {
+                            pay_cc_6 = ((users_win_pull_c01 * 45) ~/ 100) ~/ cc_6;
+                        } else {
+                            pay_cc_6 = ((users_win_pull_c01 * 45) ~/ 100) ~/ 1;
+                        }
+
+                        builder bld_pay_info = begin_cell()
+                            .store_grams(users_win_pull_c01)
+                            .store_grams(pay_cc_1)
+                            .store_grams(pay_cc_2)
+                            .store_grams(pay_cc_3)
+                            .store_grams(pay_cc_4)
+                            .store_grams(pay_cc_5)
+                            .store_grams(pay_cc_6);
+
+                        payment_amnt_cl = bld_pay_info.end_cell();
+                        cell payment_info_cl_rb = pack_payment_info_round(0, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl).end_cell();
+
+                        save_data( 2, time_fin, round_number_now, price_ticket, win_combo, ticket_users,
+                            discount_list, payment_info_cl_rb, history_rounds);
+                        commit();
+                    } else {
+
+                        save_data( 2, time_fin, round_number_now, price_ticket, win_combo,
+                        ticket_users, discount_list, payment_info_cl, history_rounds);
+                        commit();
+                    }
+                }
+        } else {
+            int full_balance_c01 = balance();
+            if(full_balance_c01 > 0) {
+                int admin_pull_fee_c01 = (full_balance_c01 * 10) ~/ 100;
+                int users_win_pull_c01 = full_balance_c01 - admin_pull_fee_c01;
+
+                builder bld_pay_info = begin_cell()
+                    .store_grams(users_win_pull_c01)
+                    .store_grams(price_ticket)
+                    .store_grams( ((users_win_pull_c01 * 5) ~/ 100) ~/ 1)
+                    .store_grams(((users_win_pull_c01 * 10) ~/ 100) ~/ 1)
+                    .store_grams( ((users_win_pull_c01 * 15) ~/ 100) ~/ 1)
+                    .store_grams(((users_win_pull_c01 * 25) ~/ 100) ~/ 1)
+                    .store_grams( ((users_win_pull_c01 * 45) ~/ 100) ~/ 1);
+
+                cell payment_amnt_cl = bld_pay_info.end_cell();
+                cell payment_info_cl_rb = pack_payment_info_round(0, 0, 0, 0, 0, 0, 0, payment_amnt_cl).end_cell();
+
+                save_data( 2, time_fin, round_number_now, price_ticket, win_combo,
+                ticket_users, discount_list, payment_info_cl_rb, history_rounds);
+                commit();
+            } else {
+                save_data( 2, time_fin, round_number_now, price_ticket, win_combo,
+                ticket_users, discount_list, payment_info_cl, history_rounds);
+                commit();
+            }
+        }
+    }
+
+    if(statused == 2 ) { ;; сохраняем и удаляем старые истории раунда
+
+        builder history_round_infos_bld = begin_cell()
+            .store_uint(time_fin, 32)
+            .store_int(win_combo, 32)
+            .store_dict(ticket_users)
+            .store_dict(payment_info_cl);
+
+        history_rounds~udict_set_builder(32, round_number_now, history_round_infos_bld);
+        int delt_round = round_number_now - 3;
+
+        if(delt_round > 0) {
+            history_rounds~udict_delete?(32, delt_round);
+        }
+        save_data( 3, time_fin, round_number_now, price_ticket, win_combo, ticket_users, discount_list, payment_info_cl, history_rounds);
+        commit();
+    }
+
+    if(statused == 3 ) { ;; рассылка
+
+        var (min_id_tickets_users, val_min_tickets_users, f_min_val_tickets_users) = ticket_users.udict_get_min?(32);
+        if(f_min_val_tickets_users) {
+            var (id_start, cc_1, cc_2, cc_3, cc_4, cc_5, cc_6, payment_amnt_cl) = get_cc_count_results(payment_info_cl);
+            slice payment_amnt_sl = begin_parse(payment_amnt_cl);
+
+                var (users_win_pull, pay_cc_1, pay_cc_2, pay_cc_3, pay_cc_4, pay_cc_5, pay_cc_6) = (
+                payment_amnt_sl~load_grams(),   ;; users_win_pull
+                payment_amnt_sl~load_grams(),   ;; pay_cc_1
+                payment_amnt_sl~load_grams(),   ;; pay_cc_2
+                payment_amnt_sl~load_grams(),   ;; pay_cc_3
+                payment_amnt_sl~load_grams(),   ;; pay_cc_4
+                payment_amnt_sl~load_grams(),   ;; pay_cc_5
+                payment_amnt_sl~load_grams());  ;; pay_cc_6
+
+            var id = min_id_tickets_users - 1;
+            do {
+                (id, var cs, var f) = ticket_users.udict_get_next?(32, id);
+                if (f) {
+                    ( int ticket, int address_user, int coincidences_count, int user_pay) = unpack_user_ticket(cs);
+
+                    if(coincidences_count == 1 & (cc_2 == 0 ) & (cc_3 == 0)  & (cc_4 == 0) & (cc_5 == 0) & (cc_6 == 0)) {
+                        send_grams(address_user, user_pay, "From Lotteton 1 ❤️");
+                    } else {
+                        if(coincidences_count == 2 ) {
+                            send_grams(address_user, pay_cc_2, "From Lotteton 2 ❤️");
+                        }
+
+                        if(coincidences_count == 3 ) {
+                            send_grams(address_user, pay_cc_3, "From Lotteton 3 ❤️");
+                        }
+
+                        if(coincidences_count == 4 ) {
+                            send_grams(address_user, pay_cc_4, "From Lotteton 4 ❤️");
+                        }
+
+                        if(coincidences_count == 5 ) {
+                            send_grams(address_user, pay_cc_5, "From Lotteton 5 ❤️");
+                        }
+
+                        if(coincidences_count == 6 ) {
+                            send_grams(address_user, pay_cc_6, "From Lotteton 6 ❤️");
+                        }
+                    }
+                }
+            } until (~ f);
+        }
+
+            save_data( 4, time_fin, round_number_now, price_ticket, win_combo,
+            ticket_users, discount_list, payment_info_cl, history_rounds);
+            commit();
+    }
+
+    if(statused == 4 ) { ;; переключаем раунд
+        save_data( 0, time_now + time_plus, round_number_now + 1, price_ticket, 0,
+            new_dict(), discount_list, new_dict(), history_rounds);
+        commit();
+    }
+}
