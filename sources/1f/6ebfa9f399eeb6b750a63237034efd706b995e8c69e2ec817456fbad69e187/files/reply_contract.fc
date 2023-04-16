@@ -1,0 +1,33 @@
+#include "imports/stdlib.fc";
+
+slice parse_sender_address (cell in_msg_full) inline {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    return sender_address;
+}
+
+() recv_internal (int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
+    slice sender_address = parse_sender_address(in_msg_full);
+
+    cell string = begin_cell()
+            .store_slice(in_msg_body)
+            .store_slice(" :3")
+            .end_cell();
+
+    var msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(sender_address)
+            .store_grams(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+
+    if ~ in_msg_body.slice_empty?() {
+        msg = begin_cell()
+                .store_slice(msg.begin_parse())
+                .store_slice(string.begin_parse())
+                .end_cell();
+    }
+
+    send_raw_message(msg, 64);
+}
