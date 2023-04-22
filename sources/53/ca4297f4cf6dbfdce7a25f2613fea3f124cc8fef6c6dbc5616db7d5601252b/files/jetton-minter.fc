@@ -1,0 +1,338 @@
+;; Jettons discoverable smart contract
+
+#include "imports/stdlib.func";
+#include "imports/constants.fc";
+#include "imports/jetton-utils.fc";
+#include "imports/errors.fc";
+#include "imports/op-codes.fc";
+#include "imports/discovery-params.fc";
+
+#pragma version >=0.3.0;
+
+(int, slice, slice, int, int, int, cell, cell, cell) load_data() inline_ref {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_coins(), ;; total_supply
+        ds~load_msg_addr(), ;; preico_address
+        ds~load_msg_addr(), ;; admin_address
+        ds~load_coins(), ;; ico_minted
+        ds~load_uint(2), ;; ico_state
+        ds~load_uint(32), ;;start_time
+        ds~load_ref(), ;; content
+        ds~load_ref(), ;; jetton_wallet_code
+        ds.preload_dict() ;; unlock_dict
+    );
+}
+
+() save_data(int total_supply, slice preico_address, slice admin_address, int ico_minted, int ico_state, int start_time, cell content, cell jetton_wallet_code, cell unlock_dict) impure inline_ref {
+    set_data(begin_cell()
+            .store_coins(total_supply)
+            .store_slice(preico_address)
+            .store_slice(admin_address)
+            .store_coins(ico_minted)
+            .store_uint(ico_state, 2)
+            .store_uint(start_time, 32)
+            .store_ref(content)
+            .store_ref(jetton_wallet_code)
+            .store_dict(unlock_dict)
+            .end_cell()
+    );
+}
+
+() mint_tokens(slice to_address, cell jetton_wallet_code, int amount, cell master_msg) impure inline_ref {
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to_wallet_address)
+            .store_coins(amount)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(state_init)
+            .store_ref(master_msg);
+    send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+
+    throw_if(0, cs~load_uint(4) & 1); ;; ignore all bounced messages
+
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of provide_wallet_address cost
+
+    var (int total_supply, slice preico_address, slice admin_address, int ico_minted, int ico_state, int start_time, cell content, cell jetton_wallet_code, cell unlock_dict) = load_data();
+
+    if (in_msg_body.slice_empty?()) { ;; ICO empty message
+        throw_unless(error::after_ico_end, ico_state == ico_state::started);
+
+        int amount = 10000000; ;; for mint message
+        int buy_amount = msg_value - amount;
+        throw_unless(error::min_value, msg_value >= ico_min_amount);
+
+        int jetton_amount = buy_amount / ico_price * one_ton;
+        throw_unless(error::max_ico_supply, ico_max_supply - (jetton_amount + ico_minted) >= 0);
+
+        var master_msg = begin_cell()
+            .store_uint(op::internal_transfer, 32)
+            .store_uint(0, 64) ;; query_id
+            .store_coins(jetton_amount)
+            .store_slice(my_address()) ;; from_address
+            .store_slice(sender_address) ;; response_address
+            .store_coins(0) ;; no forward_amount
+            .store_uint(0, 1) ;; forward_payload in this slice, not separate cell
+            .end_cell();
+
+        mint_tokens(sender_address, jetton_wallet_code, amount, master_msg);
+        save_data(total_supply + jetton_amount, preico_address, admin_address, ico_minted + jetton_amount, ico_state, start_time, content, jetton_wallet_code, unlock_dict);
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == 0) {
+        if (equal_slices(in_msg_body, "start ico")) {
+            throw_unless(error::not_an_admin, equal_slices(sender_address, admin_address));
+            throw_unless(error::can_not_change_ico, ico_state == ico_state::not_started);
+
+            save_data(total_supply, preico_address, admin_address, ico_minted, ico_state::started, start_time, content, jetton_wallet_code, unlock_dict);
+            return ();
+        }
+
+        if (equal_slices(in_msg_body, "end ico")) {
+            throw_unless(error::not_an_admin, equal_slices(sender_address, admin_address));
+            throw_unless(error::can_not_change_ico, ico_state == ico_state::started);
+            int mint_value = 100000000;
+            throw_unless(error::min_value, my_balance >= (mint_value * 2));
+
+            int jetton_amount = ico_max_supply - ico_minted;
+            (var unlock_data, int f) = unlock_dict.udict_get?(4, treasury_key); ;; 4 – treasury data key
+
+            unlock_data~skip_bits(32 + 32 + 32);
+            int left_locked = unlock_data~load_coins();
+            int amount_to_unlock = unlock_data~load_coins();
+            slice to_address = unlock_data~load_msg_addr();
+
+            var master_msg = begin_cell()
+                .store_uint(op::internal_transfer, 32)
+                .store_uint(0, 64) ;; query_id
+                .store_coins(jetton_amount)
+                .store_slice(my_address()) ;; from_address
+                .store_slice(to_address) ;; response_address
+                .store_coins(0) ;; no forward_amount
+                .store_uint(0, 1) ;; forward_payload in this slice, not separate cell
+                .end_cell();
+            mint_tokens(to_address, jetton_wallet_code, mint_value, master_msg);
+
+            save_data(total_supply + jetton_amount, preico_address, admin_address, ico_minted + jetton_amount, ico_state::finished, start_time, content, jetton_wallet_code, unlock_dict);
+            return ();
+        }
+
+        if (equal_slices(in_msg_body, "withdraw ton")) {
+            throw_unless(error::not_an_admin, equal_slices(sender_address, admin_address));
+            int storage_value = 100000000;
+            throw_unless(error::min_value, my_balance > storage_value);
+
+            var (unlock_data, f) = unlock_dict.udict_get?(4, treasury_key); ;; 4 – treasury data key
+
+            unlock_data~skip_bits(32 + 32 + 32);
+            int left_locked = unlock_data~load_coins();
+            int amount_to_unlock = unlock_data~load_coins();
+            slice to_address = unlock_data~load_msg_addr();
+
+            var msg = begin_cell()
+                .store_uint(0x10, 6)
+                .store_slice(to_address)
+                .store_coins(my_balance - storage_value)
+                .store_uint(0, 107);
+            send_raw_message(msg.end_cell(), 2);
+
+            return ();
+        }
+
+        if (equal_slices(in_msg_body, "unlock")) {
+            throw_unless(error::min_value, msg_value >= 250000000); 
+            throw_unless(error::not_an_admin, equal_slices(sender_address, admin_address));
+
+            int amount = 10000000; ;; for mint message
+            int total_amount_to_unlock = 0;
+            int now_ts = now();
+
+            int key = -1;
+            int f = -1;
+            do {
+                    (key, var unlock_data, f) = unlock_dict.udict_get_next?(4, key);
+                if (f) {
+                    var (cliff_time, unlock_period, last_unlock_time, left_locked, amount_to_unlock) = (unlock_data~load_uint(32), unlock_data~load_uint(32), unlock_data~load_uint(32), unlock_data~load_coins(), unlock_data~load_coins());
+
+                    if (((left_locked - amount_to_unlock) >= 0) & (now_ts >= start_time + cliff_time) & (now_ts >= last_unlock_time + unlock_period)) {
+                        slice res_address = unlock_data~load_msg_addr();
+                        var master_msg = begin_cell()
+                        .store_uint(op::internal_transfer, 32)
+                        .store_uint(0, 64) ;; query_id
+                        .store_coins(amount_to_unlock)
+                        .store_slice(my_address()) ;; from_address
+                        .store_slice(res_address) ;; response_address
+                        .store_coins(0) ;; no forward_amount
+                        .store_uint(0, 1) ;; forward_payload in this slice, not separate cell
+                        .end_cell();
+
+                        mint_tokens(res_address, jetton_wallet_code, amount, master_msg);
+
+                        total_amount_to_unlock += amount_to_unlock;
+
+                        unlock_dict~udict_set_builder(4, key, begin_cell()
+                        .store_uint(cliff_time, 32)
+                        .store_uint(unlock_period, 32)
+                        .store_uint(now_ts, 32)
+                        .store_coins(left_locked - amount_to_unlock)
+                        .store_coins(amount_to_unlock)
+                        .store_slice(res_address)
+                        );
+                    }
+                }
+            } until (~ f);
+
+            throw_if(500, total_amount_to_unlock == 0);
+
+            save_data(total_supply + total_amount_to_unlock, preico_address, admin_address, ico_minted, ico_state, start_time, content, jetton_wallet_code, unlock_dict);
+            return ();
+        }
+
+        throw(0xffff);
+    }
+
+
+    if (op == op::preico_buy) {
+        throw_unless(error::not_a_preico, equal_slices(sender_address, preico_address));
+        (slice buyer_addr, int buy_amount) = (in_msg_body~load_msg_addr(), in_msg_body~load_coins());
+
+        int jetton_amount = buy_amount / preico_price * one_ton;
+        throw_unless(error::max_ico_supply, ico_max_supply - (jetton_amount + ico_minted) >= 0);
+
+        int amount = 10000000; ;; for mint message
+
+        var master_msg = begin_cell()
+            .store_uint(op::internal_transfer, 32)
+            .store_uint(0, 64) ;; query_id
+            .store_coins(jetton_amount)
+            .store_slice(my_address()) ;; from_address
+            .store_slice(buyer_addr) ;; response_address
+            .store_coins(0) ;; no forward_amount
+            .store_uint(0, 1) ;; forward_payload in this slice, not separate cell
+            .end_cell();
+
+        mint_tokens(buyer_addr, jetton_wallet_code, amount, master_msg);
+        save_data(total_supply + jetton_amount, preico_address, admin_address, ico_minted + jetton_amount, ico_state, start_time, content, jetton_wallet_code, unlock_dict);
+        return ();
+    }
+
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::mint) {
+        throw_unless(error::mint_once, total_supply == 0);
+        throw_unless(error::not_an_admin, equal_slices(sender_address, admin_address));
+
+        int jetton_minted = 0;
+        while (in_msg_body.slice_refs()) {
+            cell root_master_msg = in_msg_body~load_ref();
+            slice root_master_msg_cs = root_master_msg.begin_parse();
+
+            slice to_address = root_master_msg_cs~load_msg_addr();
+            int amount = root_master_msg_cs~load_coins();
+            int jetton_amount = root_master_msg_cs~load_coins();
+
+            cell master_msg = root_master_msg_cs~load_ref();
+            mint_tokens(to_address, jetton_wallet_code, amount, master_msg);
+
+            jetton_minted += jetton_amount;
+        }
+
+        save_data(total_supply + jetton_minted, preico_address, admin_address, ico_minted, ico_state, now(), content, jetton_wallet_code, unlock_dict);
+        return ();
+    }
+
+    if (op == op::set_preico_addr) {
+        throw_unless(error::not_an_admin, equal_slices(sender_address, admin_address));
+        throw_unless(error::preico_not_empty, preico_address.preload_uint(2) != 0);
+
+        slice _preico_address = in_msg_body~load_msg_addr();
+
+        save_data(total_supply, _preico_address, admin_address, ico_minted, ico_state, start_time, content, jetton_wallet_code, unlock_dict);
+        return ();
+    }
+
+    if (op == op::burn_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(74,
+            equal_slices(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+        );
+        save_data(total_supply - jetton_amount, preico_address, admin_address, ico_minted, ico_state, start_time, content, jetton_wallet_code, unlock_dict);
+        slice response_address = in_msg_body~load_msg_addr();
+        if (response_address.preload_uint(2) != 0) {
+            var msg = begin_cell()
+                    .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 010000
+                    .store_slice(response_address)
+                    .store_coins(0)
+                    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                    .store_uint(op::excesses, 32)
+                    .store_uint(query_id, 64);
+            send_raw_message(msg.end_cell(), 2 + 64);
+        }
+        return ();
+    }
+
+    if (op == op::provide_wallet_address) {
+        throw_unless(75, msg_value > fwd_fee + provide_address_gas_consumption);
+
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_uint(1);
+
+        cell included_address = include_address?
+                ? begin_cell().store_slice(owner_address).end_cell()
+                : null();
+
+        var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(sender_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::take_wallet_address, 32)
+                .store_uint(query_id, 64);
+
+        if (is_resolvable?(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code));
+        } else {
+            msg = msg.store_uint(0, 2); ;; addr_none
+        }
+        send_raw_message(msg.store_maybe_ref(included_address).end_cell(), 64);
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    (int total_supply, _, slice admin_address, _, _, _, cell content, cell jetton_wallet_code, _) = load_data();
+    int mintable = 0;
+    return (total_supply, mintable, admin_address, content, jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    (int total_supply, _, slice admin_address, _, _, _, cell content, cell jetton_wallet_code, _) = load_data();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code);
+}
+
+(int, int, int, slice) get_ico_data() method_id {
+    (_, slice preico_address, _, int ico_minted, int ico_state, _, _, _, _) = load_data();
+    return (ico_max_supply, ico_minted, ico_state, preico_address);
+}
+
+cell get_unlock_data() method_id {
+    (_, _, _, _, _, _, _, _, cell unlock_dict) = load_data();
+    return unlock_dict;
+}
