@@ -1,0 +1,86 @@
+#include "imports/stdlib.func";
+#include "imports/op-codes.fc";
+#include "imports/errors.fc";
+#include "imports/constants.fc";
+
+const int MINT_FEE = 20000000; ;; for mint message
+
+
+(slice, slice, int, cell) load_data() inline {
+  slice ds = get_data().begin_parse();
+  return (
+    ds~load_msg_addr(), ;; admin_address
+    ds~load_msg_addr(), ;; minter_address
+    ds~load_uint(2), ;; ico_state
+    ds.preload_dict() ;; wl_dict
+  );
+}
+
+() save_data(slice admin_address, slice minter_address, int ico_state, cell wl_dict) impure inline {
+  set_data(begin_cell()
+            .store_slice(admin_address)
+            .store_slice(minter_address)
+            .store_uint(ico_state, 2)
+            .store_dict(wl_dict)
+            .end_cell()
+  );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  slice cs = in_msg_full.begin_parse();
+
+  throw_if(0, cs~load_uint(4) & 1); ;; ignore all bounced messages
+
+  slice sender_address = cs~load_msg_addr();
+
+  (slice admin_addr, slice minter_address, int ico_state, cell wl_dict) = load_data();
+  if (in_msg_body.slice_empty?()) {
+    (int wc, int addr_hash) = parse_std_addr(sender_address);
+    throw_unless(333, wc == 0);
+
+    throw_unless(400, ico_state == ico_state::started);
+
+    (_, int f) = wl_dict.udict_get?(256, addr_hash);
+    throw_unless(404, f);
+
+    int buy_amount = msg_value - MINT_FEE;
+    throw_unless(error::min_value, msg_value >= ico_min_amount);
+
+    ;; OK, can buy tokens
+    cell msg = begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(minter_address)
+      .store_coins(0)
+      .store_uint(0, 107)
+      .store_uint(op::preico_buy, 32)
+      .store_slice(sender_address)
+      .store_coins(buy_amount)
+      .end_cell();
+    send_raw_message(msg, 64);
+
+    return ();
+  }
+
+  int op = in_msg_body~load_uint(32);
+  if (op == 0) {
+    if (equal_slices(in_msg_body, "start preico")) {
+      throw_unless(error::not_an_admin, equal_slices(sender_address, admin_addr));
+      throw_unless(error::can_not_change_ico, ico_state == ico_state::not_started);
+
+      save_data(admin_addr, minter_address, ico_state::started, wl_dict);
+      return ();
+    }
+
+    if (equal_slices(in_msg_body, "end preico")) {
+      throw_unless(error::not_an_admin, equal_slices(sender_address, admin_addr));
+      throw_unless(error::can_not_change_ico, ico_state == ico_state::started);
+
+      save_data(admin_addr, minter_address, ico_state::finished, wl_dict);
+      return ();
+    }
+
+    throw(0xffff);
+  }
+
+  throw(0xffff);
+}
