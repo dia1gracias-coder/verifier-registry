@@ -1,0 +1,55 @@
+#include "libs/utils.fc";
+
+int equal_slices (slice a, slice b) asm "SDEQ";
+
+const play = 500000000;
+const min_balance = 1200000000;
+
+(slice) load_data () inline {
+    var ds = get_data().begin_parse();
+    slice owner_address = ds~load_msg_addr();
+    return (owner_address);
+}
+
+slice parse_sender_address (cell in_msg_full) inline {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    return sender_address;
+}
+
+() recv_internal (int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+
+    if(flags & 1) {
+        return (); ;; ignore bounced messages
+    }
+
+    slice sender_address = parse_sender_address(in_msg_full);
+    (slice owner_address) = load_data();
+
+    var balance = get_balance().pair_first();
+
+    if equal_slices(sender_address, owner_address) {
+        if(msg_value < play) {
+            send_grams(owner_address, 0, 128);
+        }
+    } else {
+        throw_if(502, msg_value < play);
+
+        int seed = cur_lt();
+        int seed_size = min(in_msg_body.slice_bits(), 128);
+
+        if(in_msg_body.slice_bits() > 0) {
+            seed += in_msg_body~load_uint(seed_size);
+        }
+        set_seed(seed);
+
+        if(balance > min_balance) {
+            if(rand(100) < 30) {
+                send_grams(sender_address, 2 * play, 0);
+            }
+        }
+    }
+}
