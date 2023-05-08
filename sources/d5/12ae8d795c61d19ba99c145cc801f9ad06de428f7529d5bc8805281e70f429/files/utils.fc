@@ -1,0 +1,87 @@
+int nft_collection::heroes_size() asm "99 PUSHINT";
+int nft_collection::size() asm "2595 PUSHINT";
+
+int nft_collection::deploy_value() asm "70000000 PUSHINT";
+
+builder store_uint_as_dec_string (builder b, int x) asm ""
+  "ZERO"                                                        ;; b x i=0
+  "SWAP" "TRUE"                                                 ;; b i=0 x f=-1
+  "WHILE:<{"
+  "}>DO<{"                                                      ;; b i x
+    "10 PUSHINT" "DIVMOD"                                       ;; b i x r
+    "48 ADDCONST"                                               ;; b i x r
+    "s0 s3 XCHG"                                                   ;; r i x b
+    "s0 s2 XCHG"                                                   ;; r b x i
+    "INC"                                                       ;; r b x i
+    "SWAP"                                                      ;; r b i x
+    "DUP" "0 NEQINT"                                            ;; r b i x f
+  "}>"
+  "DROP"                          
+  "REPEAT:<{" 
+    "8 STU"                                                     ;; ..rrr.. b i
+  "}>"  
+;
+
+(slice, (int)) ~nft_undeployed_pool::get_impl (slice bits, int index) inline {
+  builder bb = begin_cell();
+  int result = -1;
+  int i = 0;
+
+  while ( ~ slice_empty? (bits)) {
+    int bit = bits~load_uint(1);
+    result += bit;
+    if (result == index) {
+      bb~store_uint(0, 1);
+      bb = bb.store_slice(bits);
+      return ( bb.end_cell().begin_parse(), (i));
+    }
+    bb~store_uint(bit, 1);
+    i += 1;
+  }
+
+  throw(502);
+  return (null(), (-1));
+}
+
+(cell, (int)) ~nft_undeployed_pool::get (cell nft_undeployed_pool, int index) inline {
+  slice ps = nft_undeployed_pool.begin_parse();
+  cell dict = ps~load_ref();
+  int size = ps~load_uint(16);
+  int block_size = ps~load_uint(16);
+
+  builder pb = begin_cell();
+  pb~store_uint(size - 1, 16);
+  pb~store_uint(block_size, 16);
+
+  int prev_parts_size = 0;
+  int i = 0;
+
+  while ( ~ slice_empty?(ps)) {
+    int part_size = ps~load_uint(10);
+    prev_parts_size += part_size;
+    if (index < prev_parts_size) {
+      pb~store_uint(part_size - 1, 10);
+      pb = pb.store_slice(ps);
+
+      dump_stack();
+      (slice bits, int f) = dict.udict_get?(8, i);
+      throw_unless(502, f);
+
+      int result = i * block_size + bits~nft_undeployed_pool::get_impl(prev_parts_size - index - 1);
+      dict~udict_set(8, i, bits);
+      pb = pb.store_ref(dict);
+
+      return (pb.end_cell(), (result));
+    } else {
+      pb~store_uint(part_size, 10);
+    }
+    i += 1;
+  }
+
+  throw(502);
+  return (null(), (-1));
+}
+
+int nft_undeployed_pool::size(cell nft_undeployed_pool) inline {
+  return nft_undeployed_pool.begin_parse().preload_uint(16);
+} 
