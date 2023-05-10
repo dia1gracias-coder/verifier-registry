@@ -1,0 +1,296 @@
+;; Multisig wallet v1 by delpydoc@github.com/xJetLabs
+
+{-
+    signature:uint512 public_key:uint256 query_id:uint64 submit_proposal messages:^Messages = Request;
+
+    upgrade new_code:Cell new_data:Cell = Request;
+    edit_owner public_key:uint256 remove?:Bool weight:uint8 = Request;
+    edit_threshold threshold:Coins = Request;
+
+    messages:^(HashmapE 256 InternalMsgBody) signatures:(HashmapE 256) = PendingQuery;
+    flood:uint8 weight:uint16 = Owner;
+    storage#_ last_transaction:uint64 last_cleaned:uint64 threshold:Coins owners:(HashmapE 256 Owner) pending_queries:(HashmapE 256 PendingQuery) = Storage;
+
+    The transaction must get a rating of storage::threshold or more to be sent
+    @g... = 1, @d... = 2, @f... = 1, @tonblockchain = 2
+-}
+
+#include "stdlib.fc";
+
+const op::submit_proposal = 0xa83505c8;
+const op::edit_owner = 0x03129f04;
+const op::edit_threshold = 0x81842e3d;
+const op::upgrade = 0x10d1a193;
+
+global int storage::last_transaction;
+global int storage::last_cleaned;
+global int storage::threshold;
+global cell storage::owners;
+global cell storage::pending_queries;
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::last_transaction = ds~load_uint(64);
+    storage::last_cleaned = ds~load_uint(64);
+    storage::threshold = ds~load_coins();
+    storage::owners = ds~load_dict();
+    storage::pending_queries = ds~load_dict();
+    ds.end_parse();
+}
+
+() save_data() impure inline {
+    set_data(
+        begin_cell()
+            .store_uint(storage::last_transaction, 64)
+            .store_uint(storage::last_cleaned, 64)
+            .store_coins(storage::threshold)
+            .store_dict(storage::owners)
+            .store_dict(storage::pending_queries).end_cell()
+    );
+}
+
+int calculate_score(cell signatures) {
+    int score = 0;
+    do {
+        (signatures, int public_key, slice value, int found?) = signatures.udict_delete_get_min(256);
+        if (found?) {
+            throw_unless(35, value~load_int(1));
+            (slice owner, int found?) = storage::owners.udict_get?(256, public_key);
+            owner~skip_bits(8);
+            int weight = owner~load_uint(16);
+            score += weight;
+        }
+    } until (~ found?);
+    return score;
+}
+
+() recv_internal(slice in_msg) impure {
+    ;; do nothing
+}
+
+(int, int) _available?() { ;; returns (monopolized?, available?)
+    cell owners = storage::owners;
+    int _monopolized = false;
+    int max_score = 0;
+    do {
+        (owners, int index, slice owner, int found?) = owners.udict_delete_get_min(256);
+        if (found?) {
+            int flood = owner~load_uint(8);
+            int weight = owner~load_uint(16);
+            if (weight >= storage::threshold) {
+                _monopolized = true;
+            }
+            if (flood <= 10) {
+                max_score += weight;
+            }
+        }
+    } until (~ found?);
+    return (_monopolized, max_score >= storage::threshold);
+}
+
+() run_proposal(int query_id, cell _messages, cell signatures) impure {
+    int score = calculate_score(signatures);
+    if (score >= storage::threshold) {
+        slice messages = _messages.begin_parse();
+        while (messages.slice_bits() > 0) {
+            int mode = messages~load_uint(8);
+            if (mode == 255) { ;; internal commands
+                int op = messages~load_uint(32);
+                if (op == op::edit_owner) {
+                    int target_pk = messages~load_uint(256);
+                    int remove? = messages~load_int(1);
+                    if (remove?) {
+                        (storage::owners, slice owner, int success?) = storage::owners.udict_delete_get?(256, target_pk);
+                        if (success?) {
+                            owner~skip_bits(8);
+                            storage::threshold -= owner~load_uint(16);
+                        }
+                    } else {
+                        int weight = messages~load_uint(16);
+                        storage::owners~udict_set_builder(
+                            256, target_pk, begin_cell()
+                                .store_uint(0, 8)
+                                .store_uint(weight, 16)
+                        );
+                    }
+                }
+                elseif (op == op::edit_threshold) {
+                    storage::threshold = messages~load_coins();
+                }
+                elseif (op == op::upgrade) {
+                    cell new_code = messages~load_ref();
+                    cell new_data = messages~load_ref();
+                    set_code(new_code);
+                    set_data(new_data);
+                    return ();
+                }
+                commit();
+                save_data();
+            } else {
+                send_raw_message(messages~load_ref(), mode | 2);
+            }
+        }
+        (_, int isnt_locked?) = _available?();
+        throw_unless(577, isnt_locked?);
+
+        ;; clear flood counters
+        do {
+            (signatures, int target_pk, _, int found?) = signatures.udict_delete_get_min(256);
+            if (found?) {
+                (slice owner, int found?) = storage::owners.udict_get?(256, target_pk);
+                if (found?) {
+                    owner~skip_bits(8);
+                    int weight = owner~load_uint(16);
+                    storage::owners~udict_set_builder(
+                        256, target_pk, begin_cell()
+                            .store_uint(0, 8)
+                            .store_uint(weight, 16)
+                    );
+                }
+            }
+        } until (~ found?);
+
+        storage::pending_queries~udict_delete?(64, query_id);
+    }
+}
+
+() recv_external(slice in_msg) impure {
+    slice signature = in_msg~load_bits(512);
+    int public_key = in_msg.preload_uint(256);
+    throw_unless(401, check_signature(slice_hash(in_msg), signature, public_key));
+    in_msg~skip_bits(256);
+    int query_id = in_msg~load_uint(64);
+    var bound = (now() << 32);
+    throw_if(33, query_id < bound);
+
+    load_data();
+    (slice value, int found?) = storage::pending_queries.udict_get?(64, query_id);
+    if (found?) {
+        value~load_ref();
+        cell signatures = value~load_dict();
+        (slice value, int f?) = signatures.udict_get?(256, public_key);
+        if (f?) {
+            found? = f? ? (~ value~load_int(1)) : found?;
+        }
+    }
+    
+    throw_unless(40, (query_id > storage::last_transaction) | (found?));
+    storage::last_transaction = query_id;
+    (slice owner, int found?) = storage::owners.udict_get?(256, public_key);
+    throw_unless(34, found?);
+    
+    (int flood, int weight) = (owner~load_uint(8), owner~load_uint(16));
+    flood += 1;
+    throw_if(39, flood > 10);
+    set_gas_limit(100000);
+
+    storage::owners~udict_set_builder(
+        256, public_key, begin_cell()
+            .store_uint(flood, 8)
+            .store_uint(weight, 16)
+    );
+    (_, int isnt_locked?) = _available?();
+    if (isnt_locked?) {
+        save_data();
+        commit();
+    }
+
+    int op = in_msg~load_uint(32);
+    if (op == op::submit_proposal) {
+        (slice value, int found?) = storage::pending_queries.udict_get?(64, query_id);
+        
+        cell messages = found? ? value~load_ref() : in_msg~load_ref();
+        cell signatures = found? ? value~load_dict() : new_dict();
+        signatures~udict_set_builder(
+            256, public_key, begin_cell()
+                .store_int(true, 1)
+        );
+        storage::pending_queries~udict_set_builder(
+            64, query_id, begin_cell()
+                .store_ref(messages)
+                .store_dict(signatures)
+        );
+        run_proposal(query_id, messages, signatures);
+    }
+    else {
+        ;; without this part, users can be permanently banned through flood value
+        throw(0xffff);
+    }
+
+    ;; clear pending queries
+    bound -= (64 << 32);
+    do {
+        (cell pending_queries, int query_id, slice query, int found?) = storage::pending_queries.udict_delete_get_min(64);
+        if (found?) {
+            if (query_id < bound) {
+                storage::pending_queries = pending_queries;
+                storage::last_cleaned = query_id;
+
+                cell messages = query~load_ref();
+                cell signatures = query~load_dict();
+                do {
+                    (signatures, int target_pk, _, int f1?) = signatures.udict_delete_get_min(256);
+                    if (f1?) {
+                        (slice owner, int f2?) = storage::owners.udict_get?(256, target_pk);
+                        if (f2?) {
+                            int flood = owner~load_uint(8);
+                            int weight = owner~load_uint(16);
+                            storage::owners~udict_set_builder(
+                                256, target_pk, begin_cell()
+                                    .store_uint(max(flood - 1, 0), 8)
+                                    .store_uint(weight, 16)
+                            );
+                        }
+                    }
+                } until (~ f1?);
+            } else { found? = false; }
+        }
+    } until (~ found?);
+
+    save_data();
+    return ();
+}
+
+;; GET methods
+
+;; returns -1 for processed queries, 0 for unprocessed, 1 for unknown (forgotten)
+int processed?(int query_id) method_id {
+    load_data();
+    (slice cs, var found?) = storage::pending_queries.udict_get?(64, query_id);
+    if (found?) {
+        return 0;
+    } else {
+        return -(query_id <= storage::last_cleaned);
+    }
+}
+
+(cell, cell, int) get_query(int query_id) method_id {
+    load_data();
+    (slice value, int found?) = storage::pending_queries.udict_get?(64, query_id);
+    throw_unless(402, found?);
+    cell messages = value~load_ref();
+    cell signatures = value~load_dict();
+    return (messages, signatures, storage::threshold - calculate_score(signatures));
+}
+
+(int, int) get_owner(int public_key) method_id {
+    load_data();
+    (slice owner, int found?) = storage::owners.udict_get?(256, public_key);
+    throw_unless(402, found?);
+    return (owner~load_uint(8), owner~load_uint(16));
+}
+
+(cell, int) get_owners() method_id {
+    load_data();
+    return (storage::owners, storage::threshold);
+}
+
+int last_transaction() method_id {
+    load_data();
+    return storage::last_transaction;
+}
+
+(int, int) available?() method_id {
+    load_data();
+    return _available?();
+}
