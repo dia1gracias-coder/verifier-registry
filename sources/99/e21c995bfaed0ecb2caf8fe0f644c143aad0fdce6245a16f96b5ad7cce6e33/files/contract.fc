@@ -1,0 +1,17 @@
+const int error::invalid_op_2 = 200;
+int error::invalid_op() asm "70 PUSHINT";
+
+() recv_internal(cell in_msg_cell, slice in_msg) {
+    ;; let's first extract the flags
+    var cs = in_msg_cell.begin_parse();
+    var flags = cs~load_uint(4);
+    var op = in_msg~load_uint(32);
+
+    if (flags & 1) {
+        return ();
+    }
+
+    ;; check that operation code is 1
+    throw_unless(error::invalid_op(), op == 1);
+    throw_unless(error::invalid_op_2, op >= 2);    
+}
