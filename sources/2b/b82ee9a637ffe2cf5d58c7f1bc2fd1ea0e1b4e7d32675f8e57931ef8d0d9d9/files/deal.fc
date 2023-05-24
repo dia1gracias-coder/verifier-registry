@@ -1,0 +1,254 @@
+;; Secure Deal TON
+;;
+;; Deal Smart Contract
+;;
+;; Author: Vladislav Orlov <me@orlov-vo.ru>
+#include "imports/stdlib.fc";
+#include "imports/messages.fc";
+
+;; CONSTANTS
+
+const deal_fee = 1000000000; ;; 1.00 TON
+const dispute_fee = 50000000000; ;; 50.00 TON
+
+const status::not_inited = -1;
+const status::created = 0;
+const status::ready_to_start = 1;
+const status::in_progress = 2;
+const status::on_review = 3;
+const status::dispute = 4;
+
+const op::init = "op::init"c;
+const op::start = "op::start"c;
+const op::destroy = "op::destroy"c;
+const op::ready_for_review = "op::ready_for_review"c;
+const op::confirm = "op::confirm"c;
+const op::reject = "op::reject"c;
+const op::open_dispute = "op::open_dispute"c;
+const op::close_dispute = "op::close_dispute"c;
+
+const error::wrong_status = 40;
+const error::wrong_role = 41;
+const error::non_destroyable = 42;
+const error::not_enough_money = 43;
+
+;; STORAGE
+
+global int external_id;
+global int status;
+global int value;
+global int can_be_destroyed;
+global slice executor_address;
+global slice processor_address;
+global slice beneficiary_address;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    external_id = ds~load_uint(128);
+
+    if (ds.slice_empty?()) {
+        status = status::not_inited;
+        value = 0;
+        can_be_destroyed = true;
+        processor_address = null();
+        executor_address = null();
+        beneficiary_address = null();
+    } else {
+        status = ds~load_uint(8);
+        value = ds~load_coins();
+        can_be_destroyed = ds~load_uint(1);
+        processor_address = ds~load_msg_addr();
+        executor_address = ds~load_msg_addr();
+        beneficiary_address = ds~load_msg_addr();
+    }
+
+    ds.end_parse();
+}
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(external_id, 128)
+            .store_slice(processor_address)
+            .store_uint(status, 8)
+            .store_coins(value)
+            .store_uint(can_be_destroyed, 1)
+            .store_slice(executor_address)
+            .store_slice(beneficiary_address)
+            .end_cell()
+    );
+}
+
+;; FUNCTIONS
+
+() throw_unless_status(int required_status) impure inline {
+    throw_unless(error::wrong_status, status == required_status);
+}
+
+int is_executor(slice address) inline {
+    return equal_slices(address, executor_address);
+}
+
+int is_beneficiary(slice address) inline {
+    return equal_slices(address, beneficiary_address);
+}
+
+int is_processor(slice address) inline {
+    return equal_slices(address, processor_address);
+}
+
+() try_to_mark_as_ready_to_start(int next_balance) impure inline {
+    if (next_balance >= value) {
+        status = status::ready_to_start;
+    }
+}
+
+() start_progress() impure inline {
+    status = status::in_progress;
+    save_data();
+    messages::send_empty(deal_fee, processor_address, NORMAL | PAID_EXTERNALLY);
+}
+
+() mark_as_ready_for_review() impure inline {
+    status = status::on_review;
+    save_data();
+}
+
+() mark_as_rejected(int reason_id) impure inline {
+    status = status::in_progress;
+    save_data();
+}
+
+() open_dispute(slice plaintiff_address) impure inline {
+    status = status::dispute;
+    save_data();
+
+    ;; Send message to Processor to start dispute between sides
+    slice defendant_address = is_executor(plaintiff_address) ? beneficiary_address : executor_address;
+    cell data = begin_cell()
+        .store_uint(0xb2842ec1, 32) ;; `op::start_dispute`
+        .store_uint(0, 64) ;; empty query_id
+        .store_slice(my_address())
+        .store_slice(plaintiff_address)
+        .store_slice(defendant_address)
+        .end_cell();
+    messages::send_simple(dispute_fee, processor_address, data, NORMAL);
+}
+
+;; MESSAGE HANDLERS
+
+() recv_internal(int cur_balance, int in_msg_balance, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    load_data();
+
+    if (in_msg_body.slice_empty?()) {
+        if (status == status::not_inited) { ;; ignore all empty messages from everyone
+            return ();
+        }
+
+        ;; ignore all empty messages from executor or beneficiary
+        throw_unless(error::wrong_role, is_executor(sender_address) | is_beneficiary(sender_address));
+
+        if (is_beneficiary(sender_address) & status == status::created) {
+            can_be_destroyed = 0; ;; restrict destroying deal by sender
+            try_to_mark_as_ready_to_start(cur_balance + in_msg_balance);
+            save_data();
+        }
+
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::init) { ;; init deal with executor data
+        throw_unless_status(status::not_inited);
+        status = status::created;
+        processor_address = in_msg_body~load_msg_addr();
+        executor_address = in_msg_body~load_msg_addr();
+        value = in_msg_body~load_coins();
+        save_data();
+        return ();
+    }
+
+    if (op == op::start) { ;; mark the deal as started
+        throw_unless_status(status::ready_to_start);
+        throw_unless(error::wrong_role, is_executor(sender_address));
+        return start_progress();
+    }
+
+    if (op == op::ready_for_review) { ;; mark the work is finished and need review from benecifary
+        throw_unless_status(status::in_progress);
+        throw_unless(error::wrong_role, is_executor(sender_address));
+        return mark_as_ready_for_review();
+    }
+
+    if (op == op::confirm) { ;; close the deal and give money to executor
+        throw_unless_status(status::on_review);
+        throw_unless(error::wrong_role, is_beneficiary(sender_address));
+        ;; return all money from deal to executor and destroy smart contract
+        messages::send_empty(0, executor_address, CARRY_ALL_BALANCE | DESTROY_IF_ZERO);
+        return ();
+    }
+
+    if (op == op::reject) { ;; reject the work with a reason
+        throw_unless_status(status::on_review);
+        throw_unless(error::wrong_role, is_beneficiary(sender_address));
+        int reason_id = in_msg_body~load_uint(128); ;; we store only reason uuid here
+        return mark_as_rejected(reason_id);
+    }
+
+    if (op == op::destroy) { ;; only executor can destroy the deal and return all money back
+        throw_unless(error::non_destroyable, can_be_destroyed);
+        throw_unless(error::wrong_role, is_executor(sender_address));
+        messages::send_empty(0, executor_address, CARRY_ALL_BALANCE | DESTROY_IF_ZERO);
+        return ();
+    }
+
+    if (op == op::open_dispute) {
+        throw_if(error::wrong_status, status == status::not_inited);
+        throw_if(error::wrong_status, status == status::created);
+        throw_if(error::not_enough_money, in_msg_balance < dispute_fee);
+        return open_dispute(sender_address);
+    }
+
+    if (op == op::close_dispute) {
+        throw_unless_status(status::dispute);
+        throw_unless(error::wrong_role, is_processor(sender_address));
+        int return_coins = in_msg_body~load_coins();
+
+        if (return_coins) {
+            messages::send_empty(0, beneficiary_address, NORMAL);
+        }
+
+        messages::send_empty(0, executor_address, CARRY_ALL_BALANCE | DESTROY_IF_ZERO);
+        return ();
+    }
+
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+;; GETTERS
+
+int get_external_id() method_id {
+    load_data();
+    return external_id;
+}
+
+int get_status() method_id {
+    load_data();
+    return status;
+}
+
+int get_can_be_destroyed() method_id {
+    load_data();
+    return can_be_destroyed;
+}

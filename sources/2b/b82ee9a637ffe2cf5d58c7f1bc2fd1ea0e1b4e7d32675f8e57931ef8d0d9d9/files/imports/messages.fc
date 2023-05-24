@@ -1,0 +1,74 @@
+{-
+    messages.func
+
+    Provides easy function to craft messages.
+    https://github.com/TonoxDeFi/open-contracts/tree/main/contracts/messages
+    https://docs.ton.org/develop/smart-contracts/messages
+-}
+
+;; MODES
+const NORMAL = 0;
+const CARRY_REMAINING_GAS = 64;
+const CARRY_ALL_BALANCE = 128;
+
+;; FLAGS
+const PAID_EXTERNALLY = 1;
+const IGNORE_ERRORS = 2;
+const DESTROY_IF_ZERO = 32;
+
+cell messages::create_empty(int amount, slice to) inline_ref {
+    return begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(0, 107) ;; without body
+        .end_cell();
+}
+
+
+cell messages::create_simple(int amount, slice to, cell body) inline_ref {
+    return begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(1, 107) ;; with body
+        .store_ref(body)
+        .end_cell();
+}
+
+cell messages::create_nobounce(int amount, slice to, cell body) inline_ref {
+    return begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(1, 107) ;; with body
+        .store_ref(body)
+        .end_cell();
+}
+
+cell messages::create_with_stateinit(int amount, slice to, cell state_init, cell body) inline_ref {
+    return begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(7, 108) ;; with state init and body
+        .store_ref(state_init)
+        .store_ref(body)
+        .end_cell();
+}
+
+() messages::send_empty(int amount, slice to, int mode) impure inline_ref {
+    send_raw_message(messages::create_empty(amount, to), mode);
+}
+
+() messages::send_simple(int amount, slice to, cell body, int mode) impure inline_ref {
+    send_raw_message(messages::create_simple(amount, to, body), mode);
+}
+
+() messages::send_nobounce(int amount, slice to, cell body, int mode) impure inline_ref {
+    send_raw_message(messages::create_nobounce(amount, to, body), mode);
+}
+
+() messages::send_with_stateinit(int amount, slice to, cell state_init, cell body, int mode) impure inline_ref {
+    send_raw_message(messages::create_with_stateinit(amount, to, state_init, body), mode);
+}
