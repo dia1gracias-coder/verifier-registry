@@ -1,0 +1,55 @@
+() handle_deposit(int user, int amount) impure {
+    ;; check if amount is greater than minimum deposit
+    throw_unless(err::invalid_deposit_amount(), amount >= min::user_deposit());
+    ;; load user information from users hashmap
+    load_user(user);    
+    
+    int currentTime = now();
+    if (ctx_user_startloan_at == 0) {
+        ctx_user_startloan_at = currentTime;
+    }
+
+    int timelapsed = currentTime - ctx_user_startloan_at;
+    ;; check if passed more than 30 days since he borrowed money
+    if ((timelapsed > 30 * 24 * 60 * 60) & (ctx_user_debt > 0)) {
+        ctx_user_blacklisted = true;
+        store_user();    
+        store_base_data();
+        throw(err::unathorized_user());
+    }
+
+    ;; computing user debt to check what amount
+    ;; of the deposit covers the debt
+    ctx_user_acc_interest = compute_acc_interest(timelapsed, ctx_user_borrowed_amount);    
+    ctx_user_debt = ctx_user_borrowed_amount + ctx_user_acc_interest;
+    ;; if the user borrowed some money previously
+    ;; count this as a repayment of partial repayment
+    if (ctx_user_debt >= amount) {
+        ctx_user_debt -= amount - receipt_price();
+    } else {
+        ;; the debt is payable
+        amount -= ctx_user_debt - receipt_price();
+        ctx_user_debt = 0;
+        ctx_user_borrowed_amount = 0;
+        ctx_user_acc_interest = 0;
+        ;; add the rest to the balance
+        ctx_user_balance += amount - receipt_price();
+    }
+    
+    ;; check that the balance after this additional ammount
+    ;; doesn't surpass the maximum allowed balance
+    throw_unless(err::max_limit_balance(), max::user_balance() >= ctx_user_balance);
+
+    ;; send transaction receipt that we received the deposit without problem
+    var address = serialize_work_addr(user);
+    send_text_message(
+        address,
+        receipt_price(),
+        send_mode::default(),
+        begin_cell()
+            .store_accepted_deposit(amount, ctx_user_balance)        
+    );
+
+    store_user();
+    store_base_data();
+}
