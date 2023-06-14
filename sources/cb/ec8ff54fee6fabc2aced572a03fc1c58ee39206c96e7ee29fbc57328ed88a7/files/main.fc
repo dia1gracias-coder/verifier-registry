@@ -1,0 +1,41 @@
+#include "stdlib.fc";
+
+int get_int() method_id
+{
+    return 23;
+}
+
+slice get_version() method_id {
+    return "v0.1";
+}
+
+slice get_slice() method_id
+{
+    return "Hello world!";
+}
+
+;; This method's test fails.
+;; See more detailed description in test.specs.js
+cell get_cell() method_id
+{
+    return begin_cell()
+    .store_uint( 11, 32 )
+    .end_cell();
+}
+
+cell getter_with_cell_arg( cell arg ) method_id
+{
+    return arg;
+}
+
+slice getter_with_slice_arg( slice arg ) method_id
+{
+    return arg;
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {  ;; well known function signature
+    if (in_msg_body.slice_empty?()) {         ;; check if incoming message is empty (with no body)
+        return ();                              ;; return successfully and accept an empty message
+    }
+    int op = in_msg_body~load_uint(32);                                     ;; parse the operation type encoded in the beginning of msg body
+}
