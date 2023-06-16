@@ -1,0 +1,139 @@
+;; xJetSwap proxy wallet contract by github.com/delpydoc
+
+const op::swap = 0x73776170;
+const op::upgrade = 0x7fef947;
+const op::transfer_notification = 0x7362d09c;
+
+global slice store::platform_address;
+global cell store::user_id;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    store::platform_address = ds~load_msg_addr();
+    store::user_id = ds~load_ref();
+    ds.end_parse();
+}
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_slice(store::platform_address)
+            .store_ref(store::user_id)
+            .end_cell()
+    );
+}
+
+() execute_commands(slice task) impure {
+    while (task.slice_bits()) {
+        int mode = task~load_uint(8);
+        if (mode == 255) {
+            int op = task~load_uint(32);
+            if (op == op::upgrade) {
+                cell new_code = task~load_ref();
+                cell new_data = task~load_ref();
+                set_code(new_code);
+                set_data(new_data);
+            }
+        } else {
+            send_raw_message(task~load_ref(), mode);
+        }
+    }
+}
+
+() handle_transaction(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure inline {
+    slice cs = in_msg_full.begin_parse();
+    cs~skip_bits(4);
+    slice sender_address = cs~load_msg_addr();
+    if (equal_slices(sender_address, store::platform_address)) {
+        execute_commands(in_msg_body);
+        return ();
+    }
+
+    int op = slice_bits(in_msg_body) >= 32 ? in_msg_body~load_uint(32) : 0;
+    if (op == op::transfer_notification) {
+        int query_id = in_msg_body~load_uint(64);
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        cell msg_body = begin_cell()
+            .store_uint(0xf8a7ea5, 32)
+            .store_uint(query_id, 64)
+            .store_coins(jetton_amount)
+            .store_slice(store::platform_address)
+            .store_slice(store::platform_address)
+            .store_uint(0, 1)
+            .store_coins(1)
+            .store_uint(1, 1)
+            .store_ref(
+                begin_cell()
+                    .store_ref(store::user_id)
+                    .store_slice(in_msg_body)
+                    .end_cell()
+            )
+            .end_cell();
+
+        builder msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body);
+
+        send_raw_message(msg.end_cell(), 2 + 128);
+    } else {
+        if (op == op::swap) {
+            int fee = in_msg_body~load_coins();
+            send_raw_message(
+                begin_cell()
+                    .store_uint(0x18, 6)
+                    .store_slice(store::platform_address)
+                    .store_coins(fee)
+                    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                    .store_uint(0xd53276db, 32)
+                    .end_cell(), 2
+            );
+        }
+
+        if (my_balance >= 100000000) {
+            cell msg_body = begin_cell()
+                .store_uint(0x746f6e73, 32)
+                .store_uint((my_balance - msg_value) > 200000000 ? my_balance : msg_value, 64)
+                .store_ref(store::user_id)
+                .store_ref(
+                    begin_cell()
+                        .store_uint(op::swap, 32)
+                        .store_slice(in_msg_body)
+                        .end_cell()
+                )
+                .end_cell();
+
+            builder msg = begin_cell()
+                .store_uint(0x10, 6)
+                .store_slice(store::platform_address)
+                .store_coins(0)
+                .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_ref(msg_body);
+
+            send_raw_message(msg.end_cell(), 2 + 128);
+        }
+    }
+}
+
+() on_upgrade(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure method_id (0x137) {
+    execute_commands(in_msg_body);
+    return ();
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { return (); } ;; ignore all bounced messages
+
+    load_data();
+    handle_transaction(my_balance, msg_value, in_msg_full, in_msg_body);
+    return ();
+}
+
+;; Get methods
+int codebase_version() method_id {
+    return 104;
+}
