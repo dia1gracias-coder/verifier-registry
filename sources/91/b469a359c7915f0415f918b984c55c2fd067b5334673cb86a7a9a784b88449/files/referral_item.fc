@@ -1,0 +1,86 @@
+;; #include "imports/stdlib.fc";
+;; #include "imports/referral-utils.fc";
+;; #include "imports/messages.fc";
+;; #include "imports/constants.fc";
+
+global int storage::is_deployed;
+global slice storage::owner_address;
+global slice storage::master_address;
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::is_deployed = ds~load_int(1);
+    storage::owner_address = ds~load_msg_addr(); ;; user address
+    storage::master_address = ds~load_msg_addr(); ;; referral master address
+    ;;     ds.end_parse();
+}
+
+() save_data() impure inline {
+    set_data(
+            pack_referral_data(
+                    storage::is_deployed,
+                    storage::owner_address,
+                    storage::master_address
+            )
+    );
+}
+
+() register_new_ref(slice from_address, int msg_value) impure inline {
+    cell body = begin_cell()
+            .store_uint(op::new_ref, 32)
+            .store_slice(storage::owner_address) ;; reward to address
+            .store_slice(from_address) ;; referrer address
+            .end_cell();
+
+    send_simple_message(msg_value, storage::master_address, body, 0);
+}
+
+() send_success_msg(int msg_value, slice reward_to_address) impure inline {
+    cell body = begin_cell()
+            .store_uint(op::success_ref, 32)
+            .store_slice(reward_to_address) ;; reward to address
+            .store_slice(storage::owner_address) ;; referrer address
+            .end_cell();
+
+    send_simple_message(msg_value, storage::master_address, body, 0);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+
+    load_data();
+    slice from_address = cs~load_msg_addr();
+    throw_if(error::nothing_for_owner, equal_slices(storage::owner_address, from_address));
+
+    if (equal_slices(storage::master_address, from_address)) {
+        int op = in_msg_body~load_uint(32);
+        if (op == op::deploy_ref_item) {
+            throw_if(error::already_deployed, storage::is_deployed);
+            storage::is_deployed = -1;
+
+            slice reward_to_address = in_msg_body~load_msg_addr();
+            ifnot (equal_slices(reward_to_address, storage::master_address)) {
+                send_success_msg(const::min_ton, reward_to_address);
+            }
+
+            save_data();
+            int txt_msg = 2192949279701049734741439504264102916396516910564894663540; ;; "Your invitation contract" | 192 bits
+            int amount = msg_value - const::min_ton - const::min_for_storage - const::min_for_deploy;
+            if (amount <= 0) {
+                amount = 1;
+            }
+            send_text_msg(storage::owner_address, amount, 1, begin_cell().store_uint(txt_msg, 192));
+            return ();
+        }
+        throw(error::uknown); ;; This is impossible to happens
+    }
+
+    ;; Ask referral master to deploy referral item
+    throw_unless(error::not_enough_funds, msg_value >= const::min_ton_for_ref);
+    register_new_ref(from_address, msg_value - const::min_for_storage);
+    return ();
+}
