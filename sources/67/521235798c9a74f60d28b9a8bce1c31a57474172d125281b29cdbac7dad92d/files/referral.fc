@@ -1,0 +1,162 @@
+;; #include "imports/stdlib.fc";
+;; #include "imports/constants.fc";
+;; #include "imports/messages.fc";
+;; #include "imports/referral-utils.fc";
+;; #include "imports/jetton-utils.fc";
+
+global int storage::is_started;
+global int storage::invites;
+global int storage::total_supply;
+global int storage::total_burn;
+global int storage::treasure;
+global slice storage::minter_address;
+global cell storage::referral_item_code;
+global cell storage::jetton_item_code;
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::is_started = ds~load_int(1);
+    storage::invites = ds~load_uint(64);
+    storage::total_supply = ds~load_coins();
+    storage::total_burn = ds~load_coins();
+    storage::treasure = ds~load_coins();
+    storage::minter_address = ds~load_msg_addr();
+    storage::referral_item_code = ds~load_ref();
+    storage::jetton_item_code = ds~load_ref();
+
+    ds.end_parse();
+}
+
+() save_data() impure inline {
+    set_data(
+            begin_cell().store_int(storage::is_started, 1)
+                    .store_uint(storage::invites, 64)
+                    .store_coins(storage::total_supply)
+                    .store_coins(storage::total_burn)
+                    .store_coins(storage::treasure)
+                    .store_slice(storage::minter_address)
+                    .store_ref(storage::referral_item_code)
+                    .store_ref(storage::jetton_item_code)
+                    .end_cell()
+    );
+}
+
+() mint_reward_tokens(int reward, slice addr_from, slice addr_to) impure inline_ref {
+    builder bodyFrom = create_jetton_mint_body(now(), 40000000, reward / 2, addr_from);
+    builder bodyTo = create_jetton_mint_body(now() + 1, 40000000, reward / 2, addr_to);
+    send_simple_message(const::min_for_mint, storage::minter_address, bodyTo.end_cell(), 1);
+    send_simple_message(const::min_for_mint, storage::minter_address, bodyFrom.end_cell(), 1);
+}
+
+() deploy_new_ref(slice from_address, slice reward_to_address, int msg_value) impure {
+    cell state_init = calculate_referral_state_init(from_address, my_address(), storage::referral_item_code);
+    slice to_wallet_address = calculate_referral_address(state_init);
+    cell body = begin_cell()
+            .store_uint(op::deploy_ref_item, 32)
+            .store_slice(reward_to_address)
+            .end_cell();
+    send_message_with_stateinit(msg_value, to_wallet_address, state_init, body, 1);
+}
+
+(int) get_tokens_for_reward() inline {
+    int tokens = get_reward_by_invites(storage::invites);
+    return tokens * 1000000000;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+
+    slice from_address = cs~load_msg_addr();
+    (int wc, _) = parse_std_addr(from_address);
+    throw_unless(error::wrong_workchain, wc == 0);
+    load_data();
+
+    if (storage::is_started == 0) { ;; This is the first interaction without any rewards
+        storage::is_started = -1;
+        deploy_new_ref(from_address, my_address(), msg_value - const::min_for_storage);
+        save_data();
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::transfer_notification) { ;; Someone wants to burn tokens and get min price for it
+        throw_unless(error::not_enough_funds, msg_value >= 100000000); ;; 0.1
+        (int query_id, int jetton_amount, slice from_user) = (in_msg_body~load_uint(64), in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+        slice jetton_wallet_address = calculate_user_jetton_wallet_address(my_address(), storage::minter_address, storage::jetton_item_code);
+        throw_unless(error::wrong_token, equal_slices(from_address, jetton_wallet_address));
+        int price = (storage::total_supply - storage::total_burn) / storage::treasure;
+        int amount = jetton_amount / price;
+        storage::treasure -= amount;
+        storage::total_burn += jetton_amount;
+        save_data();
+        if (amount > 0) {
+            send_empty_message(amount, from_user, 0);
+        } else {
+            send_empty_message(1, from_user, 0);
+        }
+        return ();
+    }
+
+    if (op == op::new_ref) { ;; Someone get a new referral
+        throw_unless(error::is_done, storage::total_supply <= const::max_supply);
+        slice reward_to = in_msg_body~load_msg_addr();
+        slice user_address = in_msg_body~load_msg_addr();
+        deploy_new_ref(user_address, reward_to, msg_value);
+        save_data();
+        return ();
+    }
+
+    if (op == op::success_ref) {
+        throw_unless(error::is_done, storage::total_supply <= const::max_supply);
+        slice referrer_user_from = in_msg_body~load_msg_addr();
+        slice referrer_user_came = in_msg_body~load_msg_addr();
+        slice ref_item_addr = calculate_user_referral_address(referrer_user_came, my_address(), storage::referral_item_code);
+        throw_unless(error::wrong_referral_address, equal_slices(ref_item_addr, from_address));
+        msg_value -= const::min_for_treasure - (const::min_for_mint * 2);
+        if (my_balance - storage::treasure < const::min_for_storage) {
+            msg_value -= const::min_for_storage;
+        }
+        storage::invites += 1;
+        storage::treasure += const::min_for_treasure;
+        int reward = get_tokens_for_reward();
+        storage::total_supply += reward;
+        mint_reward_tokens(reward, referrer_user_from, referrer_user_came);
+        save_data();
+        return ();
+    }
+}
+
+(slice) get_minter_address() method_id {
+    load_data();
+    return storage::minter_address;
+}
+
+(int) get_current_reward() method_id {
+    load_data();
+    return get_tokens_for_reward();
+}
+
+(int) get_burn_price() method_id {
+    load_data();
+    return (storage::total_supply - storage::total_burn) / storage::treasure;
+}
+
+(int) get_invites() method_id {
+    load_data();
+    return storage::invites;
+}
+
+(int, int, int, int) get_balances() method_id {
+    load_data();
+    return (storage::total_supply, storage::total_burn, storage::treasure, const::max_supply);
+}
+
+(slice) get_ref_address(slice addr) method_id {
+    load_data();
+    return calculate_referral_address(calculate_referral_state_init(addr, my_address(), storage::referral_item_code));
+}

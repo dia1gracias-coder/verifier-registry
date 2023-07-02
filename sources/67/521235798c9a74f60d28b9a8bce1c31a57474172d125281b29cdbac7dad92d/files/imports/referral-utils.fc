@@ -1,0 +1,72 @@
+cell pack_referral_data(int is_deployed, slice owner_address, slice main_ref_address) inline {
+    return begin_cell()
+            .store_int(is_deployed, 1)
+            .store_slice(owner_address)
+            .store_slice(main_ref_address)
+            .end_cell();
+}
+
+cell calculate_referral_state_init(slice owner_address, slice main_ref_address, cell referral_wallet_code) inline {
+    return begin_cell()
+            .store_uint(0, 2)
+            .store_dict(referral_wallet_code)
+            .store_dict(pack_referral_data(0, owner_address, main_ref_address))
+            .store_uint(0, 1)
+            .end_cell();
+}
+
+slice calculate_referral_address(cell state_init) inline {
+    return begin_cell().store_uint(4, 3)
+            .store_int(0, 8)
+            .store_uint(cell_hash(state_init), 256)
+            .end_cell()
+            .begin_parse();
+}
+
+slice calculate_user_referral_address(slice owner_address, slice main_ref_address, cell code) inline {
+    return calculate_referral_address(calculate_referral_state_init(owner_address, main_ref_address, code));
+}
+
+(int) get_reward_by_invites(int invites) {
+    if (invites == 1) {
+        return 8192;
+    }
+    if (invites <= 2) {
+        return 4096;
+    }
+    if (invites <= 8) {
+        return 2048;
+    }
+    if (invites <= 32) {
+        return 1024;
+    }
+    if (invites <= 128) {
+        return 512;
+    }
+    if (invites <= 512) {
+        return 256;
+    }
+    if (invites <= 2048) {
+        return 128;
+    }
+    if (invites <= 8192) {
+        return 64;
+    }
+    if (invites <= 32768) {
+        return 32;
+    }
+    if (invites <= 131072) {
+        return 16;
+    }
+    if (invites <= 524288) {
+        return 8;
+    }
+    if (invites <= 2097152) {
+        return 4;
+    }
+    if (invites <= 8388608) {
+        return 2;
+    }
+
+    return 0;
+}

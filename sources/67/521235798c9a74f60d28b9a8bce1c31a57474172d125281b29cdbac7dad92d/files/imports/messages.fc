@@ -1,0 +1,78 @@
+const NORMAL = 0;
+const PAID_EXTERNALLY = 1;
+const IGNORE_ERRORS = 2;
+
+const DESTROY_IF_ZERO = 32;
+const CARRY_REMAINING_GAS = 64;
+const CARRY_ALL_BALANCE = 128;
+
+() send_empty_message(int amount, slice to, int mode) impure inline_ref {
+    cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to)
+            .store_coins(amount)
+            .store_uint(0, 107)
+            .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() send_simple_message(int amount, slice to, cell body, int mode) impure inline_ref {
+    cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to)
+            .store_coins(amount)
+            .store_uint(1, 107)
+            .store_ref(body)
+            .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() send_message_with_stateinit(int amount, slice to, cell state_init, cell body, int mode) impure inline_ref {
+    cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to)
+            .store_coins(amount)
+            .store_uint(7, 108)
+            .store_ref(state_init)
+            .store_ref(body)
+            .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() send_text_msg(slice to_addr, int value, int mode, builder content) impure {
+    var body = begin_cell()
+            .store_uint(0, 32)
+            .store_builder(content)
+            .end_cell();
+
+    var msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(to_addr)
+            .store_coins(value)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(body)
+            .end_cell();
+
+    send_raw_message(msg, mode);
+}
+
+(builder) create_jetton_mint_body(int query_id, int fwd_amount, int jetton_amount, slice to) inline {
+    cell body = begin_cell()
+            .store_uint(0x178d4519, 32)
+            .store_uint(query_id, 64)
+            .store_coins(jetton_amount)
+            .store_slice(to)
+            .store_slice(to) ;; return .store_uint() if error
+;;             .store_uint(0, 2)
+            .store_uint(0, 1)
+            .store_coins(fwd_amount / 2) ;; forward_ton_amount
+            .store_uint(0, 1)
+            .end_cell();
+
+    return begin_cell()
+            .store_uint(21, 32)
+            .store_uint(query_id, 64)
+            .store_slice(to)
+            .store_coins(fwd_amount)
+            .store_ref(body);
+}
