@@ -1,0 +1,473 @@
+int int::ownership() asm "0x05138d91 PUSHINT";
+int int::transfer() asm "0x5fcc3d14 PUSHINT";
+int int::withdraw() asm "0x186ac191 PUSHINT";
+
+int ext::start() asm "0x13484a92 PUSHINT";
+int ext::stop() asm "0x94fa2312 PUSHINT";
+int ext::royalty() asm "0x68ab4a9c PUSHINT";
+int ext::withdraw() asm "0x84113af PUSHINT";
+int ext::transfer() asm "0x932348aa PUSHINT";
+
+int const::nft_max() asm "10000 PUSHINT";
+int const::workchain() asm "0 PUSHINT";
+int const::bets_key_len() asm "16 PUSHINT";
+int const::min_commission() asm "100000000 PUSHINT";  ;; 0.1 TON
+int const::withdraw_cost() asm "100000000 PUSHINT";  ;; 0.1 TON
+int const::min_price() asm "150000000 PUSHINT";  ;; 0.15 TON
+
+int sendmode::carry_all_balance() asm "128 PUSHINT";
+int sendmode::pay_fees_separately() asm "1 PUSHINT";
+
+int state::running() asm "1 PUSHINT";
+int state::stopped() asm "0 PUSHINT";
+
+int tvm::equal_slices (slice a, slice b) asm "SDEQ";
+cell tvm::new_dict() asm "NEWDICT";
+;;
+
+(cell) empty_cell() {
+    return begin_cell().end_cell();
+}
+
+() send_bounceable_message(slice to_addr, int value, cell body, int mode) impure {
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to_addr)
+        .store_coins(value)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body)
+        .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() send_text_message(slice to_addr, int value, int mode, slice text) impure {
+    var body = begin_cell()
+        .store_uint(0, 32)
+        .store_slice(text)
+        .end_cell();
+    send_bounceable_message(to_addr, value, body, mode);
+}
+
+() send_nft(slice to_addr, slice nft) impure {
+    var body = begin_cell()
+        .store_uint(int::transfer(), 32)
+        .store_uint(0, 64)
+        .store_slice(to_addr)           ;; new_owner_address
+        .store_slice(to_addr)           ;; response_address
+        .store_uint(0, 1)               ;; empty custom_payload
+        .store_coins(0)                 ;; forward amount to new_owner_address
+        .store_uint(0, 1)               ;; empty forward_payload
+        .end_cell();
+    send_bounceable_message(nft, const::withdraw_cost(), body, sendmode::pay_fees_separately());
+}
+
+(slice) get_item_address_by_index(int idx, cell code, slice collection_address) {
+    cell data = begin_cell().store_uint(idx, 64).store_slice(collection_address).end_cell();
+    cell state_init = begin_cell().store_uint(0, 2).store_dict(code).store_dict(data).store_uint(0, 1).end_cell();
+
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(const::workchain(), 8)
+        .store_uint(cell_hash(state_init), 256)
+    .end_cell()
+    .begin_parse();
+}
+
+(int) ensure_item_in_collection(int idx, slice addr, cell code, slice collection_address) impure {
+    throw_if(1000, (idx < 0) | idx >= const::nft_max());
+    throw_if(1001, ~ tvm::equal_slices(get_item_address_by_index(idx, code, collection_address), addr));
+    return 0;
+}
+
+() set_random_seed() impure {
+    int seed = cell_hash(begin_cell()
+        .store_uint(now(), 256)
+        .store_uint(block_lt(), 256)
+        .store_uint(cur_lt(), 256)
+    .end_cell());
+    randomize(seed);
+}
+
+(slice) calc_winner(cell nft_data, cell bets_data, cell state_data) impure {
+    slice nft_slice = nft_data.begin_parse();
+    slice collection_address = nft_slice~load_msg_addr();
+    cell item_code = nft_slice.preload_ref();
+
+    int count = state_data.begin_parse().preload_uint(16);
+    if (count < 1) {
+        return null();
+    }
+
+    set_random_seed();
+    int winner_number = 1 + rand(count);
+
+    int flag = -1;
+    slice winner = null();
+    while ((count > 0) & flag) {
+        (int item_idx, slice val, int status) = bets_data~udict::delete_get_min(const::bets_key_len());
+        throw_if(500, ~ status);
+
+        if (count == winner_number) {
+            winner = val;
+            flag = 0;
+        }
+        count -= 1;
+    }
+    return winner;
+}
+
+() recv_internal(int balance, int in_msg_value, cell in_msg, slice in_msg_body) {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {  ;; ignore all bounced messages
+        return ();
+    }
+
+    ;; load & reserve commision so we couldn't spend it
+    slice ds = get_data().begin_parse();
+    cell royalty_data = ds~load_ref();
+    slice royalty_slice = royalty_data.begin_parse();
+    int commission = royalty_slice~load_coins();
+    throw_if(100, in_msg_value < commission + const::min_price());
+
+    ;; reserve
+    raw_reserve(balance - in_msg_value + commission, 0);
+    ;;
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == int::ownership()) {
+        ;; ensure we're running
+        slice last = ds.slice_last(64 + 1);
+        int state = last~load_uint(1);
+        throw_if(200, state != state::running());
+
+        ;; loading nft data
+        cell nft_data = ds~load_ref();
+        slice nft_slice = nft_data.begin_parse();
+        slice collection_address = nft_slice~load_msg_addr();
+        cell item_code = nft_slice.preload_ref();
+
+        ;; checking that the nft is in the collection
+        slice prev_owner = in_msg_body~load_msg_addr();
+        slice forward_payload = in_msg_body~load_ref().begin_parse();
+        throw_if(201, forward_payload.slice_bits() != 16);
+
+        int item_idx = forward_payload.preload_uint(16);
+        slice item_address = cs~load_msg_addr();
+
+        ensure_item_in_collection(item_idx, item_address, item_code, collection_address);
+
+        ;; processing contract data updates
+        cell bets_data = ds~load_ref();
+        cell bets_dict = bets_data.begin_parse().preload_dict();
+        bets_dict~udict_set(const::bets_key_len(), item_idx, prev_owner);
+
+        cell state_data = ds~load_ref();
+        int count = state_data.begin_parse().preload_uint(16);
+
+        ;; returning text msg: #success
+        slice text = begin_cell().store_uint(0x73756363657373, 7 * 8).end_cell().begin_parse();
+        send_text_message(prev_owner, 0, sendmode::carry_all_balance(), text);
+
+        set_data(
+            begin_cell()
+            .store_slice(ds)
+            .store_ref(royalty_data)
+            .store_ref(nft_data)
+            .store_ref(begin_cell().store_dict(bets_dict).end_cell())  ;; TODO: understand overflow here someday
+            .store_ref(begin_cell().store_uint(count + 1, 16).end_cell())
+            .end_cell()
+        );
+        return();
+    }
+
+    if (op == int::withdraw()) {
+        ;; ensure we're stopped
+        slice last = ds.slice_last(64 + 1);
+        int state = last~load_uint(1);
+        throw_if(300, state != state::stopped());
+
+        ;; loading nft data
+        cell nft_data = ds~load_ref();
+        slice nft_slice = nft_data.begin_parse();
+        slice collection_address = nft_slice~load_msg_addr();
+        cell item_code = nft_slice.preload_ref();
+
+        ;; loading bets data
+        cell bets_data = ds~load_ref();
+        cell bets_dict = bets_data.begin_parse().preload_dict();
+        cell state_data = ds~load_ref();
+        slice state_slice = state_data.begin_parse();
+        int count = state_slice~load_uint(16);
+
+        ;; checking that it's not already withdrawn
+        int payed = state_slice~load_uint(1);
+        throw_if(301, payed != 0);
+
+        ;; winner assign & checks
+        slice winner = cs~load_msg_addr();
+        throw_if(302, ~ tvm::equal_slices(winner, state_slice));
+
+        int flag = -1;
+        while (flag) {
+            (int item_idx, slice val, int status) = bets_dict~udict::delete_get_min(const::bets_key_len());
+
+            if (~ status) {
+                flag = 0;
+            } else {
+                slice nft = get_item_address_by_index(item_idx, item_code, collection_address);
+                send_nft(winner, nft);
+            }
+        }
+
+        ;; returning text msg: #success
+        slice text = begin_cell().store_uint(0x73756363657373, 7 * 8).end_cell().begin_parse();
+        send_text_message(winner, 0, sendmode::carry_all_balance(), text);
+
+        ;; storing updates
+        set_data(
+            begin_cell()
+            .store_slice(ds)
+            .store_ref(royalty_data)
+            .store_ref(nft_data)
+            .store_ref(bets_data)
+            .store_ref(
+                begin_cell()
+                    .store_uint(count, 16)
+                    .store_uint(1, 1)   ;; payed
+                    .store_slice(winner)
+                    .end_cell()
+            )
+            .end_cell()
+        );
+        return();
+    }
+
+    throw(0xffff);
+}
+
+() recv_external(slice in_msg) {
+    slice signature = in_msg~load_bits(512);
+
+    slice cs = in_msg;
+    int seqno = cs~load_uint(32);
+    int valid_until = cs~load_uint(64);
+    int op = cs~load_uint(32);
+
+    throw_if(100, valid_until <= now());
+
+    slice ds = get_data().begin_parse();
+    int pk = ds~load_uint(256);
+    int stored_seqno = ds~load_uint(32);
+
+    throw_if(101, seqno != stored_seqno);
+    throw_if(102, ~ check_signature(slice_hash(in_msg), signature, pk));
+
+    accept_message();
+
+    int state = ds~load_uint(1);
+
+    cell royalty_data = ds~load_ref();
+    cell nft_data = ds~load_ref();
+
+    if (op == ext::start()) {
+        throw_if(200, state != state::stopped());
+
+        set_data(
+            begin_cell()
+            .store_uint(pk, 256)
+            .store_uint(seqno + 1, 32)
+            .store_uint(state::running(), 1)
+            .store_uint(now(), 64)
+            .store_ref(royalty_data)
+            .store_ref(nft_data)
+            .store_ref(begin_cell().store_dict(tvm::new_dict()).end_cell())
+            .store_ref(begin_cell().store_uint(0, 16).end_cell())
+            .end_cell()
+        );
+        return ();
+    }
+
+    if (op == ext::stop()) {
+        throw_if(300, state != state::running());
+
+        cell bets_data = ds~load_ref();
+        cell state_data = ds.preload_ref();
+        cell new_state_data = state_data;
+
+        slice winner = calc_winner(
+            nft_data,
+            bets_data.begin_parse().preload_dict(),
+            state_data
+        );
+        if (~ null?(winner)) {
+            new_state_data = begin_cell()
+                .store_slice(state_data.begin_parse())
+                .store_uint(0, 1)  ;; not payed
+                .store_slice(winner)
+                .end_cell();
+        }
+
+        set_data(
+            begin_cell()
+            .store_uint(pk, 256)
+            .store_uint(seqno + 1, 32)
+            .store_uint(state::stopped(), 1)
+            .store_uint(now(), 64)
+            .store_ref(royalty_data)
+            .store_ref(nft_data)
+            .store_ref(bets_data)
+            .store_ref(new_state_data)
+            .end_cell()
+        );
+        return ();
+    }
+
+    if (op == ext::royalty()) {
+        cell new_royalty_data = cs~load_ref();
+        slice new_royalty_slice = new_royalty_data.begin_parse();
+        int new_commission = new_royalty_slice~load_coins();
+
+        throw_if(400, new_commission < const::min_commission());
+        parse_std_addr(new_royalty_slice);
+
+        int ts = ds.preload_uint(64);
+        cell bets_data = ds~load_ref();
+        cell state_data = ds.preload_ref();
+
+        set_data(
+            begin_cell()
+            .store_uint(pk, 256)
+            .store_uint(seqno + 1, 32)
+            .store_uint(state, 1)
+            .store_uint(ts, 64)
+            .store_ref(new_royalty_data)
+            .store_ref(nft_data)
+            .store_ref(bets_data)
+            .store_ref(state_data)
+            .end_cell()
+        );
+        return ();
+    }
+
+    ;; seqno-only operations
+
+    int processed = 0;
+
+    if (op == ext::withdraw()) {
+        slice addr = royalty_data.begin_parse();
+        addr~load_coins();
+        send_bounceable_message(addr, 0, empty_cell(), sendmode::carry_all_balance());
+        processed = -1;
+    }
+
+    if (op == ext::transfer()) {
+        cell nft_container = cs~load_ref();
+        slice nft_address = nft_container.begin_parse();
+        parse_std_addr(nft_address);
+
+        slice addr = royalty_data.begin_parse();
+        addr~load_coins();
+
+        send_nft(addr, nft_address);
+        processed = -1;
+    }
+
+    if (processed) {
+        int ts = ds.preload_uint(64);
+        cell bets_data = ds~load_ref();
+        cell state_data = ds.preload_ref();
+        set_data(
+            begin_cell()
+            .store_uint(pk, 256)
+            .store_uint(seqno + 1, 32)
+            .store_uint(state, 1)
+            .store_uint(ts, 64)
+            .store_ref(royalty_data)
+            .store_ref(nft_data)
+            .store_ref(bets_data)
+            .store_ref(state_data)
+            .end_cell()
+        );
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+int get_seqno() method_id {
+    slice ds = get_data().begin_parse();
+    ds~skip_bits(256);
+    return ds.preload_uint(32);
+}
+
+int get_state() method_id {
+    slice ds = get_data().begin_parse();
+    ds~skip_bits(256 + 32);
+    return ds.preload_uint(1);
+}
+
+int get_ts() method_id {
+    slice ds = get_data().begin_parse();
+    ds~skip_bits(256 + 32 + 1);
+    return ds.preload_uint(64);
+}
+
+int get_commission() method_id {
+    slice ds = get_data().begin_parse();
+    slice royalty = ds.preload_ref().begin_parse();
+    return royalty~load_coins();
+}
+
+int get_bets_count() method_id {
+    slice ds = get_data().begin_parse();
+    ds~load_ref();
+    ds~load_ref();
+    ds~load_ref();
+    slice state = ds.preload_ref().begin_parse();
+    return state.preload_uint(16);
+}
+
+int get_user_bets_count(slice address) method_id {
+    parse_std_addr(address);
+
+    slice ds = get_data().begin_parse();
+    ds~load_ref();
+    ds~load_ref();
+    cell bets_data = ds~load_ref();
+    cell bets_dict = bets_data.begin_parse().preload_dict();
+
+    int count = 0;
+    int flag = -1;
+    while (flag) {
+        (int idx, slice current_address, int status) = bets_dict~udict::delete_get_min(const::bets_key_len());
+        if (~ status) {
+            flag = 0;
+        } else {
+            if (tvm::equal_slices(address, current_address)) {
+                count += 1;
+            }
+        }
+    }
+    return count;
+}
+
+slice get_winner() method_id {
+    slice ds = get_data().begin_parse();
+    ds~load_ref();
+    ds~load_ref();
+    ds~load_ref();
+    slice state = ds.preload_ref().begin_parse();
+    state~skip_bits(16);  ;; count skip
+    throw_if(404, slice_bits(state) < 1);
+    state~skip_bits(1);  ;; payed flag skip
+    return state;
+}
+
+;; signature: cc803fca4800f5d02b183babb919c2d63d4df455
