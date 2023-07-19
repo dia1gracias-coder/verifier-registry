@@ -1,0 +1,109 @@
+#include "imports/stdlib.fc";
+#include "imports/utils.fc";
+
+int get_random_user(int user_count, int seed_int) method_id {
+    ;; Not as security, because of internal seed, but can be used by users if needed
+    set_seed(seed_int);
+
+    int random_user = rand(user_count);
+
+    return random_user;
+}
+
+(slice, (int)) ~load_decimal_symbol(slice source) {
+    ;; load decimal from bits using utf-8 table
+    int n = source~load_uint(8);
+    n = n - 48;
+    throw_unless(400, n >= 0);
+    throw_if(400, n > 9);
+    return (source, (n));
+}
+
+int get_message_number(slice msg){
+    ;; parser which convert slice to int
+    ;; slice "1234" -> int 1234
+
+    int op = msg~load_uint(32); ;; get op return code
+
+    if (op == 0) { ;; if it 0, the it has message
+        ;; each number is stored in 8 bits
+        int value_amount = 0; ;; create int which will convert our number
+
+        int bits_amount = msg.slice_bits(); ;; get how many bits our message has
+
+        int repeat_amount = bits_amount ~/ 8; ;; divide it on 8 and get how many times we need to go throught number
+
+        repeat(repeat_amount){
+            ;; "432"
+            ;; first number is 4 value_amount is 0
+            ;; we multiply 0*10 and get 0 then adding 4
+            ;; in next iteration we multiply 4*10 and get 40 and adding 3
+            ;; in last iteration we got 43 * 10 = 430 and add 2, here our solution 432 as int
+            var next_decimal = msg~load_decimal_symbol();
+
+            value_amount *= 10;
+            value_amount += next_decimal;
+        }
+
+        return value_amount;
+    }
+
+    return 0;
+}
+
+slice number_to_slice(int number) {
+    ;; convert int to slice
+    var msg = begin_cell();
+
+    var msg = store_signed(msg, number).end_cell(); ;; store signed using loop decode int to slice
+
+    return msg.begin_parse();
+}
+
+() recv_internal (cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_bits() < 32) { ;; ignore empty transfer
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr(); ;;  after flag we can get address
+
+    int user_count = get_message_number(in_msg_body); ;; convert message comment to int
+
+    var message_hash = slice_hash(in_msg_body); ;; get hash from slice
+    var cs_hash = slice_hash(cs); ;; here too
+
+    int hash = cell_hash( ;; make hash which will contain message, cs and now time for better randomness
+        begin_cell()
+            .store_uint(message_hash, 256)
+            .store_uint(cs_hash, 256)
+            .store_uint(now(), 64)
+        .end_cell()
+    );
+
+    randomize(hash); ;; random hash
+
+    randomize_lt(); ;; random lt time
+
+    int random_user = get_random_user(user_count, hash); ;; get random number from 0 to user_count and use hash as seed
+
+    slice random_user_slice = number_to_slice(random_user); ;; convert number to slice
+
+    send_raw_message(
+        begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+            .store_slice(random_user_slice)
+        .end_cell(),
+        64 + 2
+    );
+}
