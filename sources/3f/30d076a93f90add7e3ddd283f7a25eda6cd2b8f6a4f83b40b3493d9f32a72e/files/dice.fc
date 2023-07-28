@@ -1,0 +1,82 @@
+#pragma version >=0.2.0;
+
+#include "imports/stdlib.fc";
+#include "imports/constants.fc";
+#include "imports/utils.fc";
+
+(int) win(int r, int c) inline;
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+  slice cs = in_msg.begin_parse();
+  int flags = cs~load_uint(4); ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+  slice sender_address = cs~load_msg_addr();
+
+  if (flags & 1) {
+    return ();
+  }
+
+  var (owner_address) = load_data();
+  int op = in_msg_body~load_uint(32);
+  int choice = in_msg_body~load_uint(64);
+
+  if (op == op::echo) {
+    send_echo_message(sender_address, msg_value, choice);
+    return ();
+  }
+
+  if (op == op::bet) {
+    throw_unless(502, equal_slices(sender_address, ECHO_ADDRESS));
+    slice user_address = in_msg_body~load_msg_addr();
+    randomize_lt();
+    int result1 = rand(6) + 1;
+    int result2 = rand(6) + 1;
+    int result = result1 + result2;
+    int winnings = win(result, choice);
+    result = result1 * 10 + result2;
+    int amount = winnings * msg_value;
+    send_result_message(user_address, amount, result);
+    return ();
+  }
+
+  if (op == op::deposit) {
+    return ();
+  }
+  
+  if (op == op::withdraw) {
+    throw_unless(error::access_denied, equal_slices(sender_address, owner_address));
+    int withdraw_amount = in_msg_body~load_coins();
+    op_withdraw(withdraw_amount, owner_address);
+    return ();
+  }
+
+  if (op == op::transfer_ownership) {
+    throw_unless(error::access_denied, equal_slices(sender_address, owner_address));
+    slice new_owner_address = in_msg_body~load_msg_addr();
+    save_data(new_owner_address);
+    return ();
+  }
+}
+
+(int) win(int r, int c) inline {
+  if ((c == prediction::even) | (c == prediction::odd)) {
+    if((c == prediction::even) & ((r % DOUBLE) == LOOSE)) {
+      return DOUBLE;
+    }
+    elseif ((c == prediction::odd) & ((r % DOUBLE) != LOOSE)) {
+      return DOUBLE;
+    }
+  }
+  elseif ((c == prediction::above7) | (c == prediction::bellow7)) {
+    if ((c == prediction::above7) & (r > SEVEN)) {
+      return DOUBLE;
+    }
+    elseif ((c == prediction::bellow7) & (r < SEVEN)) {
+      return DOUBLE;
+    }
+  }
+  elseif (c == r) {
+    return DECUPLE;
+  }
+  return LOOSE;
+}
+

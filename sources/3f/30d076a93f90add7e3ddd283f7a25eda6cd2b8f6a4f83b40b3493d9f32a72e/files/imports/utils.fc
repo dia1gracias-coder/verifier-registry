@@ -1,0 +1,86 @@
+;; #include "constants.fc";
+
+(slice) load_data() inline {
+  var ds = get_data().begin_parse();
+  return (
+    ds~load_msg_addr()
+  );
+}
+
+() save_data(slice owner_address) impure inline {
+  set_data(begin_cell()
+    .store_slice(owner_address)
+    .end_cell());
+}
+
+slice convert_to_string(int result) {
+  builder string = begin_cell();
+  tuple chars = null();
+  do {
+      int r = result~divmod(10);
+      chars = cons(r + 48, chars);
+  } until (result == 0);
+  do {
+      int char = chars~list_next();
+      string~store_uint(char, 8);
+  } until (null?(chars));
+
+  slice final = string.end_cell().begin_parse();
+  return final;
+}
+
+() send_grams(slice address, int amount) impure {
+  cell msg = begin_cell()
+    .store_uint (0x18, 6)
+    .store_slice(address)
+    .store_grams(amount)
+    .store_uint(0, 107)
+    .end_cell(); 
+  send_raw_message(msg, 3); ;; mode, 2 for ignoring errors, 1 for sender pays fees, 64 for returning inbound message value
+}
+
+() send_result_message(slice address, int amount, int result) impure {
+  slice final = convert_to_string(result);
+  cell msg = begin_cell()
+    .store_uint (0x18, 6)
+    .store_slice(address)
+    .store_grams(amount)
+    .store_uint(0, 107)
+    .store_uint(0, 32)
+    .store_slice(final)
+    .end_cell(); 
+  send_raw_message(msg, 3);
+}
+
+() send_echo_message(slice address, int amount, int choice) impure {
+  if (amount < const::min_tons_for_playing) {
+    return ();
+  }
+  cell msg = begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(ECHO_ADDRESS)
+      .store_coins(amount)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_uint(op::echo, 32)
+      .store_uint(choice, 64)
+      .store_slice(address)
+      .end_cell();
+  send_raw_message(msg, 3);
+}
+
+() op_withdraw(int withdraw_amount, slice owner_address) impure {
+  var [balance, _] = get_balance();
+  throw_unless(error::insufficient_balance, balance >= withdraw_amount);
+  int return_value = min(withdraw_amount, balance - const::min_tons_for_storage);
+  send_grams(owner_address, return_value);
+}
+
+slice owner_address() method_id {
+  var (owner_address) = load_data();
+  return owner_address;
+}
+
+int balance() method_id {
+  var [balance, _] = get_balance();
+  return balance;
+}
