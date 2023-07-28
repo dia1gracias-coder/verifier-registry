@@ -1,0 +1,76 @@
+#pragma version >=0.2.0;
+
+#include "imports/stdlib.fc";
+#include "imports/constants.fc";
+#include "imports/utils.fc";
+
+(int) win(int ret, int r) inline;
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+  slice cs = in_msg.begin_parse();
+  int flags = cs~load_uint(4);
+  slice sender_address = cs~load_msg_addr();
+
+  if (flags & 1) {
+    return ();
+  }
+
+  var (owner_address) = load_data();
+  int op = in_msg_body~load_uint(32);
+  int choice = in_msg_body~load_uint(64);
+
+  if (op == op::echo) {
+    send_echo_message(sender_address, msg_value, choice);
+    return ();
+  }
+
+  if (op == op::bet) {
+    throw_unless(502, equal_slices(sender_address, ECHO_ADDRESS));
+    int return_value = LOOSE;
+    if (choice == 2) {
+      return_value = DOUBLE;
+    } elseif (choice == 3) {
+      return_value = QUINTUPLE;
+    } elseif (choice == 4) {
+      return_value = DECUPLE;
+    } else {
+      return();
+    }
+    slice user_address = in_msg_body~load_msg_addr();
+    randomize_lt();
+    int result1 = rand(choice);
+    int result2 = rand(choice);
+    int result3 = rand(choice);
+    int result = (100 * result1) + (10 * result2) + (result3);
+    int winnings = win(return_value, result);
+    int amount = winnings * msg_value;
+    send_result_message(user_address, amount, result);
+    return ();
+  }
+
+  if (op == op::deposit) {
+    return ();
+  }
+  
+  if (op == op::withdraw) {
+    throw_unless(error::access_denied, equal_slices(sender_address, owner_address));
+    int withdraw_amount = in_msg_body~load_coins();
+    op_withdraw(withdraw_amount, owner_address);
+    return ();
+  }
+
+  if (op == op::transfer_ownership) {
+    throw_unless(error::access_denied, equal_slices(sender_address, owner_address));
+    slice new_owner_address = in_msg_body~load_msg_addr();
+    save_data(new_owner_address);
+    return ();
+  }
+}
+
+(int) win(int ret, int r) inline {
+  if ((r == 0) | (r == 111) | (r == 222) | (r == 333)) {
+    return ret;
+  }
+  return LOOSE;
+}
+
