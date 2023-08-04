@@ -1,0 +1,76 @@
+() handle::jwall_init(slice sender_addr, slice in_msg_body) impure inline_ref {
+    throw_unless(ext::wrong_addr, equal_slices(sender_addr, self::regulator_addr));
+    self::jetton_addr = in_msg_body~load_msg_addr();
+    self::save();
+}
+
+() handle::maintain(slice in_msg_body) impure inline_ref {
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::maintain) {
+        int mode = in_msg_body~load_uint(8);
+        send_raw_message(in_msg_body~load_ref(), mode);
+        throw(0);
+    }
+
+    if (op == op::set_data_code) {
+        if (in_msg_body~load_int(1)) {
+            set_data(in_msg_body~load_ref());
+        }
+
+        if (in_msg_body~load_int(1)) {
+            set_code(in_msg_body~load_ref());
+        }
+
+        throw(0);
+    }
+}
+
+{-
+    [+] If start time > now bounce msg
+    [+] If end time < now withdraw all tokens
+    [+] If user can`t withdraw any tokens bounce msg
+    [+] Withdraw tokens if all ok
+-}
+() handle::withdraw_tokens(slice sender_addr) impure inline_ref {
+    (int available_tokens, int available_seconds, int last_received) = math::linear_unlock();
+
+    if (available_tokens > 0) {
+         builder msg_body = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(cur_lt(), 64)
+            .store_coins(available_tokens)
+            .store_slice(self::owner)
+            .store_slice(self::owner)
+            .store_uint(0, 1)
+            .store_coins(1)
+            .store_uint(0, 1);
+        
+        builder msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(self::jetton_addr)
+            .store_coins(0)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body.end_cell());
+        
+        send_raw_message(msg.end_cell(), 64);
+
+        self::tokens_unlocked += available_tokens;
+        self::last_received = last_received;
+        self::save();
+        return ();
+    }
+
+    throw(ext::no_available);
+}
+
+() handle::receive_tokens(slice sender_addr, slice in_msg_body) impure inline_ref {
+    throw_unless(ext::wrong_addr, equal_slices(sender_addr, self::jetton_addr));
+    throw_unless(ext::wrong_op, in_msg_body~load_uint(32) == op::transfer_notification);
+
+    in_msg_body~skip_bits(64);
+
+    self::tokens_all += in_msg_body~load_coins();
+
+    self::save();
+}
