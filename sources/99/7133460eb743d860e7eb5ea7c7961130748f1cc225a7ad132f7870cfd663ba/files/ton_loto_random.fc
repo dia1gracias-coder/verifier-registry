@@ -1,0 +1,138 @@
+#include "imports/stdlib.fc";
+#include "imports/utils.fc";
+
+int get_random_user(int user_count, int seed_int) method_id {
+    ;; Not as security, because of internal seed, but can be used by users if needed
+    set_seed(seed_int);
+
+    int random_user = rand(user_count);
+
+    return random_user;
+}
+
+(slice, (int)) ~load_decimal_symbol(slice source) {
+    ;; load decimal from bits using utf-8 table
+    int n = source~load_uint(8);
+    n = n - 48;
+    throw_unless(400, n >= 0);
+    throw_if(400, n > 9);
+    return (source, (n));
+}
+
+(int, int) parse_message(slice msg) {
+    int op = msg~load_uint(32); ;; get op return code
+
+    int game_id = 0;
+    int user_count = 0;
+
+    if (op == 0) { ;; if it 0, then it has message
+        ;; Parse op id to ":"
+        while (msg.preload_uint(8) != 0x3a) {
+            var next_decimal = msg~load_decimal_symbol();
+
+            game_id *= 10;
+            game_id += next_decimal;
+        }
+
+        ;; Skip ":"
+        msg~load_uint(8);
+
+        ;; Parse arg to ":"
+        while (msg.preload_uint(8) != 0x3a) {
+            var next_decimal = msg~load_decimal_symbol();
+
+            user_count *= 10;
+            user_count += next_decimal;
+        }
+    }
+
+    return (game_id, user_count);
+}
+
+slice number_to_slice(int number) {
+    ;; convert int to slice
+    var msg = begin_cell();
+
+    var msg = store_signed(msg, number).end_cell(); ;; store signed using loop decode int to slice
+
+    return msg.begin_parse();
+}
+
+() recv_internal (cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_bits() < 32) { ;; ignore empty transfer
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr(); ;;  after flag we can get address
+
+    var (game_id, user_count) = parse_message(in_msg_body); ;; convert message comment to int
+
+    slice game_id_slice = number_to_slice(game_id);
+
+    var message_hash = slice_hash(in_msg_body); ;; get hash from slice
+    var cs_hash = slice_hash(cs); ;; here too
+
+    var hash_cell = begin_cell()
+            .store_uint(message_hash, 256)
+            .store_uint(cs_hash, 256)
+            .store_uint(now(), 64);
+
+    int hash = cell_hash( ;; make hash which will contain message, cs and now time for better randomness
+        hash_cell.end_cell()
+    );
+
+    randomize(hash); ;; random hash
+
+    randomize_lt(); ;; random lt time
+
+    var users_builder = begin_cell(); ;; create our message
+
+    users_builder = users_builder.store_slice(game_id_slice); ;; add there game_id
+    users_builder = users_builder.store_slice("|");
+
+    repeat(15){
+        ;; randomize hash every iteration
+        randomize(hash);
+
+        randomize_lt();
+
+        int random_user = get_random_user(user_count, hash);
+
+        slice random_user_slice = number_to_slice(random_user);
+
+        users_builder = users_builder.store_slice(random_user_slice);
+        users_builder = users_builder.store_slice("|");
+
+        hash_cell = hash_cell.store_uint(random_user, 64);
+
+        hash = cell_hash(
+            hash_cell.end_cell() ;; edit hash for each iteration for unic numbers
+        );
+
+        hash_cell = begin_cell() ;; remove 4 component from hash_cell
+            .store_uint(message_hash, 256)
+            .store_uint(cs_hash, 256)
+            .store_uint(now(), 64);
+    }
+
+    slice users_builder_cell = users_builder.end_cell().begin_parse();
+
+    send_raw_message(
+        begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+            .store_slice(users_builder_cell)
+        .end_cell(),
+        64 + 2
+    );
+}
