@@ -1,0 +1,47 @@
+(
+    int, ;; available tokens
+    int, ;; available seconds
+    int  ;; time now, last received
+)
+math::linear_unlock() method_id {
+    self::init();
+
+    int time_now = now();
+
+    if (self::start_time > time_now) {
+        return (0, 0, 0);
+    }
+
+    if (time_now >= self::end_time) {
+        return (self::tokens_all - self::tokens_unlocked, 0, time_now);
+    }
+
+    int delta_time = self::end_time - self::start_time;
+    int tokens_per_second = self::tokens_all / delta_time;
+
+    if (self::last_received != 0) & (time_now >= self::last_received) {
+        int available_seconds = time_now - self::last_received;
+        return (available_seconds * tokens_per_second, available_seconds, time_now);
+    }
+
+    if (self::last_received != 0) & (time_now < self::last_received) {
+        return (0, 0, time_now);
+    }
+
+    int available_seconds = time_now - self::start_time;
+    return (available_seconds * tokens_per_second, available_seconds, time_now);
+}
+
+(int, int) get::time() method_id {
+    self::init();
+    return (self::start_time, now());
+}
+
+{-
+alltime = 3600
+steps = 60
+tokensperstep = 10
+available steps = 1
+
+
+-}

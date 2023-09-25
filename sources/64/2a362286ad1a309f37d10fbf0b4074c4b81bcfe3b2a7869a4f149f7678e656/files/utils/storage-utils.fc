@@ -1,0 +1,63 @@
+global int init?;
+
+global slice    self::regulator_addr;     ;; addres who init jetton addr
+global slice    self::jetton_addr;        ;; address from where we receive tokens
+global slice    self::owner;              ;; owner, who receive tokens
+global int      self::start_time;         ;; vesting start time
+global int      self::end_time;           ;; vesting end time
+global int      self::last_received;      ;; last time received
+global int      self::tokens_unlocked;      ;; withdrawn tokens
+global int      self::tokens_all;         ;; total tokens
+
+
+() self::init() impure inline_ref {
+    ifnot(null?(init?)) {
+        return ();
+    }
+
+    slice ds = get_data().begin_parse();
+
+    slice addr_ref = ds~load_ref().begin_parse();
+
+    self::regulator_addr      = addr_ref~load_msg_addr(); ;; 267
+    self::jetton_addr         = addr_ref~load_msg_addr(); ;; 267
+    self::owner               = addr_ref~load_msg_addr(); ;; 267
+
+    slice time_ref = ds~load_ref().begin_parse();
+
+    self::start_time          = time_ref~load_uint(32); ;; 32
+    self::end_time            = time_ref~load_uint(32); ;; 32
+    self::last_received      = time_ref~load_uint(32); ;; 32
+
+    slice tokens_ref = ds~load_ref().begin_parse();
+    self::tokens_unlocked       = tokens_ref~load_coins(); ;; 124
+    self::tokens_all          = tokens_ref~load_coins(); ;; 124
+
+    init? = true;
+}
+
+() self::save() impure inline_ref {
+    set_data(begin_cell()
+        .store_ref(
+            begin_cell()
+                .store_slice(self::regulator_addr)
+                .store_slice(self::jetton_addr)
+                .store_slice(self::owner)
+            .end_cell()
+        )
+        .store_ref(
+            begin_cell()
+                .store_uint(self::start_time, 32)
+                .store_uint(self::end_time, 32)
+                .store_uint(self::last_received, 32)
+            .end_cell()
+        )
+        .store_ref(
+            begin_cell()
+            .store_coins(self::tokens_unlocked)
+            .store_coins(self::tokens_all)
+            .end_cell()
+        )
+        .end_cell()
+    );
+}
