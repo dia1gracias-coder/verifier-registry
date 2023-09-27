@@ -1,0 +1,76 @@
+#include "imports/stdlib.fc";
+
+int equal_slices (slice a, slice b) asm "SDEQ";
+
+(int, slice, slice) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_uint(32), ;; counter value
+        ds~load_msg_addr(), ;; most recent sender
+        ds~load_msg_addr() ;; owner
+    );
+}
+
+() save_data(int counter_value, slice recent_sender, slice owner) impure inline {
+    set_data(begin_cell()
+        .store_uint(counter_value, 32)
+        .store_slice(recent_sender)
+        .store_slice(owner)
+        .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+
+    (int counter_value, slice recent_sender, slice owner) = load_data();
+
+    if (op == 1) {
+        ;; increase counter
+        int increment_by = in_msg_body~load_uint(32);
+        save_data(counter_value + increment_by, sender_address, owner);
+        return();
+    }
+    if (op == 2) {
+        ;; deposit
+        return();
+    }
+    if (op == 3) {
+        ;; withdraw
+        int withdraw_amount = in_msg_body~load_coins();
+        var [balance, _] = get_balance();
+        throw_if(1001, balance < withdraw_amount);
+        throw_unless(1002, equal_slices(owner, sender_address));
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(withdraw_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+        
+        send_raw_message(msg.end_cell(), 1);
+
+        return();
+    }
+
+    throw(702);
+
+}
+
+(int, slice, slice) get_contract_storage() method_id {
+    (int counter_value, slice recent_sender, slice owner) = load_data();
+    return (
+        counter_value,
+        recent_sender,
+        owner
+    );
+}
+
+int balance() method_id {
+    var [balance, _] = get_balance();
+    return balance;
+}
