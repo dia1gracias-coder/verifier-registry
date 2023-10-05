@@ -1,0 +1,41 @@
+() swap::top_up(slice in_msg_body) impure inline_ref {
+    int amount = in_msg_body~load_coins();
+    slice sender_addr = in_msg_body~load_msg_addr();
+
+    cell fwd_payload = in_msg_body~load_maybe_ref();
+
+    if (~ fwd_payload.null?()) {
+        ico::lock_tokens(fwd_payload.begin_parse(), amount);
+        return ();
+    }
+    return ();
+}
+
+
+() swap::swap_to_authentic(slice in_msg_body) impure inline_ref {
+    int amount = in_msg_body~load_coins();
+    slice sender = in_msg_body~load_msg_addr();
+
+    cell jtransfer_msg_body = begin_cell()
+        .store_uint(0x0f8a7ea5, 32)
+        .store_uint(cur_lt(), 64)
+        .store_coins(amount)
+        .store_slice(sender)
+        .store_slice(sender)
+        .store_int(0, 1)
+        .store_coins(1)
+        .store_int(0, 1)
+        .end_cell();
+
+    cell transfer_msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(swap::authentic_jwall_addr)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(jtransfer_msg_body)
+        .end_cell();
+    
+    jtn::total_supply -= amount;
+
+    send_raw_message(transfer_msg, 64);
+}

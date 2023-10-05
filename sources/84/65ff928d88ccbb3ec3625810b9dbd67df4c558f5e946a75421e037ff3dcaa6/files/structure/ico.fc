@@ -1,0 +1,110 @@
+() ico::mint_tokens(slice to_address, cell jetton_wallet_code, int amount, cell master_msg) impure {
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to_wallet_address)
+        .store_coins(amount)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(master_msg);
+    send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+() ico::lock_tokens(slice fwd_payload, int amount) impure inline_ref {
+    int op = fwd_payload~load_uint(32);
+    throw_if(ext::wrong_op, op != op::lock_tokens);
+
+    int lockup_period_months = fwd_payload~load_uint(4);
+    throw_if(ext::invalid_lockup_period, lockup_period_months > ico::max_months);
+    slice receiver_address = fwd_payload~load_msg_addr();
+
+    int time_now = now();
+    throw_if(ext::start_time, time_now < ico::start_time);
+    throw_if(ext::end_time, time_now > ico::end_time);
+    throw_if(ext::invalid_lockup_period, lockup_period_months == 0);
+    int lockup_period_seconds = 0;
+
+    if (lockup_period_months == 5) {
+        lockup_period_seconds = 5 * 60;
+    } else {
+        lockup_period_seconds = lockup_period_months * 31 * 24 * 60 * 60;
+    }
+    raw_reserve(coins::for_storage + coins::mint, 0);
+
+    cell master_msg = begin_cell()
+        .store_uint(0x178d4519, 32)
+        .store_uint(cur_lt(), 64)
+        .store_coins(amount)
+        .store_slice(receiver_address)
+        .store_slice(receiver_address)
+        .store_coins(1)
+        .store_maybe_ref(
+            begin_cell()
+                .store_uint(time_now + lockup_period_seconds, 32)
+                .store_uint(time_now + lockup_period_seconds + lockup_period_seconds, 32)
+            .end_cell()
+        )
+        .store_uint(0, 1)
+        .end_cell();
+
+    throw_if(ext::invalid_lockup_period, (time_now + lockup_period_seconds) == (time_now + lockup_period_seconds + lockup_period_seconds));
+
+    ico::mint_tokens(receiver_address, jtn::wallet_code, coins::mint, master_msg);
+
+    ico::redeemed_tokens += amount;
+    jtn::total_supply += amount;
+}
+
+
+;; () ico::buy(int msg_value, slice in_msg_body, slice sender_addr) impure inline_ref {
+;;     int lockup_period_months = in_msg_body~load_uint(4);
+;;     (slice info, int found?) = ico::prices.udict_get?(4, lockup_period_months);
+;;     throw_if(ext::invalid_lockup_period, ~ found?);
+;;     int price = info~load_coins();
+;;     int lockup_period_seconds = lockup_period_months * 31 * 24 * 60 * 60;
+
+;;     throw_if(ext::small_amount, msg_value < ico::min_amount);
+;;     throw_if(ext::big_amount, msg_value > ico::max_amount);
+;;     int time_now = now();
+
+;;     throw_if(ext::start_time, time_now < ico::start_time);
+;;     throw_if(ext::end_time, time_now > ico::end_time);
+
+;;     int buy_amount = msg_value / price * 1000000000;
+
+;;     raw_reserve(coins::for_storage + coins::mint, 0);
+
+;;     throw_if(ext::no_available_promise, buy_amount > ico::available_tokens);
+;;     cell master_msg = begin_cell()
+;;         .store_uint(0x178d4519, 32)
+;;         .store_uint(cur_lt(), 64)
+;;         .store_coins(buy_amount)
+;;         .store_slice(sender_addr)
+;;         .store_slice(sender_addr)
+;;         .store_coins(1)
+;;         .store_maybe_ref(
+;;             begin_cell()
+;;                 .store_uint(time_now + lockup_period_seconds, 32)
+;;                 .store_uint(time_now + lockup_period_seconds + ico::vesting_period, 32)
+;;             .end_cell()
+;;         )
+;;         .store_uint(0, 1)
+;;         .end_cell();
+
+;;     ico::mint_tokens(sender_addr, jtn::wallet_code, coins::mint, master_msg);
+
+;;     ico::redeemed_tokens += buy_amount;
+;;     ico::available_tokens -= buy_amount;
+;;     ico::received_tokens += msg_value;
+;;     jtn::total_supply += buy_amount;
+
+;;     cell msg = begin_cell()
+;;         .store_uint(0x18, 6)
+;;         .store_slice(jtn::regulator_address)
+;;         .store_coins(0)
+;;         .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+;;         .end_cell();
+    
+;;     send_raw_message(msg, 128);
+;; }
