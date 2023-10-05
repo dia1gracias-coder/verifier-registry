@@ -1,0 +1,69 @@
+() ico::mint_tokens(slice to_address, cell jetton_wallet_code, int amount, cell master_msg) impure {
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to_wallet_address)
+        .store_coins(amount)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(master_msg);
+    send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+() ico::lock_tokens(slice in_msg_body) impure inline_ref {
+    int amount = in_msg_body~load_coins();
+    slice sender_addr = in_msg_body~load_msg_addr();
+
+    cell fwd_payload_c = in_msg_body~load_maybe_ref();
+
+    if (fwd_payload_c.null?()) {
+        return ();
+    } 
+
+
+    slice fwd_payload = fwd_payload_c.begin_parse();
+
+    int op = fwd_payload~load_uint(32);
+    throw_if(ext::wrong_op, op != op::lock_tokens);
+
+    int lockup_period_months = fwd_payload~load_uint(4);
+    throw_if(ext::invalid_lockup_period, lockup_period_months > ico::max_months);
+    slice receiver_address = fwd_payload~load_msg_addr();
+
+    int time_now = now();
+    throw_if(ext::start_time, time_now < ico::start_time);
+    throw_if(ext::end_time, time_now > ico::end_time);
+    throw_if(ext::invalid_lockup_period, lockup_period_months == 0);
+    int lockup_period_seconds = 0;
+
+    if (lockup_period_months == 5) {
+        lockup_period_seconds = 5 * 60;
+    } else {
+        lockup_period_seconds = lockup_period_months * 31 * 24 * 60 * 60;
+    }
+    raw_reserve(coins::for_storage + coins::mint, 0);
+
+    cell master_msg = begin_cell()
+        .store_uint(0x178d4519, 32)
+        .store_uint(cur_lt(), 64)
+        .store_coins(amount)
+        .store_slice(receiver_address)
+        .store_slice(receiver_address)
+        .store_coins(1)
+        .store_maybe_ref(
+            begin_cell()
+                .store_uint(time_now + lockup_period_seconds, 32)
+                .store_uint(time_now + lockup_period_seconds + lockup_period_seconds, 32)
+            .end_cell()
+        )
+        .store_uint(0, 1)
+        .end_cell();
+
+    throw_if(ext::invalid_lockup_period, (time_now + lockup_period_seconds) == (time_now + lockup_period_seconds + lockup_period_seconds));
+
+    ico::mint_tokens(receiver_address, jtn::wallet_code, coins::mint, master_msg);
+
+    ico::redeemed_tokens += amount;
+    jtn::total_supply += amount;
+}

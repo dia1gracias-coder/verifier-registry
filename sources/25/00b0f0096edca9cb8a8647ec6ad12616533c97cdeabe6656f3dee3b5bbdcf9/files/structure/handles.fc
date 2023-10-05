@@ -1,0 +1,13 @@
+() handle::process_jetton_transfer(slice sender_addr, slice in_msg_body) impure inline_ref {
+    if (equal_slices(sender_addr, swap::authentic_jwall_addr)) {
+        ico::lock_tokens(in_msg_body);
+        return ();
+    }
+
+    if (equal_slices(sender_addr, swap::promise_jwall_addr)) {
+        swap::swap_to_authentic(in_msg_body);
+        return ();
+    }
+
+    throw(ext::unknown_address);
+}

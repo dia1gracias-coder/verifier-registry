@@ -1,0 +1,84 @@
+
+
+#include "./imports/stdlib.fc";
+#include "./imports/constants.fc";
+#include "./imports/utils.fc";
+#include "./imports/jetton-utils.fc";
+#include "./structure/storage.fc";
+#include "./structure/constructor.fc";
+#include "./structure/ico.fc";
+#include "./structure/swap.fc";
+#include "./structure/handles.fc";
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    if (flags & 1) {
+        return ();
+    } ;; bounced messages
+
+    force_chain(sender_address);
+    storage::init();
+    
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (jtn::is_initialized? == 0) {
+        throw_if(ext::invalid_op, op != op::init_storage);
+        constructor::init(in_msg_body, sender_address);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::transfer_notification) {
+        handle::process_jetton_transfer(sender_address, in_msg_body);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::excesses) { return (); }
+
+    if (op == op::burn_notification) {
+        int token_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(74,
+            equal_slices(calculate_user_jetton_wallet_address(from_address, my_address(), jtn::wallet_code), sender_address)
+        );
+
+        jtn::total_supply -= token_amount;
+        storage::save();
+        return ();
+    }
+
+    throw(ext::wrong_op);
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    storage::init();
+    return (jtn::total_supply, 0, jtn::regulator_address, jtn::content, jtn::wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    storage::init();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), jtn::wallet_code);
+}
+
+(_) get_contract_data() method_id {
+    storage::init();
+    return (
+        jtn::is_initialized?,
+        jtn::total_supply,
+        jtn::regulator_address,
+        jtn::content,
+        jtn::wallet_code,
+        swap::authentic_jwall_addr,
+        swap::promise_jwall_addr,
+        ico::start_time,
+        ico::end_time,
+        ico::max_months,
+        ico::redeemed_tokens
+    );
+}
