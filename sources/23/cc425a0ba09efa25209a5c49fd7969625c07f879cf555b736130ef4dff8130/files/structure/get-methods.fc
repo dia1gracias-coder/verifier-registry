@@ -1,0 +1,34 @@
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    storage::init();
+    return (jtn::total_supply, 0, jtn::regulator_address, jtn::content, jtn::wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    storage::init();
+    return calculate_user_jetton_wallet_address(
+        owner_address,
+        my_address(),
+        jtn::wallet_code,
+        swap::authentic_root,
+        swap::authentic_wallet_code
+    );
+}
+
+(_) get_contract_data() method_id {
+    storage::init();
+    return (
+        jtn::is_initialized?,
+        jtn::total_supply,
+        jtn::regulator_address,
+        jtn::content,
+        jtn::wallet_code,
+        swap::authentic_jwall_addr,
+        swap::promise_jwall_addr,
+        swap::authentic_root,
+        swap::authentic_wallet_code,
+        ico::start_time,
+        ico::end_time,
+        ico::max_months,
+        ico::redeemed_tokens
+    );
+}

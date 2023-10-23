@@ -1,0 +1,49 @@
+#include "./imports/stdlib.fc";
+#include "./imports/constants.fc";
+#include "./imports/utils.fc";
+#include "./imports/jetton-utils.fc";
+#include "./structure/storage.fc";
+#include "./structure/constructor.fc";
+#include "./structure/ico.fc";
+#include "./structure/handles.fc";
+#include "./structure/get-methods.fc";
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    if (flags & 1) {
+        return ();
+    } ;; bounced messages
+
+    force_chain(sender_address);
+    storage::init();
+    
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (jtn::is_initialized? == 0) {
+        throw_if(ext::invalid_op, op != op::init_storage);
+        constructor::init(in_msg_body, sender_address);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::transfer_notification) {
+        ico::lock_tokens(in_msg_body, sender_address);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::excesses) { return (); }
+
+    if (op == op::burn_notification) {
+        handle::process_burn(in_msg_body, sender_address);
+        storage::save();
+        return ();
+    }
+
+    throw(ext::wrong_op);
+}

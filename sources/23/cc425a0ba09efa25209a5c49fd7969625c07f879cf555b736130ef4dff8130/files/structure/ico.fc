@@ -1,0 +1,101 @@
+() ico::send_authentic(slice to_address, int amount) impure inline_ref {
+    cell body = begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(0, 64)
+        .store_coins(amount)
+        .store_slice(to_address)
+        .store_slice(to_address)
+        .store_dict(new_dict())
+        .store_coins(coins::notification_amount)
+        .store_uint(0, 1)
+    .end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(swap::authentic_jwall_addr)
+        .store_coins(coins::jetton_transfer)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body)
+        .end_cell();
+
+    send_raw_message(msg, 2);
+}
+
+() ico::mint_tokens(slice to_address, cell jetton_wallet_code, int amount, cell master_msg, int jetton_amount) impure {
+    cell state_init = calculate_jetton_wallet_state_init(
+        to_address,
+        my_address(),
+        jetton_wallet_code,
+        swap::authentic_root,
+        swap::authentic_wallet_code
+    );
+
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to_wallet_address)
+        .store_coins(amount)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(master_msg);
+    send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+
+    ico::send_authentic(to_wallet_address, jetton_amount);
+}
+
+() ico::lock_tokens(slice in_msg_body, slice sender_addr) impure inline_ref {
+    throw_unless(ext::unknown_address, equal_slices(sender_addr, swap::authentic_jwall_addr));
+    int amount = in_msg_body~load_coins();
+    slice sender_address = in_msg_body~load_msg_addr();
+
+    cell fwd_payload_c = in_msg_body~load_maybe_ref();
+
+    if (fwd_payload_c.null?()) {
+        return ();
+    } 
+
+    slice fwd_payload = fwd_payload_c.begin_parse();
+
+    int op = fwd_payload~load_uint(32);
+    throw_if(ext::wrong_op, op != op::lock_tokens);
+
+    int lockup_period_months = fwd_payload~load_uint(4);
+    throw_if(ext::invalid_lockup_period, lockup_period_months > ico::max_months);
+    slice receiver_address = fwd_payload~load_msg_addr();
+
+    int time_now = now();
+    throw_if(ext::start_time, time_now < ico::start_time);
+    throw_if(ext::end_time, time_now > ico::end_time);
+    throw_if(ext::invalid_lockup_period, lockup_period_months == 0);
+    int lockup_period_seconds = 0;
+
+    if (lockup_period_months == 5) {
+        lockup_period_seconds = 5 * 60;
+    } else {
+        lockup_period_seconds = lockup_period_months * 31 * 24 * 60 * 60;
+    }
+    raw_reserve(coins::for_storage + coins::mint, 0);
+
+    cell master_msg = begin_cell()
+        .store_uint(op::internal_transfer, 32)
+        .store_uint(cur_lt(), 64)
+        .store_coins(amount)
+        .store_slice(receiver_address)
+        .store_slice(receiver_address)
+        .store_coins(1)
+        .store_maybe_ref(
+            begin_cell()
+                .store_uint(time_now + lockup_period_seconds, 32)
+                .store_uint(time_now + lockup_period_seconds + lockup_period_seconds, 32)
+            .end_cell()
+        )
+        .store_uint(0, 1)
+        .end_cell();
+
+    throw_if(ext::invalid_lockup_period, (time_now + lockup_period_seconds) == (time_now + lockup_period_seconds + lockup_period_seconds));
+
+    ico::mint_tokens(receiver_address, jtn::wallet_code, coins::mint, master_msg, amount);
+
+    ico::redeemed_tokens += amount;
+    jtn::total_supply += amount;
+}

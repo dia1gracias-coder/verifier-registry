@@ -1,0 +1,12 @@
+() constructor::init(slice in_msg_body, slice sender_addr) impure inline_ref {
+    throw_unless(ext::invalid_address, equal_slices(sender_addr, jtn::regulator_address));
+    swap::promise_jwall_addr = calculate_user_jetton_wallet_address(
+        my_address(),
+        my_address(),
+        jtn::wallet_code,
+        swap::authentic_root,
+        swap::authentic_wallet_code
+    );
+    swap::authentic_jwall_addr = in_msg_body~load_msg_addr();
+    jtn::is_initialized? = -1;
+}

@@ -1,0 +1,6 @@
+() force_chain(slice addr) impure {
+    (int wc, _) = parse_std_addr(addr);
+    throw_unless(333, wc == workchain);
+}
+
+slice   extlib::addr_none()                             asm "<b b{00} s, b> <s PUSHSLICE";

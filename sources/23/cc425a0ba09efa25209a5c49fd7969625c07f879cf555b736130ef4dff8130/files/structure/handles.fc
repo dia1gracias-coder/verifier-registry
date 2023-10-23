@@ -1,0 +1,15 @@
+() handle::process_burn(slice in_msg_body, slice sender_address) impure inline_ref {
+    int token_amount = in_msg_body~load_coins();
+    slice from_address = in_msg_body~load_msg_addr();
+    throw_unless(74,
+        equal_slices(calculate_user_jetton_wallet_address(
+            from_address,
+            my_address(),
+            jtn::wallet_code,
+            swap::authentic_root,
+            swap::authentic_wallet_code
+        ), sender_address)
+    );
+
+    jtn::total_supply -= token_amount;
+}

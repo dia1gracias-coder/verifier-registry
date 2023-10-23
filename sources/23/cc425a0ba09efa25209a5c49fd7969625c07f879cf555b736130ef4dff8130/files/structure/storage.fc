@@ -1,0 +1,96 @@
+global int init?;
+
+global int jtn::is_initialized?;
+
+global int jtn::total_supply; ;; 124 bits
+global slice jtn::regulator_address; ;; 267 bits
+global cell jtn::content;
+global cell jtn::wallet_code;
+
+global slice swap::authentic_jwall_addr; ;; 267 bits
+global slice swap::promise_jwall_addr; ;; 267 bits
+global slice swap::authentic_root; ;; 267 bits
+global cell  swap::authentic_wallet_code; ;; 1 ref
+
+global int ico::start_time; ;; 32 bits
+global int ico::end_time; ;; 32 bits
+global int ico::max_months; ;; 4 bits
+
+global int ico::redeemed_tokens; ;; 124 bits
+
+() storage::init() impure inline_ref {
+    ifnot(null?(init?)) {
+        return ();
+    }
+
+    slice ds = get_data().begin_parse();
+    jtn::is_initialized? = ds~load_int(2);
+
+    slice jtn_data = ds~load_ref().begin_parse();
+
+    jtn::total_supply = jtn_data~load_coins();
+    jtn::regulator_address = jtn_data~load_msg_addr();
+    jtn::content = jtn_data~load_ref();
+    jtn::wallet_code = jtn_data~load_ref();
+
+    slice swap_data = ds~load_ref().begin_parse();
+
+    swap::authentic_jwall_addr = swap_data~load_msg_addr();
+    swap::promise_jwall_addr = swap_data~load_msg_addr();  
+    swap::authentic_root = swap_data~load_msg_addr();
+    swap::authentic_wallet_code = swap_data~load_ref();
+
+    slice ico_data = ds~load_ref().begin_parse();
+
+    slice time_info = ico_data~load_ref().begin_parse();
+
+    ico::start_time = time_info~load_uint(32);
+    ico::end_time = time_info~load_uint(32);
+    ico::max_months = time_info~load_uint(4);
+
+    slice coins_info = ico_data~load_ref().begin_parse();
+
+    ico::redeemed_tokens = coins_info~load_coins();
+
+    init? = true;
+}
+
+() storage::save() impure inline_ref {
+    set_data(
+        begin_cell()
+            .store_int(jtn::is_initialized?, 2)
+            .store_ref(
+                begin_cell()
+                    .store_coins(jtn::total_supply)
+                    .store_slice(jtn::regulator_address)
+                    .store_ref(jtn::content)
+                    .store_ref(jtn::wallet_code)
+                .end_cell()
+            )
+            .store_ref(
+                begin_cell()
+                    .store_slice(swap::authentic_jwall_addr)
+                    .store_slice(swap::promise_jwall_addr)
+                    .store_slice(swap::authentic_root)
+                    .store_ref(swap::authentic_wallet_code)
+                .end_cell()
+            )
+            .store_ref(
+                begin_cell()
+                    .store_ref(
+                        begin_cell()
+                            .store_uint(ico::start_time, 32)
+                            .store_uint(ico::end_time, 32)
+                            .store_uint(ico::max_months, 4)
+                        .end_cell()
+                    )
+                    .store_ref(
+                        begin_cell()
+                            .store_coins(ico::redeemed_tokens)
+                        .end_cell()
+                    )
+                .end_cell()
+            )
+        .end_cell()
+    );
+}
