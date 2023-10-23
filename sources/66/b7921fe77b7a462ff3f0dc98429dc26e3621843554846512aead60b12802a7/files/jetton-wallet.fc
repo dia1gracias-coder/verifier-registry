@@ -1,0 +1,53 @@
+#include "./imports/stdlib.fc";
+#include "./imports/send-modes.fc";
+#include "./imports/constants.fc";
+#include "./imports/utils.fc";
+#include "./imports/jetton-utils.fc";
+#include "./imports/authentic-jetton-utils.fc";
+#include "./structure/storage.fc";
+#include "./structure/authentic.fc";
+#include "./structure/handles.fc";
+#include "./structure/get-methods.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        handle::on_bounce(in_msg_body);
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of forward_payload costs
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::transfer) { ;; outgoing transfer
+        handle::send_tokens(in_msg_body, sender_address, msg_value, fwd_fee);
+        return ();
+    }
+
+    if (op == op::internal_transfer) { ;; incoming transfer
+        handle::receive_tokens(in_msg_body, sender_address, my_balance, fwd_fee, msg_value);
+        return ();
+    }
+
+    if (op == op::burn) { ;; burn
+        handle::burn_tokens(in_msg_body, sender_address, msg_value, fwd_fee);
+        return ();
+    }
+
+    if ((op == op::excesses) | (op == op::transfer_notification)) { ;; incoming transfer notification from userJettonPromiseAuthenticWallet
+        return ();
+    }
+
+    throw(ext::wrong_op);
+}
+

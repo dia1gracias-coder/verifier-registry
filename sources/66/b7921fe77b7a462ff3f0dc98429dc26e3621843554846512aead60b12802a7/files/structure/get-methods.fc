@@ -1,0 +1,42 @@
+(int, slice, slice, cell) get_wallet_data() method_id {
+    load_data();
+    cell locked_amounts = store::locked_amounts;
+    (_, _, _, int locked_amount) = handle::calculate_unlocked_amount(locked_amounts);
+    return (
+        store::balance + locked_amount,
+        store::owner_address,
+        store::jetton_master_address,
+        store::jetton_wallet_code
+    );
+}
+
+(cell, int) get_unlocked_amount() method_id {
+    load_data();
+    cell locked_amounts = store::locked_amounts;
+    (_, _, int unlocked_amount, _) = handle::calculate_unlocked_amount(locked_amounts);
+    return (store::locked_amounts, unlocked_amount);
+}
+
+(slice, slice, int, cell) get_authentic_data() method_id {
+    load_data();
+    return (
+        authentic::jetton_wallet,
+        authentic::master,
+        authentic::balance,
+        authentic::wallet_code
+    );
+}
+
+(int, int, cell) get_lockups_data() method_id {
+    load_data();
+
+    cell locked_amounts = store::locked_amounts;
+
+    (locked_amounts, _, int unlocked_amount, int locked_amount) = handle::calculate_unlocked_amount(locked_amounts);
+
+    return (
+        store::balance + unlocked_amount, ;; tokens available
+        locked_amount - unlocked_amount - store::balance, ;; tokens locked
+        locked_amounts ;; lock history
+    );
+}

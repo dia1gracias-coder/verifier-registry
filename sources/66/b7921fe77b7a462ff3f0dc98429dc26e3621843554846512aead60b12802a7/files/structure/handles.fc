@@ -1,0 +1,266 @@
+(
+    cell,
+    int,
+    int,
+    int
+) handle::calculate_unlocked_amount(cell locked_amounts) inline_ref {
+    int next_index = 0;
+    int unlocked_amount_total = 0;
+    int locked_amount_total = 0;
+    int cur_time = now();
+
+    do {
+        (int k, slice value, int f?) = locked_amounts.udict_get_nexteq?(16, next_index);
+        if (f?) {
+            int start_unlock_time = value~load_uint(32); ;; 32 bits
+            int end_unlock_time = value~load_uint(32); ;; 32 bits
+            int last_received = value~load_uint(32); ;; 32 bits
+            int locked_amount = value~load_coins(); ;; max 124 bits
+            int unlocked_amount = value~load_coins(); ;; max 124 bits
+
+            locked_amount_total += (locked_amount - unlocked_amount);
+
+            int tokens_per_second = locked_amount / (end_unlock_time - start_unlock_time); 
+            if ((cur_time > start_unlock_time) & (cur_time > last_received) & (cur_time < end_unlock_time)) {
+                int seconds_passed = 0;
+                if (last_received != 0) {
+                    seconds_passed = cur_time - last_received;
+                } else {
+                    seconds_passed = cur_time - start_unlock_time;
+                }
+
+                int tokens_unlocked = seconds_passed * tokens_per_second;
+                unlocked_amount_total += tokens_unlocked;
+                unlocked_amount += tokens_unlocked;
+                last_received = cur_time;
+
+                locked_amounts~udict_set(
+                    16, k,
+                    begin_cell()
+                        .store_uint(start_unlock_time, 32)
+                        .store_uint(end_unlock_time, 32)
+                        .store_uint(last_received, 32)
+                        .store_coins(locked_amount)
+                        .store_coins(unlocked_amount)
+                    .end_cell().begin_parse()
+                );
+
+            } elseif(cur_time >= end_unlock_time) {
+                int tokens_unlocked = locked_amount - unlocked_amount;
+                unlocked_amount_total += tokens_unlocked;
+                (locked_amounts, _) = locked_amounts.udict_delete?(16, k);
+            }
+
+            next_index = k + 1;
+        }
+    } until (~ f?);
+    return (locked_amounts, next_index, unlocked_amount_total, locked_amount_total);
+}
+
+
+() handle::burn_tokens(slice in_msg_body, slice sender_address, int msg_value, int fwd_fee) impure inline {
+    ;; NOTE we can not allow fails in action phase since in that case there will be
+    ;; no bounce. Thus check and throw in computation phase.
+    load_data();
+    int query_id = in_msg_body~load_uint(64);
+    int jetton_amount = in_msg_body~load_coins();
+    slice response_address = in_msg_body~load_msg_addr();
+    ;; ignore custom payload
+    ;; slice custom_payload = in_msg_body~load_dict();
+    cell locked_amounts = store::locked_amounts;
+    (locked_amounts, _, int unlocked_amount, _) = handle::calculate_unlocked_amount(locked_amounts);
+    store::locked_amounts = locked_amounts;
+    store::balance += unlocked_amount;
+    store::balance -= jetton_amount;
+    authentic::balance -= jetton_amount;
+
+    throw_unless(ext::not_owner, equal_slices(store::owner_address, sender_address));
+    throw_unless(ext::balance_error, store::balance >= 0);
+    throw_unless(ext::balance_error, authentic::balance >= 0);
+    throw_unless(ext::not_enough_gas, msg_value > fwd_fee + 4 * gas_consumption + coins::jetton_transfer + coins::burn);
+
+    var msg_body = begin_cell()
+            .store_uint(op::burn_notification, 32)
+            .store_uint(query_id, 64)
+            .store_coins(jetton_amount)
+            .store_slice(store::owner_address)
+            .store_slice(response_address)
+            .end_cell();
+
+    var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(store::jetton_master_address)
+            .store_coins(coins::burn)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body);
+
+    authentic::send(store::owner_address, jetton_amount);
+    send_raw_message(msg.end_cell(), REVERT_ON_ERRORS);
+    save_data();
+}
+
+() handle::send_tokens(slice in_msg_body, slice sender_address, int msg_value, int fwd_fee) impure inline {
+    int query_id = in_msg_body~load_uint(64);
+    int jetton_amount = in_msg_body~load_coins();
+    slice to_owner_address = in_msg_body~load_msg_addr();
+    force_chain(to_owner_address);
+
+    load_data();
+    throw_unless(ext::not_owner, equal_slices(store::owner_address, sender_address));
+
+    ;; Calculate locked amounts
+    cell locked_amounts = store::locked_amounts;
+    (locked_amounts, _, int unlocked_amount, _) = handle::calculate_unlocked_amount(locked_amounts);
+    store::locked_amounts = locked_amounts;
+    store::balance += unlocked_amount;
+    store::balance -= jetton_amount;
+    authentic::balance -= jetton_amount;
+    throw_unless(ext::balance_error, store::balance >= 0);
+    throw_unless(ext::balance_error, authentic::balance >= 0);
+
+    cell state_init = calculate_jetton_wallet_state_init(
+        to_owner_address,
+        store::jetton_master_address,
+        store::jetton_wallet_code,
+        authentic::master,
+        authentic::wallet_code
+    );
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    slice response_address = in_msg_body~load_msg_addr();
+    cell lockup_params = in_msg_body~load_dict();
+    int forward_ton_amount = in_msg_body~load_coins();
+    slice either_forward_payload = in_msg_body;
+    var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to_wallet_address)
+            .store_coins(coins::jetton_transfer)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(state_init);
+    var msg_body = begin_cell()
+            .store_uint(op::internal_transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(jetton_amount)
+            .store_slice(store::owner_address)
+            .store_slice(response_address)
+            .store_coins(forward_ton_amount)
+            .store_dict(lockup_params)
+            .store_slice(either_forward_payload)
+            .end_cell();
+
+    msg = msg.store_ref(msg_body);
+    throw_unless(ext::not_enough_gas, msg_value >
+            forward_ton_amount + coins::jetton_transfer * 2);
+
+    authentic::send(to_wallet_address, jetton_amount);
+    send_raw_message(msg.end_cell(), REVERT_ON_ERRORS);
+    save_data();
+}
+
+() handle::receive_tokens(slice in_msg_body, slice sender_address, int my_ton_balance, int fwd_fee, int msg_value) impure inline {
+    load_data();
+    int query_id = in_msg_body~load_uint(64);
+    int jetton_amount = in_msg_body~load_coins();
+    slice from_address = in_msg_body~load_msg_addr();
+    slice response_address = in_msg_body~load_msg_addr();
+    throw_unless(ext::not_valid_wallet,
+        equal_slices(store::jetton_master_address, sender_address)
+        |
+        equal_slices(calculate_user_jetton_wallet_address(
+            from_address,
+            store::jetton_master_address,
+            store::jetton_wallet_code,
+            authentic::master,
+            authentic::wallet_code
+        ), sender_address)
+    );
+    int forward_ton_amount = in_msg_body~load_coins();
+    cell lockup_params = in_msg_body~load_maybe_ref();
+    
+    ;; only master can lock tokens
+    if (~ lockup_params.null?() & equal_slices(store::jetton_master_address, sender_address)) {
+        slice lockup_params = lockup_params.begin_parse();
+        int start_unlock_time = lockup_params~load_uint(32);
+        int end_unlock_time = lockup_params~load_uint(32);
+
+        if ((end_unlock_time - start_unlock_time)  <= 0) { ;; if hacker sends invalid start and end time, maybe division by zero
+            store::balance += jetton_amount;
+        } else {
+            cell locked_amounts = store::locked_amounts;
+            (int k, _, int f?) = locked_amounts.udict_get_max?(16);
+            int next_index = f? ? k + 1 : 0;
+
+            locked_amounts~udict_set(
+                16, next_index,
+                begin_cell()
+                    .store_uint(start_unlock_time, 32)
+                    .store_uint(end_unlock_time, 32)
+                    .store_uint(0, 32) ;; last received
+                    .store_coins(jetton_amount)
+                    .store_coins(0)
+                    .end_cell().begin_parse()
+            );
+
+            store::locked_amounts = locked_amounts;
+        }
+    } else {
+        store::balance += jetton_amount;
+    }
+
+    if (equal_slices(authentic::jetton_wallet, extlib::addr_none())) {
+        authentic::constructor();
+    }
+    authentic::balance += jetton_amount;
+
+    int ton_balance_before_msg = my_ton_balance - msg_value;
+    int storage_fee = min_tons_for_storage - min(ton_balance_before_msg, min_tons_for_storage);
+    msg_value -= (storage_fee + gas_consumption);
+    throw_unless(ext::not_enough_gas, msg_value >= 0);
+
+    if (forward_ton_amount) {
+        msg_value -= (forward_ton_amount + fwd_fee);
+        slice either_forward_payload = in_msg_body;
+
+        var msg_body = begin_cell()
+                .store_uint(op::transfer_notification, 32)
+                .store_uint(query_id, 64)
+                .store_coins(jetton_amount)
+                .store_slice(from_address)
+                .store_slice(either_forward_payload)
+                .end_cell();
+
+        var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(store::owner_address)
+                .store_coins(forward_ton_amount)
+                .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_ref(msg_body);
+
+        send_raw_message(msg.end_cell(), REVERT_ON_ERRORS | PAY_FEES_SEPARATELY);
+    }
+
+    msg_value -= fwd_fee;
+    if ((response_address.preload_uint(2) != 0) & (msg_value > 0)) {
+        var msg = begin_cell()
+                .store_uint(0x10, 6) ;; nobounce
+                .store_slice(response_address)
+                .store_coins(msg_value)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::excesses, 32)
+                .store_uint(query_id, 64);
+        send_raw_message(msg.end_cell(), IGNORE_ERRORS);
+    }
+
+    save_data();
+}
+
+
+() handle::on_bounce(slice in_msg_body) impure {
+    in_msg_body~skip_bits(32); ;; 0xFFFFFFFF
+    load_data();
+    int op = in_msg_body~load_uint(32);
+    throw_unless(ext::wrong_op, (op == op::transfer) | (op == op::burn_notification));
+    int query_id = in_msg_body~load_uint(64);
+    int jetton_amount = in_msg_body~load_coins();
+    store::balance += jetton_amount;
+    save_data();
+}
