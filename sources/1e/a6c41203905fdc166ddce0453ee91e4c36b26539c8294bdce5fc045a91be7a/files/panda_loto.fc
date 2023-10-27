@@ -1,0 +1,177 @@
+#include "imports/stdlib.fc";
+#include "imports/utils.fc";
+
+int asm::is_tuple(tuple) asm "ISTUPLE";
+(slice, slice) load_next(slice) asm( -> 1 0) "LDREFRTOS";
+
+forall X -> (tuple, ()) ~inv_list_cons(tuple tail, X head) asm "PAIR";
+forall X -> (tuple, X) ~inv_list_next(tuple) asm "UNPAIR";
+
+int builder_remaining_bits(builder b) asm "BREMBITS"; ;; Returns the number of data bits that can still be stored in b.	
+
+int get_random_user(int user_count, int seed_int) method_id {
+    ;; Not as security, because of internal seed, but can be used by users if needed
+    set_seed(seed_int);
+
+    int random_user = rand(user_count);
+
+    return random_user;
+}
+
+(slice, (int)) ~load_decimal_symbol(slice source) {
+    ;; load decimal from bits using utf-8 table
+    int n = source~load_uint(8);
+    n = n - 48;
+    throw_unless(400, n >= 0);
+    throw_if(400, n > 9);
+    return (source, (n));
+}
+
+(int, int, int) parse_message(slice msg) {
+    int op = msg~load_uint(32); ;; get op return code
+
+    int game_id = 0;
+    int user_count = 0;
+    int winner_count = 0;
+
+    if (op == 0) { ;; if it 0, then it has message
+        ;; Parse op id to ":"
+        while (msg.preload_uint(8) != 0x3a) {
+            var next_decimal = msg~load_decimal_symbol();
+
+            game_id *= 10;
+            game_id += next_decimal;
+        }
+
+        ;; Skip ":"
+        msg~load_uint(8);
+
+        ;; Parse arg to ":"
+        while (msg.preload_uint(8) != 0x3a) {
+            var next_decimal = msg~load_decimal_symbol();
+
+            user_count *= 10;
+            user_count += next_decimal;
+        }
+
+        ;; Skip ":"
+        msg~load_uint(8);
+
+        while (msg.preload_uint(8) != 0x3a) {
+            var next_decimal = msg~load_decimal_symbol();
+
+            winner_count *= 10;
+            winner_count += next_decimal;
+        }
+    }
+
+    return (game_id, user_count, winner_count);
+}
+
+slice number_to_slice(int number) {
+    ;; convert int to slice
+    var msg = begin_cell();
+
+    var msg = store_signed(msg, number).end_cell(); ;; store signed using loop decode int to slice
+
+    return msg.begin_parse();
+}
+
+() recv_internal (cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_bits() < 32) { ;; ignore empty transfer
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr(); ;; after flag we can get address
+
+    var (game_id, user_count, winner_count) = parse_message(in_msg_body); ;; convert message comment to int
+
+    slice game_id_slice = number_to_slice(game_id);
+
+    var message_hash = slice_hash(in_msg_body); ;; get hash from slice
+    var cs_hash = slice_hash(cs); ;; here too
+
+    int now_time = now();
+
+    var hash_cell = begin_cell()
+            .store_uint(message_hash, 256)
+            .store_uint(cs_hash, 256)
+            .store_uint(now_time, 64);
+
+    int hash = cell_hash( ;; make hash which will contain message, cs and now time for better randomness
+        hash_cell.end_cell()
+    );
+
+    randomize(hash); ;; random hash
+
+    randomize_lt(); ;; random lt time
+
+    tuple data = null();
+    tuple random_numbers_data = null();
+
+    var users_builder = begin_cell().store_uint(0, 32); ;; create our message
+
+    users_builder = users_builder.store_slice(game_id_slice); ;; add there game_id
+    users_builder = users_builder.store_slice("|");
+
+    repeat(winner_count){
+        ;; randomize hash every iteration
+        if (builder_remaining_bits(users_builder) <= 50){
+            data~inv_list_cons(users_builder);
+
+            users_builder = begin_cell();
+        }
+
+        randomize(hash);
+
+        randomize_lt();
+
+        int random_user = get_random_user(user_count, hash);
+
+        slice random_user_slice = number_to_slice(random_user);
+
+        users_builder = users_builder.store_slice(random_user_slice);
+        users_builder = users_builder.store_slice("|");
+
+        if(random_user != 0){
+            now_time = now_time + random_user;
+        } else {
+            now_time = now_time + 1;
+        }
+
+        hash_cell = begin_cell() ;; remove 4 component from hash_cell
+            .store_uint(message_hash, 256)
+            .store_uint(cs_hash, 256)
+            .store_uint(now_time, 64);
+
+        hash = cell_hash(
+            hash_cell.end_cell() ;; edit hash for each iteration for unic numbers
+        );
+    }
+
+    cell head = users_builder.end_cell();
+    while (data.asm::is_tuple()) {
+      head = data~inv_list_next().store_ref(head).end_cell();
+    }
+
+    sender_address = "0:527964d55cfa6eb731f4bfc07e9d025098097ef8505519e853986279bd8400d8"a; ;; hardcoded random receive address
+
+    send_raw_message(
+        begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+            .store_uint(1, 1)
+            .store_ref(head)
+        .end_cell(),
+        64 + 2
+    );
+}
