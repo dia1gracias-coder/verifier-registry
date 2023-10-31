@@ -1,0 +1,674 @@
+#include "stdlib.fc";
+#include "constants.fc";
+
+const int old_wallet_code_hash = 0x3a1b672fa12c46689ff28b736d13d05f88dd9772127f56bef71406a0f31d4a53;
+
+builder to_builder(slice s) inline {
+    return begin_cell().store_slice(s);
+}
+
+builder store_state_init(builder b, cell state_init) inline {
+    return state_init.null?()
+        ? b.store_uint(0, 1)
+        : b.store_uint(2 + 1, 1 + 1).store_ref(state_init);
+}
+
+builder store_body(builder b, builder body) inline {
+    return body.builder_bits() <= 518
+        ? b.store_uint(0, 1).store_builder(body)
+        : b.store_maybe_ref(body.end_cell());
+}
+
+builder store_log(builder b, builder log) inline {
+    return log.builder_bits() <= 654
+        ? b.store_uint(0, 1).store_builder(log)
+        : b.store_maybe_ref(log.end_cell());
+}
+
+() send_msg(int bounceable?, builder dst, cell state_init, builder body, int coins, int mode) impure inline_ref {
+    ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+    ;;   src:MsgAddress dest:MsgAddressInt
+    ;;   value:CurrencyCollection ihr_fee:Grams fwd_fee:Grams
+    ;;   created_lt:uint64 created_at:uint32 = CommonMsgInfoRelaxed;
+    ;; message$_ {X:Type} info:CommonMsgInfoRelaxed
+    ;;   init:(Maybe (Either StateInit ^StateInit))
+    ;;   body:(Either X ^X) = MessageRelaxed X;
+    cell msg = begin_cell()
+        .store_uint(bounceable? ? 0x18 : 0x10, 6) ;; 011000 or 010000
+        .store_builder(dst)
+        .store_coins(coins)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32)
+        .store_state_init(state_init)
+        .store_body(body)
+        .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() emit_log(int topic, builder log) impure inline_ref {
+    ;; addr_extern$01 len:(## 9) external_address:(bits len) = MsgAddressExt;
+    ;; ext_out_msg_info$11 src:MsgAddress dest:MsgAddressExt
+    ;;   created_lt:uint64 created_at:uint32 = CommonMsgInfoRelaxed;
+    ;; message$_ {X:Type} info:CommonMsgInfoRelaxed
+    ;;   init:(Maybe (Either StateInit ^StateInit))
+    ;;   body:(Either X ^X) = MessageRelaxed X;
+    cell msg = begin_cell()
+        .store_uint(0x31, 2 + 2 + 2) ;; 110001
+        .store_uint(256, 9)
+        .store_uint(topic, 256)
+        .store_uint(0, 64 + 32 + 1)
+        .store_log(log)
+        .end_cell();
+    send_raw_message(msg, send::regular);
+}
+
+() log_loan
+( int round_since
+, builder validator
+, int min_payment
+, int validator_reward_share
+, int loan_amount
+, int accrue_amount
+, int stake_amount
+) impure inline {
+    builder log = begin_cell()
+        .store_uint(round_since, 32)
+        .store_builder(validator)
+        .store_coins(min_payment)
+        .store_uint(validator_reward_share, 8)
+        .store_coins(loan_amount)
+        .store_coins(accrue_amount)
+        .store_coins(stake_amount);
+    emit_log(log::loan, log);
+}
+
+() log_repayment
+( int round_since
+    , slice validator
+    , int repayment_amount
+    , int loan_amount
+    , int accrue_amount
+    , int stakers_share
+    , int governor_share
+    , int validator_share
+) impure inline {
+    builder log = begin_cell()
+        .store_uint(round_since, 32)
+        .store_slice(validator)
+        .store_coins(repayment_amount)
+        .store_coins(loan_amount)
+        .store_coins(accrue_amount)
+        .store_coins(stakers_share)
+        .store_coins(governor_share)
+        .store_coins(validator_share);
+    emit_log(log::repayment, log);
+}
+
+() log_finish(int round_since, int total_staked, int total_recovered, int total_coins, int total_tokens) impure inline {
+    builder log = begin_cell()
+        .store_uint(round_since, 32)
+        .store_coins(total_staked)
+        .store_coins(total_recovered)
+        .store_coins(total_coins)
+        .store_coins(total_tokens);
+    emit_log(log::finish, log);
+}
+
+(int, int) get_elector() inline {
+    ;; _ elector_addr:bits256 = ConfigParam 1;
+    return ( chain::main, config_param(config::elector_address).begin_parse().preload_uint(256) );
+}
+
+(int, int, int, int) get_election_config() inline {
+    ;; _ validators_elected_for:uint32 elections_start_before:uint32
+    ;;   elections_end_before:uint32 stake_held_for:uint32
+    ;;   = ConfigParam 15;
+    slice cs = config_param(config::election).begin_parse();
+    return ( cs~load_uint(32), cs~load_uint(32), cs~load_uint(32), cs~load_uint(32) );
+}
+
+(int, int, int) get_validators_config() inline {
+    ;; _ max_validators:(## 16) max_main_validators:(## 16) min_validators:(## 16)
+    ;;   { max_validators >= max_main_validators }
+    ;;   { max_main_validators >= min_validators }
+    ;;   { min_validators >= 1 }
+    ;;   = ConfigParam 16;
+    slice cs = config_param(config::validators).begin_parse();
+    return ( cs~load_uint(16), cs~load_uint(16), cs~load_uint(16) );
+}
+
+(int, int, int, int) get_stake_config() inline {
+    ;; _ min_stake:Grams max_stake:Grams min_total_stake:Grams max_stake_factor:uint32 = ConfigParam 17;
+    slice cs = config_param(config::stake).begin_parse();
+    return ( cs~load_coins(), cs~load_coins(), cs~load_coins(), cs~load_uint(32) );
+}
+
+(int, int, int, int) get_storage_prices() inline {
+    ;; _#cc utime_since:uint32 bit_price_ps:uint64 cell_price_ps:uint64
+    ;;   mc_bit_price_ps:uint64 mc_cell_price_ps:uint64 = StoragePrices;
+    ;; _ (Hashmap 32 StoragePrices) = ConfigParam 18;
+    cell dict = config_param(config::storage_prices);
+    ( _, slice v, _ ) = dict.udict_get_prev?(32, now());
+    throw_unless(err::unexpected_storage_price_format, v~load_uint(8) == 0xcc);
+    v~skip_bits(32);
+    return ( v~load_uint(64), v~load_uint(64), v~load_uint(64), v~load_uint(64) );
+}
+
+(int, int) get_gas_prices(int i) inline_ref {
+    ;; gas_prices#dd gas_price:uint64 gas_limit:uint64 gas_credit:uint64
+    ;;   block_gas_limit:uint64 freeze_due_limit:uint64 delete_due_limit:uint64
+    ;;   = GasLimitsPrices;
+
+    ;; gas_prices_ext#de gas_price:uint64 gas_limit:uint64 special_gas_limit:uint64 gas_credit:uint64
+    ;;   block_gas_limit:uint64 freeze_due_limit:uint64 delete_due_limit:uint64
+    ;;   = GasLimitsPrices;
+
+    ;; gas_flat_pfx#d1 flat_gas_limit:uint64 flat_gas_price:uint64 other:GasLimitsPrices
+    ;;   = GasLimitsPrices;
+
+    ;; config_mc_gas_prices#_ GasLimitsPrices = ConfigParam 20;
+    ;; config_gas_prices#_ GasLimitsPrices = ConfigParam 21;
+    slice cs = config_param(i).begin_parse();
+    int t = cs~load_uint(8);
+    if (t == 0xd1) {
+        cs~skip_bits(64 + 64);
+        t = cs~load_uint(8);
+    }
+    throw_unless(err::unexpected_gas_price_format, (t == 0xdd) | (t == 0xde));
+    return ( cs~load_uint(64), cs~load_uint(64) );
+}
+
+(int, int, int) get_msg_forward_prices(int i) inline_ref {
+    ;; msg_forward_prices#ea lump_price:uint64 bit_price:uint64 cell_price:uint64
+    ;;   ihr_price_factor:uint32 first_frac:uint16 next_frac:uint16 = MsgForwardPrices;
+
+    ;; // used for messages to/from masterchain
+    ;; config_mc_fwd_prices#_ MsgForwardPrices = ConfigParam 24;
+    ;; // used for all other messages
+    ;; config_fwd_prices#_ MsgForwardPrices = ConfigParam 25;
+    slice cs = config_param(i).begin_parse();
+    int t = cs~load_uint(8);
+    throw_unless(err::unexpected_msg_forward_prices_format, t == 0xea);
+    return ( cs~load_uint(64), cs~load_uint(64), cs~load_uint(64) );
+}
+
+(int, int) get_vset_times(int i) inline_ref {
+    ;; validators_ext#12 utime_since:uint32 utime_until:uint32
+    ;;   total:(## 16) main:(## 16) { main <= total } { main >= 1 }
+    ;;   total_weight:uint64 list:(HashmapE 16 ValidatorDescr) = ValidatorSet;
+    slice cs = config_param(i).begin_parse();
+    throw_unless(err::unexpected_validator_set_format, cs~load_uint(8) == 0x12);
+    return ( cs~load_uint(32), cs~load_uint(32) );
+}
+
+cell create_state_init(cell code, cell data) inline {
+    ;; _ split_depth:(Maybe (## 5)) special:(Maybe TickTock)
+    ;;   code:(Maybe ^Cell) data:(Maybe ^Cell)
+    ;;   library:(HashmapE 256 SimpleLib) = StateInit;
+    return begin_cell()
+        .store_uint(6, 5) ;; 00110
+        .store_ref(code)
+        .store_ref(data)
+        .end_cell();
+}
+
+builder create_address(int wc, int addr) inline_ref {
+    ;; addr_std$10 anycast:(Maybe Anycast)
+    ;;   workchain_id:int8 address:bits256  = MsgAddressInt;
+    return begin_cell()
+        .store_uint(4, 3) ;; 100
+        .store_int(wc, 8)
+        .store_uint(addr, 256);
+}
+
+cell create_wallet_data(builder owner, slice treasury, cell wallet_code) inline {
+    return begin_cell()
+        .store_builder(owner)
+        .store_slice(treasury)
+        .store_coins(0) ;; tokens
+        .store_dict(null()) ;; staking
+        .store_coins(0) ;; unstaking
+        .store_ref(wallet_code)
+        .end_cell();
+}
+
+cell create_loan_data(slice treasury, builder validator, int round_since) inline {
+    return begin_cell()
+        .store_uint(0, 2) ;; addr_none for elector
+        .store_slice(treasury)
+        .store_builder(validator)
+        .store_uint(round_since, 32)
+        .end_cell();
+}
+
+(builder, cell, int) create_wallet_address(builder owner, slice treasury, cell wallet_code) inline_ref {
+    cell wallet_data = create_wallet_data(owner, treasury, wallet_code);
+    cell state_init = create_state_init(wallet_code, wallet_data);
+    int addr = state_init.cell_hash();
+    builder wallet = create_address(chain::base, addr);
+    return (wallet, state_init, addr);
+}
+
+(builder, cell, int) create_loan_address(slice treasury, builder validator, int round_since, cell loan_code) inline_ref {
+    cell loan_data = create_loan_data(treasury, validator, round_since);
+    cell state_init = create_state_init(loan_code, loan_data);
+    int addr = state_init.cell_hash();
+    builder loan = create_address(chain::main, addr);
+    return (loan, state_init, addr);
+}
+
+int request_sort_key(int min_payment, int validator_reward_share, int loan_amount) inline_ref {
+    ;; sort based on:
+    ;;   1. efficieny
+    ;;   2. treasury reward share
+    ;;   3. least loan amount
+    int treasury_reward_share = 255 - validator_reward_share;
+    int min_payment_round = min_payment >> 30; ;; round to around 1 TON
+    int loan_amount_round = max(1, loan_amount >> 40); ;; round to around 1100 TON
+    int loan_amount_round_comp = (1 << 80) - loan_amount_round;
+    int efficieny = min((1 << 24) - 1, muldiv(min_payment_round, 1000, loan_amount_round));
+    return (efficieny << (8 + 80)) + (treasury_reward_share << 80) + loan_amount_round_comp;
+}
+
+() check_new_stake_msg(slice cs) impure inline {
+    cs~skip_bits(256 + 32 + 32 + 256);
+    slice ss = cs~load_ref().begin_parse();
+    cs.end_parse();
+    ss~skip_bits(512);
+    ss.end_parse();
+}
+
+;; https://github.com/ton-blockchain/ton/blob/ae5c0720143e231c32c3d2034cfe4e533a16d969/crypto/block/block.tlb#L721
+int max_recommended_punishment_for_validator_misbehaviour(int stake) inline_ref {
+    ;; misbehaviour_punishment_config_v1#01
+    ;;   default_flat_fine:Grams default_proportional_fine:uint32
+    ;;   severity_flat_mult:uint16 severity_proportional_mult:uint16
+    ;;   unpunishable_interval:uint16
+    ;;   long_interval:uint16 long_flat_mult:uint16 long_proportional_mult:uint16
+    ;;   medium_interval:uint16 medium_flat_mult:uint16 medium_proportional_mult:uint16
+    ;;    = MisbehaviourPunishmentConfig;
+    ;; _ MisbehaviourPunishmentConfig = ConfigParam 40;
+
+    cell cp = config_param(config::misbehaviour_punishment);
+    if (cell_null?(cp)) {
+        ;; 101 TON - https://github.com/ton-blockchain/ton/blob/b38d227a469666d83ac535ad2eea80cb49d911b8/lite-client/lite-client.cpp#L3678
+        return 101000000000;
+    }
+
+    slice cs = cp.begin_parse();
+
+    ( int prefix
+    , int default_flat_fine, int default_proportional_fine
+    , int severity_flat_mult, int severity_proportional_mult
+    , int unpunishable_interval
+    , int long_interval, int long_flat_mult, int long_proportional_mult
+    ) = ( cs~load_uint(8)
+        , cs~load_coins(), cs~load_uint(32)
+        , cs~load_uint(16), cs~load_uint(16)
+        , cs~load_uint(16)
+        , cs~load_uint(16), cs~load_uint(16), cs~load_uint(16)
+    );
+
+    ;; https://github.com/ton-blockchain/ton/blob/master/lite-client/lite-client.cpp#L3721
+    int fine = default_flat_fine;
+    int fine_part = default_proportional_fine;
+
+    fine *= severity_flat_mult;
+    fine >>= 8;
+    fine_part *= severity_proportional_mult;
+    fine_part >>= 8;
+
+    fine *= long_flat_mult;
+    fine >>= 8;
+    fine_part *= long_proportional_mult;
+    fine_part >>= 8;
+
+    ;; https://github.com/ton-blockchain/ton/blob/b38d227a469666d83ac535ad2eea80cb49d911b8/crypto/smartcont/elector-code.fc#L529
+    return min(stake, fine + muldiv(stake, fine_part, 1 << 32));
+}
+
+int wallet_storage_fee() inline_ref {
+    ( int bit_price_ps, int cell_price_ps, _, _ ) = get_storage_prices();
+    int bits = 267 + 267 + 124 + 1 + 124 + 2 * (32 + 124);
+    int cells = 1 + 3; ;; 3 cells may be used by a dict holding 2 entries
+    bits += 13875; ;; bits of wallet_code
+    cells += 47; ;; cells of wallet_code
+    int pps = bits * bit_price_ps + cells * cell_price_ps;
+    int duration = 60 * 60 * 24 * 365 * 2; ;; 2 years in seconds
+    return pps * duration >> 16; ;; currently near 0.04 TON
+}
+
+(int, int) loan_storage_fee() inline_ref {
+    ;; loan smart contract storage on main chain while validating
+    ( int bit_price_ps, int cell_price_ps, int mc_bit_price_ps, int mc_cell_price_ps ) = get_storage_prices();
+    int bits1 = 267 + 267 + 267 + 32;
+    int cells1 = 1;
+
+    ;; storage of loan request on base chain while participating
+    int bits2 = 124 + 8 + 124 + 124 + 124 + 256 + 32 + 32 + 256 + 512;
+    int cells2 = 1 + 1 + 1;
+
+    ;; sotrage of participation on base chain while participating
+    bits2 = 32 + 3 + 1 + 112 + 256 + 16 + 4 + 256 + bits2 + 124 + 124 + 256 + 32 + 32;
+    cells2 = 2 + 4 + 2 + cells2;
+
+    int pps1 = bits1 * mc_bit_price_ps + cells1 * mc_cell_price_ps;
+    int pps2 = bits2 * bit_price_ps + cells2 * cell_price_ps;
+    ;; 1 round validation, 1 round participation and stake held, 1 round for prolonged rounds, 1 round to be safe
+    ( int validators_elected_for, _, _, _ ) = get_election_config();
+    int duration = 4 * validators_elected_for;
+    return ( pps1 * duration >> 16, pps2 * duration >> 16 ); ;; currently near 0.005 TON
+}
+
+int msg_fwd_fee(int lump_price, int bit_price, int cell_price, int rest_bits, int rest_cells) inline_ref {
+    ;; // msg_fwd_fees = (lump_price + ceil((bit_price * msg.bits + cell_price * msg.cells)/2^16)) nanograms
+    ;; // ihr_fwd_fees = ceil((msg_fwd_fees * ihr_price_factor)/2^16) nanograms
+    ;; // bits in the root cell of a message are not included in msg.bits (lump_price pays for them)
+    return lump_price + ((rest_bits * bit_price + rest_cells * cell_price + 65535) >> 16);
+}
+
+int deposit_coins_fee(cell wallet_state_init) {
+    int storage_fee = wallet_storage_fee();
+
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    int computation_gas =
+        gas::deposit_coins +
+        gas::save_coins +
+        gas::gas_excess +
+        gas::stake_coins +
+        gas::mint_tokens +
+        gas::receive_tokens +
+        gas::transfer_notification +
+        gas::gas_excess;
+    int computation_fee = computation_gas * gas_price >> 16;
+
+    ( int lump_price, int bit_price, int cell_price ) = get_msg_forward_prices(config::fwd_prices);
+    ( int cells, int bits, _ ) = compute_data_size(wallet_state_init, 1000);
+    ;; consider an additional cell for the message body
+    cells += 1;
+    bits += 1023;
+    int s_fwd_fee = lump_price;
+    int m_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, 1023, 1);
+    int l_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, bits, cells);
+    int fwd_fee =
+        s_fwd_fee + ;; deposit_coins
+        l_fwd_fee + ;; save_coins
+        s_fwd_fee + ;; gas_excess
+        s_fwd_fee + ;; stake_coins
+        m_fwd_fee + ;; mint_tokens
+        m_fwd_fee + ;; receive_tokens or save_coins
+        s_fwd_fee + ;; transfer_notification
+        s_fwd_fee; ;; gas_excess
+
+    return storage_fee + computation_fee + fwd_fee;
+}
+
+int stake_coins_fee() {
+    int storage_fee = wallet_storage_fee();
+
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    int computation_gas =
+        gas::stake_coins +
+        gas::mint_tokens +
+        gas::save_coins +
+        gas::receive_tokens +
+        gas::transfer_notification +
+        gas::gas_excess;
+    int computation_fee = computation_gas * gas_price >> 16;
+
+    ( int lump_price, int bit_price, int cell_price ) = get_msg_forward_prices(config::fwd_prices);
+    int s_fwd_fee = lump_price;
+    int m_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, 1023, 1);
+    int fwd_fee =
+        s_fwd_fee + ;; stake_coins
+        m_fwd_fee + ;; mint_tokens
+        m_fwd_fee + ;; receive_tokens or save_coins
+        s_fwd_fee + ;; transfer_notification
+        s_fwd_fee; ;; gas_excess
+
+    return storage_fee + computation_fee + fwd_fee;
+}
+
+int stake_first_coins_fee() {
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    return gas::stake_first_coins * gas_price >> 16;
+}
+
+int send_tokens_fee(cell wallet_state_init) {
+    int storage_fee = wallet_storage_fee();
+
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    int computation_gas =
+        gas::send_tokens +
+        gas::receive_tokens +
+        gas::transfer_notification +
+        gas::gas_excess;
+    int computation_fee = computation_gas * gas_price >> 16;
+
+    ( int lump_price, int bit_price, int cell_price ) = get_msg_forward_prices(config::fwd_prices);
+    ( int cells, int bits, _ ) = compute_data_size(wallet_state_init, 1000);
+    ;; consider an additional cell for the message body
+    cells += 1;
+    bits += 1023;
+    int s_fwd_fee = lump_price;
+    int m_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, 1023, 1);
+    int l_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, bits, cells);
+    int fwd_fee =
+        m_fwd_fee + ;; send_tokens
+        l_fwd_fee + ;; receive_tokens
+        s_fwd_fee + ;; transfer_notification
+        s_fwd_fee; ;; gas_excess
+
+    return storage_fee + computation_fee + fwd_fee;
+}
+
+int unstake_tokens_fee() {
+    int storage_fee = wallet_storage_fee();
+
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    int computation_gas =
+        gas::unstake_tokens +
+        gas::reserve_tokens +
+        gas::gas_excess +
+        gas::gas_excess +
+        gas::withdraw_tokens +
+        gas::burn_tokens +
+        gas::burn_failed +
+        gas::withdrawal_notification +
+        gas::gas_excess;
+    int computation_fee = computation_gas * gas_price >> 16;
+
+    ( int lump_price, int bit_price, int cell_price ) = get_msg_forward_prices(config::fwd_prices);
+    int s_fwd_fee = lump_price;
+    int m_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, 1023, 1);
+    int fwd_fee =
+        m_fwd_fee + ;; unstake_tokens
+        m_fwd_fee + ;; reserve_tokens
+        s_fwd_fee + ;; gas_excess
+        s_fwd_fee + ;; gas_excess
+        s_fwd_fee + ;; withdraw_tokens
+        m_fwd_fee + ;; burn_tokens
+        s_fwd_fee + ;; withdrawal_notification or burn_failed
+        s_fwd_fee; ;; gas_excess
+
+    return storage_fee + computation_fee + fwd_fee;
+}
+
+int unstake_all_tokens_fee() {
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    return gas::unstake_all_tokens * gas_price >> 16;
+}
+
+int transfer_notification_fee() {
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    return gas::transfer_notification * gas_price >> 16;
+}
+
+int withdraw_tokens_fee() {
+    int storage_fee = wallet_storage_fee();
+
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    int computation_gas =
+        gas::withdraw_tokens +
+        gas::burn_tokens +
+        gas::burn_failed +
+        gas::withdrawal_notification +
+        gas::gas_excess;
+    int computation_fee = computation_gas * gas_price >> 16;
+
+    ( int lump_price, int bit_price, int cell_price ) = get_msg_forward_prices(config::fwd_prices);
+    int s_fwd_fee = lump_price;
+    int m_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, 1023, 1);
+    int fwd_fee =
+        s_fwd_fee + ;; withdraw_tokens
+        m_fwd_fee + ;; burn_tokens
+        s_fwd_fee + ;; withdrawal_notification or burn_failed
+        s_fwd_fee; ;; gas_excess
+
+    return storage_fee + computation_fee + fwd_fee;
+}
+
+int upgrade_wallet_fee(cell wallet_state_init) {
+    int storage_fee = wallet_storage_fee();
+
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    int computation_gas =
+        gas::upgrade_wallet +
+        gas::convert_wallet +
+        gas::merge_wallet +
+        gas::gas_excess;
+    int computation_fee = computation_gas * gas_price >> 16;
+
+    ( int lump_price, int bit_price, int cell_price ) = get_msg_forward_prices(config::fwd_prices);
+    ( int cells, int bits, _ ) = compute_data_size(wallet_state_init, 1000);
+    ;; consider 10 additional entries in the staking dict
+    cells += 20 + 1;
+    bits += (32 + 124) * 10 + 1023;
+    int s_fwd_fee = lump_price;
+    int l_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, bits, cells);
+    int fwd_fee =
+        s_fwd_fee + ;; upgrade_wallet
+        l_fwd_fee + ;; convert_wallet
+        l_fwd_fee + ;; merge_wallet
+        s_fwd_fee; ;; gas_excess
+
+    return storage_fee + computation_fee + fwd_fee;
+}
+
+int request_loan_fee(cell loan_state_init) {
+    ( int loan_storage_fee, int request_storage_fee ) = loan_storage_fee();
+    int storage_fee = loan_storage_fee + request_storage_fee;
+
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    ( int mc_gas_price, _ ) = get_gas_prices(config::mc_gas_prices);
+    int computation_gas =
+        gas::request_loan +
+        gas::participate_in_election +
+        gas::decide_loan_requests +
+        gas::process_loan_requests +
+        gas::vset_changed +
+        gas::vset_changed +
+        gas::finish_participation +
+        gas::recover_stakes +
+        gas::recover_stake_result;
+    int mc_computation_gas =
+        gas::send_new_stake +
+        gas::new_stake +
+        gas::new_stake_error +
+        gas::new_stake_ok +
+        gas::send_recover_stake +
+        gas::recover_stake +
+        gas::recover_stake_ok;
+    int computation_fee = (computation_gas * gas_price >> 16) + (mc_computation_gas * mc_gas_price >> 16);
+
+    ( int lump_price, int bit_price, int cell_price ) = get_msg_forward_prices(config::fwd_prices);
+    ( int mc_lump_price, int mc_bit_price, int mc_cell_price ) = get_msg_forward_prices(config::mc_fwd_prices);
+    ( int cells, int bits, _ ) = compute_data_size(loan_state_init, 1000);
+    ;; consider two additional cells for the message body
+    cells += 2;
+    bits += 1088;
+    int s_fwd_fee = lump_price;
+    int m_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, 1088, 2);
+    int mc_s_fwd_fee = mc_lump_price;
+    int mc_m_fwd_fee = msg_fwd_fee(mc_lump_price, mc_bit_price, mc_cell_price, 1088, 2);
+    int mc_l_fwd_fee = msg_fwd_fee(mc_lump_price, mc_bit_price, mc_cell_price, bits, cells);
+    int fwd_fee =
+        m_fwd_fee + ;; request_loan
+        s_fwd_fee + ;; participate_in_election
+        s_fwd_fee + ;; decide_loan_requests
+        s_fwd_fee + ;; process_loan_requests
+        mc_l_fwd_fee + ;; send_new_stake
+        mc_m_fwd_fee + ;; new_stake
+        mc_s_fwd_fee + ;; new_stake_error or new_stake_ok
+        s_fwd_fee + ;; vset_changed
+        s_fwd_fee + ;; vset_changed
+        s_fwd_fee + ;; finish_participation
+        s_fwd_fee + ;; recover_stakes
+        mc_s_fwd_fee + ;; send_recover_stake
+        mc_s_fwd_fee + ;; recover_stake
+        mc_s_fwd_fee + ;; recover_stake_ok
+        s_fwd_fee; ;; recover_stake_result
+
+    return storage_fee + computation_fee + fwd_fee;
+}
+
+int send_new_stake_fee(cell loan_state_init) {
+    ( int loan_storage_fee, _ ) = loan_storage_fee();
+    int storage_fee = loan_storage_fee;
+
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    ( int mc_gas_price, _ ) = get_gas_prices(config::mc_gas_prices);
+    int computation_gas =
+        gas::recover_stake_result;
+    int mc_computation_gas =
+        gas::send_new_stake +
+        gas::new_stake +
+        gas::new_stake_error +
+        gas::new_stake_ok;
+    int computation_fee = (computation_gas * gas_price >> 16) + (mc_computation_gas * mc_gas_price >> 16);
+
+    ( int lump_price, int bit_price, int cell_price ) = get_msg_forward_prices(config::fwd_prices);
+    ( int mc_lump_price, int mc_bit_price, int mc_cell_price ) = get_msg_forward_prices(config::mc_fwd_prices);
+    ( int cells, int bits, _ ) = compute_data_size(loan_state_init, 1000);
+    ;; consider two additional cells for the message body
+    cells += 2;
+    bits += 1088;
+    int s_fwd_fee = lump_price;
+    int m_fwd_fee = msg_fwd_fee(lump_price, bit_price, cell_price, 1088, 2);
+    int mc_s_fwd_fee = mc_lump_price;
+    int mc_m_fwd_fee = msg_fwd_fee(mc_lump_price, mc_bit_price, mc_cell_price, 1088, 2);
+    int mc_l_fwd_fee = msg_fwd_fee(mc_lump_price, mc_bit_price, mc_cell_price, bits, cells);
+    int fwd_fee =
+        mc_l_fwd_fee + ;; send_new_stake
+        mc_m_fwd_fee + ;; new_stake
+        mc_s_fwd_fee + ;; new_stake_error or new_stake_ok
+        s_fwd_fee; ;; recover_stake_result
+
+    return storage_fee + computation_fee + fwd_fee;
+}
+
+int recover_stake_fee() {
+    ( int loan_storage_fee, _ ) = loan_storage_fee();
+    int storage_fee = loan_storage_fee;
+
+    ( int gas_price, _ ) = get_gas_prices(config::gas_prices);
+    ( int mc_gas_price, _ ) = get_gas_prices(config::mc_gas_prices);
+    int computation_gas =
+        gas::recover_stake_result;
+    int mc_computation_gas =
+        gas::send_recover_stake +
+        gas::recover_stake +
+        gas::recover_stake_ok;
+    int computation_fee = (computation_gas * gas_price >> 16) + (mc_computation_gas * mc_gas_price >> 16);
+
+    ( int lump_price, int bit_price, int cell_price ) = get_msg_forward_prices(config::fwd_prices);
+    ( int mc_lump_price, int mc_bit_price, int mc_cell_price ) = get_msg_forward_prices(config::mc_fwd_prices);
+    int s_fwd_fee = lump_price;
+    int mc_s_fwd_fee = mc_lump_price;
+    int fwd_fee =
+        mc_s_fwd_fee + ;; send_recover_stake
+        mc_s_fwd_fee + ;; recover_stake
+        mc_s_fwd_fee + ;; recover_stake_error or recover_stake_ok
+        s_fwd_fee; ;; recover_stake_result
+
+    return storage_fee + computation_fee + fwd_fee;
+}
