@@ -1,0 +1,84 @@
+#include "metadata_utils.func";
+
+global cell controller_code;
+global cell payout_minter_code;
+
+slice addr_none() asm "b{00} PUSHSLICE";
+builder store_zeros(builder b, int n) asm "STZEROES";
+
+cell controller_init_data (cell static_data) {
+  ;; TODO optimize with store_zeros
+  return begin_cell()
+            .store_uint(0, 8) ;; state
+            .store_bool(false)  ;; halted
+            .store_bool(false)  ;; approved
+            .store_coins(0) ;; stake_amount_sent
+            .store_timestamp(0) ;; stake_at
+            .store_uint(0, 256) ;; saved_validator_set_hash
+            .store_uint(0, 8) ;; validator_set_changes_count
+            .store_timestamp(0) ;; validator_set_change_time
+            .store_timestamp(0) ;; stake_held_for
+            .store_coins(0) ;; borrowed_amount
+            .store_timestamp(0) ;; borrowing_time
+            .store_uint(0, 2) ;; sudoer addr_none
+            .store_timestamp(0) ;; sudoer_set_at
+            .store_share(0)     ;; max_expected_interest
+            .store_ref(static_data)
+           .end_cell();
+}
+
+cell controller_init_state (cell static_data) {
+    return begin_cell()
+            .store_uint(0, 1 + 1) ;; split_depth (Maybe = 0) and special (Maybe = 0)
+            .store_maybe_ref(controller_code)
+            .store_maybe_ref(controller_init_data(static_data))
+            .store_uint(0,1) ;; libraries - empty cell
+            .end_cell();
+}
+
+
+slice calc_address(int workchain, cell state_init) inline {
+    return begin_cell().store_uint(4, 3) ;; 0x100 : $10 + anycast (Maybe = 0)
+            .store_workchain(workchain)
+            .store_uint(
+                    cell_hash(state_init), 256)
+            .end_cell()
+            .begin_parse();
+}
+
+global slice consigliere;
+
+cell calculate_payout_state_init(slice pool_address, int round_id, int distributing_jettons?) {
+  cell content_dict = new_dict();
+  ;; TODO optimize
+  slice name = concat(distributing_jettons? ? "Deposit " : "Withdrawal ", concat("Payout#", encode_number_to_text(round_id, 10)));
+  content_dict~udict_set_ref(256, "name"H, pack_metadata_value(name));
+  if (distributing_jettons?) {
+    content_dict~udict_set_ref(256, "description"H, pack_metadata_value("Converts deposited TON to Pool Jettons"));
+  } else {
+    content_dict~udict_set_ref(256, "description"H, pack_metadata_value("Converts burned Pool Jettons to TON"));
+  }
+  content_dict~udict_set_ref(256, "symbol"H, pack_metadata_value("⏲️"));
+  content_dict~udict_set_ref(256, "uri"H, pack_metadata_value("my-custom-stake-address.ton"));
+  content_dict~udict_set_ref(256, "image"H, pack_metadata_value("my-custom-stake-address.ton/icon.img"));
+  content_dict~udict_set_ref(256, "render_type"H, pack_metadata_value("hidden"));
+  ;; To make payout address unpredictable we use two sources of difficult to know in advance data:
+  ;; Hash of contract storage and block random seed
+  randomize_lt();
+  content_dict~udict_set_ref(256, "random_seed"H, begin_cell().store_uint(random() >> 8, 256).store_uint(get_data().cell_hash(), 256).end_cell());
+  cell onchain_content = begin_cell().store_uint(0, 8).store_dict(content_dict).end_cell();
+  
+  
+  cell data =  begin_cell()
+            .store_coins(0)                   ;; total_supply
+            .store_slice(my_address())        ;; admin_address
+            .store_maybe_ref(null())          ;; Distribution
+            .store_ref(onchain_content)       ;; Content
+           .end_cell();
+  return begin_cell()
+            .store_uint(0, 1 + 1) ;; split_depth (Maybe = 0) and special (Maybe = 0)
+            .store_maybe_ref(payout_minter_code)
+            .store_maybe_ref(data)
+            .store_uint(0,1) ;; libraries - empty cell
+            .end_cell();
+}

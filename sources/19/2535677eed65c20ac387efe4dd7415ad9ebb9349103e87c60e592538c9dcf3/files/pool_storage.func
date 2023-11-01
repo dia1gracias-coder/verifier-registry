@@ -1,0 +1,210 @@
+;;[borrowers_dict, round_id, active_borrowers, borrowed, expected, returned, profit]
+(slice, ([cell, int, int, int, int, int, int])) ~load_round_data(slice s) inline {
+    slice ds = s~load_ref().begin_parse();
+    var data = [ds~load_dict(),             ;; borrowers
+                ds~load_uint(32),           ;; round_id
+                ds~load_uint(32),           ;; active_borrowers
+                ds~load_coins(),            ;; borrowed
+                ds~load_coins(),            ;; expected
+                ds~load_coins(),            ;; returned
+                ds~load_signed_coins()];    ;; profit
+   return (s, (data));
+}
+
+builder store_round_data(builder b, [cell, int, int, int, int, int, int] round_data) inline {
+  var [borrowers_dict, round_id, active_borrowers, borrowed, expected, returned, profit] = round_data;
+  cell serialized = begin_cell()
+                     .store_dict(borrowers_dict)
+                     .store_uint(round_id, 32)
+                     .store_uint(active_borrowers, 32)
+                     .store_coins(borrowed)
+                     .store_coins(expected)
+                     .store_coins(returned)
+                     .store_signed_coins(profit)
+                     .end_cell();
+  return b.store_ref(serialized);
+}
+
+
+(slice, ()) ~load_minters_data(slice s) impure inline {
+    slice ds = s~load_ref().begin_parse();
+    jetton_minter = ds~load_msg_addr();
+    supply = ds~load_coins();
+
+    deposit_payout = null();
+    requested_for_deposit = 0;
+    ;; (Maybe (Either X, ^X))
+    if(ds~load_bool()) {
+      if(ds~load_bool()) {
+        slice ajm_s = ds~load_ref().begin_parse();
+        deposit_payout = ajm_s~load_msg_addr();
+        requested_for_deposit = ajm_s~load_coins();
+      } else {
+        deposit_payout = ds~load_msg_addr();
+        requested_for_deposit = ds~load_coins();
+      }
+    }
+
+    withdrawal_payout = null();
+    requested_for_withdrawal = 0;
+    ;;(Maybe (Either X, ^X)) 
+    if(ds~load_bool()) {
+      if(ds~load_bool()) {
+          slice atm_s = ds~load_ref().begin_parse();
+          withdrawal_payout = atm_s~load_msg_addr();
+          requested_for_withdrawal = atm_s~load_coins();
+      } else {
+          withdrawal_payout = ds~load_msg_addr();
+          requested_for_withdrawal = ds~load_coins();
+      }
+    }
+    return (s, ());
+}
+
+builder save_minters_data(builder pb) inline {
+    builder b = begin_cell()
+                 .store_slice(jetton_minter)
+                 .store_coins(supply);
+    if(deposit_payout.null?()) {
+      b = b.store_bool(false);
+    } else {
+      b = b.store_bool(true) ;; Maybe
+           .store_bool(false) ;;Either X
+           .store_slice(deposit_payout)
+           .store_coins(requested_for_deposit);
+    }
+    if(withdrawal_payout.null?()) {
+      b = b.store_bool(false);
+    } else {
+      b = b.store_bool(true);
+      if(b.builder_bits() > 1023 - 267 - 124) {
+        b = b.store_bool(true) ;;Either ^X
+              .store_ref(
+              begin_cell()
+                .store_slice(withdrawal_payout)
+                .store_coins(requested_for_withdrawal)
+              .end_cell()
+            );
+      } else {
+        b = b.store_bool(false) ;;Either X
+             .store_slice(withdrawal_payout)
+             .store_coins(requested_for_withdrawal);
+      }
+    }
+    return pb.store_ref(b.end_cell());
+}
+
+
+
+(slice, ()) ~load_roles(slice s) impure inline {
+    slice ds = s~load_ref().begin_parse();
+    sudoer = ds~load_msg_addr();
+    sudoer_set_at = ds~load_timestamp();
+    governor = ds~load_msg_addr();
+    governor_update_after = ds~load_timestamp();
+    interest_manager = ds~load_msg_addr();
+    ds = ds~load_ref().begin_parse();
+    halter = ds~load_msg_addr();
+    approver = ds~load_msg_addr();
+    return (s, ());
+}
+
+builder save_roles(builder pb) inline {
+    cell roles = begin_cell()
+                 .store_slice(sudoer)
+                 .store_timestamp(sudoer_set_at)
+                 .store_slice(governor)
+                 .store_timestamp(governor_update_after)
+                 .store_slice(interest_manager)
+                 .store_ref(
+                   begin_cell()
+                   .store_slice(halter)
+                   .store_slice(approver)
+                   .end_cell()
+                  )
+                 .end_cell();
+   return pb.store_ref(roles);
+}
+
+(slice, ()) ~load_codes(slice s) impure inline {
+    slice ds = s~load_ref().begin_parse();
+    controller_code = ds~load_ref();
+    pool_jetton_wallet_code = ds~load_ref();
+    payout_minter_code = ds~load_ref();
+    return (s, ());
+}
+
+builder save_codes(builder pb) inline {
+    cell codes = begin_cell()
+                 .store_ref(controller_code)
+                 .store_ref(pool_jetton_wallet_code)
+                 .store_ref(payout_minter_code)
+                 .end_cell();
+   return pb.store_ref(codes);
+}
+
+global slice untouched_data;
+
+() load_data() impure inline_ref {
+
+    ;; this check should be removed in production
+    ;; it ensures that load_data is not loaded twice
+    ;;throw_unless(2222, state.null?());
+
+    slice ds = get_data().begin_parse();
+    state = ds~load_uint(8);
+    halted? = ds~load_bool();
+    total_balance = ds~load_coins();
+    ds~load_minters_data();
+    untouched_data = ds;
+    interest_rate = ds~load_share();
+    optimistic_deposit_withdrawals = ds~load_bool();
+    deposits_open? = ds~load_bool();
+    saved_validator_set_hash = ds~load_uint(256);
+    slice round_data = ds~load_ref().begin_parse();
+        current_round_borrowers = round_data~load_round_data();
+        prev_round_borrowers = round_data~load_round_data();
+    loan_params_per_validator = [ds~load_coins(), ds~load_coins()];
+    governance_fee = ds~load_share();
+    ds~load_roles();
+    ds~load_codes();
+}
+
+() save_data() impure inline_ref {
+    [int min_loan_per_validator, int max_loan_per_validator] = loan_params_per_validator;
+    set_data(begin_cell()
+        .store_uint(state, 8)
+        .store_bool(halted?)
+        .store_coins(total_balance)
+        .save_minters_data()
+        .store_share(interest_rate)
+        .store_bool(optimistic_deposit_withdrawals)
+        .store_bool(deposits_open?)
+        .store_uint(saved_validator_set_hash, 256)
+        .store_ref(
+          begin_cell()
+          .store_round_data(current_round_borrowers)
+          .store_round_data(prev_round_borrowers)
+          .end_cell()
+        )
+        .store_coins(min_loan_per_validator)
+        .store_coins(max_loan_per_validator)
+        .store_share(governance_fee)
+        .save_roles()
+        .save_codes()
+        .end_cell()
+    );
+}
+
+() save_data_optimised() impure inline_ref {
+    if(untouched_data.null?()) {
+        return save_data();
+    }
+    set_data(begin_cell()
+        .store_uint(state, 8)
+        .store_bool(halted?)
+        .store_coins(total_balance)
+        .save_minters_data()
+        .store_slice(untouched_data)
+    .end_cell());
+}
