@@ -1,0 +1,199 @@
+#pragma version =0.4.3;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+#include "tact_MyContract1.headers.fc";
+#include "tact_MyContract1.stdlib.fc";
+#include "tact_MyContract1.constants.fc";
+#include "tact_MyContract1.storage.fc";
+
+;;
+;; Contract MyContract1 functions
+;;
+
+(int, int, slice) $MyContract1$_contract_init(int $id) impure inline_ref {
+    var (($self'id, $self'level, $self'owner)) = (null(), 0, null());
+    $self'id = $id;
+    $self'owner = __tact_context_get_sender();
+    return ($self'id, $self'level, $self'owner);
+}
+
+((int, int, slice), int) $MyContract1$_fun_stopped((int, int, slice) $self) impure inline_ref {
+    var (($self'id, $self'level, $self'owner)) = $self;
+    return (($self'id, $self'level, $self'owner), ($self'level == 0));
+}
+
+((int, int, slice), int) $MyContract1$_fun_level((int, int, slice) $self) impure inline_ref {
+    var (($self'id, $self'level, $self'owner)) = $self;
+    return (($self'id, $self'level, $self'owner), $self'level);
+}
+
+((int, int, slice), int) $MyContract1$_fun_id((int, int, slice) $self) impure inline_ref {
+    var (($self'id, $self'level, $self'owner)) = $self;
+    return (($self'id, $self'level, $self'owner), $self'id);
+}
+
+((int, int, slice), ()) $MyContract1$_fun_requireOwner((int, int, slice) $self) impure inline_ref {
+    var (($self'id, $self'level, $self'owner)) = $self;
+    throw_unless(132, ( __tact_slice_eq_bits($self'owner, __tact_context_get_sender()) ));
+    return (($self'id, $self'level, $self'owner), ());
+}
+
+((int, int, slice), slice) $MyContract1$_fun_owner((int, int, slice) $self) impure inline_ref {
+    var (($self'id, $self'level, $self'owner)) = $self;
+    return (($self'id, $self'level, $self'owner), $self'owner);
+}
+
+;;
+;; Receivers of a Contract MyContract1
+;;
+
+(((int, int, slice)), ()) $MyContract1$_internal_binary_Restart((int, int, slice) $self, (int, slice) $msg) impure inline {
+    var ($self'id, $self'level, $self'owner) = $self;
+    var ($msg'level, $msg'newOwner) = $msg;
+    ($self'id, $self'level, $self'owner)~$MyContract1$_fun_requireOwner();
+    throw_unless(49309, ($self'level == 0));
+    if ((~ null?($msg'newOwner))) {
+        $self'owner = __tact_not_null($msg'newOwner);
+        $global_send($SendParameters$_constructor_to_value_mode_body(__tact_not_null($msg'newOwner), 0, 0, __gen_cell_comment_c7e655649ff0cfa84349173a677dec85a565d82321f5bd58ced77474d8cceb5a()));
+    }
+    if (($msg'level > 0)) {
+        $self'level = $msg'level;
+        ($self'id, $self'level, $self'owner)~$MyContract1$_fun_reply(__gen_cell_comment_dd647feae1c2833cf9b8026098c513bdf11a71c9a8fba15bebf7778ec7d31e4f());
+    } else {
+        ($self'id, $self'level, $self'owner)~$MyContract1$_fun_reply(__gen_cell_comment_0b206ea9e1e981d81296f975964d0acd38e134b6aab4905aceacbd4105c4437e());
+    }
+    return (($self'id, $self'level, $self'owner), ());
+}
+
+(((int, int, slice)), ()) $MyContract1$_internal_binary_Bet((int, int, slice) $self, (int) $msg) impure inline {
+    var ($self'id, $self'level, $self'owner) = $self;
+    var ($msg'value) = $msg;
+    throw_unless(16290, ($self'level != 0));
+    throw_unless(33230, ($Context$_get_value(__tact_context_get()) >= 100000000));
+    if (($global_random(1, $self'level) != $msg'value)) {
+        $global_send($SendParameters$_constructor_to_value_mode_body(__tact_context_get_sender(), 0, 1, __gen_cell_comment_5a500ae387c47294cebf9a882e8b21cc2dbea0cb86ceeb135817e4bb595a1031()));
+        return (($self'id, $self'level, $self'owner), ());
+    }
+    $self'level = 0;
+    $global_send($SendParameters$_constructor_to_value_mode_body($self'owner, 0, 1, __gen_cell_comment_ff48764ea96ebb498e75125030606861a94d8b2b6af025dba70fa4514245cdbb()));
+    $global_send($SendParameters$_constructor_to_value_mode_body(__tact_context_get_sender(), 0, 128, __gen_cell_comment_7f4091ace9a1f37fe399447acc80126b3151f46fbf63150864b50eea8802a9b6()));
+    return (($self'id, $self'level, $self'owner), ());
+}
+
+(((int, int, slice)), ()) $MyContract1$_internal_binary_Deploy((int, int, slice) $self, (int) $deploy) impure inline {
+    var ($self'id, $self'level, $self'owner) = $self;
+    var ($deploy'queryId) = $deploy;
+    ($self'id, $self'level, $self'owner)~$MyContract1$_fun_notify($DeployOk$_store_cell($DeployOk$_constructor_queryId($deploy'queryId)));
+    return (($self'id, $self'level, $self'owner), ());
+}
+
+;;
+;; Get methods of a Contract MyContract1
+;;
+
+_ %stopped() method_id(74107) {
+    var self = $MyContract1$_contract_load();
+    var res = self~$MyContract1$_fun_stopped();
+    return res;
+}
+
+_ %level() method_id(83005) {
+    var self = $MyContract1$_contract_load();
+    var res = self~$MyContract1$_fun_level();
+    return res;
+}
+
+_ %id() method_id(105872) {
+    var self = $MyContract1$_contract_load();
+    var res = self~$MyContract1$_fun_id();
+    return res;
+}
+
+_ %owner() method_id(83229) {
+    var self = $MyContract1$_contract_load();
+    var res = self~$MyContract1$_fun_owner();
+    return res;
+}
+
+_ supported_interfaces() method_id {
+    return (
+        "org.ton.introspection.v0"H >> 128,
+        "org.ton.abi.ipfs.v0"H >> 128,
+        "org.ton.deploy.lazy.v0"H >> 128,
+        "org.ton.chain.workchain.v0"H >> 128,
+        "org.ton.ownable"H >> 128
+    );
+}
+
+_ get_abi_ipfs() method_id {
+    return "ipfs://QmPJSLTq9XQCBajFMDARGn3u1uWeZ36cyGAgFto8E4gKT9";
+}
+
+_ lazy_deployment_completed() method_id {
+    return get_data().begin_parse().load_int(1);
+}
+
+;;
+;; Routing of a Contract MyContract1
+;;
+
+((int, int, slice), int) $MyContract1$_contract_router_internal((int, int, slice) self, int msg_bounced, slice in_msg) impure inline_ref {
+    ;; Handle bounced messages
+    if (msg_bounced) {
+        return (self, true);
+    }
+    
+    ;; Parse incoming message
+    int op = 0;
+    if (slice_bits(in_msg) >= 32) {
+        op = in_msg.preload_uint(32);
+    }
+    
+    
+    ;; Receive Restart message
+    if (op == 3537176591) {
+        var msg = in_msg~$Restart$_load();
+        self~$MyContract1$_internal_binary_Restart(msg);
+        return (self, true);
+    }
+    
+    ;; Receive Bet message
+    if (op == 905136697) {
+        var msg = in_msg~$Bet$_load();
+        self~$MyContract1$_internal_binary_Bet(msg);
+        return (self, true);
+    }
+    
+    ;; Receive Deploy message
+    if (op == 2490013878) {
+        var msg = in_msg~$Deploy$_load();
+        self~$MyContract1$_internal_binary_Deploy(msg);
+        return (self, true);
+    }
+    
+    return (self, false);
+}
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    var msg_flags = cs~load_uint(4);
+    var msg_bounced = -(msg_flags & 1);
+    slice msg_sender_addr = __tact_verify_address(cs~load_msg_addr());
+    __tact_context = (msg_bounced, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var self = $MyContract1$_contract_load();
+    
+    ;; Handle operation
+    int handled = self~$MyContract1$_contract_router_internal(msg_bounced, in_msg);
+    
+    ;; Throw if not handled
+    throw_unless(130, handled);
+    
+    ;; Persist state
+    $MyContract1$_contract_store(self);
+}
