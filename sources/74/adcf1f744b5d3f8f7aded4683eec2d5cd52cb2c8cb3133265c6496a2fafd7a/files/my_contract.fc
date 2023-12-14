@@ -1,0 +1,182 @@
+#include "imports/stdlib.fc";
+
+global slice jetton_wallet;
+global int jetton_balance;
+global slice admin_wallet;
+global int price;
+
+const int op::transfer_notification = 0x7362d09c;
+const int op::withdraw_jetton = 1;
+const int op::withdraw_ton = 2;
+const int op::set_jetton_wallet = 3;
+
+
+() save_data() impure { ;; save global variables to storage
+    set_data(
+        begin_cell()
+            .store_slice(jetton_wallet)
+            .store_coins(jetton_balance)
+            .store_slice(admin_wallet)
+            .store_coins(price)
+        .end_cell()
+    );
+}
+
+() load_data() impure { ;; loading global variables from c4 storage
+    var ds = get_data().begin_parse();
+
+    jetton_wallet = ds~load_msg_addr();
+    jetton_balance = ds~load_coins();
+    admin_wallet = ds~load_msg_addr();
+    price = ds~load_coins();
+
+    ds.end_parse();
+}
+
+() send_jetton(slice to, int amount, slice jetton_wallet) impure {
+    cell msg_body = begin_cell()
+        .store_uint(0xf8a7ea5, 32)
+        .store_uint(0, 64)
+        .store_coins(amount)
+        .store_slice(to)
+        .store_slice(to)
+        .store_uint(0, 1)
+        .store_coins(0)
+        .store_uint(0, 1)
+        .end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(jetton_wallet)
+        .store_coins(50000000) ;; 0.05 TON
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body)
+        .end_cell();
+
+    send_raw_message(msg, 1);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    load_data(); ;; updating global variables from storage
+    
+    if (in_msg_body.slice_empty?()) {
+        if equal_slices(sender_address, admin_wallet) {
+            return ();
+        }
+
+        if (msg_value > 100000000) { ;; 0.1 TON
+            int jetton_amount = msg_value * (price / 1000000000);
+            if (jetton_amount > jetton_balance) {
+                cell msg = begin_cell()
+                    .store_uint(0x10, 6)
+                    .store_slice(sender_address)
+                    .store_coins(0)
+                    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                    .end_cell();
+
+                send_raw_message(msg, 64);
+                return ();
+            }
+            send_jetton(sender_address, jetton_amount, jetton_wallet);
+            jetton_balance = jetton_balance - jetton_amount;
+            save_data();
+        }
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    
+    if (op == op::transfer_notification) {
+        int amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        if equal_slices(sender_address, jetton_wallet) {
+            jetton_balance = jetton_balance + amount;
+            if equal_slices(from_address, admin_wallet) {
+                save_data();
+                return ();
+            } 
+            int ton_amount = amount / (price / 1000000000);
+            if ((250000000 > ton_amount) | (ton_amount > my_balance)) {
+                send_jetton(from_address, amount, jetton_wallet);
+                return ();
+            } 
+            cell msg = begin_cell()
+                .store_uint(0x10, 6)
+                .store_slice(from_address)
+                .store_coins(ton_amount)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+
+            send_raw_message(msg, 0);
+
+            save_data();
+            return ();
+        }
+        send_jetton(from_address, amount, sender_address);
+        return ();
+    }
+
+    if (op == op::withdraw_jetton) {
+        if equal_slices(sender_address, admin_wallet) {
+            int amount = in_msg_body~load_coins();
+            ifnot (amount > jetton_balance) {
+                jetton_balance = jetton_balance - amount;
+            }
+
+            send_jetton(sender_address, amount, jetton_wallet);
+            save_data();
+        }
+        return ();
+    }
+
+    if (op == op::withdraw_ton) {
+        if equal_slices(sender_address, admin_wallet) {
+            cell msg = begin_cell()
+                .store_uint(0x10, 6)
+                .store_slice(sender_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+
+            send_raw_message(msg, 128);
+        }
+        return ();
+    }
+
+    if (op == op::set_jetton_wallet) {
+        if equal_slices(sender_address, admin_wallet) {
+            slice new_jetton_wallet = in_msg_body~load_msg_addr();
+            jetton_wallet = new_jetton_wallet;
+            save_data();
+        }
+        return ();
+    }
+    throw(0xffff);
+}
+
+int get_jetton_balance() method_id {
+    load_data();
+    return jetton_balance;
+}
+slice get_admin_wallet() method_id {
+     load_data();
+     return admin_wallet;
+}
+
+slice get_jetton_wallet() method_id {
+    load_data();
+    return jetton_wallet;
+}
+int get_price() method_id {
+    load_data();
+    return price;
+}
