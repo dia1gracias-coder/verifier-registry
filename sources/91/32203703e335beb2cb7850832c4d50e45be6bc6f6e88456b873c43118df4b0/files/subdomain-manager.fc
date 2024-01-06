@@ -1,0 +1,84 @@
+#include "imports/stdlib.fc";
+
+const int op::update_record = 0x537a3491;
+
+global slice owner;
+global cell domains;
+
+() load_data () impure {
+    slice ds = get_data().begin_parse();
+    owner = ds~load_msg_addr();
+    domains = ds~load_dict();
+}
+
+() save_data () impure {
+    set_data(begin_cell()
+        .store_slice(owner)
+        .store_dict(domains)
+    .end_cell());
+}
+
+() recv_internal (int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    cs~skip_bits(4);
+    slice sender = cs~load_msg_addr();
+    load_data();
+    throw_unless(501, equal_slices(sender, owner));
+
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::update_record) {
+        slice domain = in_msg_body~load_ref().begin_parse();
+        (cell records, _) = domains.udict_get_ref?(256, string_hash(domain));
+        int key = in_msg_body~load_uint(256);
+        if (in_msg_body~load_uint(1) == 1) {
+            cell value = in_msg_body~load_ref();
+            records~udict_set_ref(256, key, value);
+        } else {
+            records~udict_delete?(256, key);
+        }
+        domains~udict_set_ref(256, string_hash(domain), records);
+        save_data();
+    }
+}
+
+(slice, slice) parse_subdomain (slice subdomain) {
+    slice subdomain_sfx = subdomain;
+    while (subdomain_sfx~load_uint(8)) { }
+    subdomain~skip_last_bits(slice_bits(subdomain_sfx));
+    return (subdomain, subdomain_sfx);
+}
+
+(int, cell) dnsresolve (slice subdomain, int category) method_id {
+    int subdomain_bits = slice_bits(subdomain);
+    throw_unless(70, subdomain_bits % 8 == 0);
+
+    if (subdomain.preload_uint(8) == 0) {
+        subdomain~skip_bits(8);
+    }
+
+    ;; "test\0qwerty\0" -> "test" "qwerty\0"
+    ;; "test\0" -> "test" ""
+    (subdomain, slice subdomain_suffix) = parse_subdomain(subdomain);
+    int subdomain_suffix_bits = slice_bits(subdomain_suffix);
+
+    load_data();
+    (cell records, _) = domains.udict_get_ref?(256, string_hash(subdomain));
+
+    if (subdomain_suffix_bits > 0) { ;; more than "<SUBDOMAIN>\0" requested
+        category = "dns_next_resolver"H;
+    }
+
+    int resolved = subdomain_bits - subdomain_suffix_bits;
+
+    if (category == 0) { ;; all categories are requested
+        return (resolved, records);
+    }
+
+    (cell value, int found) = records.udict_get_ref?(256, category);
+    return (resolved, value);
+}
