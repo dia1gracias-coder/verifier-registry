@@ -1,0 +1,120 @@
+#include "messages.fc";
+#include "op-codes.fc";
+
+cell pack_jetton_wallet_data(int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+    return  begin_cell()
+            .store_coins(balance)
+            .store_slice(owner_address)
+            .store_slice(jetton_master_address)
+            .store_ref(jetton_wallet_code)
+            .end_cell();
+}
+
+cell calculate_jetton_wallet_state_init(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+    return begin_cell()
+            .store_uint(0, 2)
+            .store_dict(jetton_wallet_code)
+            .store_dict(pack_jetton_wallet_data(0, owner_address, jetton_master_address, jetton_wallet_code))
+            .store_uint(0, 1)
+            .end_cell();
+}
+
+slice create_address(int wc, int address_hash) inline {
+    return begin_cell().store_uint(4, 3)
+            .store_int(wc, 8)
+            .store_uint(address_hash, 256)
+            .end_cell()
+            .begin_parse();
+}
+
+slice calculate_address_by_state_init(cell state_init) inline {
+    return create_address(WORKCHAIN, cell_hash(state_init));
+}
+
+slice calculate_user_jetton_wallet_address(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+    return calculate_address_by_state_init(calculate_jetton_wallet_state_init(owner_address, jetton_master_address, jetton_wallet_code));
+}
+
+() send_receipt_message(addr, ans_tag, query_id, body, grams, mode) impure inline_ref {
+    var msg = begin_cell()
+            .store_uint(NON_BOUNCEABLE, 6)
+            .store_slice(addr)
+            .store_grams(grams)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(ans_tag, 32)
+            .store_uint(query_id, 64);
+    if (body >= 0) {
+        msg~store_uint(body, 256);
+    }
+    send_raw_message(msg.end_cell(), mode);
+}
+
+;; LIMITS:
+;; chainId: uint32 (it seems EVM chainId is uint256, but for our cases 32 bits is enough https://chainlist.org/)
+;; token address in EVM network: 160 bit (an Ethereum address is a 42-character hexadecimal address derived from the last 20 bytes of the public key controlling the account with 0x appended in front. e.g., 0x71C7656EC7ab88b098defB751B7401B5f6d8976F - https://info.etherscan.com/what-is-an-ethereum-address)
+;; decimals: uint8 (ERC-20 has uint8 decimals - https://eips.ethereum.org/EIPS/eip-20)
+(int, int, int) unpack_wrapped_token_data(cell data) inline {
+    slice slice_data = data.begin_parse();
+
+    (
+        int chain_id,
+        int token_address,
+        int token_decimals
+    ) = (
+        slice_data~load_uint(32),
+        slice_data~load_uint(160),
+        slice_data~load_uint(8)
+    );
+    slice_data.end_parse();
+
+    return (
+        chain_id,
+        token_address,
+        token_decimals
+    );
+}
+
+;; https://github.com/ton-blockchain/TEPs/blob/master/text/0064-token-data-standard.md#data-serialization
+cell pack_metadata_value(slice a) inline {
+    return begin_cell().store_uint(0, 8).store_slice(a).end_cell();
+}
+
+slice encode_number_to_text(int decimals, int radix) {
+    builder str = begin_cell();
+    int ctr  = 0;
+    tuple chars =  empty_tuple();
+
+    do {
+        (decimals, int rem) = decimals /% radix;
+
+        chars~tpush( rem >= 10 ? 87 + rem : 48 + rem);
+        ctr += 1;
+    } until (decimals == 0);
+
+    repeat( ctr ) {
+        str     = str.store_uint(chars.at(ctr - 1), 8);
+        ctr    -= 1;
+    }
+
+    return str.end_cell().begin_parse();
+}
+
+() emit_log_simple (int event_id, cell data, int need_separate_cell) impure inline {
+    ;; 1023 - (4+2+9+256+64+32+2) = 654 bit free
+
+    var msg = begin_cell()
+            .store_uint (12, 4)         ;; ext_out_msg_info$11 src:MsgAddressInt ()
+            .store_uint (1, 2)          ;; addr_extern$01
+            .store_uint (256, 9)        ;; len:(## 9)
+            .store_uint(event_id, 256); ;; external_address:(bits len)
+
+    if (need_separate_cell) {
+        msg = msg.store_uint(1, 64 + 32 + 2) ;; created_lt, created_at, init:Maybe, body:Either
+                .store_ref(data);
+    } else {
+        msg = msg.store_uint(0, 64 + 32 + 2) ;; created_lt, created_at, init:Maybe, body:Either
+                .store_slice(data.begin_parse());
+    }
+
+    send_raw_message(msg.end_cell(), SEND_MODE_REGULAR);
+}
