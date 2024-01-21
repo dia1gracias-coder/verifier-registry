@@ -1,0 +1,353 @@
+;; Distributor NFT collection smart contract
+;; Every minted token has its bill value.
+;; When distribution of some asset (TON or Jetton) started,
+;; every burned token gets a share from this asset in proportion
+;; of its bill value to total.
+
+#include "stdlib.func";
+#include "types.func";
+#include "op-codes.func";
+#include "errors.func";
+#include "params.func";
+#include "messages.func";
+#include "metadata_utils.func";
+
+
+slice addr_none() asm " <b 0 2 u, b> <s PUSHSLICE";
+const int ONE_COIN = 1000000000;
+
+const int jetton_transfer_notification_value = ONE_COIN / 100;
+const int burn_request_value = ONE_COIN / 100;
+const int start_distribution_gas_usage = ONE_COIN / 100;
+
+
+;; storage scheme
+;; storage#_ issued_bills:Coins
+;;           admin:MsgAddress
+;;           distribution:Maybe ^Cell
+;;           collection_content:^Cell
+;;           ^[
+;;                next_item_index:uint64
+;;                prev:MsgAddress current:MsgAddress next:MsgAddress
+;;                next_state_init:^Cell
+;;            ]
+;;           = Storage;
+
+(int, slice, cell, cell, int, slice, slice, slice, cell) load_data() inline {
+  var ds = get_data().begin_parse();
+  int issued_bills = ds~load_coins();
+  slice admin = ds~load_msg_addr();
+  cell distribution = ds~load_maybe_ref();
+  cell collection_content = ds~load_ref();
+  if(ds.slice_refs()) {
+    ds = ds.preload_ref().begin_parse();
+    int next_index = ds~load_uint(64);
+    (slice prev, slice current, slice next) =
+    (ds~load_msg_addr(), ds~load_msg_addr(), ds~load_msg_addr());
+    cell next_state_init = ds~load_ref();
+    return (issued_bills, admin, distribution, collection_content, next_index, prev, current, next, next_state_init);
+  } else {
+    slice ea = addr_none();
+    return (issued_bills, admin, distribution, collection_content, 0, ea, ea, ea, null());
+  }
+}
+
+() save_data(int issued_bills, slice admin, cell distribution, cell collection_content, int next_item_index, slice prev, slice current, slice next, cell next_init_state) impure inline {
+
+  builder storage = begin_cell()
+                      .store_coins(issued_bills)
+                      .store_slice(admin)
+                      .store_maybe_ref(distribution)
+                      .store_ref(collection_content);
+  if(next_item_index > 0) {
+    cell nfts = begin_cell()
+                             .store_uint(next_item_index, 64)
+                             .store_slice(prev)
+                             .store_slice(current)
+                             .store_slice(next)
+                             .store_ref(next_init_state)
+                 .end_cell();
+    storage = storage.store_ref(nfts);
+  }
+    set_data(storage.end_cell());
+}
+
+cell calculate_nft_item_state_init(int item_index, cell nft_item_code) {
+  cell data = begin_cell()
+                 .store_bool(false) ;; init?
+                 .store_slice(my_address())
+                 .store_uint(item_index, 64)
+              .end_cell();
+  return begin_cell().store_uint(0, 2).store_dict(nft_item_code).store_dict(data).store_uint(0, 1).end_cell();
+}
+
+slice calculate_nft_item_address(cell state_init) {
+  return begin_cell().store_uint(4, 3)
+                     .store_workchain(BASECHAIN) ;; wc
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+
+() recv_internal( int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender = cs~load_msg_addr();
+
+    (int op, int query_id) = in_msg_body~load_body_header();
+
+    var (issued_bills, admin, distribution, collection_content, next_item_index, prev, current, next, next_state_init) = load_data();
+
+
+
+    if (op == op::init_collection) {
+      throw_unless(error::unauthorized_init, equal_slice_bits(sender, admin));
+      distribution = in_msg_body~load_ref();
+      throw_unless(333, distribution.begin_parse().slice_bits());
+      return save_data(issued_bills, admin, distribution, collection_content, next_item_index, prev, current, next, next_state_init);
+    }
+    throw_unless(error::need_init, ~ cell_null?(distribution));
+
+    slice distr = distribution.begin_parse();
+    int distribution_started = distr~load_bool();
+    if (op == op::mint_nft) {
+      throw_unless(error::unauthorized_mint_request, equal_slice_bits(sender, admin));
+      throw_if(error::mint_after_distribution_start, distribution_started);
+      slice owner = in_msg_body~load_msg_addr();
+      int amount = in_msg_body~load_coins();
+
+      if(cell_null?(next_state_init)) {
+        next_state_init = calculate_nft_item_state_init(next_item_index, nft_item_code());
+        next = calculate_nft_item_address(next_state_init);
+      }
+
+      next_item_index += 1;
+      issued_bills += amount;
+      (prev, current, cell current_state_init) = (current, next, next_state_init);
+
+      next_state_init = calculate_nft_item_state_init(next_item_index, nft_item_code());
+      next = calculate_nft_item_address(next_state_init);
+
+      var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(current)
+                .store_coins(0)
+                .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+                .store_ref(current_state_init)
+                .store_ref(
+                  begin_cell()
+                    .store_op(op::init_nft)
+                    .store_query_id(query_id)
+                    .store_slice(owner)
+                    .store_coins(amount)
+                    .store_slice(next)  ;; reverse order intentioned
+                    .store_slice(prev)
+                  .end_cell()
+                );
+      send_raw_message(msg.end_cell(), sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+      return save_data(issued_bills, admin, distribution, collection_content, next_item_index, prev, current, next, next_state_init);
+    }
+
+
+    if (op == op::transfer_notification) { ;; accept only as jetton distribution start
+        ;; theoretically we should not throw on getting jetton transfer because it may lead
+        ;; to lost jettons. On practice in most cases we can not correctly handle untimely transfers
+        throw_if(error::distribution_already_started, distribution_started);
+        int jettons? = distr~load_bool();
+        throw_unless(error::cannot_distribute_jettons, jettons?);
+        distr~load_coins(); ;; volume
+        slice my_jetton_wallet = distr~load_msg_addr();
+        throw_unless(error::unknown_jetton_wallet, equal_slice_bits(sender, my_jetton_wallet));
+        
+        int burnt_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(error::unauthorized_transfer_source,
+                     (equal_slice_bits(from_address, admin)
+                     |
+                     ;; null address when was minted directly to the wallet
+                     (from_address.preload_uint(2) == 0)));
+        distribution = begin_cell()
+                        .store_bool(true) ;; started
+                        .store_bool(true) ;; jettons
+                        .store_coins(burnt_amount)
+                        .store_slice(my_jetton_wallet)
+                           .end_cell();
+        var msg = begin_cell()
+                    .store_msg_flags(msgflag::BOUNCEABLE)
+                    .store_slice(current)
+                    .store_coins(burn_request_value)
+                    .store_msgbody_prefix_slice()
+                    .store_op(op::burn)
+                    .store_query_id(query_id);
+        send_raw_message(msg.end_cell(), sendmode::REGULAR | sendmode::PAY_FEES_SEPARETELY );
+        return save_data(issued_bills, admin, distribution, collection_content, next_item_index, prev, current, next, next_state_init);
+    }
+
+    if (op == op::start_distribution) {
+        throw_unless(error::unauthorized_start_request, equal_slice_bits(sender, admin));
+        throw_if(error::distribution_already_started, distribution_started);
+        int jettons? = distr~load_bool();
+        throw_if(error::cannot_distribute_tons, jettons?);
+
+        distribution = begin_cell()
+                        .store_bool(true) ;; started
+                        .store_bool(false) ;; not jettons
+                        .store_coins(msg_value - start_distribution_gas_usage) ;; volume
+                       .end_cell();
+        
+            var msg = begin_cell()
+                    .store_msg_flags(msgflag::BOUNCEABLE)
+                    .store_slice(current)
+                    .store_coins(burn_request_value)
+                    .store_msgbody_prefix_slice()
+                    .store_op(op::burn)
+                    .store_query_id(query_id);
+            send_raw_message(msg.end_cell(), sendmode::REGULAR | sendmode::PAY_FEES_SEPARETELY );
+        return save_data(issued_bills, admin, distribution, collection_content, next_item_index, prev, current, next, next_state_init);
+    }
+
+    if (op == op::burn_notification) {
+        throw_unless(error::burn_before_distribution, distribution_started);
+        int burnt_amount = in_msg_body~load_coins();
+        slice burner_address = in_msg_body~load_msg_addr();
+        int burnt_index = in_msg_body~load_uint(64);
+
+        cell state_init = calculate_nft_item_state_init(burnt_index, nft_item_code());
+        slice expected_address = calculate_nft_item_address(state_init);
+        
+        throw_unless(error::unauthorized_burn_notification,
+                equal_slice_bits(expected_address, sender)
+        );
+        int jettons? = distr~load_bool();
+        int volume_to_distribute = distr~load_coins();
+
+        int share_amount = muldiv(burnt_amount, volume_to_distribute, issued_bills);
+        ;;  ^ The same as
+        ;; share = (jettons_burned / supply) * volume_to_distribute
+
+        var new_distr = begin_cell().store_bool(true).store_bool(jettons?)
+                            .store_coins(volume_to_distribute - share_amount);
+
+        if (jettons?) {
+            slice my_jetton_wallet_address = distr~load_msg_addr();
+            var msg = begin_cell()
+                    .store_msg_flags(msgflag::BOUNCEABLE)
+                    .store_slice(my_jetton_wallet_address)
+                    .store_coins(0)
+                    .store_msgbody_prefix_ref(
+                      begin_cell()
+                      .store_op(op::jetton_transfer)
+                      .store_query_id(query_id)
+                      .store_coins(share_amount)
+                      .store_slice(burner_address)
+                      .store_slice(burner_address)
+                      .store_maybe_ref(null()) ;; custom_payload
+                      .store_coins(jetton_transfer_notification_value)
+                      .store_bool(false)
+                      .store_op(op::distributed_asset)
+                      .end_cell()
+                    );
+            send_raw_message(msg.end_cell(), sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            new_distr = new_distr.store_slice(my_jetton_wallet_address);
+        } else {
+
+            var msg = begin_cell()
+                    .store_msg_flags(msgflag::NON_BOUNCEABLE)
+                    .store_slice(burner_address)
+                    .store_coins(share_amount)
+                    .store_msgbody_prefix_slice()
+                    .store_op(op::distributed_asset)
+                    .store_query_id(query_id);
+
+            send_raw_message(msg.end_cell(), sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        }
+        distribution = new_distr.end_cell();
+        if(burnt_index == 0) {
+            var msg = begin_cell()
+                    .store_msg_flags(msgflag::NON_BOUNCEABLE)
+                    .store_slice(admin)
+                    .store_coins(0)
+                    .store_msgbody_prefix_slice()
+                    .store_op(op::return_unused)
+                    .store_query_id(query_id);
+
+            send_raw_message(msg.end_cell(), sendmode::CARRY_ALL_BALANCE);
+        }
+        return save_data(issued_bills - burnt_amount, admin, distribution, collection_content, burnt_index, prev, current, next, next_state_init);
+    }
+
+    throw(0xffff);
+}
+
+;; Get methods
+
+(int, cell, slice) get_collection_data() method_id {
+  var (issued_bills, admin, distribution, collection_content, next_item_index, prev, current, next, next_state_init) = load_data();
+  return (next_item_index, collection_content, admin);
+}
+
+cell get_distribution_data() method_id {
+  var (issued_bills, admin, distribution, collection_content, next_item_index, prev, current, next, next_state_init) = load_data();
+  return distribution;
+}
+
+(int, int) get_issued_bills() method_id {
+  ;; returns issued_bills (amount), bills_count
+  var (issued_bills, admin, distribution, collection_content, next_item_index, prev, current, next, next_state_init) = load_data();
+  return (issued_bills, next_item_index);
+}
+
+slice get_nft_address_by_index(int index) method_id {
+    cell state_init = calculate_nft_item_state_init(index, nft_item_code());
+    return calculate_nft_item_address(state_init);
+}
+
+cell get_nft_content(int index, cell individual_nft_content) method_id {
+;; individual_nft_content has only share amount for this token in it.
+;; This function generates onchain metadata containing (in dict):
+;; {
+;;  sha256(name): "Bill for {amount} TON/Pool Jetton in Withdrawal/Deposit Payout #{collection_no}",
+;;  sha256(description): "DO NOT SEND ON CONTRACTS: Automatically converts deposited TON to Pool Jettons when ready
+;;                   or  "DO NOT SEND ON CONTRACTS: Converts burned Pool Jettons to TON when ready"
+;; }
+
+  var (issued_bills, admin, distribution, collection_content, next_item_index, prev, current, next, next_state_init) = load_data();
+  slice cs = individual_nft_content.begin_parse();
+  int amount = cs~load_coins();
+  cs = distribution.begin_parse();
+  cs~skip_bits(1);
+  int jettons? = cs~load_bool();
+  cs = collection_content.begin_parse();
+  ;;cell onchain_content = begin_cell().store_uint(0, 8).store_dict(content_dict).end_cell();
+  cs~skip_bits(8);
+  cell content = cs~load_dict();
+  (cell old_name_cell, int success?) = content.udict_get_ref?(256, "name"H);
+  slice old_name = old_name_cell.begin_parse();
+  old_name~skip_bits(8); ;; 0 for string
+
+  builder new_name = begin_cell()
+                                 .store_uint(0, 8)
+                                 .store_slice("Bill for ")
+                                 .store_coins_string(amount);
+  if(jettons?) {
+      new_name = new_name.store_slice(" TON in ");
+  } else {
+      new_name = new_name.store_slice(" Pool Jetton in ");
+  }
+  content~udict_set_ref(256, "name"H, new_name.store_slice(old_name).end_cell());
+  if (jettons?) {
+      content~udict_set_ref(256, "description"H, pack_metadata_value("DO NOT SEND ON CONTRACTS: Automatically converts deposited TON to Pool Jettons when ready"));
+  } else {
+      content~udict_set_ref(256, "description"H, pack_metadata_value("DO NOT SEND ON CONTRACTS: Converts burned Pool Jettons to TON when ready"));
+  }
+  cell onchain_content = begin_cell().store_uint(0, 8).store_dict(content).end_cell();
+  return onchain_content;
+}
