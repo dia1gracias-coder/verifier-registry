@@ -1,0 +1,154 @@
+#include "imports/stdlib.fc";
+
+const MIN_CONTRACT_BALANCE = 1000000000; ;; 1 TON
+const DEAD_CONTRACT_BALANCE = 100000000; ;; 0.1 TON. Just in case.
+
+(slice, cell, int, int, int) load_data() inline {
+    var ds = get_data().begin_parse();
+    return(
+        ds~load_msg_addr(), ;; Owner address
+        ds~load_ref(), ;; Battle code
+        ds~load_coins(), ;; Min battle value
+        ds~load_uint(8), ;; Fee percent
+        ds~load_uint(64) ;; Battle index 
+    );
+}
+
+() save_data(slice owner_address, cell battle_code, int min_battle_value, int fee_percent, int battle_index) impure inline {
+    set_data(
+    begin_cell()
+        .store_slice(owner_address)
+        .store_ref(battle_code)
+        .store_coins(min_battle_value)
+        .store_uint(fee_percent, 8)
+        .store_uint(battle_index, 64)
+    .end_cell()
+    );
+}
+
+cell calculate_battle_state_init(int battle_index, cell battle_code) {
+    cell data = begin_cell().store_uint(battle_index, 64).store_slice(my_address()).end_cell();
+    return begin_cell().store_uint(0, 2).store_dict(battle_code).store_dict(data).store_uint(0, 1).end_cell();
+}
+
+slice calculate_battle_address(int wc, cell state_init) {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(wc, 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}
+
+() deploy_battle(int battle_index, cell battle_code, int value, slice owner_address, int fee_percent) impure {
+    cell state_init = calculate_battle_state_init(battle_index, battle_code);
+    slice battle_address = calculate_battle_address(0 ,state_init);
+
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(battle_address)
+        .store_coins(value)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(begin_cell()
+        .store_slice(owner_address)
+        .store_uint(fee_percent, 8)
+        .end_cell());
+
+    send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+
+    if(in_msg_body.slice_empty?()) { ;; Ignore empty messages
+        return();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if(flags & 1) { ;; Ignore all bounces messages
+        return();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    int op = in_msg_body~load_uint(32);
+    (slice owner_address, cell battle_code, int min_battle_value, int fee_percent, int battle_index) = load_data();
+
+    if(op == 1) { ;; Create Battle
+        throw_unless(87, (my_balance - msg_value) >= DEAD_CONTRACT_BALANCE); ;; Avoid contract death
+        throw_unless(88, msg_value >= min_battle_value);
+
+        deploy_battle(battle_index, battle_code, msg_value, sender_address, fee_percent);
+        battle_index += 1;
+        save_data(owner_address, battle_code, min_battle_value, fee_percent, battle_index);
+        return();
+    }
+
+    throw_unless(70, equal_slices(owner_address, sender_address));
+
+    if(op == 2) { ;; Collect fees
+        int value = in_msg_body~load_coins();
+        throw_unless(71, value < (my_balance - MIN_CONTRACT_BALANCE));
+
+        var msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(owner_address)
+            .store_coins(value)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+
+        send_raw_message(msg, 0);
+        return();
+    }
+
+    if(op == 3) { ;; Change min_battle_value
+        int new_min_battle_value = in_msg_body~load_coins();
+        throw_unless(72, new_min_battle_value >= 1000000000); ;; < 1 TON
+
+        save_data(owner_address, battle_code, new_min_battle_value, fee_percent, battle_index);
+        return();
+    }
+
+    if(op == 4) { ;; Change fee_percent
+        int new_fee_percent = in_msg_body~load_uint(8);
+        throw_unless(73, new_fee_percent > 1);
+        throw_unless(74, new_fee_percent <= 5); ;; 5% is MAX
+
+        save_data(owner_address, battle_code, min_battle_value, new_fee_percent, battle_index);
+        return();
+    }
+
+    if(op == 5) { ;; Change owner_address
+        slice new_owner_address = in_msg_body~load_msg_addr();
+        save_data(new_owner_address, battle_code, min_battle_value, fee_percent, battle_index);
+        return();
+    }
+
+    throw(0xffff);
+}
+
+;;
+;; Get methods
+;;
+
+int get_min_battle_value() method_id {
+    (_, _, int min_battle_value, _, _) = load_data();
+    return min_battle_value;
+}
+
+int get_fee_percent() method_id {
+    (_, _, _, int fee_percent, _) = load_data();
+    return fee_percent;
+}
+
+int get_battle_index() method_id {
+    (_, _, _, _, int battle_index) = load_data();
+    return battle_index;
+}
+
+slice get_battle_address_by_index(int battle_index) method_id {
+    (_, cell battle_code, _, _, _) = load_data();
+    cell state_init = calculate_battle_state_init(battle_index, battle_code);
+    return calculate_battle_address(0, state_init);
+}
