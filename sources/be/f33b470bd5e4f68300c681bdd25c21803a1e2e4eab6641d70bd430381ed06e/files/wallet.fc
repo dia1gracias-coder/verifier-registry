@@ -1,0 +1,117 @@
+;; Wallet V3 Custom R3
+;; (c) 2024 oscux
+
+;; TL-B scheme:
+;; storage#_ seqno:uint32 public_key:uint256 subwallet_id:uint32 trusted_hashpart:uint256 = Storage;
+;;
+;; new_internal#0000aac1 send_mode:uint8 message:^InternalMessage = SpendRequest;
+;; upgrade#0000aaa0 new_code:^Cell new_data:^Cell = UpgradeRequest;
+
+#include "imports/stdlib.fc";
+
+const int op::new_internal =          0xAAC1;
+const int op::upgrade =               0xAAA0;
+
+const int error::not_allowed =        105;
+const int error::expired =            108;
+
+() execute_command(slice request, int sudo?) impure {
+    int op = request~load_uint(32);
+    if (op == op::new_internal) {
+        int mode = request~load_uint(8);
+        cell message = request~load_ref();
+        send_raw_message(message, mode);
+        return ();
+    }
+    if (op == op::upgrade) {
+        throw_unless(error::not_allowed, sudo?);
+        cell new_code = request~load_ref();
+        cell new_data = request~load_ref();
+        set_code(new_code);
+        set_c3(new_code.begin_parse().bless());
+        set_data(new_data);
+        ;; but next commands executes with old code
+        return ();
+    }
+    if (op == 0) {
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+() execute_commands(slice requests, int sudo?) impure {
+    while (requests.slice_refs() > 0) {
+        execute_command(requests~load_ref().begin_parse(), sudo?);
+    }
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    cs~skip_bits(4);
+    slice sender_address = cs~load_msg_addr();
+    (_, int sender_hashpart) = parse_std_addr(sender_address);
+    slice ds = get_data().begin_parse();
+    ds~skip_bits(32 + 256 + 32);
+    int trusted_hashpart = ds~load_uint(256);
+    if (sender_hashpart == trusted_hashpart) {
+        throw_if(error::not_allowed, trusted_hashpart == 0);
+        execute_commands(in_msg_body~load_ref().begin_parse(), true);
+    }
+    return ();
+}
+
+() recv_external(slice in_msg) impure {
+    slice signature = in_msg~load_bits(512);
+    slice cs = in_msg;
+    (int subwallet_id, int valid_until, int msg_seqno) = (cs~load_uint(32), cs~load_uint(32), cs~load_uint(32));
+    throw_if(error::expired, valid_until <= now());
+    slice ds = get_data().begin_parse();
+    (int stored_seqno, int public_key, int stored_subwallet, int trusted_hashpart) = (ds~load_uint(32), ds~load_uint(256), ds~load_uint(32), ds~load_uint(256));
+    throw_unless(error::not_allowed, subwallet_id == stored_subwallet);
+    throw_unless(error::not_allowed, msg_seqno == stored_seqno);
+    throw_unless(error::not_allowed, check_signature(slice_hash(in_msg), signature, public_key));
+    accept_message();
+    cs~touch();
+    int exit_code = 0;
+    try {
+        execute_commands(in_msg~load_ref().begin_parse(), trusted_hashpart == 0 ? true : false);
+    } catch (x, n) {
+        exit_code = n;
+    }
+    set_data(
+        begin_cell()
+            .store_uint(stored_seqno + 1, 32)
+            .store_uint(public_key, 256)
+            .store_uint(stored_subwallet, 32)
+            .store_uint(trusted_hashpart, 256)
+            .store_uint(exit_code, 16)
+            .end_cell()
+    );
+    return ();
+}
+
+;; Get methods
+
+int seqno() method_id {
+    slice ds = get_data().begin_parse();
+    return ds~load_uint(32);
+}
+
+int get_public_key() method_id {
+    slice ds = get_data().begin_parse();
+    ds~skip_bits(32);
+    return ds~load_uint(256);
+}
+
+int get_trusted_hashpart() method_id {
+    slice ds = get_data().begin_parse();
+    ds~skip_bits(32 + 256 + 32);
+    return ds~load_uint(256);
+}
+
+int prev_exit_code() method_id {
+    slice ds = get_data().begin_parse();
+    ds~skip_bits(32 + 256 + 32 + 256);
+    return ds~load_uint(16);
+}
