@@ -1,0 +1,79 @@
+;;
+;; Header files for SplitBill
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_verify_address
+slice __tact_verify_address(slice address) inline;
+
+;; __tact_store_address
+builder __tact_store_address(builder b, slice address) inline;
+
+;; __tact_my_balance
+int __tact_my_balance() inline;
+
+;; __tact_not_null
+forall X -> X __tact_not_null(X x) inline;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_store_bool
+builder __tact_store_bool(builder b, int v) inline;
+
+;; $Deploy$_load
+(slice, ((int))) $Deploy$_load(slice sc_0) inline;
+
+;; $DeployOk$_store
+builder $DeployOk$_store(builder build_0, (int) v) inline;
+
+;; $DeployOk$_store_cell
+cell $DeployOk$_store_cell((int) v) inline;
+
+;; $StateInit$_not_null
+((cell, cell)) $StateInit$_not_null(tuple v) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $SplitBill$_contract_init
+tuple $SplitBill$_contract_init() impure inline_ref;
+
+;; $SplitBill$_contract_load
+tuple $SplitBill$_contract_load() impure inline_ref;
+
+;; $SplitBill$_contract_store
+() $SplitBill$_contract_store(tuple v) impure inline;
+
+;; $global_send
+() $global_send((int, slice, int, int, cell, cell, cell) $params) impure inline_ref;
+
+;; $Refundable$_constructor_amount_take
+((int, int)) $Refundable$_constructor_amount_take(int amount, int take) inline;
+
+;; $SplitBill$_fun_refund
+(tuple, (int, int)) $SplitBill$_fun_refund(tuple $self, int $value) impure inline_ref;
+
+;; $SplitBill$_fun_refundAmount
+(tuple, int) $SplitBill$_fun_refundAmount(tuple $self, int $value) impure inline_ref;
+
+;; $SplitBill$_fun_balance
+(tuple, int) $SplitBill$_fun_balance(tuple $self) impure inline_ref;
+
+;; $SendParameters$_constructor_bounce_to_value_mode_body_code_data
+((int, slice, int, int, cell, cell, cell)) $SendParameters$_constructor_bounce_to_value_mode_body_code_data(int bounce, slice to, int value, int mode, cell body, cell code, cell data) inline;
+
+;; $SplitBill$_fun_forward
+(tuple, ()) $SplitBill$_fun_forward(tuple $self, slice $to, cell $body, int $bounce, tuple $init) impure inline_ref;
+
+;; $SplitBill$_fun_notify
+(tuple, ()) $SplitBill$_fun_notify(tuple $self, cell $body) impure inline;
+
+;; $SendParameters$_constructor_to_value_mode
+((int, slice, int, int, cell, cell, cell)) $SendParameters$_constructor_to_value_mode(slice to, int value, int mode) inline;
+
+;; $DeployOk$_constructor_queryId
+((int)) $DeployOk$_constructor_queryId(int queryId) inline;
