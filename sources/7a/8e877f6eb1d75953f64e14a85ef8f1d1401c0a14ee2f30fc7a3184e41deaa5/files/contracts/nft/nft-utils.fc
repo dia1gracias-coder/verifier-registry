@@ -1,0 +1,21 @@
+#include "../imports/stdlib.fc";
+#include "../imports/messages.fc";
+
+() transfer_nft(slice nft_address, slice new_owner_address, slice response_address, cell payload, int query_id, int amount) impure {
+    var msg_body = begin_cell()
+            .store_uint(op::transfer(), 32)
+            .store_uint(query_id, 64) 
+            .store_slice(new_owner_address) ;; new_owner_address
+            .store_slice(response_address) ;; response_address
+            .store_int(0, 1) ;; empty custom_payload
+            .store_coins(amount) ;; forward amount to new_owner_address
+            .store_ref(payload); ;; payload
+
+    var msg = begin_cell()
+            .store_msg_flag(msg_flag::bounceable)
+            .store_slice(nft_address)
+            .store_coins(0)
+            .store_msgbody_prefix_ref(msg_body.end_cell());
+
+    send_raw_message(msg.end_cell(), CARRY_REMAINING_BALANCE);
+}

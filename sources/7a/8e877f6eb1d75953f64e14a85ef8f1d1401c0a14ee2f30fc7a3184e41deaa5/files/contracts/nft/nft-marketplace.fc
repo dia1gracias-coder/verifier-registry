@@ -1,0 +1,147 @@
+#include "../imports/stdlib.fc";
+#include "../imports/messages.fc";
+#include "../imports/params.fc";
+#include "../jetton/jetton-utils.fc";
+#include "error-codes.fc";
+#include "op-codes.fc";
+#include "nft-utils.fc";
+
+const int min_tons_for_storage = 20000000;
+const int nft_sale_create_amount = 10000000;
+const int nft_sale_initialize_amount = 10000000;
+
+;; NFT marketplace smart contract
+
+(slice, slice, cell, cell, cell) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(), ;; owner
+        ds~load_msg_addr(), ;; jetton_minter
+        ds~load_ref(), ;; nft_sale_code
+        ds~load_ref(), ;; fee cell (numerator:uint16 denominator:uint16 owner:MsgAddress)
+        ds~load_ref() ;; jetton_wallet_code
+    );
+}
+
+() save_data(slice owner_address, slice jetton_minter, cell nft_sale_code, cell fee, cell jetton_wallet_code) impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(owner_address)
+            .store_slice(jetton_minter)
+            .store_ref(nft_sale_code)
+            .store_ref(fee)
+            .store_ref(jetton_wallet_code)
+        .end_cell()
+    );
+}
+
+cell pack_nft_sale_data(slice nft_owner, slice marketplace, slice nft_address) inline {
+    return begin_cell()
+                .store_slice(marketplace)
+                .store_slice(nft_owner)
+                .store_slice(nft_address)
+           .end_cell();
+}
+{-
+    _ split_depth:(Maybe (## 5)) special:(Maybe TickTock)
+      code:(Maybe ^Cell) data:(Maybe ^Cell)
+      library:(HashmapE 256 SimpleLib) = StateInit;
+-}
+cell calculate_nft_sell_state_init(slice marketpalce, slice nft_owner, slice nft_address, cell code) inline {
+    return  begin_cell()
+                .store_uint(0,1 + 1) ;; split_depth (Maybe = 0) and special (Maybe = 0)
+                .store_maybe_ref(code)
+                .store_maybe_ref(pack_nft_sale_data(nft_owner, marketpalce, nft_address))
+                .store_uint(0,1) ;; libraries - empty cell
+            .end_cell();
+}
+
+slice deploy_sale(slice nft_owner, slice nft_address, cell nft_sale_code) impure {
+    cell state_init = calculate_nft_sell_state_init(my_address(), nft_owner, nft_address, nft_sale_code);
+    slice sale_address = calc_address(state_init);
+    var msg = begin_cell()
+              .store_msg_flag(msg_flag::bounceable)
+              .store_slice(sale_address)
+              .store_coins(nft_sale_create_amount)
+              .store_msgbody_prefix_stateinit(state_init, begin_cell().end_cell());
+    send_raw_message(msg.end_cell(), PAY_FEES_SEPARATELY); ;; pay transfer fees separately, revert on errors
+    
+    return sale_address;
+}
+
+slice calculateSaleWallet(slice sale_address, slice jetton_minter_address, cell jetton_wallet_code) {
+    cell state_init = calculate_jetton_wallet_state_init(sale_address, jetton_minter_address, jetton_wallet_code);
+    return calc_address(state_init);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {  ;; ignore all bounced messages
+        return ();
+    }
+    
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+  
+    var (owner_address, jetton_minter, nft_sale_code, fee, jetton_wallet_code) = load_data();
+    if (op == op::ownership_assigned()) {
+        int ton_balance_before_msg = my_balance - msg_value;
+        raw_reserve(max(ton_balance_before_msg, min_tons_for_storage), 2);
+        
+        slice nft_owner_address = in_msg_body~load_msg_addr();
+        slice ref_slice = in_msg_body~load_ref().begin_parse();
+        int price = ref_slice~load_coins();
+
+        var sale_address =
+            deploy_sale(nft_owner_address, sender_address, nft_sale_code);
+
+        cell payload = begin_cell()
+            .store_coins(price)
+            .store_slice(calculateSaleWallet(sale_address, jetton_minter, jetton_wallet_code))
+            .store_ref(fee)
+            .store_slice(nft_owner_address)
+            .end_cell();
+
+        transfer_nft(sender_address, sale_address, nft_owner_address, payload, query_id, nft_sale_initialize_amount);
+        
+        save_data(owner_address, jetton_minter, nft_sale_code, fee, jetton_wallet_code);
+        return ();
+    }
+
+    if (op == op::change_admin) { ;; change admin
+        throw_unless(error::unauthorized, equal_slices(sender_address, owner_address));
+        save_data(in_msg_body~load_msg_addr(), jetton_minter, nft_sale_code, fee, jetton_wallet_code);
+        return ();
+    }
+
+    if (op == op::set_fee) { ;; change admin
+        throw_unless(error::unauthorized, equal_slices(sender_address, owner_address));
+        save_data(owner_address, jetton_minter, nft_sale_code, in_msg_body~load_ref(), jetton_wallet_code);
+        return ();
+    }
+}
+
+() recv_external(slice in_msg) impure {
+}
+
+(slice, slice, int, int, slice) get_marketplace_data() method_id {
+     var (owner, jetton_minter, _, fees, _) = load_data();
+
+     slice fees_slice = fees.begin_parse();
+     return (owner, jetton_minter, fees_slice~load_uint(16), fees_slice~load_uint(16), fees_slice~load_msg_addr());
+}
+
+slice get_sale_address(slice nft_owner, slice nft_address) method_id {
+    var (_, _, nft_sale_code, _, _) = load_data();
+
+    cell state_init = calculate_nft_sell_state_init(my_address(), nft_owner, nft_address, nft_sale_code);
+    return calc_address(state_init);
+}
