@@ -1,0 +1,238 @@
+#pragma version >=0.4.4;
+
+
+const int err::insufficient_fee = 101;
+const int err::insufficient_funds = 102;
+const int err::access_denied = 103;
+const int err::only_basechain_allowed = 104;
+const int err::receiver_is_sender = 105;
+const int err::stopped = 106;
+const int err::invalid_op = 107;
+const int err::invalid_comment = 108;
+const int err::invalid_parameters = 109;
+
+const int err::not_accepting_loan_requests = 201;
+const int err::unable_to_participate = 202;
+const int err::too_soon_to_participate = 203;
+const int err::not_ready_to_finish_participation = 204;
+const int err::too_soon_to_finish_participation = 205;
+const int err::vset_not_changed = 206;
+const int err::vset_not_changeable = 207;
+const int err::not_ready_to_burn_all = 208;
+
+const int err::unexpected_validator_set_format = 304;
+
+
+const int participation::open = 0;
+const int participation::distributing = 1;
+const int participation::staked = 2;
+const int participation::validating = 3;
+const int participation::held = 4;
+const int participation::recovering = 5;
+const int participation::burning = 6;
+
+
+const int unstake::auto = 0;
+const int unstake::instant = 1;
+const int unstake::best = 2;
+
+
+const int op::new_stake = 0x4e73744b;
+const int op::new_stake_error = 0xee6f454c;
+const int op::new_stake_ok = 0xf374484c;
+const int op::recover_stake = 0x47657424;
+const int op::recover_stake_error = 0xfffffffe;
+const int op::recover_stake_ok = 0xf96f7324;
+
+const int op::ownership_assigned = 0x05138d91;
+const int op::get_static_data = 0x2fcb26a2;
+const int op::report_static_data = 0x8b771735;
+
+const int op::send_tokens = 0x0f8a7ea5;
+const int op::receive_tokens = 0x178d4519;
+const int op::transfer_notification = 0x7362d09c;
+const int op::gas_excess = 0xd53276db;
+const int op::unstake_tokens = 0x595f07bc;
+
+const int op::provide_wallet_address = 0x2c76b973;
+const int op::take_wallet_address = 0xd1735400;
+
+const int op::prove_ownership = 0x04ded148;
+const int op::ownership_proof = 0x0524c7ae;
+const int op::ownership_proof_bounced = 0xc18e86d2;
+const int op::request_owner = 0xd0c3bfea;
+const int op::owner_info = 0x0dd607e3;
+const int op::destroy = 0x1f04537a;
+const int op::burn_bill = 0x6f89f5e3;
+
+const int op::provide_current_quote = 0xad83913f;
+const int op::take_current_quote = 0x0a420458;
+
+const int op::deposit_coins = 0x3d3761a6;
+const int op::send_unstake_all = 0x45baeda9;
+const int op::reserve_tokens = 0x386a358b;
+const int op::mint_tokens = 0x42684479;
+const int op::burn_tokens = 0x7cffe1ee;
+const int op::request_loan = 0x36335da9;
+const int op::participate_in_election = 0x574a297b;
+const int op::decide_loan_requests = 0x6a31d344;
+const int op::process_loan_requests = 0x071d07cc;
+const int op::vset_changed = 0x2f0b5b3b;
+const int op::finish_participation = 0x23274435;
+const int op::recover_stakes = 0x4f173d3e;
+const int op::recover_stake_result = 0x0fca4c86;
+const int op::last_bill_burned = 0xc6d8b51f;
+const int op::propose_governor = 0x76ff2956;
+const int op::accept_governance = 0x06e237e3;
+const int op::set_halter = 0x16bb5b17;
+const int op::set_stopped = 0x0e5e9773;
+const int op::set_instant_mint = 0x535b09d2;
+const int op::set_governance_fee = 0x470fe5f6;
+const int op::set_rounds_imbalance = 0x1b4463b6;
+const int op::send_message_to_loan = 0x0e93f65b;
+const int op::retry_distribute = 0x6ec00c48;
+const int op::retry_recover_stakes = 0x2b7ad9e8;
+const int op::retry_mint_bill = 0x654de488;
+const int op::retry_burn_all = 0x106b8001;
+const int op::set_parent = 0x4f6f6eed;
+const int op::proxy_set_content = 0x2b1c8e37;
+const int op::withdraw_surplus = 0x23355ffb;
+const int op::proxy_withdraw_surplus = 0x77a0bf77;
+const int op::upgrade_code = 0x3d6a29b5;
+const int op::proxy_upgrade_code = 0x78570010;
+const int op::send_upgrade_wallet = 0x7ade1ed8;
+const int op::migrate_wallet = 0x325aacfa;
+const int op::proxy_add_library = 0x31cb87f7;
+const int op::proxy_remove_library = 0x747bf3a2;
+const int op::gift_coins = 0x3496db80;
+const int op::top_up = 0x5372158c;
+
+const int op::proxy_tokens_minted = 0x5be57626;
+const int op::proxy_save_coins = 0x47daa10f;
+const int op::proxy_reserve_tokens = 0x688b0213;
+const int op::proxy_rollback_unstake = 0x32b67194;
+const int op::proxy_tokens_burned = 0x4476fde0;
+const int op::proxy_unstake_all = 0x76bd2760;
+const int op::proxy_upgrade_wallet = 0x4664bc68;
+const int op::proxy_migrate_wallet = 0x0cb246bb;
+const int op::proxy_merge_wallet = 0x6833d7d0;
+const int op::set_content = 0x04dc78b7;
+
+const int op::tokens_minted = 0x5445efee;
+const int op::save_coins = 0x4cce0e74;
+const int op::rollback_unstake = 0x1b77fd1a;
+const int op::tokens_burned = 0x5b512e25;
+const int op::unstake_all = 0x5ae30148;
+const int op::upgrade_wallet = 0x01d9ae1c;
+const int op::merge_wallet = 0x63d3a76c;
+const int op::withdraw_jettons = 0x768a50b2;
+
+const int op::mint_bill = 0x4b2d7871;
+const int op::bill_burned = 0x840f6369;
+const int op::burn_all = 0x639d400a;
+
+const int op::assign_bill = 0x3275dfc2;
+
+const int op::proxy_new_stake = 0x089cd4d0;
+const int op::proxy_recover_stake = 0x407cb243;
+
+const int op::request_rejected = 0xcd0f2116;
+const int op::loan_result = 0xfaaa8366;
+const int op::take_profit = 0x8b556813;
+
+const int op::stake_notification = 0xd401b82b;
+const int op::withdrawal_notification = 0xf0fa223b;
+
+const int op::add_library = 0x53d0473e;
+const int op::remove_library = 0x6bd0ce52;
+
+
+const int gas::send_tokens = 10341;
+const int gas::receive_tokens = 11691;
+const int gas::deposit_coins = 18715;
+const int gas::proxy_save_coins = 6149;
+const int gas::save_coins = 7091;
+const int gas::mint_bill = 7731;
+const int gas::assign_bill = 5960;
+const int gas::burn_bill = 6558;
+const int gas::bill_burned = 12316;
+const int gas::mint_tokens = 12230;
+const int gas::proxy_tokens_minted = 6815;
+const int gas::tokens_minted = 13339;
+const int gas::unstake_tokens = 9040;
+const int gas::proxy_reserve_tokens = 6538;
+const int gas::reserve_tokens = 15495;
+const int gas::burn_tokens = 16601;
+const int gas::proxy_tokens_burned = 7307;
+const int gas::tokens_burned = 7179;
+const int gas::send_unstake_all = 12967;
+const int gas::proxy_unstake_all = 6553;
+const int gas::unstake_all = 7423;
+const int gas::upgrade_wallet = 7618;
+const int gas::proxy_migrate_wallet = 7978;
+const int gas::migrate_wallet = 12802;
+const int gas::proxy_merge_wallet = 7815;
+const int gas::merge_wallet = 7443;
+
+const int gas::request_loan = 20337;
+const int gas::participate_in_election = 21208;
+const int gas::decide_loan_requests = 16847;
+const int gas::process_loan_requests = 22448;
+const int gas::proxy_new_stake = 6770;
+const int gas::vset_changed = 7494;
+const int gas::finish_participation = 9115;
+const int gas::recover_stakes = 18711;
+const int gas::proxy_recover_stake = 4440;
+const int gas::recover_stake_result = 32696;
+const int gas::burn_all = 10298;
+const int gas::last_bill_burned = 18835;
+const int gas::new_stake = 9351;
+const int gas::new_stake_error = 4661;
+const int gas::new_stake_ok = 1802;
+const int gas::recover_stake = 4475;
+const int gas::recover_stake_ok = 5175;
+
+
+const int fee::treasury_storage = 10000000000; ;; 10 TON
+const int fee::librarian_storage = 1000000000; ;; 1 TON
+const int fee::new_stake_confirmation = 1000000000; ;; 1 TON
+
+
+const int log::loan = 0x1;
+const int log::repayment = 0x2;
+const int log::finish = 0x3;
+const int log::failed_burning_tokens = 0x4;
+
+
+const int config::elector_address = 1;
+const int config::election = 15;
+const int config::validators = 16;
+const int config::stake = 17;
+const int config::previous_validators = 32;
+const int config::current_validators = 34;
+const int config::next_validators = 36;
+const int config::misbehaviour_punishment = 40;
+
+
+const int send::regular = 0;
+const int send::pay_gas_separately = 1;
+const int send::ignore_errors = 2;
+const int send::bounce_if_failed = 16;
+const int send::destroy_if_zero = 32;
+const int send::remaining_value = 64;
+const int send::unreserved_balance = 128;
+
+
+const int reserve::exact = 0;
+const int reserve::all_but_amount = 1;
+const int reserve::at_most = 2;
+const int reserve::add_original_balance = 4;
+const int reserve::negate = 8;
+const int reserve::bounce_if_failed = 16;
+
+
+const int chain::main = -1;
+const int chain::base = 0;
+
+
+const int gas_limit = 1000000;
