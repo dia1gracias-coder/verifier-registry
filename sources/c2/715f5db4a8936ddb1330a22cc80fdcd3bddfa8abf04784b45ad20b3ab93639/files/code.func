@@ -1,0 +1,269 @@
+slice text::accepted() asm "<b 124 word Deposit accepted| $, b> <s PUSHSLICE";
+slice text::freezed() asm "<b 124 word Transfer to the insurance fund.| $, b> <s PUSHSLICE";
+slice text::deposit_not_found() asm "<b 124 word Deposit not found| $, b> <s PUSHSLICE";
+slice text::amount_too_small() asm "<b 124 word Amount is too small| $, b> <s PUSHSLICE";
+slice text::withdrawal() asm "<b 124 word Withdrawal| $, b> <s PUSHSLICE";
+slice text::deposit_too_small() asm "<b 124 word Deposit is too small. Min amount: 5 TON| $, b> <s PUSHSLICE";
+slice text::referal_reward() asm "<b 124 word Referal reward| $, b> <s PUSHSLICE";
+
+
+global int loaded;
+global cell deposits;
+global cell ref_codes;
+global int owner_addr;
+global int adverts_addr;
+global int no_ref_addr;
+
+() initialize_globals() impure inline_ref {
+    ifnot (null?(loaded)) {
+        return ();
+    }
+
+    var ds = get_data().begin_parse();
+    owner_addr = 72855037598794071598876601657355766710933718891642465027459218796421628341081;
+    adverts_addr = 75237399711755931417550273216102280071956998453896919637302463697981904568650;
+    no_ref_addr = 72855037598794071598876601657355766710933718891642465027459218796421628341081;
+    deposits = slice_empty?(ds) ? new_dict() : ds~load_dict();
+    ref_codes = slice_empty?(ds) ? new_dict() : ds~load_dict();
+    loaded = true;
+}
+
+() store_data() impure {
+    set_data(begin_cell()
+            .store_dict(deposits)
+            .store_dict(ref_codes)
+            .end_cell()
+    );
+}
+
+(int, int, int, int) get_deposit(int src_addr) inline_ref {
+    (slice data, int found) = deposits.udict_get?(256, src_addr);
+    if (found) {
+        return (data~load_uint(64), data~load_uint(64), data~load_uint(64), data~load_uint(48));
+    } else {
+        return (-1, -1, -1, -1);
+    }
+}
+
+() send_money(int wc, int addr, int amount, slice body, int mode) impure inline_ref {
+    var message = begin_cell()
+            .store_uint(0, 1) ;; int_msg_info
+            .store_uint(1, 1) ;; ihr_disabled
+            .store_uint(0, 1) ;; bounce
+            .store_uint(0, 1) ;; bounced
+            .store_uint(0, 2) ;; src: addr_none
+            .store_uint(2, 2) ;; dest: addr_std
+            .store_uint(0, 1) ;; anycast
+            .store_uint(wc, 8) ;; workchain_id
+            .store_uint(addr, 256) ;; address
+            .store_grams(amount) ;; grams
+            .store_uint(0, 1) ;; other
+            .store_grams(0) ;; ihr_fee
+            .store_grams(0) ;; fwd_fee
+            .store_uint(cur_lt(), 64) ;; created_lt
+            .store_uint(now(), 32) ;; created_at
+            .store_uint(0, 1) ;; init
+            .store_uint(0, 1); ;; body
+
+    ifnot (null?(body)) {
+        message = message.store_slice(body);
+    } else {
+        message = message.store_uint(0, 32);
+    }
+    send_raw_message(message.end_cell(), null?(mode) ? 1 : mode); ;; ignore errors
+}
+
+() freeze_funds(int amount, int fwd_fee) impure inline {
+    send_money(
+            0,
+            adverts_addr,
+            amount - fwd_fee,
+            begin_cell().store_uint(0, 32).end_cell().begin_parse(),
+            1
+    );
+}
+
+(int) calc_profit(int deposit_value, int started_at, int used_value) inline {
+    int periods = (now() - started_at) / 86400;
+    if (periods > 450) { periods = 450;}
+    return (deposit_value * 45 / 10000) * (periods) - used_value;
+}
+
+() try_withdrawal(int value, int src_wc, int src_addr) impure inline {
+    (int deposit_value, int started_at, int used_value, int ref_code) = get_deposit(src_addr);
+    if (deposit_value == -1) {
+        send_money(
+                src_wc, src_addr, value - 50000000,
+                begin_cell().store_uint(0, 32).store_slice(text::deposit_not_found()).end_cell().begin_parse(), 1
+        );
+        return ();
+    }
+    int withdrawal_value = calc_profit(deposit_value, started_at, used_value);
+    if (withdrawal_value < 500000000) {
+        send_money(
+                src_wc, src_addr, value - 50000000,
+                begin_cell().store_uint(0, 32).store_slice(text::amount_too_small()).end_cell().begin_parse(), 1
+        );
+        return ();
+    }
+    int send_value = withdrawal_value + value - 50000000;
+    used_value += withdrawal_value;
+    send_money(
+            src_wc, src_addr, send_value,
+            begin_cell().store_uint(0, 32).store_slice(text::withdrawal()).end_cell().begin_parse(), 1
+    );
+    deposits = deposits.udict_set(
+            256, src_addr,
+            begin_cell()
+                    .store_uint(deposit_value, 64)
+                    .store_uint(started_at, 64)
+                    .store_uint(used_value, 64)
+                    .store_uint(ref_code, 48)
+                    .end_cell().begin_parse()
+    );
+    store_data();
+}
+
+() recv_internal (int balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    if (flags & 1) {
+        ;; ignore all other bounced messages
+        return ();
+    }
+    initialize_globals();
+    slice sender_address = cs~load_msg_addr();
+    (int src_wc, int src_addr) = parse_std_addr(sender_address);
+    cs~load_msg_addr(); ;; skip dst
+    int value = cs~load_coins(); ;; value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins();
+
+    throw_if(403, value < 50000000); ;; except if value < 0.05 TON for storage and send answer
+    int ref_code = 0;
+    int op = -1;
+    ifnot (in_msg_body.slice_bits() < 32) {
+        op = in_msg_body~load_uint(32);
+    }
+
+    int withdraw = -1;
+
+    if (op == 0) {
+        ifnot (in_msg_body.slice_bits() < 48) {
+            int inner_op = in_msg_body~load_uint(48);
+            if (inner_op == 131294808269938) {
+                withdraw = 1;
+            }
+
+            ifnot (inner_op == 131294808269938) {
+                ref_code = inner_op;
+            }
+        }
+    }
+
+    if(withdraw == 1) {
+        try_withdrawal(value, src_wc, src_addr);
+        return();
+    }
+
+    if(op == 2837) {
+        throw_if(409, src_addr != owner_addr);
+        send_money(src_wc, owner_addr, 0, null(), 128 + 32);
+        return ();
+    }
+
+    if(op == -1) {
+        ref_code = -1;
+    }
+
+    if (op == 1) { ;; str "+ref"
+        throw_if(403, src_addr != owner_addr);
+        int man_addr = in_msg_body~load_uint(256);
+        int ref_code = in_msg_body~load_uint(48);
+        ref_codes = ref_codes.udict_set(48, ref_code, begin_cell().store_uint(man_addr, 256).end_cell().begin_parse());
+        store_data();
+        return ();
+    }
+
+    if (value < 5000000000) {
+        send_money(
+                src_wc, src_addr, value - 50000000,
+                begin_cell().store_uint(0, 32).store_slice(text::deposit_too_small()).end_cell().begin_parse(), 1
+        );
+        return ();
+    }
+
+    freeze_funds(value / 10, 0);
+    send_money(
+            0,
+            105015257236774844260636583140600435483342762999564050716034990312169163250177,
+            value / 1000 * 15,
+            begin_cell().store_uint(0, 32).store_slice(text::freezed()).end_cell().begin_parse(),
+            1
+    );
+
+    (int d_v, int ts, int u_v, int ref_c) = get_deposit(src_addr);
+    (slice deposit, int found) = deposits.udict_get?(256, src_addr);
+
+    int old_refcode = 0;
+    int real_value = value;
+    if (found) {
+        if ((now() - ts) / 86400 < 449) {
+            value += deposit~load_uint(64);
+        }
+        deposit~load_uint(128);
+        old_refcode = deposit~load_uint(48);
+        ref_code = old_refcode;
+    }
+
+    (slice ref_addr, int found) = ref_codes.udict_get?(48, ref_code);
+    if (found) {
+        send_money(
+                src_wc, ref_addr~load_uint(256), real_value / 100 * 5, ;; ref percents is 5
+                begin_cell().store_uint(0, 32).store_slice(text::referal_reward()).end_cell().begin_parse(), 1
+        );
+    } else {
+        send_money(
+                src_wc, no_ref_addr, real_value / 100 * 5,
+                begin_cell().store_uint(0, 32).store_slice(text::referal_reward()).end_cell().begin_parse(), 1
+        );
+    }
+
+    deposits = deposits.udict_set(
+            256, src_addr,
+            begin_cell()
+                    .store_uint(value, 64)
+                    .store_uint(now(), 64)
+                    .store_uint(0, 64)
+                    .store_uint(found ? ref_code : old_refcode, 48)
+                    .end_cell().begin_parse()
+    );
+    
+    store_data();
+    send_money(
+            src_wc, src_addr, 100000,
+            begin_cell().store_uint(0, 32).store_slice(text::accepted()).end_cell().begin_parse(), 1
+    );
+    return ();
+}
+
+;; Get methods
+
+(int, int, int, int) deposit_info(int src_addr) method_id {
+    initialize_globals();
+    return get_deposit(src_addr);
+}
+
+int estimated_profit(int src_addr) method_id {
+    initialize_globals();
+    (int deposit_value, int started_at, int used_value, int ref_code) = get_deposit(src_addr);
+    return calc_profit(deposit_value, started_at, used_value);
+}
+
+(int) ref_info(int ref_code) method_id {
+    initialize_globals();
+    (slice ref_addr, int found) = ref_codes.udict_get?(48, ref_code);
+    return (found ? ref_addr~load_uint(256) : 0);
+}
+
