@@ -1,0 +1,83 @@
+#include "imports/stdlib.fc";
+#include "imports/messages.fc";
+
+const err::invalid_op = 400;
+const err::unathorized = 401;
+const err::too_early = 402;
+const err::invalid_days = 403;
+
+const op::deposit = "d"u;
+const op::release = "r"u;
+
+global int storage::release_ts;
+global slice storage::admin_address;
+
+() load_storage() impure inline {
+    var cs = get_data().begin_parse();
+    storage::admin_address = cs~load_msg_addr();
+    storage::release_ts = cs.preload_uint(32); ;; realease assets time
+}
+
+() save_storage() impure inline {
+    set_data(begin_cell()
+	.store_slice(storage::admin_address)
+	.store_uint(storage::release_ts, 32)
+	.end_cell());
+}
+
+() recv_internal(cell in_msg_full, slice in_msg_body) impure {
+    ;; ignore all empty messages
+    if (in_msg_body.slice_data_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+
+    ;; message sender
+    slice msg_sender = cs~load_msg_addr();
+    ;; operation
+    int op = in_msg_body~load_uint(32);
+    
+    ;; load current state of storage
+    load_storage();
+    
+    if (op == op::deposit) {
+    	;; the message should be from admin
+		throw_unless(err::unathorized, equal_slices(msg_sender, storage::admin_address));
+    	;; we will receive the amount of days to lock the money
+    	int days = in_msg_body~load_uint(32);
+    	;; the release_ts supplied should be bigger than our current time
+		throw_unless(err::invalid_days, days > 0);
+    
+    	;; days * hours * mins * secs give us the seconds
+    	int release_ts = now() + days * 24 * 60 * 60;
+    	;; only if we receive a bigger, release time we save it
+    	if (release_ts > storage::release_ts) {
+			storage::release_ts = release_ts;
+			save_storage();
+    	}
+    
+    	return();
+    }
+    
+    ;; release assets to admin address
+    if (op == op::release) {
+		;; verify that releaser it's the admin
+		throw_unless(err::unathorized, equal_slices(msg_sender, storage::admin_address));
+		throw_unless(err::too_early, now() > storage::release_ts);
+    	cell txt = begin_cell()
+    		.store_uint(0, 32)
+    		.store_slice("Money back!")
+    		.end_cell();
+    
+    	send_simple_message(0, storage::admin_address, txt, CARRY_ALL_BALANCE);
+    
+    	return ();
+    }
+
+    throw(err::invalid_op);
+}
