@@ -1,0 +1,201 @@
+#include "imports/utils.fc";
+
+global slice treasury;
+global int round_since;
+global int next_item_index;
+global cell bill_code;
+
+() save_data() impure inline_ref {
+    begin_cell()
+        .store_slice(treasury)
+        .store_uint(round_since, 32)
+        .store_uint(next_item_index, 64)
+        .store_ref(bill_code)
+        .end_cell()
+        .set_data();
+}
+
+() load_data() impure inline_ref {
+    slice ds = get_data().begin_parse();
+    treasury = ds~load_msg_addr();
+    round_since = ds~load_uint(32);
+    next_item_index = ds~load_uint(64);
+    bill_code = ds~load_ref();
+    ds.end_parse();
+}
+
+() mint_bill(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    int amount = s~load_coins();
+    int unstake? = s~load_int(1);
+    slice owner = s~load_msg_addr();
+    slice parent = s~load_msg_addr();
+    int ownership_assigned_amount = s~load_coins();
+    s.end_parse();
+
+    ( builder bill, builder state_init, _ ) = create_bill_address(next_item_index, my_address(), bill_code);
+    next_item_index += 1;
+
+    throw_unless(err::access_denied, equal_slice_bits(src, treasury));
+
+    builder body = begin_cell()
+        .store_uint(op::assign_bill, 32)
+        .store_uint(query_id, 64)
+        .store_coins(amount)
+        .store_int(unstake?, 1)
+        .store_slice(owner)
+        .store_slice(parent)
+        .store_coins(ownership_assigned_amount);
+    send_msg(false, bill, state_init, body, 0, send::remaining_value);
+}
+
+() burn_next(int query_id, int index) impure inline {
+    if index < next_item_index {
+        ( builder bill, _, _ ) = create_bill_address(index, my_address(), bill_code);
+
+        builder body = begin_cell()
+            .store_uint(op::burn_bill, 32)
+            .store_uint(query_id, 64);
+        send_msg(false, bill, null(), body, burn_bill_fee(), send::pay_gas_separately);
+    } else {
+        builder done = begin_cell()
+            .store_uint(op::last_bill_burned, 32)
+            .store_uint(query_id, 64)
+            .store_uint(round_since, 32);
+        send_msg(false, treasury.to_builder(), null(), done, last_bill_burned_fee(), send::pay_gas_separately);
+    }
+}
+
+() bill_burned(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    int amount = s~load_coins();
+    int unstake? = s~load_int(1);
+    slice owner = s~load_msg_addr();
+    slice parent = s~load_msg_addr();
+    int index = s~load_uint(64);
+    s.end_parse();
+
+    ( _, _, int bill_addr ) = create_bill_address(index, my_address(), bill_code);
+    ( int src_wc, int src_addr ) = parse_std_addr(src);
+
+    throw_unless(err::access_denied, (src_wc == chain::base) & (src_addr == bill_addr));
+
+    burn_next(query_id, index + 1);
+
+    builder body = begin_cell()
+        .store_uint(unstake? ? op::burn_tokens : op::mint_tokens, 32)
+        .store_uint(query_id, 64)
+        .store_coins(amount)
+        .store_slice(owner)
+        .store_slice(parent)
+        .store_uint(round_since, 32);
+    send_msg(false, treasury.to_builder(), null(), body, 0, send::unreserved_balance);
+
+    throw(0);
+}
+
+() burn_all(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    int start_index = s~load_uint(64);
+    s.end_parse();
+
+    throw_unless(err::access_denied, equal_slice_bits(src, treasury));
+
+    burn_next(query_id, start_index);
+
+    throw(0);
+}
+
+() on_bounce(slice src, slice s) impure inline {
+    s~skip_bits(32);
+    int op = s~load_uint(32);
+    int query_id = s~load_uint(64);
+
+    throw(0);
+}
+
+() route_internal_message(int flags, slice src, slice s) impure inline {
+    if flags & 1 {
+        return on_bounce(src, s);
+    }
+
+    int op = s~load_uint(32);
+
+    if op == op::mint_bill {
+        return mint_bill(src, s);
+    }
+
+    if op == op::bill_burned {
+        return bill_burned(src, s);
+    }
+
+    if op == op::burn_all {
+        return burn_all(src, s);
+    }
+
+    throw(err::invalid_op);
+}
+
+() recv_internal(cell in_msg_full, slice s) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice src = cs~load_msg_addr();
+
+    load_data();
+    route_internal_message(flags, src, s);
+    save_data();
+}
+
+;;
+;; get methods
+;;
+
+cell create_collection_name() inline {
+    return begin_cell()
+        .store_uint(0, 8)
+        .store_slice("Hipo Payout ")
+        .store_builder(int_to_string(round_since))
+        .end_cell();
+}
+
+cell create_collection_description() inline {
+    return begin_cell()
+        .store_uint(0, 8)
+        .store_slice("For validation round starting at Unix time ")
+        .store_builder(int_to_string(round_since))
+        .end_cell();
+}
+
+cell create_collection_image() inline {
+    return begin_cell()
+        .store_uint(0, 8)
+        .store_slice("https://app.hipo.finance/collection.png")
+        .end_cell();
+}
+
+cell create_collection_metadata() {
+    cell content = new_dict();
+    content~udict_set_ref(256, "name"H, create_collection_name());
+    content~udict_set_ref(256, "description"H, create_collection_description());
+    content~udict_set_ref(256, "image"H, create_collection_image());
+    cell onchain = begin_cell().store_uint(0, 8).store_dict(content).end_cell();
+    return onchain;
+}
+
+(int, cell, slice) get_collection_data() method_id {
+    load_data();
+
+    return (next_item_index, create_collection_metadata(), treasury);
+}
+
+slice get_nft_address_by_index(int index) method_id {
+    load_data();
+
+    ( builder bill, _, _ ) = create_bill_address(index, my_address(), bill_code);
+
+    return bill.end_cell().begin_parse();
+}
+
+cell get_nft_content(int index, cell individual_content) method_id {
+    return individual_content;
+}
