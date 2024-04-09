@@ -1,0 +1,129 @@
+#include "imports/stdlib.fc";
+
+
+(slice, slice, int, int) load_data() inline {
+  var ds = get_data().begin_parse();
+  return (ds~load_msg_addr(), ds~load_msg_addr(), ds~load_uint(64), ds~load_coins());
+}
+
+() save_data(slice owner_address, slice collection_address, int index, int price) impure inline {
+  set_data(begin_cell()
+    .store_slice(owner_address)
+    .store_slice(collection_address)
+    .store_uint(index, 64)
+    .store_coins(price)
+    .end_cell());
+}
+
+slice inttostr(int n) {
+    builder string = begin_cell();
+    tuple chars = null();
+    do {
+        int r = n~divmod(10);
+        chars = cons(r + 48, chars);
+    } until (n == 0);
+    do {
+        int char = chars~list_next();
+        string~store_uint(char, 8);
+    } until (null?(chars));
+
+    slice result = string.end_cell().begin_parse();
+    return begin_cell().store_slice(result).store_slice(".json").end_cell().begin_parse();
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    var (owner_address, collection_address, index, price) = load_data();
+
+    if (op == 1) { ;; mint
+        int old_index = index;
+        while (msg_value ~/ price + old_index > index) {
+
+            cell content_cell = begin_cell()
+                .store_slice(sender_address)
+                .store_ref(begin_cell()
+                    .store_slice(inttostr(index))
+                    .end_cell()
+                )
+                .end_cell();
+
+            cell msg_body_cell = begin_cell()
+                .store_uint(1, 32)
+                .store_uint(0, 64)
+                .store_uint(index, 64)
+                .store_coins(10000000)
+                .store_ref(content_cell)
+                .end_cell();
+
+            var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(collection_address)
+                .store_coins(50000000)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_slice(msg_body_cell.begin_parse())
+            .end_cell();
+            send_raw_message(msg, 3);
+            index += 1;
+        }
+        save_data(owner_address, collection_address, index, price);
+        return ();
+    }
+
+    if (op == 2) { ;; set price
+        int price = in_msg_body~load_coins();
+        if equal_slices(sender_address, owner_address) {
+            save_data(owner_address, collection_address, index, price);
+        }    
+        return ();
+    }
+
+    if (op == 3) { ;; withdraw balance
+        if equal_slices(sender_address, owner_address) {
+            cell msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(owner_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(0, 32)
+                .store_slice("Withdraw")
+            .end_cell();
+            send_raw_message(msg, 128);
+        }   
+        return ();
+    }
+
+    if (op == 4) { ;; set index
+        int new_index = in_msg_body~load_uint(64);
+        if equal_slices(sender_address, owner_address) {
+            save_data(owner_address, collection_address, new_index, price);
+        }    
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+int get_price() method_id {
+    var (_, _, _, price) = load_data();
+    return price;
+}
+
+int get_index() method_id {
+    var (_, _, index, _) = load_data();
+    return index;
+}
