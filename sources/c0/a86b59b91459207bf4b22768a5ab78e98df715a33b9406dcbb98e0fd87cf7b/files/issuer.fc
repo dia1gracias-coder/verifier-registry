@@ -1,0 +1,381 @@
+#pragma version >=0.2.0;
+
+;; reference
+;; https://github.com/ton-blockchain/token-contract/blob/main/ft/jetton-minter.fc
+
+#include "imports/stdlib.fc";
+#include "imports/intlib.fc";
+
+#include "interfaces/jetton.fc";
+
+;; https://github.com/ton-blockchain/token-contract/blob/21e7844fa6dbed34e0f4c70eb5f0824409640a30/ft/jetton-minter-discoverable.fc#L3
+;; 6905(computational_gas_price) * 1000(cur_gas_price) = 6905000
+;; ceil(6905000) = 10000000 ~= 0.01 TON
+int constant::provide_address_gas_consumption() asm "10000000 PUSHINT";
+
+;;
+;; storage
+;;
+
+global int    storage::circulating_supply;
+global int    storage::mineable_supply;
+
+global slice  storage::administrator_address;
+global cell   storage::description_data;
+global cell   storage::wallet_code;
+
+global int    storage::mine::rseed;
+global int    storage::mine::counter;
+global int    storage::mine::active;
+global slice  storage::mine::last;
+global int    storage::mine::nstep;
+
+() storage::load() impure {
+  slice ds = get_data().begin_parse();
+  
+  storage::circulating_supply = ds~load_coins();
+  storage::mineable_supply = ds~load_coins();
+
+  storage::administrator_address = ds~load_msg_addr();
+  storage::description_data = ds~load_ref();
+  storage::wallet_code = ds~load_ref();
+  
+  slice mine = ds~load_ref().begin_parse();
+  storage::mine::active = mine~load_uint(1);
+  storage::mine::rseed = mine~load_uint(256);
+  storage::mine::counter = mine~load_uint(256);
+  storage::mine::last = mine~load_msg_addr();
+  storage::mine::nstep = mine~load_uint(32);
+
+  ds.end_parse();
+}
+
+() storage::save() impure {
+  set_data(
+    begin_cell()
+      .store_coins(storage::circulating_supply)
+      .store_coins(storage::mineable_supply)
+      .store_slice(storage::administrator_address)
+      .store_ref(storage::description_data)
+      .store_ref(storage::wallet_code)
+      .store_ref(begin_cell()
+          .store_uint(storage::mine::active, 1)
+          .store_uint(storage::mine::rseed, 256)
+          .store_uint(storage::mine::counter, 256)
+          .store_slice(storage::mine::last)
+          .store_uint(storage::mine::nstep, 32)
+          .end_cell())
+      .end_cell()
+  );
+}
+
+;;
+;; mine
+;;
+
+(slice, int) is_ascii_yo(slice s) inline {
+  if (s.slice_bits() < 16) {
+    return (s, false);
+  }
+  int prefix = s.preload_uint(16);
+  if (prefix == 0x796F) { ;; yo
+    return (s.skip_bits(16), true);
+  } elseif (prefix == 0x596F) { ;; Yo
+    return (s.skip_bits(16), true);
+  } elseif (prefix == 0x594F) { ;; YO
+    return (s.skip_bits(16), true);
+  } elseif (prefix == 0x794F) { ;; yO
+    return (s.skip_bits(16), true);
+  } else {
+    return (s, false);
+  }
+}
+
+(int, int) random_mine(int seed, int counter, int msg_value) inline {
+  randomize(seed);
+  int time_shift = rand(4);
+
+  if (counter < 1000) { ;; first 1000 -> 10000 yoken
+    return (10000000000000, time_shift);
+  } elseif (counter < 11000) { ;; next 10,000 -> 1000 yoken
+    return (1000000000000, time_shift);
+  } elseif (counter < 111000) { ;; next 100,000 -> 100 yoken
+    return (100000000000, time_shift);
+  } elseif (counter < 1111000) { ;; next 1,000,000 -> 10 yoken
+    return (10000000000, time_shift);
+  } else {  ;; next random
+    int maximum = 100000000000; ;; 100 TON
+    int random = rand(maximum);
+    
+    int scaled = min(random + msg_value, maximum);
+    if (scaled > 99000000000) { ;; 1%
+      return (100000000000, time_shift); ;; 100 yoken
+    } elseif (scaled > 90000000000) { ;; 10%
+      return (10000000000, time_shift); ;; 10 yoken
+    } else {
+      return (1000000000, time_shift); ;; 1 yoken
+    }
+  }
+}
+
+;; messages
+
+() send_internal_transfer(slice to_address, int amount) impure {
+  cell state_init = wallet_state_init(to_address, my_address(), storage::wallet_code);
+
+  builder body = begin_cell()
+    .store_uint(operation::internal_transfer(), 32)
+    .store_uint(0, 64) ;; query_id
+    .store_coins(amount)
+    .store_uint(0, 2) ;; from_address; null
+    .store_uint(0, 2) ;; response_address; null
+    .store_coins(10000000) ;; forward_fees;; 0.01 TON
+    .store_uint(0, 1); ;; forward_payload in this slice, not separate cell
+
+  builder message = begin_cell()
+      .store_uint(0x18, 6) ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool packages:MsgAddress -> 011000
+      .store_slice(contract::address(state_init))
+      .store_coins(20000000) ;; 0.02 TON
+      .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+      .store_ref(state_init)
+      .store_ref(body.end_cell());
+
+  send_raw_message(message.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+;;
+;; handlers
+;;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  if (in_msg_body.slice_empty?()) { ;; bounce back empty messages
+    throw(0xffff);
+  }
+    
+  slice cs = in_msg_full.begin_parse();
+  int in_msg_full_hash = slice_hash(cs);
+
+  int flags = cs~load_uint(4);
+  if (flags & 1) { ;; ignore all bounced messages
+    return ();
+  }
+    
+  slice sender_address = cs~load_msg_addr();
+  cs~load_msg_addr(); ;; skip dst
+  cs~load_coins(); ;; skip value
+  cs~skip_bits(1); ;; skip extracurrency collection
+  cs~load_coins(); ;; skip ihr_fee
+    
+  int fwd_fee = cs~load_coins(); ;; fwd_fee used for estimation to `operation::provide_wallet_address` cost
+  int in_msg_lt = cs~load_uint(64); ;; lt of incoming message for abuse protection
+
+  int operation = in_msg_body~load_uint(32);
+  storage::load();
+
+  if (operation == 0) {
+    if (in_msg_body~is_ascii_yo()) {
+      throw_unless(error::forbidden(), storage::mine::active);
+      throw_unless(error::forbidden(), now() > storage::mine::nstep);
+      throw_unless(error::forbidden(), ~ equal_slices(sender_address, storage::mine::last));
+
+      throw_unless(error::forbidden(), storage::mineable_supply > 0);
+      throw_unless(error::insufficient_funds(), msg_value >= 300000000); ;; now allowed to mine with mesage lower than 0.42 TON
+
+      int in_msg_lt_index = in_msg_lt - ((in_msg_lt / 10000) * 10000);
+      if (in_msg_lt_index > 2) {
+        ;; punishment for spammers
+        return ();
+      }
+
+      int friend_bonus = 1000000000; ;; 1 yoken
+      int friend_sent = false;
+
+      int rseed = random::seed(storage::mine::rseed, in_msg_full_hash);
+      (int random_mine_amount, int random_time_shift) = random_mine(rseed, storage::mine::counter, msg_value);
+
+      int mined_amount = min(random_mine_amount, storage::mineable_supply);
+      int mined_amount_with_friend = mined_amount + friend_bonus;
+
+      if ((in_msg_body.slice_bits() > 8) & (storage::mineable_supply >= mined_amount_with_friend)) {
+        in_msg_body~skip_bits(8); ;; ' ' skip whitespace
+
+        slice friend_address = in_msg_body~load_msg_addr_friendly();
+        if (~ equal_slices(sender_address, friend_address)) {
+          friend_sent = true;
+          send_internal_transfer(friend_address, friend_bonus);
+        }
+      }
+      
+      send_internal_transfer(sender_address, mined_amount);
+
+      int total_mined = 0;
+      if (friend_sent) {
+        total_mined = mined_amount_with_friend;
+      } else {
+        total_mined = mined_amount;
+      }
+
+      storage::mine::rseed = rseed;
+      storage::mine::counter += 1; ;; uint256; we all die before maximum value will be reached
+      storage::mine::last = sender_address;
+      storage::mine::nstep = now() + 2 + random_time_shift;
+
+      storage::circulating_supply += total_mined;
+      storage::mineable_supply -= total_mined;
+
+      storage::save();
+      return ();
+    }
+
+    ;; next operations can be done only by the contract's administrator
+    throw_unless(error::forbidden(), equal_slices(storage::administrator_address, sender_address));
+
+    if (in_msg_body~is_ascii_comment(0x746F707570, 40)) { ;; topup
+      return ();
+    }
+
+    if (in_msg_body~is_ascii_comment(0x7769746864726177, 64)) { ;; withdraw
+      throw_unless(error::insufficient_balance(), my_balance > 510000000); ;; 0.51 TON
+      raw_reserve(500000000, 0); ;; 0.5 TON
+
+      builder message = begin_cell()
+        .store_uint(0x10, 6) ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool packages:MsgAddress -> 010000 ;; nobounce
+        .store_slice(storage::administrator_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+
+      send_raw_message(message.end_cell(), 128); ;; pay transfer fees separately
+      return ();
+    }
+
+    if (in_msg_body~is_ascii_comment(0x6D696E74, 32)) { ;; mint
+      throw_unless(error::forbidden(), storage::circulating_supply == 0);
+
+      in_msg_body~skip_bits(8); ;; ' ' skip whitespace
+      int minted_amount = in_msg_body~ascii_continuous_to_number();
+
+      in_msg_body~skip_bits(8); ;; ' ' skip whitespace
+      slice destination_address = in_msg_body~load_msg_addr_friendly();
+
+      storage::circulating_supply += minted_amount;
+
+      send_internal_transfer(destination_address, minted_amount);
+      storage::save();
+
+      return ();
+    }
+
+    if (in_msg_body~is_ascii_comment(0x6D696E65, 32)) { ;; mine
+      throw_unless(error::forbidden(), storage::mineable_supply == 0);
+
+      in_msg_body~skip_bits(8); ;; ' ' skip whitespace
+      
+      storage::mineable_supply = in_msg_body~ascii_continuous_to_number();
+      storage::save();
+
+      return ();
+    }
+
+    if (in_msg_body~is_ascii_comment(0x6F70656E, 32)) { ;; open
+      throw_unless(error::forbidden(), ~ storage::mine::active);
+
+      storage::mine::active = 1;
+      storage::save();
+
+      return ();
+    }
+
+    if (in_msg_body~is_ascii_comment(0x61646D696E, 40)) { ;; admin
+      in_msg_body~skip_bits(8); ;; ' ' skip whitespace
+      
+      storage::administrator_address = in_msg_body~load_msg_addr_friendly();
+      storage::save();
+
+      return ();
+    }
+
+    throw(0xffff);
+  }
+
+  int query_id = in_msg_body~load_uint(64);
+
+  if (operation == operation::provide_wallet_address()) {
+    throw_unless(error::bad_request(), msg_value > fwd_fee + constant::provide_address_gas_consumption());
+
+    slice owner_address = in_msg_body~load_msg_addr();
+    int include_address? = in_msg_body~load_uint(1);
+
+    cell included_address = null();
+    if (include_address?) {
+      included_address = begin_cell().store_slice(owner_address).end_cell();
+    }
+
+    builder message = begin_cell()
+      .store_uint(0x18, 6) ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool packages:MsgAddress -> 011000
+      .store_slice(sender_address)
+      .store_coins(0)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_uint(operation::take_wallet_address(), 32)
+      .store_uint(query_id, 64);
+
+    if (workchain::is_mine?(owner_address)) {
+      message = message.store_slice(wallet_address(owner_address, my_address(), storage::wallet_code));
+    } else {
+      message = message.store_uint(0, 2); ;; addr_none
+    }
+
+    send_raw_message(message.store_maybe_ref(included_address).end_cell(), 64);
+    return ();
+  }
+
+  if (operation == operation::burn_notification()) {
+    int jetton_amount = in_msg_body~load_coins();
+    slice from_address = in_msg_body~load_msg_addr();
+
+    throw_unless(
+      error::forbidden(), 
+      equal_slices(wallet_address(from_address, my_address(), storage::wallet_code), sender_address));
+
+    storage::circulating_supply -= jetton_amount;
+    storage::save();
+
+    slice response_address = in_msg_body~load_msg_addr();
+    if (response_address.preload_uint(2) != 0) {
+      builder message = begin_cell()
+        .store_uint(0x10, 6) ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool packages:MsgAddress -> 010000 ;; nobounce
+        .store_slice(response_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(operation::excesses(), 32)
+        .store_uint(query_id, 64);
+      
+      send_raw_message(message.end_cell(), 2 + 64);
+    }
+
+    return ();
+  }
+
+  throw(0xffff);
+}
+
+;;
+;; getters
+;;
+
+;; https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md#get-methods-1
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+  storage::load();
+  return (
+    storage::circulating_supply + storage::mineable_supply, 
+    0, ;; immutable
+    storage::administrator_address, 
+    storage::description_data, 
+    storage::wallet_code
+  );
+}
+
+;; https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md#get-methods-1
+slice get_wallet_address(slice owner_address) method_id {
+  storage::load();
+  return wallet_address(owner_address, my_address(), storage::wallet_code);
+}

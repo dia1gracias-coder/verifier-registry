@@ -1,0 +1,37 @@
+#pragma version >=0.2.0;
+
+#include "../imports/stdlib.fc";
+
+;; https://github.com/ton-blockchain/TEPs/blob/master/text/0089-jetton-wallet-discovery.md#scheme
+int operation::provide_wallet_address() asm "0x2c76b973 PUSHINT";
+int operation::take_wallet_address() asm "0xd1735400 PUSHINT";
+
+;; https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md#tl-b-schema
+int operation::excesses() asm "0xd53276db PUSHINT";
+int operation::transfer() asm "0xf8a7ea5 PUSHINT";
+int operation::transfer_notification() asm "0x7362d09c PUSHINT";
+int operation::internal_transfer() asm "0x178d4519 PUSHINT";
+int operation::burn() asm "0x595f07bc PUSHINT";
+int operation::burn_notification() asm "0x7bdd97de PUSHINT";
+
+cell wallet_data(int balance, slice owner_address, slice issuer_address, cell code) {
+  return begin_cell()
+    .store_coins(balance)
+    .store_slice(owner_address)
+    .store_slice(issuer_address)
+    .store_ref(code)
+    .end_cell();
+}
+
+cell wallet_state_init(slice owner_address, slice issuer_address, cell code) {
+  return begin_cell()
+    .store_uint(0, 2)
+    .store_dict(code)
+    .store_dict(wallet_data(0, owner_address, issuer_address, code))
+    .store_uint(0, 1)
+    .end_cell();
+}
+
+slice wallet_address(slice owner_address, slice issuer_address, cell code) {
+  return contract::address(wallet_state_init(owner_address, issuer_address, code));
+}

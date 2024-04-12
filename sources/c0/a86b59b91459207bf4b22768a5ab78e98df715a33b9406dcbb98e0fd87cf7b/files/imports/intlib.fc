@@ -1,0 +1,105 @@
+#include "stdlib.fc";
+#include "base64.fc";
+
+;;
+;; worckchain
+;;
+
+int workchain::default() asm "0 PUSHINT";
+
+int workchain::is_mine?(slice address) inline {
+  (int wc, _) = parse_std_addr(address);
+  return wc == workchain::default();
+}
+
+() workchain::throw_if(slice address) impure {
+  (int wc, _) = parse_std_addr(address);
+  throw_unless(333, wc == workchain::default());
+}
+
+;;
+;; errors
+;;
+
+int error::bad_request()          asm "400 PUSHINT";
+int error::unauthorized()         asm "401 PUSHINT";
+int error::forbidden()            asm "403 PUSHINT";
+int error::insufficient_funds()   asm "75 PUSHINT";
+int error::bad_address()          asm "66 PUSHINT";
+int error::insufficient_balance() asm "103 PUSHINT";
+
+;;
+;; contracts
+;;
+
+slice contract::address(cell state_init) {
+  return begin_cell()
+    .store_uint(4, 3)
+    .store_int(workchain::default(), 8)
+    .store_uint(cell_hash(state_init), 256)
+    .end_cell()
+    .begin_parse();
+}
+
+;;
+;; address
+;;
+
+(slice, slice) load_msg_addr_friendly(slice s) {
+  slice decoded = base64::continuous_decode(s);
+  decoded~skip_bits(8); ;; flag byte
+  decoded~skip_last_bits(16); ;; CRC16-CCITT hash
+
+  throw_if(error::bad_address(), decoded.slice_bits() != 264);
+
+  builder address = begin_cell()
+    .store_uint(2, 2) ;; internal address
+    .store_uint(0, 1) ;;  no anycast
+    .store_slice(decoded);
+
+  return (s, address.end_cell().begin_parse());
+}
+
+;;
+;; ascii
+;;
+
+(slice, int) is_ascii_comment(slice s, int value, int bits) {
+  if (s.slice_bits() < bits) {
+    return (s, false);
+  } elseif (s.preload_uint(bits) == value) {
+    return (s.skip_bits(bits), true); 
+  } else {
+    return (s, false);
+  }
+}
+
+(slice, int) ascii_continuous_to_number(slice data) impure inline {
+  int number = 0;
+  while (~ data.slice_empty?()) {
+    int char = data.preload_uint(8);
+    if ((char < 48) | (char > 57)) {
+      return (data, number);
+    } else {
+      data~skip_bits(8);
+      number = (number * 10) + (char - 48);
+    }
+  }
+  return (data, number);
+}
+
+;;
+;; randomize
+;;
+
+int random::seed(int previous, int updated) {
+  return slice_hash(
+    begin_cell()
+      .store_uint(previous, 256)
+      .store_uint(updated, 256)
+      .store_uint(cur_lt(), 64)
+      .store_uint(now(), 64)
+      .end_cell()
+      .begin_parse()
+  );
+}
