@@ -1,0 +1,208 @@
+#include "imports/stdlib.fc";
+
+;; consts
+slice msg::withdraw_funds()    asm "<b 124 word Withdraw funds by owner| $, b> <s PUSHSLICE";
+slice msg::result_jackpot()    asm "<b 124 word Jackpot| $, b> <s PUSHSLICE";
+slice msg::comma_to_right()    asm "<b 124 word Comma moved right| $, b> <s PUSHSLICE";
+slice msg::comma_to_left()    asm "<b 124 word Comma moved left| $, b> <s PUSHSLICE";
+slice msg::result_won_but_no_funds()    asm "<b 124 word Comma is bankrupt| $, b> <s PUSHSLICE";
+
+int 1ton() asm "1000000000 PUSHINT";
+
+;; storage variables
+global slice storage::owner;
+global int storage::last_number;
+global int storage::hash;
+
+;; load_data populates storage variables using stored data
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    storage::owner = ds~load_msg_addr();
+    storage::last_number = ds~load_uint(64);
+    storage::hash = slice_empty?(ds) ? 0 : ds~load_uint(256);
+
+    ds.end_parse();
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_slice(storage::owner)
+            .store_uint(storage::last_number, 64)
+            .store_uint(storage::hash, 256)
+            .end_cell()
+    );
+}
+
+;; check if message starts with comma
+(slice, int) is_play_message(slice s) inline {
+    if (s.slice_bits() < 8) {
+        return (s, false);
+    }
+
+    int prefix = s.preload_uint(8);
+
+    if (prefix == 0x2C) {
+        return (s.skip_bits(8), true);
+    } else {
+        return (s, false);
+    }
+}
+
+;; check if message starts with small dash (simply a minus sign)
+(slice, int) is_withdraw_message(slice s) inline {
+    if (s.slice_bits() < 8) {
+        return (s, false);
+    }
+
+    int prefix = s.preload_uint(8);
+
+    if (prefix == 0x2D) {
+        return (s.skip_bits(8), true);
+    } else {
+        return (s, false);
+    }
+}
+
+;; transfer money from contract
+() transfer_money(slice address, int amount, slice msg, int mode) impure inline_ref {
+    cell body = begin_cell()
+        .store_uint(0, 32)
+        .store_slice(msg)
+        .end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(address)
+        .store_coins(amount)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body)
+        .end_cell();
+
+    ;; 128 for withdrawal of all funds
+    ;; 0 + 1 for regular payout
+    send_raw_message(msg, mode);
+
+    return ();
+
+}
+
+;; handle playing the comma game!
+() handle_play_message(slice sender_address, int my_balance, int msg_value, int hash) impure inline_ref {
+    throw_if(0xFFFF, (msg_value < (1ton() / 10)));
+
+    int new_hash = slice_hash(
+        begin_cell()
+            .store_uint(storage::hash, 256)
+            .store_uint(hash, 256)
+            .store_uint(cur_lt(), 64)
+            .store_uint(now(), 64)
+            .end_cell()
+            .begin_parse()
+    );
+
+    randomize(new_hash);
+    storage::hash = new_hash;
+
+    int number = rand(10000); ;; [0; 10000)
+    storage::last_number = number;
+
+    if (number < 1) { ;; win half of a balance
+        int win = my_balance / 2;
+        slice msg = msg::result_jackpot();
+
+        if (my_balance > win) {
+            transfer_money(sender_address, win, msg, 0 + 1);
+            save_data();
+        } else {
+            transfer_money(sender_address, msg_value / 2, msg::result_won_but_no_funds(), 0 + 1);
+        }
+    } elseif (number < 5000) { ;; win x10
+        int win = msg_value * 10;
+        slice msg = msg::comma_to_right();
+
+        if (my_balance > win) {
+            transfer_money(sender_address, win, msg, 0 + 1);
+            save_data();
+        } else {
+            transfer_money(sender_address, msg_value / 2, msg::result_won_but_no_funds(), 0 + 1);
+        }
+    } elseif (number < 10000) { ;; win x0.1
+        int win = msg_value / 10;
+        slice msg = msg::comma_to_left();
+
+        if (my_balance > win) {
+            transfer_money(sender_address, win, msg, 0 + 1);
+            save_data();
+        } else {
+            transfer_money(sender_address, msg_value / 2, msg::result_won_but_no_funds(), 0 + 1);
+        }
+    }
+
+    return ();
+}
+
+;; handle funds withdrawal
+() handle_withdraw_message(slice sender_address, int my_balance) impure inline_ref {
+    throw_unless(1488, equal_slices(sender_address, storage::owner));
+
+    transfer_money(storage::owner, my_balance, msg::withdraw_funds(), 128);
+
+    return ();
+}
+
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    load_data(); ;; here we populate the storage variables
+
+    int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+
+    if (op == 0) {
+        if (in_msg_body~is_play_message()) {
+            int hash = slice_hash(cs);
+
+            return handle_play_message(sender_address, my_balance, msg_value, hash);
+        } elseif (in_msg_body~is_withdraw_message()) {
+            return handle_withdraw_message(sender_address, my_balance);
+        }
+    }
+
+    throw(228); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+;; getter for last hash
+int get_hash() method_id {
+    load_data();
+
+    return storage::hash;
+}
+
+;; getter for last number
+int get_last_number() method_id {
+    load_data();
+
+    return storage::last_number;
+}
+
+;; getter for the owner address
+slice get_owner() method_id {
+    load_data();
+
+    return storage::owner;
+}
