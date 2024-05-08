@@ -1,0 +1,26 @@
+#include "imports/stdlib.fc";
+
+(int) load_data() inline {
+    slice ds = get_data().begin_parse();
+    int sum = ds~load_uint(64);
+    return sum;
+}
+
+() save_data(int newSum) impure inline {
+    set_data(
+        begin_cell()
+        .store_uint(newSum, 64)
+        .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    int sum = load_data();
+    int newSum = sum + msg_value;
+    save_data(newSum);
+    return ();
+}
+
+(int) getSum() method_id {
+    return load_data();
+}
