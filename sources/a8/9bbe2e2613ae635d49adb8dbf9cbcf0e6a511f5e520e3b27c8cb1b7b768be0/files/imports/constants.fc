@@ -1,0 +1,47 @@
+{- OP-CODES -}
+
+;; Common 
+const int op::get_storage_data       = 0x5b88e5cc;
+const int op::report_storage_data    = 0xaab4a8ef;
+const int op::excesses               = 0xd53276db;
+const int op::withdraw_jettons       = 0x18a9ed91;
+const int op::withdraw_ton           = 0x37726bdb;
+
+;; Jettons
+const int op::transfer_jetton         = 0xf8a7ea5;
+const int op::transfer_notification   = 0x7362d09c;
+const int op::burn_jetton             = 0x595f07bc;
+const int op::claim                   = 0xa769de27;
+
+
+
+{- EXCEPTIONS -}
+
+const int exc::out_of_gas = 13;
+
+const int exc::wrong_state = 33;
+const int exc::wrong_signature = 35;
+
+const int exc::incorrect_sender = 49;
+const int exc::wrong_campaign_id = 58;
+
+
+const int exc::wrong_chain = 333;
+const int exc::unsupported_op = 0xffff;
+
+
+{- GAS (TODO) -}
+
+const int gas::send_jettons = 40000000;
+const int gas::min_reserve  = 5000000;
+
+{- MESSAGE MODES -}
+
+const int mode::simple                  = 0;
+const int mode::carry_remaining_gas     = 64;
+const int mode::carry_remaining_balance = 128;
+
+const int mode::pay_fees_separately     = 1;
+const int mode::ignore_errors           = 2;
+const int mode::bounce_on_fail          = 16;
+const int mode::selfdestruct_on_empty   = 32;
