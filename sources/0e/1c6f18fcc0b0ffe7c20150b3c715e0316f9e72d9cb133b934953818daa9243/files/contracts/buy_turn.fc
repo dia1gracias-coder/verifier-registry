@@ -1,0 +1,90 @@
+#include "imports/stdlib.fc";
+
+const op::buy_ticket = "op::buy_ticket"c;
+const op::withdraw_funds = "op::withdraw_funds"c;
+const op::set_ticket_price = "op::set_ticket_price"c;
+
+global int ctx_id;
+global int ticket_count;
+global int ticket_price;
+global int contract_balance;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    ticket_price = 500000000;
+    ctx_id = ds~load_uint(32);
+    ticket_count = ds~load_uint(32);
+    contract_balance = ds~load_uint(32);
+
+    ds.end_parse();
+}
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+      .store_uint(ctx_id, 32)
+      .store_uint(ticket_count, 32)
+      .store_uint(ticket_price, 32)
+      .store_uint(contract_balance, 32)
+      .end_cell()
+    );
+}
+
+() set_ticket_price(int new_price) impure {
+    load_data();
+    ticket_price = new_price;
+    save_data();
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::buy_ticket) {
+        int num_tickets = in_msg_body~load_uint(32);
+        int total_cost = num_tickets * ticket_price;
+
+        if (msg_value < total_cost) {
+            throw(0xffff); 
+        }
+
+        ticket_count += num_tickets;
+        contract_balance += total_cost;
+        save_data();
+        return ();
+    }
+
+    if (op == op::set_ticket_price) { 
+        int new_price = in_msg_body~load_uint(32);
+        set_ticket_price(new_price);
+        return ();
+    }
+
+    throw(0xffff); 
+}
+
+int get_ticket_count() method_id {
+    load_data();
+    return ticket_count;
+}
+
+int get_id() method_id {
+    load_data();
+    return ctx_id;
+}
+
+int get_contract_balance() method_id {
+    load_data();
+    return contract_balance;
+}
