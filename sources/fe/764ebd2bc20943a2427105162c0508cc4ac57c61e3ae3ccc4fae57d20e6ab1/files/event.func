@@ -1,0 +1,74 @@
+#include "imports/stdlib.fc";
+#include "types.func";
+#include "op-codes.func";
+#include "messages.func";
+#include "errors.func";
+
+
+global int event_index;
+global int is_init;
+global slice multisig_address;
+
+global cell event;
+
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    event_index = ds~load_u64();
+    is_init = ds~load_bit();
+    multisig_address = ds~load_msg_addr();
+    if (is_init == 0) {
+        event = null();
+    } else {
+        event = ds~load_ref();
+    }
+
+}
+
+() save_data() impure inline {
+    set_data(
+        begin_cell()
+            .store_u64(event_index)
+            .store_bit(is_init)
+            .store_slice(multisig_address)
+            .store_ref(event)
+            .end_cell()
+    );
+}
+
+
+() recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    int msg_flags = in_msg_full_slice~load_msg_flags();
+    if (is_bounced(msg_flags)) {
+        return ();
+    }
+    slice sender_address = in_msg_full_slice~load_msg_addr();
+    load_data();
+    if (null?(event)) {
+        int op = in_msg_body~load_op();
+        int query_id = in_msg_body~load_query_id();
+        if (op == op::init) {
+
+            throw_unless(error::unauthorized_init, equal_slices_bits(sender_address, multisig_address));
+            event = in_msg_body~load_ref();
+            is_init = 1;
+            save_data();
+            builder event_body = begin_cell();
+            send_message_with_only_body(multisig_address, 0, event_body, NON_BOUNCEABLE, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            return ();
+        }
+    }
+    throw_unless(error::unauthorized_execute, equal_slices_bits(sender_address, multisig_address));
+}
+
+
+_ get_event_data() method_id {
+    load_data();
+    return (
+        multisig_address,
+        is_init,
+        event_index,
+        event
+    );
+}
