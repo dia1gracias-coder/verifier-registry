@@ -1,0 +1,162 @@
+#include "imports/stdlib.fc";
+#include "pool/storage.fc";
+#include "pool/op.fc";
+#include "pool/consts.fc";
+#include "pool/lib.fc";
+#include "pool/errors.fc";
+#include "pool/getters.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+
+    ;; ignore empty messages
+    if (in_msg_body.slice_empty?()) { 
+        return ();
+    }
+    ;; start to check message
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    
+    if (flags & 1) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    ;; query_id is used to help tie in all calls to the same query
+    int op = in_msg_body~load_uint(32);
+    load_storage();
+
+    if(op == add_reward_tokens){
+        ;; Check that sender is the admin wallet
+        throw_unless(INVALID_CALLER, equal_slice_bits(sender_address, storage::admin_wallet));
+        int rewards_added = in_msg_body~load_coins();
+        ;; update current data values
+        storage::tokens_for_rewards += rewards_added;
+        save_storage();
+        return();
+    }
+    if(op == stake_tokens){
+        ;; Check that sender is the admin wallet
+        throw_unless(INVALID_CALLER, equal_slice_bits(sender_address, storage::admin_wallet));
+        slice from_user = in_msg_body~load_msg_addr();
+        int stake_amount = in_msg_body~load_coins();
+        int reward_tokens = get_total_reward_tokens(stake_amount);
+        ;; update current data values
+        storage::tokens_staked = storage::tokens_staked + stake_amount;
+        storage::tokens_claimed = storage::tokens_claimed + reward_tokens;
+        throw_if(EXCEEDED_REWARDS, storage::tokens_claimed > storage::tokens_for_rewards);
+        ;; get position address
+        (cell state_init, slice position_address) = get_position_state_init_and_address(from_user);
+        save_storage();
+        ;; send message to the position
+        var msg_body = begin_cell()
+            .store_uint(position::update_stake_amount, 32)
+            .store_uint(storage::lock_duration, 64)
+            .store_coins(stake_amount)
+            .store_coins(reward_tokens)
+        .end_cell();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(position_address)
+            .store_coins(0)
+            .store_uint(7, 108)
+            .store_ref(state_init)
+            .store_ref(msg_body)
+        .end_cell();
+
+        send_raw_message(msg,65);
+        return();
+    }
+
+    if(op == update_locked_rewards){
+        ;; Check that sender is a position wallet
+        slice position_owner = in_msg_body~load_msg_addr();
+        (_, slice position_address) = get_position_state_init_and_address(position_owner);
+        throw_unless(INVALID_POSITION_CALLER, equal_slice_bits(position_address, sender_address));
+        int tokens_to_lock = in_msg_body~load_coins();
+
+        storage::tokens_claimed += tokens_to_lock;
+        ;; if rewards exceed, throw error
+        throw_if(EXCEEDED_REWARDS, storage::tokens_claimed > storage::tokens_for_rewards);
+        save_storage();
+        return();
+    }
+    if(op == claim_all_tokens){
+        {-
+            Body needs:
+            * total Amount of staked tokens
+            * total Amount of reward tokens
+            * owner address
+        -} 
+        (int reward_tokens, int staked_tokens, slice position_owner) = (in_msg_body~load_coins(), in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+        ;; Check that sender is a position wallet
+        (_, slice position_address) = get_position_state_init_and_address(position_owner);
+        throw_unless(INVALID_POSITION_CALLER, equal_slice_bits(position_address, sender_address));
+        {-
+            Total Amount of staked Tokens is decreased
+        -}
+        storage::tokens_staked -= staked_tokens;
+        save_storage();
+
+        ;; Send Message to claim to main staking contract
+        cell msg_body = begin_cell()
+            .store_uint(claim_all_tokens, 32)
+            .store_uint(storage::pool_id, 32)
+            .store_coins(reward_tokens)
+            .store_coins(staked_tokens)
+            .store_slice(position_owner)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(storage::admin_wallet)
+            .store_coins(0)
+            .store_uint(1, 107)
+            .store_ref(msg_body)
+        .end_cell();
+
+        send_raw_message(msg,65);
+        return();
+    }
+
+    ;; OWNER ONLY
+    throw_unless(INVALID_OP, equal_slice_bits(sender_address, storage::admin_wallet));
+        
+    if(op == get_unclaimed_tokens){
+        int free_rewards = storage::tokens_for_rewards - storage::tokens_claimed;
+        storage::tokens_for_rewards = storage::tokens_claimed;
+        save_storage();
+        throw_unless(INVALID_REWARD_REFIT_AMOUNT, free_rewards > 0);
+        ;; update current data values
+        cell msg_body = begin_cell()
+            .store_uint(get_unclaimed_tokens, 32)
+            .store_uint(storage::pool_id, 32)
+            .store_coins(free_rewards)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(storage::admin_wallet)
+            .store_coins(0)
+            .store_uint(1, 107)
+            .store_ref(msg_body)
+        .end_cell();
+        send_raw_message(msg,64);
+        return();
+    }
+    if(op == init_pool){
+        ;; update current data values
+        int num = in_msg_body~load_uint(32);
+        int deno = in_msg_body~load_uint(32);
+        int lock = in_msg_body~load_uint(32);
+        throw_if(INVALID_REWARD_RATIO, num == 0);
+        throw_if(INVALID_REWARD_RATIO, deno == 0);
+        throw_if(INVALID_LOCK_DURATION, lock == 0);
+        storage::reward_ratio_num = num;
+        storage::reward_ratio_deno = deno;
+        storage::lock_duration = lock;
+        save_storage();
+        return();
+    }
+    throw(INVALID_OP);
+}
+

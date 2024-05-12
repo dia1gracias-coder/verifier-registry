@@ -1,0 +1,35 @@
+(slice) get_serialized_address(int workchain, int address) inline {
+    return (begin_cell()
+        .store_uint(4, 3)
+        .store_uint(workchain, 8)
+        .store_uint(address, 256)
+    ).end_cell().begin_parse();
+}
+
+int get_total_reward_tokens(int staked_amount) inline {
+    ;; using muldiv stores potential overflow into a 513 bit cell before doing division
+    return muldiv(staked_amount, storage::reward_ratio_num, storage::reward_ratio_deno);
+}
+
+cell pack_position_data(slice position_owner) inline_ref {
+    return begin_cell()
+                .store_uint(0, 64)
+                .store_uint(0, 64)
+                .store_coins(0)
+                .store_coins(0)
+                .store_coins(0)
+                .store_slice(my_address())
+                .store_slice(position_owner)
+            .end_cell();
+}
+
+(cell, slice) get_position_state_init_and_address(slice position_owner) inline {
+    cell state_init = begin_cell()
+        .store_uint(0,2)
+        .store_dict(storage::position_code)
+        .store_dict(pack_position_data(position_owner))
+        .store_uint(0,1)
+        .end_cell();
+    return (state_init, get_serialized_address(WORKCHAIN, cell_hash(state_init)));
+}
+

@@ -1,0 +1,22 @@
+(int, int, int, int, int, int, int, slice, slice, slice) get_pool_data() method_id {
+    load_storage();
+
+    return (
+        storage::pool_id,
+        storage::lock_duration,
+        storage::reward_ratio_num,
+        storage::reward_ratio_deno,
+        storage::tokens_for_rewards,
+        storage::tokens_staked,
+        storage::tokens_claimed,
+        storage::staked_token_wallet,
+        storage::reward_token_wallet,
+        storage::admin_wallet
+    );
+}
+
+slice get_user_position_address(slice user_address) method_id {
+    load_storage();
+    (_, slice position_address) = get_position_state_init_and_address(user_address);
+    return position_address;
+}

@@ -1,0 +1,52 @@
+global int storage::pool_id;                     ;;128
+global int storage::lock_duration;               ;;32      
+global int storage::reward_ratio_num;            ;;10
+global int storage::reward_ratio_deno;           ;;10
+global int storage::tokens_for_rewards;          ;;128
+global int storage::tokens_staked;               ;;128
+global int storage::tokens_claimed;              ;;128
+global slice storage::staked_token_wallet;       ;; Wallet Address is given by the Factory Contract
+global slice storage::reward_token_wallet;       ;; Wallet Address is given by the Factory Contract
+global slice storage::admin_wallet; ;; This has to be the factory contract
+;; Cell Refs to hold code for the position and jetton contracts
+global cell storage::position_code;
+
+() save_storage() impure inline {
+    set_data(
+        begin_cell()
+            .store_uint(storage::pool_id, 32)
+            .store_uint(storage::lock_duration, 32) ;; Max 68 years
+            .store_uint(storage::reward_ratio_num, 32) ;; 100_00000
+            .store_uint(storage::reward_ratio_deno, 32) ;; 100_00000
+            .store_coins(storage::tokens_for_rewards)
+            .store_coins(storage::tokens_staked)
+            .store_coins(storage::tokens_claimed)
+            .store_ref(
+            ;; addresses are stored in a cell since each wallet can take up to 256 bits of space
+            begin_cell()
+                    .store_slice(storage::staked_token_wallet)
+                    .store_slice(storage::reward_token_wallet)
+                    .store_slice(storage::admin_wallet)
+                    .end_cell()
+        )
+            .store_ref(storage::position_code)
+        .end_cell() 
+    );
+}
+
+() load_storage() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::pool_id = ds~load_uint(32);
+    storage::lock_duration = ds~load_uint(32);
+    storage::reward_ratio_num = ds~load_uint(32);
+    storage::reward_ratio_deno = ds~load_uint(32);
+    storage::tokens_for_rewards = ds~load_coins();
+    storage::tokens_staked = ds~load_coins();
+    storage::tokens_claimed = ds~load_coins();
+    slice addresses_slice = ds~load_ref().begin_parse();
+    storage::position_code = ds~load_ref();
+
+    storage::staked_token_wallet = addresses_slice~load_msg_addr();
+    storage::reward_token_wallet = addresses_slice~load_msg_addr();
+    storage::admin_wallet = addresses_slice~load_msg_addr();
+}
