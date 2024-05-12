@@ -1,0 +1,21 @@
+int get_total_pools() method_id {
+    load_storage();
+    return staking_storage::pool_count;
+}
+
+(int,  int, slice,  slice, slice) get_pool_data(int pool_id) method_id {
+    load_storage();
+    (slice data, int success) = staking_storage::pool_dict.udict_get?(256,pool_id);
+    if(success){
+        return (
+            success,
+            data~load_uint(1),      ;; initialized_status
+            data~load_msg_addr(),   ;; pool wallet
+            data~load_msg_addr(),   ;; stake wallet
+            data~load_msg_addr()    ;; reward wallet
+        );
+    }
+    slice zero_address = begin_cell().end_cell().begin_parse();
+    return (success, 0, zero_address, zero_address, zero_address);
+}
+
