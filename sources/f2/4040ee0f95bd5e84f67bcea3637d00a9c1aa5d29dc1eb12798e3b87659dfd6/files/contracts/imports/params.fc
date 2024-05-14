@@ -1,0 +1,12 @@
+int workchain() asm "0 PUSHINT";
+
+() force_chain(slice addr) impure {
+  (int wc, _) = parse_std_addr(addr);
+  throw_unless(333, wc == workchain());
+}
+
+const int LOG_CREATE_BATTLE = 0xc0470ccf;
+const int LOG_BET_BLUE = 0xc0550ccf;
+const int LOG_BET_RED = 0xc0660ccf;
+const int LOG_APPROVE_BATTLE = 0xc0770ccf;
+const int LOG_PAY_BATTLE = 0xc0880ccf;

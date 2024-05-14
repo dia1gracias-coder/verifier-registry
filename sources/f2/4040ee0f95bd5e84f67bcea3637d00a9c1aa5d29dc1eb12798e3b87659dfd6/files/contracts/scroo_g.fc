@@ -1,0 +1,855 @@
+;; storage scheme
+;; storage#_ total_supply:Coins owner_address:MsgAddress content:^Cell battle_code:^Cell = Storage;
+
+#include "imports/stdlib.fc";
+#include "imports/params.fc";
+#include "imports/constants.fc";
+#include "imports/op-codes.fc";
+#include "imports/utils.fc";
+#pragma version >=0.2.0;
+
+const TIMEOUT_BITS = 64;
+const min_tons_for_storage = 10000000; ;; 0.01 TON
+const gas_consumption = 10000000; ;; 0.01 TON
+
+(int, int, int, int, int, slice, slice, cell, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_coins(), ;; min_bet_amount
+        ds~load_coins(), ;; max_bet_amount
+        ds~load_uint(TIMEOUT_BITS), ;; battle_timeout
+        ds~load_uint(TIMEOUT_BITS), ;; bet_timeout
+        ds~load_uint(8), ;; fee_percent
+        ds~load_msg_addr(), ;; owner_address
+        ds~load_msg_addr(), ;; scroog_address
+        ds~load_ref(), ;; battle_chain
+        ds~load_ref(), ;; blue_bet_chain
+        ds~load_ref() ;; red_bet_chain
+    );
+}
+
+() save_data(int min_bet_amount, int max_bet_amount, int battle_timeout, int bet_timeout, int fee_percent, slice owner_address, slice scroog_address, cell battle_chain, cell blue_bet_chain, cell red_bet_chain) impure inline {
+    set_data(begin_cell()
+            .store_coins(min_bet_amount)
+            .store_coins(max_bet_amount)
+            .store_uint(battle_timeout, TIMEOUT_BITS)
+            .store_uint(bet_timeout, TIMEOUT_BITS)
+            .store_uint(fee_percent, 8)
+            .store_slice(owner_address)
+            .store_slice(scroog_address)
+            .store_ref(battle_chain)
+            .store_ref(blue_bet_chain)
+            .store_ref(red_bet_chain)
+            .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    ;; ~dump(my_balance);
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of provide_wallet_address cost
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    (int min_bet_amount, int max_bet_amount, int battle_timeout, int bet_timeout, int fee_percent, slice owner_address, slice scroog_address, cell battle_chain, cell blue_bet_chain, cell red_bet_chain) = load_data();
+
+    if (op == op::create_battle()) {
+        int battle_id = in_msg_body~load_uint(128);
+        int royalty_percent = in_msg_body~load_uint(8);
+        int start_time = in_msg_body~load_uint(TIMEOUT_BITS);
+        ;; int amount = in_msg_body~load_coins();
+        ;; cell master_msg = in_msg_body~load_ref();
+        ;; slice master_msg_cs = master_msg.begin_parse();
+
+        ;; master_msg_cs~skip_bits(TIMEOUT_BITS + 64); ;; op + query_id
+
+        cell new_battle_chain = begin_cell()
+                            .store_uint(battle_id, 128)
+                            .store_uint(royalty_percent, 8)
+                            .store_uint(fee_percent, 8)
+                            .store_uint(start_time, TIMEOUT_BITS)
+                            .store_uint(start_time + battle_timeout, TIMEOUT_BITS)
+                            .store_uint(0, 1)
+                            .store_slice(sender_address)
+                            .store_slice(sender_address)
+                            .store_ref(battle_chain)
+                            .end_cell();
+
+        save_data(min_bet_amount, max_bet_amount, battle_timeout, bet_timeout, fee_percent, owner_address, scroog_address, new_battle_chain, blue_bet_chain, red_bet_chain);
+
+        emit_log_simple(LOG_CREATE_BATTLE, 
+            begin_cell()
+                    .store_uint(battle_id, 128)
+                    .store_slice(sender_address) 
+                    .store_uint(royalty_percent, 8)
+                    .store_uint(start_time, TIMEOUT_BITS)
+                    .store_uint(start_time + battle_timeout, TIMEOUT_BITS)
+                    .end_cell(),
+            0
+        );
+        return ();
+    }
+
+    if (op == op::approve_battle()) {
+        int battle_id = in_msg_body~load_uint(128);
+        int is_battle_found = 0;
+        slice battle_chain_slice = battle_chain.begin_parse();
+
+        cell new_battle_chain = begin_cell().end_cell();
+
+        while (battle_chain_slice.slice_empty?() != -1) {
+            int existing_battle_id = battle_chain_slice~load_uint(128);
+            int existing_royalty_percent = battle_chain_slice~load_uint(8);
+            int existing_fee_percent = battle_chain_slice~load_uint(8);
+            int existing_start_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+            int existing_end_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+            int existing_paid = battle_chain_slice~load_uint(1);
+            slice existing_blue_address = battle_chain_slice~load_msg_addr();
+            slice existing_red_address = battle_chain_slice~load_msg_addr();
+            cell existing_battle_chain = battle_chain_slice~load_ref();
+
+            if (existing_battle_id == battle_id) {
+                throw_unless(74, equal_slices(existing_blue_address, existing_red_address));
+                throw_unless(74, existing_start_time > now());
+
+                is_battle_found = 1;
+                new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(existing_end_time, TIMEOUT_BITS)
+                                .store_uint(existing_paid, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(sender_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+            } else {
+                new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(existing_end_time, TIMEOUT_BITS)
+                                .store_uint(existing_paid, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(existing_red_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+            }
+
+            battle_chain_slice = existing_battle_chain.begin_parse();
+        }
+
+        throw_unless(74, is_battle_found == 1);
+
+
+        save_data(min_bet_amount,max_bet_amount,battle_timeout,bet_timeout,fee_percent,owner_address,scroog_address,new_battle_chain,blue_bet_chain,red_bet_chain);
+
+        emit_log_simple(LOG_APPROVE_BATTLE, 
+            begin_cell()
+                    .store_uint(battle_id, 128)
+                    .store_slice(sender_address) 
+                    .end_cell(),
+            0
+        );
+
+        return();
+    }
+
+    if (op == op::create_blue_bet()) {
+        throw_unless(74, msg_value < max_bet_amount);
+        throw_unless(74, msg_value > min_bet_amount);
+
+        int battle_id = in_msg_body~load_uint(128);
+        slice sender = in_msg_body~load_msg_addr();
+
+        slice battle_chain_slice = battle_chain.begin_parse();
+        slice blue_bet_chain_slice = blue_bet_chain.begin_parse();
+
+        int is_battle_found = 0;
+        int is_bet_found = 0;
+
+        cell new_blue_bet_chain = begin_cell().end_cell();
+        cell new_battle_chain = begin_cell().end_cell();
+
+        int battle_end_time = now();
+
+        while (battle_chain_slice.slice_empty?() != -1) {
+            int existing_battle_id = battle_chain_slice~load_uint(128);
+            int existing_royalty_percent = battle_chain_slice~load_uint(8);
+            int existing_fee_percent = battle_chain_slice~load_uint(8);
+            int existing_start_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+            int existing_end_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+            int existing_paid = battle_chain_slice~load_uint(1);
+            slice existing_blue_address = battle_chain_slice~load_msg_addr();
+            slice existing_red_address = battle_chain_slice~load_msg_addr();
+            cell existing_battle_chain = battle_chain_slice~load_ref();
+
+            if (existing_battle_id == battle_id) {                
+                is_battle_found = 1;
+
+                throw_unless(74, existing_start_time < now());
+                throw_unless(74, existing_end_time > now());
+
+                throw_unless(74, equal_slices(existing_blue_address, existing_red_address) != -1);
+
+                battle_end_time = existing_end_time;
+
+                if (existing_end_time - now() < bet_timeout) {
+                    battle_end_time = now() + bet_timeout;
+
+                    new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(now() + bet_timeout, TIMEOUT_BITS)
+                                .store_uint(existing_paid, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(existing_red_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+                } else {
+                    new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(existing_end_time, TIMEOUT_BITS)
+                                .store_uint(existing_paid, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(existing_red_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+                }
+            } else {
+                new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(existing_end_time, TIMEOUT_BITS)
+                                .store_uint(existing_paid, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(existing_red_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+            }
+
+            battle_chain_slice = existing_battle_chain.begin_parse();
+        }
+
+        throw_unless(74, is_battle_found);
+
+        int bet_amount = msg_value;
+
+        while (blue_bet_chain_slice.slice_empty?() != -1) {
+
+            int existing_battle_id = blue_bet_chain_slice~load_uint(128);
+            slice existing_sender = blue_bet_chain_slice~load_msg_addr();
+            int amount = blue_bet_chain_slice~load_coins();
+            cell existing_blue_bet_chain = blue_bet_chain_slice~load_ref();
+
+            if (existing_battle_id == battle_id) {
+                if (equal_slices(sender, existing_sender)) {
+                    is_bet_found = 1;
+
+                    if (amount + msg_value > max_bet_amount) {
+                        bet_amount = max_bet_amount - amount;
+                        ;; return redundant amount to sender
+                        if (msg_value - bet_amount - min_tons_for_storage - gas_consumption) {
+                            send_grams(sender_address, msg_value - bet_amount - min_tons_for_storage - gas_consumption);
+                        }
+                    }
+
+                    new_blue_bet_chain = begin_cell()
+                                        .store_uint(existing_battle_id, 128)
+                                        .store_slice(existing_sender)
+                                        .store_coins(amount + bet_amount)
+                                        .store_ref(new_blue_bet_chain)
+                                        .end_cell();
+                } else {
+                    new_blue_bet_chain = begin_cell()
+                                        .store_uint(existing_battle_id, 128)
+                                        .store_slice(existing_sender)
+                                        .store_coins(amount)
+                                        .store_ref(new_blue_bet_chain)
+                                        .end_cell();
+                }
+            } else {
+                new_blue_bet_chain = begin_cell()
+                                        .store_uint(existing_battle_id, 128)
+                                        .store_slice(existing_sender)
+                                        .store_coins(amount)
+                                        .store_ref(new_blue_bet_chain)
+                                        .end_cell();
+            }
+
+            blue_bet_chain_slice = existing_blue_bet_chain.begin_parse();
+        }
+
+        
+        if (is_bet_found != 1) {
+            new_blue_bet_chain = begin_cell()
+                                .store_uint(battle_id, 128)
+                                .store_slice(sender)
+                                .store_coins(msg_value)
+                                .store_ref(new_blue_bet_chain)
+                                .end_cell();
+        }
+
+        save_data(min_bet_amount,max_bet_amount,battle_timeout,bet_timeout,fee_percent,owner_address,scroog_address,new_battle_chain,new_blue_bet_chain,red_bet_chain);
+
+        emit_log_simple(LOG_BET_BLUE, 
+            begin_cell()
+                    .store_uint(battle_id, 128)
+                    .store_slice(sender_address) 
+                    .store_coins(bet_amount)
+                    .store_uint(battle_end_time, TIMEOUT_BITS)
+                    .end_cell(),
+            1
+        );
+
+        return();
+    }
+
+    if (op == op::create_red_bet()) {
+        throw_unless(74, msg_value < max_bet_amount);
+        throw_unless(74, msg_value > min_bet_amount);
+
+        int battle_id = in_msg_body~load_uint(128);
+        slice sender = in_msg_body~load_msg_addr();
+
+        slice battle_chain_slice = battle_chain.begin_parse();
+        slice red_bet_chain_slice = red_bet_chain.begin_parse();
+
+        int is_battle_found = 0;
+        int is_bet_found = 0;
+  
+        cell new_red_bet_chain = begin_cell().end_cell();
+        cell new_battle_chain = begin_cell().end_cell();
+
+        int battle_end_time = now();
+
+        while (battle_chain_slice.slice_empty?() != -1) {
+            int existing_battle_id = battle_chain_slice~load_uint(128);
+            int existing_royalty_percent = battle_chain_slice~load_uint(8);
+            int existing_fee_percent = battle_chain_slice~load_uint(8);
+            int existing_start_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+            int existing_end_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+            int existing_paid = battle_chain_slice~load_uint(1);
+            slice existing_blue_address = battle_chain_slice~load_msg_addr();
+            slice existing_red_address = battle_chain_slice~load_msg_addr();
+            cell existing_battle_chain = battle_chain_slice~load_ref();
+
+            if (existing_battle_id == battle_id) {                
+                is_battle_found = 1;
+
+                throw_unless(74, existing_start_time < now());
+                throw_unless(74, existing_end_time > now());
+
+                throw_unless(74, equal_slices(existing_blue_address, existing_red_address) != -1);
+
+                battle_end_time = existing_end_time;
+
+                if (existing_end_time - now() < bet_timeout) {
+                    battle_end_time = now() + bet_timeout;
+
+                    new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(now() + bet_timeout, TIMEOUT_BITS)
+                                .store_uint(existing_paid, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(existing_red_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+                } else {
+                    new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(existing_end_time, TIMEOUT_BITS)
+                                .store_uint(existing_paid, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(existing_red_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+                }
+            } else {
+                new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(existing_end_time, TIMEOUT_BITS)
+                                .store_uint(existing_paid, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(existing_red_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+            }
+
+           
+
+            battle_chain_slice = existing_battle_chain.begin_parse();
+        }
+
+        throw_unless(74, is_battle_found);
+
+        int bet_amount = msg_value;
+
+        while (red_bet_chain_slice.slice_empty?() != -1) {
+            int existing_battle_id = red_bet_chain_slice~load_uint(128);
+            slice existing_sender = red_bet_chain_slice~load_msg_addr();
+            int amount = red_bet_chain_slice~load_coins();
+            cell existing_red_bet_chain = red_bet_chain_slice~load_ref();
+
+            if (existing_battle_id == battle_id) {
+                if (equal_slices(sender, existing_sender)) {
+                    is_bet_found = 1;
+
+                    if (amount + msg_value > max_bet_amount) {
+                        bet_amount = max_bet_amount - amount;
+                        ;; return redundant amount to sender
+                        if (msg_value - bet_amount - min_tons_for_storage - gas_consumption) {
+                            send_grams(sender_address, msg_value - bet_amount - min_tons_for_storage - gas_consumption);
+                        }
+                    }
+
+                    new_red_bet_chain = begin_cell()
+                                        .store_uint(existing_battle_id, 128)
+                                        .store_slice(existing_sender)
+                                        .store_coins(amount + bet_amount)
+                                        .store_ref(new_red_bet_chain)
+                                        .end_cell();
+                } else {
+                    new_red_bet_chain = begin_cell()
+                                    .store_uint(existing_battle_id, 128)
+                                    .store_slice(existing_sender)
+                                    .store_coins(amount)
+                                    .store_ref(new_red_bet_chain)
+                                    .end_cell();
+                }
+            } else {
+                new_red_bet_chain = begin_cell()
+                                    .store_uint(existing_battle_id, 128)
+                                    .store_slice(existing_sender)
+                                    .store_coins(amount)
+                                    .store_ref(new_red_bet_chain)
+                                    .end_cell();
+            }
+
+            red_bet_chain_slice = existing_red_bet_chain.begin_parse();                                        
+        }
+
+        if (is_bet_found != 1) {
+            new_red_bet_chain = begin_cell()
+                                .store_uint(battle_id, 128)
+                                .store_slice(sender)
+                                .store_coins(msg_value)
+                                .store_ref(new_red_bet_chain)
+                                .end_cell();
+        }
+
+        save_data(min_bet_amount,max_bet_amount,battle_timeout,bet_timeout,fee_percent,owner_address,scroog_address,new_battle_chain,blue_bet_chain,new_red_bet_chain);
+
+        emit_log_simple(LOG_BET_RED, 
+            begin_cell()
+                    .store_uint(battle_id, 128)
+                    .store_slice(sender_address) 
+                    .store_coins(bet_amount)
+                    .store_uint(battle_end_time, TIMEOUT_BITS)
+                    .end_cell(),
+            1
+        );
+
+        return();
+    }
+
+    if (op == op::pay()) {
+        int battle_id = in_msg_body~load_uint(128);
+
+        slice battle_chain_slice = battle_chain.begin_parse();
+        int is_battle_found = 0;
+        int royalty_percent = 0;
+
+        slice blue_address = "";
+        slice red_address = "";
+
+        cell new_battle_chain = begin_cell().end_cell();
+
+        while (battle_chain_slice.slice_empty?() != -1) {
+            int existing_battle_id = battle_chain_slice~load_uint(128);
+            int existing_royalty_percent = battle_chain_slice~load_uint(8);
+            int existing_fee_percent = battle_chain_slice~load_uint(8);
+            int existing_start_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+            int existing_end_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+            int existing_paid = battle_chain_slice~load_uint(1);
+            slice existing_blue_address = battle_chain_slice~load_msg_addr();
+            slice existing_red_address = battle_chain_slice~load_msg_addr();
+            cell existing_battle_chain = battle_chain_slice~load_ref();
+
+            if (existing_battle_id == battle_id) {                
+                is_battle_found = 1;
+                
+                throw_unless(74, existing_paid == 0);
+                throw_unless(74, equal_slices(existing_blue_address, existing_red_address) != -1);
+                throw_unless(74, existing_end_time < now());
+
+                royalty_percent = existing_royalty_percent;
+
+                red_address = existing_red_address;
+                blue_address = existing_blue_address;
+
+                new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(existing_end_time, TIMEOUT_BITS)
+                                .store_uint(1, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(existing_red_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+            } else {
+                new_battle_chain = begin_cell()
+                                .store_uint(existing_battle_id, 128)
+                                .store_uint(existing_royalty_percent, 8)
+                                .store_uint(existing_fee_percent, 8)
+                                .store_uint(existing_start_time, TIMEOUT_BITS)
+                                .store_uint(existing_end_time, TIMEOUT_BITS)
+                                .store_uint(existing_paid, 1)
+                                .store_slice(existing_blue_address)
+                                .store_slice(existing_red_address)
+                                .store_ref(new_battle_chain)
+                                .end_cell();
+            }
+
+            
+
+            battle_chain_slice = existing_battle_chain.begin_parse();
+        }
+
+        throw_unless(74, is_battle_found == 1);
+
+        slice blue_bet_chain_slice = blue_bet_chain.begin_parse();
+        slice red_bet_chain_slice = red_bet_chain.begin_parse();
+
+        int blue_total_bets = 0;
+        int red_total_bets = 0;
+
+        tuple blue_bets = empty_tuple();
+        tuple red_bets = empty_tuple();
+        ~dump(battle_id);
+
+        while (blue_bet_chain_slice.slice_empty?() != -1) {
+            int existing_battle_id = blue_bet_chain_slice~load_uint(128);
+            slice existing_sender = blue_bet_chain_slice~load_msg_addr();
+            int amount = blue_bet_chain_slice~load_coins();
+            cell existing_blue_bet_chain = blue_bet_chain_slice~load_ref();
+
+            if (existing_battle_id == battle_id) {
+                blue_total_bets += amount;
+                cell blue_bet = begin_cell()
+                                .store_slice(existing_sender)
+                                .store_coins(amount)
+                                .end_cell();
+
+                blue_bets~tpush(blue_bet);
+            }
+
+            blue_bet_chain_slice = existing_blue_bet_chain.begin_parse();
+        }
+
+        while (red_bet_chain_slice.slice_empty?() != -1) {
+            int existing_battle_id = red_bet_chain_slice~load_uint(128);
+            slice existing_sender = red_bet_chain_slice~load_msg_addr();
+            int amount = red_bet_chain_slice~load_coins();
+            cell existing_red_bet_chain = red_bet_chain_slice~load_ref();
+
+            if (existing_battle_id == battle_id) {
+                red_total_bets += amount;
+                cell red_bet = begin_cell()
+                                .store_slice(existing_sender)
+                                .store_coins(amount)
+                                .end_cell();
+                                
+                red_bets~tpush(red_bet);
+            }
+
+            red_bet_chain_slice = existing_red_bet_chain.begin_parse();
+        }
+
+        int total_bets_amount = red_total_bets + blue_total_bets;
+        int interest_amount = (total_bets_amount * fee_percent) / 100;
+
+        if ((red_total_bets == blue_total_bets) | (red_total_bets == 0) | (blue_total_bets == 0)) {
+            int len = blue_bets.tlen();
+            int i = 0;
+
+            while (i < len) {
+                cell bet = blue_bets.at(i);
+
+                slice bet_slice =  bet.begin_parse();
+                slice address = bet_slice~load_msg_addr();
+                int amount = bet_slice~load_coins();
+
+                ;;transfer
+                if (amount - gas_consumption - min_tons_for_storage > 0) {
+                    send_grams(address, amount - gas_consumption - min_tons_for_storage);
+                }
+
+                i = i + 1;
+            }
+
+            len = red_bets.tlen();
+            i = 0;
+
+            while (i < len) {
+                cell bet = red_bets.at(i);
+
+                slice bet_slice =  bet.begin_parse();
+                slice address = bet_slice~load_msg_addr();
+                int amount = bet_slice~load_coins();
+
+                ;;transfer
+                if (amount - gas_consumption - min_tons_for_storage > 0) {
+                    send_grams(address, amount - gas_consumption - min_tons_for_storage);
+                }
+
+                i = i + 1;
+            }
+        } 
+
+        if (red_total_bets > blue_total_bets) {
+            int royalty_amount = (blue_total_bets * royalty_percent) / 100;
+            int win_amount = blue_total_bets - royalty_amount;
+
+            if (interest_amount > win_amount) {
+                win_amount = 0;
+                interest_amount = win_amount;
+            } else {
+                win_amount -= interest_amount;
+            }
+
+            int change_amount = win_amount;
+
+            int len = red_bets.tlen();
+            int i = 0;
+
+            while (i < len) {
+                cell bet = red_bets.at(i);
+
+                slice bet_slice =  bet.begin_parse();
+                slice address = bet_slice~load_msg_addr();
+                int amount = bet_slice~load_coins();
+
+                int portion = (amount * 100) / red_total_bets;
+                int gain_amount = (win_amount * portion) / 100;
+
+                amount += gain_amount;
+                change_amount -= gain_amount;
+
+                ;;transfer amount
+                if (amount - gas_consumption - min_tons_for_storage > 0) {
+                    send_grams(address, amount - gas_consumption - min_tons_for_storage);
+                }
+
+                i = i + 1;
+            }
+
+            interest_amount += change_amount;
+            ;;transfer
+            if (interest_amount > 0) {
+                send_grams(scroog_address, interest_amount);
+            }
+
+            if (royalty_amount > 0) {
+                send_grams(red_address, royalty_amount);
+            }
+        }
+
+        if (blue_total_bets > red_total_bets) {
+            int royalty_amount = (red_total_bets * royalty_percent) / 100;
+            int win_amount = red_total_bets - royalty_amount;
+
+            if (interest_amount > win_amount) {
+                win_amount = 0;
+                interest_amount = win_amount;
+            } else {
+                win_amount -= interest_amount;
+            }
+
+            int change_amount = win_amount;
+
+            int len = blue_bets.tlen();
+            int i = 0;
+
+            while (i < len) {
+                cell bet = blue_bets.at(i);
+
+                slice bet_slice =  bet.begin_parse();
+                slice address = bet_slice~load_msg_addr();
+                int amount = bet_slice~load_coins();
+
+                int portion = (amount * 100) / blue_total_bets;
+                int gain_amount = (win_amount * portion) / 100;
+
+                amount += gain_amount;
+                change_amount -= gain_amount;
+
+                ;;transfer amount
+                if (amount - gas_consumption - min_tons_for_storage > 0) {
+                    send_grams(address, amount - gas_consumption - min_tons_for_storage);
+                }
+
+                i = i + 1;
+            }
+
+            interest_amount += change_amount;
+
+            ;;transfer
+            if (interest_amount > 0) {
+                send_grams(scroog_address, interest_amount);
+            }
+
+            if (royalty_amount > 0) {
+                send_grams(blue_address, royalty_amount);
+            }
+        }
+
+        emit_log_simple(LOG_PAY_BATTLE, 
+            begin_cell()
+                    .store_uint(battle_id, 128)
+                    .end_cell(),
+            1
+        );
+
+        return();
+    }
+
+    if (op == op::set_min_bet_amount()) {
+        throw_unless(74, equal_slices(sender_address, owner_address));
+
+        int new_min_bet_amount = in_msg_body~load_coins();
+
+        throw_unless(74, new_min_bet_amount < max_bet_amount);
+
+        save_data(new_min_bet_amount,max_bet_amount,battle_timeout,bet_timeout,fee_percent,owner_address,scroog_address,battle_chain,blue_bet_chain,red_bet_chain);
+    }
+
+    if (op == op::set_max_bet_amount()) {
+        throw_unless(74, equal_slices(sender_address, owner_address));
+
+        int new_max_bet_amount = in_msg_body~load_coins();
+
+        throw_unless(74, new_max_bet_amount > min_bet_amount);
+
+        save_data(min_bet_amount,new_max_bet_amount,battle_timeout,bet_timeout,fee_percent,owner_address,scroog_address,battle_chain,blue_bet_chain,red_bet_chain);
+    }
+
+    if (op == op::set_fee_percent()) {
+        throw_unless(74, equal_slices(sender_address, owner_address));
+
+        int new_fee_percent = in_msg_body~load_uint(8);
+
+        throw_unless(74, new_fee_percent <= 30);
+
+        save_data(min_bet_amount,max_bet_amount,battle_timeout,bet_timeout,new_fee_percent,owner_address,scroog_address,battle_chain,blue_bet_chain,red_bet_chain);
+    }
+
+    if (op == op::set_battle_timeout()) {
+        throw_unless(74, equal_slices(sender_address, owner_address));
+
+        int new_battle_timeout = in_msg_body~load_uint(TIMEOUT_BITS);
+
+        throw_unless(74, new_battle_timeout <= 86400);
+        throw_unless(74, new_battle_timeout >= 600);
+
+        save_data(min_bet_amount,max_bet_amount,new_battle_timeout,bet_timeout,fee_percent,owner_address,scroog_address,battle_chain,blue_bet_chain,red_bet_chain);
+    }
+
+    if (op == op::set_bet_timeout()) {
+        throw_unless(74, equal_slices(sender_address, owner_address));
+
+        int new_bet_timeout = in_msg_body~load_uint(TIMEOUT_BITS);
+
+        throw_unless(74, new_bet_timeout < 3600);
+
+        save_data(min_bet_amount,max_bet_amount,battle_timeout,new_bet_timeout,fee_percent,owner_address,scroog_address,battle_chain,blue_bet_chain,red_bet_chain);
+    }
+
+    if (op == op::set_scroog_address()) {
+        throw_unless(74, equal_slices(sender_address, owner_address));
+
+        slice new_scroog_address = in_msg_body~load_msg_addr();
+
+        save_data(min_bet_amount,max_bet_amount,battle_timeout,bet_timeout,fee_percent,owner_address,new_scroog_address,battle_chain,blue_bet_chain,red_bet_chain);
+    }
+
+    throw(0xffff);
+}
+
+cell get_battle(int battle_id) method_id {
+    (int min_bet_amount, int max_bet_amount, int battle_timeout, int bet_timeout, int fee_percent, slice owner_address, slice scroog_address, cell battle_chain, cell blue_bet_chain, cell red_bet_chain) = load_data();
+
+    slice battle_chain_slice = battle_chain.begin_parse();
+    cell battle = begin_cell().end_cell();
+
+    while (battle_chain_slice.slice_refs_empty?() != -1) {
+        int existing_battle_id = battle_chain_slice~load_uint(128);
+        int existing_royalty_percent = battle_chain_slice~load_uint(8);
+        int existing_fee_percent = battle_chain_slice~load_uint(8);
+        int existing_start_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+        int existing_end_time = battle_chain_slice~load_uint(TIMEOUT_BITS);
+        int existing_paid = battle_chain_slice~load_uint(1);
+        slice existing_blue_address = battle_chain_slice~load_msg_addr();
+        slice existing_red_address = battle_chain_slice~load_msg_addr();
+        cell existing_battle_chain = battle_chain_slice~load_ref();
+
+        if (existing_battle_id == battle_id) {
+            battle = begin_cell()
+                    .store_uint(existing_battle_id, 128)
+                    .store_uint(existing_royalty_percent, 8)
+                    .store_uint(existing_fee_percent, 8)
+                    .store_uint(existing_start_time, TIMEOUT_BITS)
+                    .store_uint(existing_end_time, TIMEOUT_BITS)
+                    .store_uint(existing_paid, 1)
+                    .store_slice(existing_blue_address)
+                    .store_slice(existing_red_address)
+                    .store_ref(existing_battle_chain)
+                    .end_cell();
+        }
+
+        battle_chain_slice = existing_battle_chain.begin_parse();
+    }
+
+    return battle;
+}
+
+int get_max_bet_amount() method_id {
+    (int min_bet_amount, int max_bet_amount, int battle_timeout, int bet_timeout, int fee_percent, slice owner_address, slice scroog_address, cell battle_chain, cell blue_bet_chain, cell red_bet_chain) = load_data();
+    
+    return max_bet_amount;
+}
