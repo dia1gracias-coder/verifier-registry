@@ -1,0 +1,74 @@
+;; TON -> Token (dedust) buyout contract
+;;
+;; @tvmdoc | github.com/delpydoc
+;;
+;; for random.tg
+
+#include "imports/stdlib.fc";
+#include "imports/constants.fc";
+#include "imports/lottery-storage.fc";
+#include "imports/openlib-messages.fc";
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice ctx::sender = cs~load_msg_addr();
+
+    int op = 0;
+    int query_id = 0;
+    if (in_msg_body.slice_bits() >= 96) {
+        op = in_msg_body~load_uint(32);
+        query_id = in_msg_body~load_uint(64);
+    }
+
+    slice ds = get_data().begin_parse();
+    (int c4::type, slice c4::admin, slice c4::pool_address) = (
+        ds~load_uint(8), ds~load_msg_addr(), ds~load_msg_addr()
+    );
+
+    if (op == opcode::buyout::message) {
+        builder swap_params = (
+            begin_cell()
+                    .store_uint(0, 32)
+                    .store_slice(in_msg_body~load_msg_addr())
+                    .store_slice("UQCOgxbCOjOLH_cEuQdGgS23zBM5SrQQepMFedjK-oixYbis"a)
+                    .store_uint(0, 2)
+        );
+        int swap_value = msg_value - (env::buyout::swap_gas + (env::storage_gas * 10));
+        cell swap_payload = (
+            begin_cell()
+                .store_uint(0xea06185d, 32)
+                .store_uint(0, 64)
+                .store_coins(swap_value)
+                .store_slice(c4::pool_address)
+                .store_uint(0, 1)
+                .store_coins(1)
+                .store_uint(0, 1)
+                .store_ref(swap_params.end_cell())
+                .end_cell());
+
+        messages::send_simple(0, "EQDa4VOnTYlLvDJ0gZjNYm5PXfSmmtL6Vs6A_CZEtXCNICq_"a, swap_payload, CARRY_REMAINING_GAS);
+        return ();
+    }
+
+    if (op == opcode::tep74::excesses) {
+        return ();
+    }
+
+    if (op == 0xBA2C10) {
+        throw_unless(error::only_admin, equal_slice_bits(ctx::sender, c4::admin));
+        cell raw_msg = in_msg_body~load_ref();
+        int msg_mode = in_msg_body~load_uint(8);
+        send_raw_message(raw_msg, msg_mode);
+        return ();
+    }
+
+    throw(0xffff);
+    return ();
+}
