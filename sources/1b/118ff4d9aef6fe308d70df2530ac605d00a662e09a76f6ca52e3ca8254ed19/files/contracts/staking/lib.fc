@@ -1,0 +1,41 @@
+(slice) get_serialized_address(int workchain, int address) inline {
+    return (begin_cell()
+        .store_uint(4, 3)
+        .store_uint(workchain, 8)
+        .store_uint(address, 256)
+    ).end_cell().begin_parse();
+}
+
+cell pack_pool_data(int id, slice stake_jetton_wallet, slice reward_jetton_wallet) inline_ref {
+
+    return begin_cell()
+        .store_uint(id, 32)
+        .store_uint(0, 32)
+        .store_uint(0, 32)
+        .store_uint(0, 32)
+        .store_coins(0)
+        .store_coins(0)
+        .store_coins(0)
+        .store_ref(
+        begin_cell()
+            .store_slice(stake_jetton_wallet)
+            .store_slice(reward_jetton_wallet)
+            .store_slice(my_address())
+            .end_cell()
+    )
+        .store_ref(staking_storage::position_code)
+    .end_cell();
+}
+;; (vars_to_create) -> (cell state_init, slice pool_address)
+(cell, slice) get_state_init_and_address(int id, slice stake_jetton_wallet, slice reward_jetton_wallet) inline {
+
+    cell state_init = begin_cell()
+        .store_uint(0,2)
+        .store_dict(staking_storage::pool_code)
+        .store_dict(pack_pool_data(id, stake_jetton_wallet, reward_jetton_wallet))
+        .store_uint(0,1)
+    .end_cell();
+
+    return (state_init, get_serialized_address(WORKCHAIN,cell_hash(state_init)));
+}
+

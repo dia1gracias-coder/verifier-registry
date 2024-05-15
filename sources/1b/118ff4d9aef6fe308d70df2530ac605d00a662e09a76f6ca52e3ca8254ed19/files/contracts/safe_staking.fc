@@ -1,0 +1,295 @@
+#include "imports/stdlib.fc";
+#include "staking/constants.fc";
+#include "staking/storage.fc";
+#include "staking/op.fc";
+#include "staking/errors.fc";
+#include "staking/lib.fc";
+#include "staking/getters.fc";
+#include "staking/gas_fn.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+
+    ;; ignore empty messages
+    if (in_msg_body.slice_empty?()) { 
+        return ();
+    }
+    ;; start to check message
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    
+    if (flags & 1) {
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    int op = in_msg_body~load_uint(32);
+    load_storage();
+
+    ;; Add tokens for staking/rewards
+    if(op == transfer_notification){
+        ;; query_id is used to help tie in all calls to the same query
+        (int query_id, int jetton_amount, slice from_user) = (in_msg_body~load_uint(64), in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+        cell ref_cs = in_msg_body~load_ref(); 
+        slice ref_ds = ref_cs.begin_parse();
+
+        int transfer_op = ref_ds~load_uint(32);
+        int pool_id = ref_ds~load_uint(32);
+        (slice pool_data, int success) = staking_storage::pool_dict.udict_get?(256,pool_id);
+        
+        throw_if(INVALID_POOL_ID, success == 0);
+        throw_if(POOL_NOT_INITIALIZED, pool_data~load_uint(1) == 0);
+
+        (slice pool_address, slice stake_wallet, slice reward_wallet) = (pool_data~load_msg_addr(), pool_data~load_msg_addr(), pool_data~load_msg_addr());
+
+        if(transfer_op == stake_tokens){
+            throw_unless(INVALID_CALLER, equal_slice_bits(sender_address, stake_wallet));
+            var msg_body = begin_cell()
+                .store_uint(stake_tokens, 32)
+                .store_slice(from_user)
+                .store_coins(jetton_amount)
+                .end_cell();
+            var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(pool_address)
+                .store_coins(0)
+                .store_uint(1,107)
+                .store_ref(msg_body)
+            .end_cell();
+            send_raw_message(msg, 65);
+
+            return();
+        }
+        if(transfer_op == add_rewards){
+            ;; Only Reward wallet can add rewards on notification
+            throw_unless(INVALID_CALLER, equal_slice_bits(sender_address, reward_wallet));
+            ;; send message to pool adding rewards
+            var msg_body = begin_cell()
+                .store_uint(add_rewards,32)
+                .store_coins(jetton_amount)
+                .end_cell();
+            var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(pool_address)
+                .store_coins(0)
+                .store_uint(1,107)
+                .store_ref(msg_body)
+            .end_cell();
+            send_raw_message(msg, 65);
+
+            return();
+        }
+        throw(INVALID_TRANSFER_OP);
+    }
+    if(op == claim_tokens){
+        ;; Only pool can request to claim tokens
+        (int pool_id, int reward_tokens, int staked_tokens, slice owner) = (in_msg_body~load_uint(32), in_msg_body~load_coins(), in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+        (slice data, int success) = staking_storage::pool_dict.udict_get?(256, pool_id);
+        throw_if(INVALID_POOL_ID, (success == 0) | (data~load_uint(1) == 0));
+        throw_unless(INVALID_CALLER, equal_slice_bits(sender_address, data~load_msg_addr()));
+        slice stake_wallet = data~load_msg_addr();
+        slice reward_wallet = data~load_msg_addr();
+        ;; truncate hash to 64 bits
+        int query_id = pool_id + (slice_hash(owner) & 0xffffffffffffffff); 
+
+        int gas_required = get_gas_fee(20000, WORKCHAIN);
+        int gas_amount = (msg_value - gas_required) / 2;
+        ;; send staked tokens
+        cell msg_body = begin_cell()
+            .store_uint(transfer, 32)
+        ;; query Id
+            .store_uint(query_id, 64)
+            .store_coins(staked_tokens)
+            .store_slice(owner)
+            .store_slice(owner)
+            .store_uint(0,1)
+            .store_coins(0)
+            .store_uint(0,1)
+            .end_cell();
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(stake_wallet)
+            .store_coins(gas_amount)
+            .store_uint(1,107)
+            .store_ref(msg_body)
+        .end_cell();
+        send_raw_message(msg, 0);
+        ;; send reward tokens
+        cell msg_body = begin_cell()
+            .store_uint(transfer, 32)
+        ;; query Id
+            .store_uint(query_id, 64)
+            .store_coins(reward_tokens)
+            .store_slice(owner)
+            .store_slice(owner)
+            .store_uint(0,1)
+            .store_coins(0)
+            .store_uint(0,1)
+            .end_cell();
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(reward_wallet)
+            .store_coins(gas_amount)
+            .store_uint(1,107)
+            .store_ref(msg_body)
+        .end_cell();
+        send_raw_message(msg, 0);
+
+        return();
+    }
+    if(op == recover_rewards){
+        (int pool_id, int reward_tokens) = (in_msg_body~load_uint(32), in_msg_body~load_coins());
+        (slice data, int success) = staking_storage::pool_dict.udict_get?(256, pool_id);
+        throw_if(INVALID_POOL_ID, (success == 0));
+        data~load_uint(1);
+        (slice pool_address, slice stake_wallet, slice reward_wallet) = (data~load_msg_addr(), data~load_msg_addr(), data~load_msg_addr());
+        if(equal_slice_bits(sender_address, pool_address)){
+            int gas_required = get_gas_fee(20000, WORKCHAIN);
+            int gas_amount = (msg_value - gas_required) / 2;
+            ;; If pool calls, then we need to send the amount requested
+            cell msg_body = begin_cell()
+                    .store_uint(transfer, 32)
+                    .store_uint(slice_hash(staking_storage::admin_wallet) & 0xffffffffffffffff, 64)
+                    .store_coins(reward_tokens)
+                    .store_slice(staking_storage::admin_wallet)
+                    .store_slice(staking_storage::admin_wallet)
+                    .store_uint(0,1)
+                    .store_coins(0)
+                    .store_uint(0,1)
+                    .end_cell();
+            var msg = begin_cell()
+                    .store_uint(0x18, 6)
+                    .store_slice(reward_wallet) ;; reward wallet
+                    .store_coins(gas_amount)
+                    .store_uint(1,107)
+                    .store_ref(msg_body)
+                .end_cell();
+            send_raw_message(msg, 0);
+            return();
+        }
+        if(equal_slice_bits(sender_address, staking_storage::admin_wallet)){
+            ;; If owner initiated, need to request pool for data
+            cell msg_body = begin_cell()
+                .store_uint(recover_rewards, 32)
+                .end_cell();
+            var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(pool_address)
+                .store_coins(0)
+                .store_uint(1,107)
+                .store_ref(msg_body)
+            .end_cell();
+            send_raw_message(msg, 64);
+            return();
+        }
+        throw(INVALID_OP);
+    }
+    throw_unless(INVALID_CALLER,equal_slice_bits(sender_address,staking_storage::admin_wallet));
+    if(op == create_pool){
+        (slice stake_wallet, slice reward_wallet) = (in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr());
+        ;; get Init state and address
+        (cell state_init, slice pool_address) = get_state_init_and_address(staking_storage::pool_count, stake_wallet, reward_wallet);
+
+        builder pool_data = begin_cell()
+            .store_uint(0,1)
+            .store_slice(pool_address)
+            .store_slice(stake_wallet)
+            .store_slice(reward_wallet);
+            
+        ;; save pool data in dict
+        staking_storage::pool_dict~udict_set_builder(256 , staking_storage::pool_count , pool_data);
+
+        staking_storage::pool_count += 1;
+        save_storage();
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(pool_address)
+            .store_coins(0)
+            .store_uint(7,108)
+            .store_ref(state_init)
+            .store_ref(begin_cell().end_cell())
+        .end_cell();
+        send_raw_message(msg, 64);
+
+        return();
+    }
+    if(op == init_pool_data){
+        int pool_id = in_msg_body~load_uint(32);
+        throw_if(INVALID_POOL_ID, pool_id > staking_storage::pool_count);
+        (slice data, int success) = staking_storage::pool_dict.udict_get?(256,pool_id);
+        throw_if(ALREADY_INITIALIZED, success == 0 );
+        throw_if(ALREADY_INITIALIZED, data~load_uint(1) == 1);
+        (slice pool_address, slice stake_wallet, slice reward_wallet) = (data~load_msg_addr(), data~load_msg_addr(), data~load_msg_addr());
+        ;;----------------------------------------------------------------------
+        ;; Set initialized state
+        builder pool_data = begin_cell()
+            .store_uint(1,1)
+            .store_slice(pool_address)
+            .store_slice(stake_wallet)
+            .store_slice(reward_wallet);
+        staking_storage::pool_dict~udict_set_builder(256, pool_id, pool_data);
+        save_storage();
+        slice forward_body = in_msg_body;
+        var msg_body = begin_cell()
+            .store_uint(init_pool_data,32)
+            .store_slice(forward_body)
+            .end_cell();
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(pool_address)
+            .store_coins(0)
+            .store_uint(1,107)
+            .store_ref(msg_body)
+        .end_cell();
+        send_raw_message(msg, 64);
+
+        return();
+    }
+    if(op == stop_pool){
+        int pool_id = in_msg_body~load_uint(32);
+        (slice data, int success) = staking_storage::pool_dict.udict_get?(256, pool_id);
+        throw_if(INVALID_POOL_ID, (success == 0) | (data~load_uint(1) == 0));
+        data~load_uint(1);
+        builder pool_data = begin_cell()
+            .store_uint(0,1)
+            .store_slice(data~load_msg_addr())
+            .store_slice(data~load_msg_addr())
+            .store_slice(data~load_msg_addr());
+        staking_storage::pool_dict~udict_set_builder(256, pool_id, pool_data);
+        save_storage();
+        return();
+    }
+    if(op == set_owner){
+        slice new_owner = in_msg_body~load_msg_addr();
+        staking_storage::admin_wallet = new_owner;
+        save_storage();
+        return();
+    }
+    if(op == emergency_recover_rewards){
+        (slice reward_token_wallet, int reward_token_amount) = (in_msg_body~load_msg_addr(), in_msg_body~load_coins());
+        int gas_required = get_gas_fee(20000, WORKCHAIN);
+        int gas_amount = (msg_value - gas_required) / 2;
+        ;; send reward tokens
+        cell msg_body = begin_cell()
+            .store_uint(transfer, 32)
+        ;; query Id
+            .store_uint(0, 64)
+            .store_coins(reward_token_amount)
+            .store_slice(sender_address)
+            .store_slice(sender_address)
+            .store_uint(0,1)
+            .store_coins(0)
+            .store_uint(0,1)
+            .end_cell();
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(reward_token_wallet)
+            .store_coins(gas_amount)
+            .store_uint(1,107)
+            .store_ref(msg_body)
+        .end_cell();
+        send_raw_message(msg, 0);
+
+        return();
+    }
+    throw(INVALID_OP);
+}
