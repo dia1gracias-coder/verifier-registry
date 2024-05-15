@@ -1,0 +1,365 @@
+#include "imports/stdlib.fc";
+#include "gas.fc";
+
+cell nft_code() asm """
+"te6ccuECDQEAAdAAABoAJAAuADwARgBQATABRgJCArgDPgN+A6ABFP8A9KQT9LzyyAsBAgFiAgMCAs4EBQAJoR+f4AUCASAGBwIBIAsMAtcMiHHAJJfA+DQ0wMBcbCSXwPg+kD6QDH6ADFx1yH6ADH6ADDwAgSzjhQwbCI0UjLHBfLhlQH6QNQwECPwA+AG0x/TP4IQX8w9FFIwuo6HMhA3XjJAE+AwNDQ1NYIQL8smohK64wJfBIQP8vCAICQARPpEMHC68uFNgAfZRNccF8uGR+kAh8AH6QNIAMfoAggr68IAboSGUUxWgod4i1wsBwwAgkgahkTbiIML/8uGSIY4+ghAFE42RyFAJzxZQC88WcSRJFFRGoHCAEMjLBVAHzxZQBfoCFctqEssfyz8ibrOUWM8XAZEy4gHJAfsAEEeUECo3W+IKAHJwghCLdxc1BcjL/1AEzxYQJIBAcIAQyMsFUAfPFlAF+gIVy2oSyx/LPyJus5RYzxcBkTLiAckB+wAAggKONSbwAYIQ1TJ22xA3RABtcXCAEMjLBVAHzxZQBfoCFctqEssfyz8ibrOUWM8XAZEy4gHJAfsAkzAyNOJVAvADADs7UTQ0z/6QCDXScIAmn8B+kDUMBAkECPgMHBZbW2AAHQDyMs/WM8WAc8WzMntVIE7pcZM="
+base64>B B>boc PUSHREF
+""";
+
+;; =============================================================================================
+;; =========================================-Errors-============================================
+;; =============================================================================================
+
+const int error::wrong_workchain = 100;
+const int error::not_access = 101;
+const int error::already_inited  = 102;
+const int error::wrong_address = 103;
+
+;; =============================================================================================
+;; =======================================-Constants-===========================================
+;; =============================================================================================
+
+const slice collection_address = "EQDmkj65Ab_m0aZaW8IpKw4kYqIgITw_HRstYEkVQ6NIYCyW"a;
+const int burn_fee = 100000000;
+
+const ZERO_COINS_SIZE = 4;
+
+const int NOT  = 1000000000; ;; 9 Decimals
+const int 10k  = 10000 * NOT; ;; 10m in-game points -> 10k NOT
+const int 100k = 100000 * NOT; ;; 100m in-game points -> 100k NOT
+
+const int op::init = 0x5a6e0982;
+const int op::deposit_jetton = 0x6d8b6e80;
+const int op::send_message = 0x3df81015;
+const int op::change_admin = 0x548e8bfd;
+const int op::claim_admin = 0x56c97402;
+
+const int op::take_wallet_address = 0xd1735400;
+const int op::transfer_notification = 0x7362d09c;
+const int op::ownership_assigned = 0x05138d91;
+
+const int op::exchange_voucher = 0x5fec6642;
+
+const int op::provide_wallet_address = 0x2c76b973;
+const int op::excesses = 0xd53276db;
+
+const int op::nft_transfer = 0x5fcc3d14;
+const int op::jetton_transfer = 0xf8a7ea5;
+
+;; =============================================================================================
+;; ========================================-Globals-============================================
+;; =============================================================================================
+
+global slice sender;
+global int   query_id;
+
+global slice jetton_sender;
+
+global slice data::admin;
+global slice data::proposed_admin;
+global int   data::jetton_init?;
+global slice data::jetton_wallet;
+global int   data::jetton_balance;
+global int   data::min_idx;
+global int   data::max_idx;
+
+() load_data() impure inline {
+  slice ds = get_data().begin_parse();
+  var (admin, proposed_admin,
+       jetton_init?, jetton_wallet,
+       jetton_balance, ds2) = (ds~load_msg_addr(), ds~load_msg_addr(),
+                               ds~load_bool(), ds~load_msg_addr(),
+                               ds~load_coins(), ds.preload_ref().begin_parse());
+  var (min_idx, max_idx) = (ds2~load_uint(64), ds2.preload_uint(64));
+
+  data::max_idx = max_idx;
+  data::min_idx = min_idx;
+  data::jetton_balance = jetton_balance;
+  data::jetton_wallet = jetton_wallet;
+  data::jetton_init? = jetton_init?;
+  data::proposed_admin = proposed_admin;
+  data::admin = admin;
+}
+
+() save_data() impure inline {
+  set_data(begin_cell()
+          .store_slice(data::admin)
+          .store_slice(data::proposed_admin)
+          .store_bool(data::jetton_init?)
+          .store_slice(data::jetton_wallet)
+          .store_coins(data::jetton_balance)
+          .store_ref(begin_cell()
+                    .store_uint(data::min_idx, 64)
+                    .store_uint(data::max_idx, 64)
+                    .end_cell())
+          .end_cell());
+}
+
+;; =============================================================================================
+;; =========================================-Utils-=============================================
+;; =============================================================================================
+
+() send_excesses(slice dest) impure inline {
+  ifnot (equal_slice_bits(dest, addr_none)) {
+    builder message = begin_cell()
+                     .store_msg_flags_non_bounceable()
+                     .store_slice(dest)
+                     .store_zeroes(ZERO_COINS_SIZE + MSG_ONLY_BODY_SIZE)
+                     .store_op(op::excesses)
+                     .store_query_id(query_id);
+    send_raw_message(message.end_cell(), sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::IGNORE_ERRORS);
+  }
+}
+
+slice calc_nft_address(int idx) inline {
+  cell nft_data = begin_cell().store_uint(idx, 64).store_slice(collection_address).end_cell();
+  cell state_init = begin_cell().store_state_init(nft_data, nft_code()).end_cell();
+  return begin_cell().store_bc_address(state_init.cell_hash()).end_cell().begin_parse();
+}
+
+
+() send_nft(slice dest, slice nft_item) impure inline {
+  {-
+    transfer query_id:uint64 new_owner:MsgAddress
+             response_destination:MsgAddress custom_payload:(Maybe ^Cell)
+             forward_amount:(VarUInteger 16) forward_payload:(Either Cell ^Cell)
+             = InternalMsgBody;
+  -}
+    builder message = begin_cell()
+                   .store_msg_flags_bounceable()
+                   .store_slice(nft_item)
+                   .store_uint(MSG_BODY_IN_REF, ZERO_COINS_SIZE + MSG_ONLY_BODY_SIZE)
+                   .store_ref(begin_cell()
+                             .store_op(op::nft_transfer)
+                             .store_query_id(query_id)
+                             .store_slice(dest)
+                             .store_slice(dest)
+                             .store_maybe_ref(null())
+                             .store_varuint16(1)
+                             .store_false()
+                             .end_cell());
+  send_raw_message(message.end_cell(), sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::BOUNCE_ON_ACTION_FAIL);
+}
+
+() send_jettons(slice dest, int amount, slice jetton_wallet) impure inline {
+  {-
+    transfer query_id:uint64 amount:(VarUInteger 16) destination:MsgAddress
+             response_destination:MsgAddress custom_payload:(Maybe ^Cell)
+             forward_ton_amount:(VarUInteger 16) forward_payload:(Either Cell ^Cell)
+             = InternalMsgBody; 32 + 64 + 124 + 267 + 267 + 1 + 5  + 1
+  -}
+  builder message = begin_cell()
+                   .store_msg_flags_bounceable()
+                   .store_slice(jetton_wallet)
+                   .store_uint(MSG_BODY_IN_REF, ZERO_COINS_SIZE + MSG_ONLY_BODY_SIZE)
+                   .store_ref(begin_cell()
+                             .store_op(op::jetton_transfer)
+                             .store_query_id(query_id)
+                             .store_varuint16(amount)
+                             .store_slice(dest)
+                             .store_slice(dest)
+                             .store_maybe_ref(null())
+                             .store_varuint16(1)
+                             .store_false()
+                             .end_cell());
+  send_raw_message(message.end_cell(), sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::BOUNCE_ON_ACTION_FAIL);
+}
+
+;; =============================================================================================
+;; ==========================================-Main-=============================================
+;; =============================================================================================
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  var (flags, sender_from_msg, fwd_fee_from_msg) = parse_message(in_msg_full);
+  sender = sender_from_msg;
+
+  if (flags.bounced?()) {
+    return ();
+  }
+
+  throw_unless(error::wrong_workchain, sender.validate_addr_bc());
+
+  load_data();
+
+  int op = in_msg_body~load_op();
+  int query_id = in_msg_body~load_query_id();
+
+  if (op == op::ownership_assigned) {
+    {- TEP-62
+      ownership_assigned#05138d91 query_id:uint64 prev_owner:MsgAddress
+                                  forward_payload:(Either Cell ^Cell)
+                                  = InternalMsgBody;
+    -}
+    slice nft_sender = in_msg_body~load_msg_addr();
+    int either_forward_payload = in_msg_body~load_bool();
+    slice forward_payload = either_forward_payload ? in_msg_body~load_ref().begin_parse() : in_msg_body;
+
+    ifnot ((forward_payload.slice_bits() == (32 + 64)) & (msg_value >= exchange_voucher_fee()) & data::jetton_init?) {
+      send_nft(nft_sender, sender);
+      return ();
+    }
+
+    int inner_op = forward_payload~load_op();
+    int nft_idx = forward_payload.preload_uint(64);
+
+    int success = false;
+
+    int right_op?    = inner_op == op::exchange_voucher;
+    int right_addr?  = equal_slice_bits(calc_nft_address(nft_idx), sender);
+    int right_range? = nft_idx == min(data::max_idx, max(nft_idx, data::min_idx));
+    int right_shard? = sender.slice_check_prefix(my_address().preload_bits(2 + 1 + 8 + 4)); ;; constructor + anycast + workchain + part of hash
+
+    if (right_op? & right_addr? & right_range? & right_shard?) {
+      int reward = 10k;
+      if (nft_idx < 5413) {
+          {-
+            burned:
+            - 2, 324, 496, 969, 1039, 1040, 1041, 2317, 2747, 3474, 3475, 3476, 3681, 4030, 4987, 4996, 4998, 5395, 5397, 5405, 5406
+            alive:
+            - 263, 1038, 1042, 1717, 2211, 2876, 3222, 3832, 3833, 4986, 4988, 4989, 4990, 4995, 4997, 4999, 5396, 5412
+          -}
+        if ((nft_idx == 263) | (nft_idx == 1038) | (nft_idx == 1042) | (nft_idx == 1717) |
+            (nft_idx == 2211) | (nft_idx == 2876) | (nft_idx == 3222) | (nft_idx == 3832) |
+            (nft_idx == 3833) | ((nft_idx >= 4986) & (nft_idx <= 4990)) | (nft_idx == 4995) |
+            (nft_idx == 4997) | (nft_idx == 4999) | (nft_idx == 5396) | (nft_idx == 5412)) {
+            reward = 100k;
+        }
+      }
+
+      if (data::jetton_balance >= reward) {
+        send_jettons(nft_sender, reward, data::jetton_wallet);
+        data::jetton_balance -= reward;
+        success = true;
+        save_data();
+      }
+    }
+
+    ifnot (success) {
+      send_nft(nft_sender, sender);
+    }
+
+    return ();
+  }
+
+  if (op == op::transfer_notification) {
+    {- TEP-74
+      transfer_notification#7362d09c query_id:uint64 amount:(VarUInteger 16)
+                                     sender:MsgAddress forward_payload:(Either Cell ^Cell)
+                                     = InternalMsgBody;
+    -}
+    int jetton_value = in_msg_body~load_varuint16();
+    slice jetton_sender = in_msg_body~load_msg_addr();
+    int either_forward_payload = in_msg_body~load_bool();
+    slice forward_payload = either_forward_payload ? in_msg_body~load_ref().begin_parse() : in_msg_body;
+
+    ifnot ((forward_payload.slice_bits() == (32)) &
+        (msg_value >= accept_jettons_fee()) &
+        (data::jetton_init?) &
+        (equal_slice_bits(sender, data::jetton_wallet))) {
+      send_jettons(jetton_sender, jetton_value, sender);
+      return ();
+    }
+
+    int inner_op = forward_payload~load_op();
+
+    if (inner_op == op::deposit_jetton) {
+      data::jetton_balance += jetton_value;
+      send_excesses(jetton_sender);
+    } else {
+      send_jettons(jetton_sender, jetton_value, sender);
+      return ();
+    }
+
+    save_data();
+    return ();
+  }
+
+  if (op == op::take_wallet_address) {
+    {- TEP-89
+      take_wallet_address#d1735400 query_id:uint64 wallet_address:MsgAddress
+                                   owner_address:(Maybe ^MsgAddress)
+                                   = InternalMsgBody;
+    -}
+    throw_if(error::already_inited, data::jetton_init?);
+    throw_unless(error::not_access, equal_slice_bits(data::jetton_wallet, sender));
+
+    slice wallet_address = in_msg_body~load_msg_addr();
+    data::jetton_init? = true;
+    data::jetton_wallet = wallet_address;
+
+    send_excesses(data::admin);
+
+    save_data();
+    return ();
+  }
+
+  if (op == op::send_message) {
+    throw_unless(error::not_access, equal_slice_bits(data::admin, sender));
+
+    cell message = in_msg_body~load_ref();
+    int mode = in_msg_body~load_uint(8);
+    in_msg_body.end_parse();
+
+    send_raw_message(message, mode);
+    return ();
+  }
+
+  if (op == op::change_admin) {
+    throw_unless(error::not_access, equal_slice_bits(data::admin, sender));
+
+    slice proposed_admin = in_msg_body~load_msg_addr();
+    in_msg_body.end_parse();
+
+    throw_unless(error::wrong_address, validate_addr_bc(proposed_admin));
+
+    data::proposed_admin = proposed_admin;
+
+    send_excesses(data::admin);
+
+    save_data();
+    return ();
+  }
+  if (op == op::claim_admin) {
+    throw_unless(error::not_access, equal_slice_bits(data::proposed_admin, sender));
+    in_msg_body.end_parse();
+
+    data::admin = data::proposed_admin;
+    data::proposed_admin = addr_none;
+
+    send_excesses(data::admin);
+
+    save_data();
+    return ();
+  }
+
+  if (op == op::init) {
+    throw_if(error::already_inited, data::jetton_init?);
+    {- TEP-89
+      provide_wallet_address#2c76b973 query_id:uint64 owner_address:MsgAddress
+                                      include_address:Bool
+                                      = InternalMsgBody;
+    -}
+    builder message = begin_cell()
+                   .store_msg_flags_non_bounceable()
+                   .store_slice(data::jetton_wallet) ;; jetton root at the moment
+                   .store_zeroes(ZERO_COINS_SIZE + MSG_ONLY_BODY_SIZE)
+                   .store_op(op::provide_wallet_address)
+                   .store_query_id(query_id)
+                   .store_slice(my_address())
+                   .store_false();
+    send_raw_message(message.end_cell(), sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::IGNORE_ERRORS);
+    return ();
+  }
+
+  throw(0xffff);
+}
+
+
+(slice, slice, int, slice, int, int, int) get_exchange_data() method_id {
+  load_data();
+  return (data::admin, data::proposed_admin, data::jetton_init?, data::jetton_wallet, data::jetton_balance, data::min_idx, data::max_idx);
+}
+
+(int) get_exchange_fee() method_id {
+    return exchange_voucher_fee();
+}
