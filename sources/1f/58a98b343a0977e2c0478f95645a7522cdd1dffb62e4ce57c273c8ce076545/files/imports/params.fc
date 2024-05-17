@@ -1,0 +1,7 @@
+int workchain() asm "0 PUSHINT";
+int const::min_tons_for_storage() asm "10000000 PUSHINT"; ;; 0.01 TON
+
+() force_chain(slice addr) impure {
+  (int wc, _) = parse_std_addr(addr);
+  throw_unless(333, wc == workchain());
+}
