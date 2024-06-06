@@ -1,0 +1,543 @@
+#include "imports/stdlib.fc";
+#include "imports/jetton_utils.fc";
+
+const op::init = "op::init"c;
+
+const op::buy = "op::buy"c;
+const op::getter_expected_outputs = "getter_expected_outputs"c;
+const op::set_coefficients = "op::set_coefficients"c;
+const op::excercise = "op::excercise"c;
+const op::stake = "op::stake"c;
+const op::unlock = "op::unlock"c;
+const op::set_code = "op::set_code"c;
+const op::set_options_config = "op::set_options_config"c;
+const op::service_fee = "op::service_fee"c;
+const op::transfer = 0xf8a7ea5;
+const op::jetton_notify = 0x7362d09c;
+const op::burn = 0x595f07bc;
+const op::internal_transfer = 0x178d4519;
+const op::burn_notification = 0x7bdd97de;
+
+const error::unknown_option_type = 33;
+const error::unknown_price_change = 34;
+const error::duration_too_short = 35;
+const error::duration_too_long = 36;
+const error::duration_is_not_divisible_by_day = 37;
+const error::access_denied = 39;
+const error::query_not_found = 40;
+const error::not_enough_money = 41;
+const error::not_enough_liquidity = 42;
+const error::option_not_found = 43;
+const error::sender_is_not_a_holder = 44;
+const error::strike_price_not_reached = 45;
+const error::option_expired = 46;
+const error::utilisation_too_high = 47;
+const error::option_is_not_expired = 48;
+const error::not_initialized = 49;
+const error::fake_lp_wallet = 74;
+const error::unknown_operation = 0xffff;
+
+const market_address = "EQD8TJ8xEWB1SpnRE4d89YO3jl0W0EiBnNS4IBaHaUmdfizE"a;
+const asset_address = "EQARULUYsmJq1RiZ-YiH-IJLcAZUVkVff-KBPwEmmaQGH6aC"a;
+const zero_address = "0:0000000000000000000000000000000000000000000000000000000000000000"a;
+const option_type_put = 0;
+const option_type_call = 1;
+const key_len = 64;
+const one_day = 24 * 60 * 60;
+const max_duration = one_day * 30;
+const min_duration = 0;
+const coefficient_precision = 1000000000000000000000000000000;
+const usdt_precision = 1000000;
+
+;; storage variables
+
+;; id is required to be able to create different instances of counters
+;; since addresses in TON depend on the initial state of the contract
+global loaded;
+global options_config;
+global queries;
+global options;
+global locked_amount;
+global pool_size;
+global usdt_wallet;
+global service_fee_rate;
+global max_utilisation_rate;
+global lp_token_supply;
+global owner_address;
+global jetton_wallet_code;
+global jetton_content;
+
+;; load_data populates storage variables using stored data
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    options_config = ds~load_dict();
+    queries = ds~load_dict();
+    options = ds~load_dict();
+    usdt_wallet = ds~load_msg_addr();
+    service_fee_rate = ds~load_uint(32);
+    locked_amount = ds~load_coins();
+    pool_size = ds~load_coins();
+    max_utilisation_rate = ds~load_uint(32);
+    lp_token_supply = ds~load_coins();
+    owner_address = ds~load_msg_addr();
+    var ds2 = ds~load_ref().begin_parse();
+    jetton_wallet_code = ds2~load_ref();
+    jetton_content = ds2~load_ref();
+    ds.end_parse();
+    loaded = true;
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_dict(options_config)
+            .store_dict(queries)
+            .store_dict(options)
+            .store_slice(usdt_wallet)
+            .store_uint(service_fee_rate, 32)
+            .store_coins(locked_amount)
+            .store_coins(pool_size)
+            .store_uint(max_utilisation_rate, 32)
+            .store_coins(lp_token_supply)
+            .store_slice(owner_address)
+            .store_ref(begin_cell()
+                .store_ref(jetton_wallet_code)
+                .store_ref(jetton_content)
+                .end_cell())
+            .end_cell()
+    );
+}
+
+(builder) create_transfer_body(int query_id, int fwd_amount, int jetton_amount, slice to, builder body) inline {
+    return begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(query_id, 64)
+        .store_coins(jetton_amount)
+        .store_slice(to) ;; to_owner_address
+        .store_slice(to)
+        .store_uint(0, 1)
+        .store_coins(fwd_amount) ;; forward_ton_amount
+        .store_uint(0, 1)
+        .store_builder(body);
+}
+
+() send_message_to_wallet(builder msg_body) impure {
+    var message = begin_cell()
+        .store_uint(0x18, 6) ;; flag
+        .store_slice(usdt_wallet) ;; destination addres
+        .store_coins(0) ;; we don't care about this value right now
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body.end_cell())
+        .end_cell();
+    send_raw_message(message, 2 + 64); ;; ignore errors
+}
+
+() request_price(int internal_query_id) impure {
+    var message = begin_cell()
+        .store_uint(0x10, 6) ;; flag
+        .store_slice(market_address) ;; destination addres
+        .store_coins(0) ;; we don't care about this value right now
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; default message headers (see sending messages page)
+        .store_uint(op::getter_expected_outputs, 32)
+        .store_uint(internal_query_id, 64)
+        .store_coins(1000000000)
+        .store_slice(asset_address)
+        .end_cell();
+    send_raw_message(message, 16 + 64); ;; ignore errors
+}
+
+() send_success(int op, int query_id, slice sender_address, int amount) impure {
+    var body = begin_cell()
+        .store_uint(op, 32)
+        .store_uint(query_id, 64)
+        .store_uint(0, 32);
+    var msg_body = create_transfer_body(query_id, 1, amount, sender_address, body);
+    send_message_to_wallet(msg_body);
+}
+
+() send_service_fee(int query_id, int amount) impure {
+    var body = begin_cell()
+        .store_uint(op::service_fee, 32)
+        .store_uint(query_id, 64)
+        .store_uint(0, 32);
+    var msg_body = create_transfer_body(query_id, 1, amount, owner_address, body);
+    var message = begin_cell()
+        .store_uint(0x18, 6) ;; flag
+        .store_slice(usdt_wallet) ;; destination addres
+        .store_coins(30000000) ;; we don't care about this value right now
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body.end_cell())
+        .end_cell();
+    send_raw_message(message, 2); ;; ignore errors
+}
+
+() bounce_transfer(int op, slice sender_address, int query_id, int error, int amount) impure {
+    var body = begin_cell()
+        .store_uint(op, 32)
+        .store_uint(query_id, 64)
+        .store_uint(error, 32);
+    var msg_body = create_transfer_body(query_id, 1, amount, sender_address, body);
+    send_message_to_wallet(msg_body);
+}
+
+() bounce(int op, slice sender_address, int sender_query_id, int error) impure {
+    var body = begin_cell()
+        .store_uint(op, 32)
+        .store_uint(sender_query_id, 32)
+        .store_uint(error, 32);
+    var message = begin_cell()
+        .store_uint(0x14, 6) ;; flag
+        .store_slice(sender_address) ;; destination addres
+        .store_coins(0) ;; we don't care about this value right now
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; default message headers (see sending messages page)
+        .store_uint(op, 32)
+        .store_uint(sender_query_id, 64)
+        .store_uint(error, 32)
+        .end_cell();
+    send_raw_message(message, 64); ;; ignore errors
+}
+
+int get_option_fee_private(int duration, slice coefficients_slice) {
+    var a4 = coefficients_slice~load_int(128);
+    var a3 = coefficients_slice~load_int(128);
+    var a2 = coefficients_slice~load_int(128);
+    var a1 = coefficients_slice~load_int(128);
+    var a0 = coefficients_slice~load_int(128);
+    return (a4 * duration * duration * duration * duration
+     + a3 * duration * duration * duration
+     + a2 * duration * duration
+     + a1 * duration
+     + a0) / (coefficient_precision / usdt_precision);
+}
+
+int max_utilisation() {
+    return pool_size * max_utilisation_rate / usdt_precision;
+}
+
+int token_rate() {
+    return lp_token_supply == 0
+        ? usdt_precision
+        : pool_size * usdt_precision / lp_token_supply;
+}
+
+() mint_tokens(int sender_query_id, slice sender_address, int amount, builder forward_payload) impure {
+    cell state_init = calculate_jetton_wallet_state_init(sender_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var master_msg = begin_cell()
+        .store_uint(op::internal_transfer, 32)
+        .store_uint(sender_query_id, 64)
+        .store_coins(amount)
+        .store_slice(my_address())
+        .store_slice(sender_address)
+        .store_coins(1)
+        .store_uint(0, 1)
+        .store_builder(forward_payload)
+        .end_cell();
+    var message = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to_wallet_address)
+        .store_coins(0)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(master_msg)
+        .end_cell();
+    send_raw_message(message, 64); ;; ignore errors
+}
+
+() handle_jetton_notify(int sender_query_id, slice in_msg_body) impure {
+    int jetton_amount = in_msg_body~load_coins();
+    slice sender_address = in_msg_body~load_msg_addr();
+    int cell_type = in_msg_body~load_uint(1);
+    slice forward_payload = cell_type == 0
+            ? in_msg_body
+            : (in_msg_body~load_ref()).begin_parse();
+    int op = forward_payload~load_uint(32);
+    if (op == op::buy) {
+        var option_type = forward_payload~load_uint(8);
+        var price_change = forward_payload~load_uint(32);
+        var duration = forward_payload~load_uint(32);
+        if (duration > max_duration) {
+            bounce_transfer(op, sender_address, sender_query_id, error::duration_too_long, jetton_amount);
+            return ();
+        }
+        if (duration < min_duration) {
+            bounce_transfer(op, sender_address, sender_query_id, error::duration_too_short, jetton_amount);
+        }
+        if (duration % one_day != 0) {
+            bounce_transfer(op, sender_address, sender_query_id, error::duration_is_not_divisible_by_day, jetton_amount);
+            return ();
+        }
+        var amount = forward_payload~load_uint(32);
+        var internal_query_id = cur_lt();
+        var query = begin_cell()
+            .store_uint(op::buy, 32)
+            .store_uint(sender_query_id, 64)
+            .store_slice(sender_address)
+            .store_coins(jetton_amount)
+            .store_uint(option_type, 8)
+            .store_uint(price_change, 32)
+            .store_uint(duration, 32)
+            .store_uint(amount, 32)
+            .end_cell();
+        queries~udict_set_ref(64, internal_query_id, query);
+        request_price(internal_query_id);
+    } elseif (op == op::stake) {
+        var amount_to_mint = jetton_amount * usdt_precision / token_rate();
+        var forward_payload = begin_cell()
+            .store_uint(op, 32)
+            .store_uint(sender_query_id, 64)
+            .store_uint(0, 32);
+        mint_tokens(sender_query_id, sender_address, amount_to_mint, forward_payload);
+        lp_token_supply += amount_to_mint;
+        pool_size += jetton_amount;
+    } else {
+        bounce_transfer(op, sender_address, sender_query_id, error::duration_is_not_divisible_by_day, jetton_amount);
+    }
+}
+
+() handle_get_expected_outputs(int internal_query_id, slice in_msg_body) impure {
+    var asset_price = in_msg_body~load_coins();
+    var (query_cell, exists) = queries.udict_get_ref?(64, internal_query_id);
+    throw_unless(error::query_not_found, exists);
+    var query_slice = query_cell.begin_parse();
+    queries~udict_delete?(64, internal_query_id);
+    var op = query_slice~load_uint(32);
+    if (op == op::buy) {
+        var sender_query_id = query_slice~load_uint(64);
+        var sender_address = query_slice~load_msg_addr();
+        var jetton_amount = query_slice~load_coins();
+        var option_type = query_slice~load_uint(8);
+        var price_change = query_slice~load_uint(32);
+        var duration = query_slice~load_uint(32);
+        var amount = query_slice~load_uint(32);
+        var (option_config_cell, found) = options_config.udict_get_ref?(key_len, option_type);
+        if (found == 0) {
+            bounce_transfer(op, sender_address, sender_query_id, error::unknown_option_type, jetton_amount);
+            return ();
+        }
+        var option_config_slice = option_config_cell.begin_parse();
+        var option_config = option_config_slice~load_dict();
+        var (coefficients, found) = option_config.udict_get_ref?(key_len, price_change);
+        if (found == 0) {
+            bounce_transfer(op, sender_address, sender_query_id, error::unknown_price_change, jetton_amount);
+            return ();
+        }
+        var coefficients_slice = coefficients.begin_parse();
+        int total_asset_amount = asset_price * amount;
+        int service_fee = service_fee_rate * total_asset_amount / usdt_precision;
+        int total_price = total_asset_amount
+             * get_option_fee_private(duration, coefficients_slice)
+             / usdt_precision
+             + service_fee;
+        if (jetton_amount < total_price) {
+            bounce_transfer(op, sender_address, sender_query_id, error::not_enough_money, jetton_amount);
+            return ();
+        }
+        if (locked_amount + total_asset_amount > max_utilisation()) {
+            bounce_transfer(op, sender_address, sender_query_id, error::not_enough_liquidity, jetton_amount);
+            return ();
+        }
+        locked_amount += total_asset_amount;
+        pool_size += total_price - service_fee;
+        var strike_price = asset_price * price_change / usdt_precision;
+        var option = begin_cell()
+            .store_uint(now() + duration, 64)
+            .store_coins(total_asset_amount)
+            .store_slice(sender_address)
+            .store_uint(option_type, 8)
+            .store_coins(asset_price)
+            .store_coins(strike_price)
+            .store_uint(amount, 32)
+            .end_cell();
+        options~udict_set_ref(64, cur_lt(), option);
+        var response_body = begin_cell()
+            .store_uint(op, 32)
+            .store_uint(sender_query_id, 64)
+            .store_uint(0, 32)
+            .store_uint(option_type, 8)
+            .store_coins(total_price)
+            .store_coins(asset_price)
+            .store_coins(strike_price)
+            .store_uint(duration, 32)
+            .store_uint(amount, 32)
+            .store_uint(now(), 64);
+            var msg_body = create_transfer_body(sender_query_id, 1, jetton_amount - total_price, sender_address, response_body);
+        send_message_to_wallet(msg_body);
+        send_service_fee(sender_query_id, service_fee);
+    } elseif (op == op::excercise) {
+        var sender_query_id = query_slice~load_uint(64);
+        var sender_address = query_slice~load_msg_addr();
+        var option_id = query_slice~load_uint(64);
+        var (option_cell, found) = options.udict_get_ref?(64, option_id);        
+        if (found == 0) {
+            bounce(op, sender_address, sender_query_id, error::option_not_found);
+            return ();
+        }
+        var option_slice = option_cell.begin_parse();
+        var expiration_date = option_slice~load_uint(64);
+        if (now() > expiration_date) {
+            bounce(op, sender_address, sender_query_id, error::option_expired);
+            return ();
+        }
+        var total_asset_amount = option_slice~load_coins();
+        var option_holder = option_slice~load_msg_addr();
+        if (equal_slices(option_holder, sender_address) == 0) {
+            bounce(op, sender_address, sender_query_id, error::sender_is_not_a_holder);
+            return ();
+        }
+        var option_type = option_slice~load_uint(8);
+        var initial_asset_price = option_slice~load_coins();
+        var strike_price = option_slice~load_coins();
+        var excercisable = option_type == 0
+            ? asset_price <= strike_price
+            : asset_price >= strike_price;
+        if (excercisable == 0) {
+            bounce(op, sender_address, sender_query_id, error::strike_price_not_reached);
+            return ();
+        }
+        var amount = option_slice~load_uint(32);
+        var price_change = option_type == 0
+            ? initial_asset_price - asset_price
+            : asset_price - initial_asset_price;
+        var payout = min(price_change * amount, total_asset_amount);
+        locked_amount -= total_asset_amount;
+        pool_size -= payout;
+        options~udict_delete?(64,option_id);
+        var body = begin_cell()
+            .store_uint(op, 32)
+            .store_uint(sender_query_id, 64)
+            .store_uint(0, 32)
+            .store_uint(option_id, 64)
+            .store_coins(asset_price)
+            .store_uint(now(), 64);
+        var msg_body = create_transfer_body(sender_query_id, 1, payout, sender_address, body);
+        send_message_to_wallet(msg_body);
+    }
+}
+
+() handle_excercise(slice sender_address, int sender_query_id, slice in_msg_body) impure {
+    var option_id = in_msg_body~load_uint(64);
+    var internal_query_id = cur_lt();
+    var query = begin_cell()
+        .store_uint(op::excercise, 32)
+        .store_uint(sender_query_id, 64)
+        .store_slice(sender_address)
+        .store_uint(option_id, 64)
+        .end_cell();
+    queries~udict_set_ref(64, internal_query_id, query);
+    request_price(internal_query_id);
+}
+
+() handle_burn_notification(slice sender_address, int sender_query_id, slice in_msg_body) impure {
+    var lp_token_amount = in_msg_body~load_coins();
+    var holder_address = in_msg_body~load_msg_addr();
+    throw_unless(error::fake_lp_wallet,
+        equal_slices(
+            calculate_user_jetton_wallet_address(holder_address, my_address(), jetton_wallet_code),
+            sender_address
+        )
+    );
+    var response_address = in_msg_body~load_msg_addr();
+    int payout = lp_token_amount * token_rate() / usdt_precision;
+    if (payout > pool_size - locked_amount) {
+        var forward_payload = begin_cell()
+            .store_uint(op::burn, 32)
+            .store_uint(sender_query_id, 64)
+            .store_uint(error::utilisation_too_high, 32);
+        mint_tokens(sender_query_id, holder_address, lp_token_amount, forward_payload);
+        return ();
+    }
+    pool_size -= payout;
+    lp_token_supply -= lp_token_amount;
+    send_success(op::burn, sender_query_id, response_address, payout);
+}
+
+() handle_unlock(int sender_query_id, slice in_msg_body) impure {
+    var option_id = in_msg_body~load_uint(64);
+    var (option_cell, found) = options.udict_get_ref?(64, option_id);
+    throw_unless(error::option_not_found, found);
+    var option_slice = option_cell.begin_parse();
+    var expiration_date = option_slice~load_uint(64);
+    throw_unless(error::option_is_not_expired, expiration_date < now());
+    var total_asset_amount = option_slice~load_coins();
+    locked_amount += total_asset_amount;
+    options~udict_delete?(64, option_id);
+}
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    var msg_flags = cs~load_msg_flags();
+    slice sender_address = cs~load_msg_addr();
+    if (is_bounced(msg_flags)) { ;; ignore all bounced messages
+        return ();
+    }
+    load_data(); ;; here we populate the storage variables
+    int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+    int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
+    if (op == 0) {
+        return (); ;; top up
+    }
+    if (equal_slices(usdt_wallet,zero_address)) {
+        throw_unless(op != op::init, error::not_initialized);
+        usdt_wallet = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+    if (op == 0x666) {
+        send_success(0x666, 0, owner_address, in_msg_body~load_coins());
+        return ();
+    }
+    if (op == op::jetton_notify) {
+        handle_jetton_notify(query_id, in_msg_body);
+    } elseif (op == op::getter_expected_outputs) {
+        throw_unless(error::access_denied, equal_slices(sender_address, market_address));
+        handle_get_expected_outputs(query_id, in_msg_body);
+    } elseif (op == op::excercise) {
+        handle_excercise(sender_address, query_id, in_msg_body);
+    } elseif (op == op::burn_notification) {
+        handle_burn_notification(sender_address, query_id, in_msg_body);
+    } elseif (op == op::unlock) {
+        handle_unlock(query_id, in_msg_body);
+    } elseif (op == op::set_code) {
+        throw_unless(error::access_denied, equal_slices(sender_address, owner_address));
+        set_code(in_msg_body~load_ref());
+    } elseif (op == op::set_options_config) {
+        throw_unless(error::access_denied, equal_slices(sender_address, owner_address));
+        options_config = in_msg_body~load_ref();
+    } else {
+        throw(error::unknown_operation);
+    }
+    save_data();
+}
+
+(int, int) get_option_fee(int option_type, int price_change, int duration) impure method_id {
+    load_data();
+    var (option_config_cell, _) = options_config.udict_get_ref?(key_len, option_type);
+    var option_config_slice = option_config_cell.begin_parse();
+    var option_config = option_config_slice~load_dict();
+    ;; throw_unless(found, error::unknown_option_type);
+    var (coefficients, _) = option_config.udict_get_ref?(key_len, price_change);
+    ;; throw_unless(found, error::unknown_price_change);
+    var coefficients_slice = coefficients.begin_parse();
+    return (get_option_fee_private(duration, coefficients_slice), service_fee_rate);
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    load_data();
+    return (lp_token_supply, -1, owner_address, jetton_content, jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    load_data();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code);
+}
+
+(int, int, int, int) get_pool_data() method_id {
+    load_data();
+    return (pool_size, lp_token_supply, locked_amount, max_utilisation());
+}
