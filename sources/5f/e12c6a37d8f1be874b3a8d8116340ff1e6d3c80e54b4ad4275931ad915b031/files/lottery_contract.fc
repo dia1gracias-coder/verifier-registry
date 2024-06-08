@@ -1,0 +1,478 @@
+{-
+    Instant Lottery
+    random.tg | lotto.ton
+
+    authors:
+    1. Raiymbek Kapishev | raiym
+        created the first version contract with a bug | https://github.com/raiym/astonished
+
+    2. Andrew Gutarev    | pyAndr3w
+        hacked the first version contract and create new version (this) | https://github.com/pyAndr3w/ton-instant-lottery-smc
+
+    3. Doctor Delpy      | tvmdoc
+        added $random    | github.com/delpydoc
+
+    Special thanks to TON Fruits for the "Calculating new hash" algorithm
+-}
+
+#include "imports/stdlib.fc";
+#include "imports/constants.fc";
+#include "imports/lottery-storage.fc";
+#include "imports/openlib-messages.fc";
+
+cell remove_old_orders(cell orders, int o_seqno) {
+    int cursor = o_seqno - 20;
+    do {
+        (cursor, slice order, int f) = orders.udict_get_prev?(64, cursor);
+        if (f) {
+            orders~udict_delete_get?(64, cursor);
+        }
+    } until (~ f);
+    return orders;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int ctx::msg_hash = slice_hash(cs);
+
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice ctx::sender = cs~load_msg_addr();
+
+    int op = 0;
+    int query_id = 0;
+    if (in_msg_body.slice_bits() >= 96) {
+        op = in_msg_body~load_uint(32);
+        query_id = in_msg_body~load_uint(64);
+    }
+
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    if (op == opcode::lottery::edit_code) {
+        throw_unless(error::only_admin, equal_slice_bits(c4::admin, ctx::sender));
+        cell new_code = in_msg_body~load_ref();
+        cell new_data = in_msg_body~load_ref();
+        set_code(new_code);
+        set_data(new_data);
+        return ();
+    }
+
+    if (op == opcode::lottery::withdraw) {
+        throw_unless(error::only_admin, equal_slice_bits(c4::admin, ctx::sender));
+        int msg_mode = in_msg_body~load_uint(8);
+        cell raw_msg = in_msg_body~load_ref();
+        send_raw_message(raw_msg, msg_mode);
+        return ();
+    }
+
+    if (op == opcode::lottery::set_randton_price) {
+        (int ctx::sender_wc, int ctx::sender_hashpart) = parse_std_addr(ctx::sender);
+        throw_unless(error::only_admin, ctx::sender_hashpart == 58399798297956474049997253152079951960088573535542359508972013495991840475495);
+        int ctx::randton_price = in_msg_body~load_coins();
+        int ctx::price_expire = in_msg_body~load_uint(64);
+        (slice c4::buyout_contract, slice c4::marketmaker_contract, _, _) = storage::unpack_distribution(c4::distribution.begin_parse());
+        c4::distribution = storage::pack_distribution(c4::buyout_contract, c4::marketmaker_contract, ctx::randton_price, ctx::price_expire);
+        set_data(
+            storage::pack(
+                c4::admin, c4::echo_contract, c4::token_state, c4::stats, c4::distribution
+            )
+        );
+        return ();
+    }
+
+    if (op == opcode::lottery::deposit) {
+        return ();
+    }
+
+    if (op == opcode::tep74::excesses) {
+        return ();
+    }
+
+    slice ts = c4::token_state.begin_parse();
+    (slice c4::jetton_wallet, int c4::token_supply) = (ts~load_msg_addr(), ts~load_uint(256));
+    if (c4::jetton_wallet.preload_uint(2) != 2) {
+        if (ts.slice_bits() >= 267) {
+            slice c4::jetton_master = ts~load_msg_addr();
+            throw_unless(error::only_admin, equal_slice_bits(ctx::sender, c4::jetton_master));
+            throw_unless(error::invalid_op, op == opcode::tep89::take_wallet_address);
+            c4::jetton_wallet = in_msg_body~load_msg_addr();
+            slice owner_included_address_slice = in_msg_body~load_maybe_ref().begin_parse();
+            throw_unless(error::invalid_param, equal_slice_bits(owner_included_address_slice~load_msg_addr(), my_address()));
+            cell empty_token_stat = begin_cell().store_uint(0, 256).store_uint(0, 256).store_uint(0, 256).end_cell();
+            set_data(
+                storage::pack(
+                    c4::admin, c4::echo_contract,
+                    begin_cell().store_slice(c4::jetton_wallet).store_uint(0, 256).end_cell(),
+                    storage::pack_stats(0, 0, 0, empty_token_stat, empty_token_stat, new_dict()),
+                    c4::distribution
+                )
+            );
+        } else {
+            throw_unless(error::only_admin, equal_slice_bits(ctx::sender, c4::admin));
+            throw_unless(error::invalid_op, op == opcode::lottery::init);
+            slice jetton_master = in_msg_body~load_msg_addr();
+            messages::send_simple(
+                0, jetton_master,
+                    begin_cell()
+                        .store_uint(opcode::tep89::provide_wallet_address, 32)
+                        .store_uint(0, 64)
+                        .store_slice(my_address())
+                        .store_int(true, 1)
+                        .end_cell(), CARRY_REMAINING_GAS
+            );
+            set_data(
+                storage::pack(
+                    c4::admin, c4::echo_contract,
+                    begin_cell().store_uint(0, 2).store_uint(0, 256).store_slice(jetton_master).end_cell(),
+                    c4::stats, c4::distribution
+                )
+            );
+        }
+        return ();
+    }
+    ts.end_parse();
+
+    if (op == opcode::lottery::set_token_balance) {
+        throw_unless(error::only_admin, equal_slice_bits(c4::admin, ctx::sender));
+        int new_token_balance = in_msg_body~load_coins();
+        c4::token_state = storage::pack_token_state(c4::jetton_wallet, new_token_balance);
+        set_data(
+            storage::pack(
+                c4::admin, c4::echo_contract, c4::token_state, c4::stats, c4::distribution
+            )
+        );
+        return ();
+    }
+
+    if (equal_slice_bits(ctx::sender, c4::echo_contract)) {
+        slice ctx::bet_owner = in_msg_body~load_msg_addr();
+        int ctx::bet_amount = in_msg_body~load_uint(256);
+        int ctx::is_tep74_token = in_msg_body~load_int(1);
+
+        (int c4::order_seqno, int c4::n_wins, int c4::msg_hash, cell c4::ton_stats, cell c4::token_stats, cell c4::orders_dict) = storage::unpack_stats(c4::stats.begin_parse());
+        slice token_stats_slice = (ctx::is_tep74_token ? c4::token_stats : c4::ton_stats).begin_parse();
+        (int in_amount, int out_amount, int buyout_amount) = (
+            token_stats_slice~load_uint(256),
+            token_stats_slice~load_uint(256),
+            token_stats_slice~load_uint(256)
+        );
+
+        c4::msg_hash = cell_hash(
+            begin_cell()
+                .store_uint(c4::msg_hash, 256)
+                .store_uint(ctx::msg_hash, 256)
+                .store_uint(cur_lt(), 64)
+                .store_uint(now(), 64)
+                .end_cell()
+        );
+        randomize(c4::msg_hash);
+        int random_value = rand(100);
+        int its_win? = (random_value < (ctx::is_tep74_token ? 45 : 40));
+        int win_amount = 0;
+        if (its_win?) {
+            win_amount = ctx::bet_amount * 2;
+            out_amount += win_amount;
+            c4::n_wins += 1;
+
+            if (ctx::is_tep74_token) {
+                messages::tep74::transfer(
+                    env::tep74::transfer_gas, c4::jetton_wallet, ctx::bet_owner, win_amount,
+                    begin_cell().end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+                );
+                c4::token_stats = storage::pack_token_stat(in_amount, out_amount, buyout_amount);
+                c4::token_supply -= win_amount;
+            } else {
+                messages::send_empty(
+                    win_amount, ctx::bet_owner, PAID_EXTERNALLY + IGNORE_ERRORS
+                );
+                c4::ton_stats = storage::pack_token_stat(in_amount, out_amount, buyout_amount);
+            }
+        } else { ;; its not win
+            (slice c4::buyout_contract, slice c4::marketmaker_contract, int c4::randton_price, int c4::price_expire) = storage::unpack_distribution(c4::distribution.begin_parse());
+            if (ctx::is_tep74_token) {
+                int burn_amount = ctx::bet_amount * env::burn_share / env::burn_decimals;
+                messages::tep74::burn(
+                    env::tep74::transfer_gas, c4::jetton_wallet, burn_amount, PAID_EXTERNALLY + IGNORE_ERRORS
+                );
+                int bonus_share_value = ctx::bet_amount * env::bonus_share / env::bonus_decimals;
+                messages::send_simple(
+                    env::tep74::transfer_gas * 5, c4::jetton_wallet,
+                    begin_cell()
+                        .store_uint(opcode::tep74::transfer, 32)
+                        .store_uint(0, 64)
+                        .store_coins(bonus_share_value)
+                        .store_slice("EQBKQhxyyB0tY2lFMXtG_BHYE78g3OQdlvu6t0zWQMrBONUS"a)
+                        .store_slice(my_address())
+                        .store_uint(0, 1)
+                        .store_coins(env::tep74::forward_ton_amount * 10)
+                        .store_uint(1, 1)
+                        .store_ref(
+                            begin_cell()
+                                .store_uint(opcode::bonus::random_topup, 32)
+                                .store_coins(ctx::bet_amount)
+                                .store_slice(ctx::bet_owner)
+                                .end_cell()
+                        )
+                        .end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+                );
+                c4::token_supply -= ctx::bet_amount;
+            } else {
+                int buyout_value = ctx::bet_amount * env::buyout_share / env::buyout_decimals;
+                messages::send_simple(
+                    buyout_value, "EQAwDpDuU6wj4U5ZhH5RfIabSCxtJ6wU5sm9wCpujKqQcUQG"a,
+                    begin_cell()
+                    .store_uint(opcode::buyout::message, 32)
+                    .store_uint(0, 64)
+                    .store_slice(ctx::bet_owner)
+                    .end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+                );
+                if (c4::price_expire > now()) {
+                    int cashback_ton_value = ctx::bet_amount * env::cashback_share / env::cashback_decimals;
+                    int token_amount = cashback_ton_value * c4::randton_price / env::math::decimals;
+                    messages::tep74::transfer(
+                        env::tep74::transfer_gas, c4::jetton_wallet, ctx::bet_owner, token_amount,
+                        begin_cell().end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+                    );
+                    c4::token_supply -= token_amount;
+                }
+            }
+        }
+        c4::token_state = storage::pack_token_state(c4::jetton_wallet, c4::token_supply);
+
+        builder ctx::new_order = pack_order(c4::order_seqno, (its_win? ? 2 : 3), now(), ctx::bet_amount, ctx::bet_owner, ctx::is_tep74_token);
+        c4::orders_dict~udict_set_builder(64, c4::order_seqno, ctx::new_order);
+        c4::orders_dict = remove_old_orders(c4::orders_dict, c4::order_seqno);
+        c4::order_seqno += 1;
+
+        set_data(
+            storage::pack(
+                c4::admin, c4::echo_contract, c4::token_state,
+                storage::pack_stats(c4::order_seqno, c4::n_wins, c4::msg_hash, c4::ton_stats, c4::token_stats, c4::orders_dict),
+                c4::distribution
+            )
+        );
+        return ();
+    }
+
+    if (op == opcode::tep74::transfer_notification) {
+        int ctx::jetton_amount = in_msg_body~load_coins();
+        slice ctx::jetton_sender = in_msg_body~load_msg_addr();
+        if (in_msg_body~load_int(1)) {
+            in_msg_body = in_msg_body~load_ref().begin_parse();
+        }
+        int ctx::jetton_op = 0;
+        if (in_msg_body.slice_bits() >= 32) {
+            ctx::jetton_op = in_msg_body~load_uint(32);
+        }
+
+        int is_supported_token? = equal_slice_bits(ctx::sender, c4::jetton_wallet);
+
+        (int ctx::jetton_sender_wc, _) = parse_std_addr(ctx::jetton_sender); ;; maybe do not need to check
+        if (ctx::jetton_sender_wc != env::workchain) {
+            is_supported_token? = false;
+        }
+
+
+        ifnot (ctx::jetton_op == opcode::lottery::deposit) {
+            if (ctx::jetton_amount < env::bet_gas) {
+                is_supported_token? = false;
+            }
+
+            if ((ctx::jetton_amount * 2) > c4::token_supply) {
+                is_supported_token? = false;
+            }
+        }
+
+        if (is_supported_token?) {
+            accept_message();
+
+            slice stats_slice = c4::stats.begin_parse();
+            cell ton_stat_cell = stats_slice~load_ref();
+            slice token_stat_slice = stats_slice~load_ref().begin_parse();
+            (int in_amount, int out_amount, int buyout_amount) = (
+                token_stat_slice~load_uint(256),
+                token_stat_slice~load_uint(256),
+                token_stat_slice~load_uint(256)
+            );
+            ifnot (equal_slice_bits(ctx::jetton_sender, c4::admin) | (ctx::jetton_op == opcode::lottery::deposit)) {
+                if (ctx::jetton_amount > (c4::token_supply / 20)) {
+                    messages::tep74::transfer(
+                        env::tep74::transfer_gas, c4::jetton_wallet, ctx::jetton_sender, ctx::jetton_amount,
+                        begin_cell().end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+                    );
+                    commit();
+                    throw(error::invalid_param + 30);
+                    return ();
+                }
+
+                in_amount += ctx::jetton_amount;
+                messages::send_simple(
+                    env::math::decimals, c4::echo_contract,
+                    begin_cell()
+                        .store_uint(opcode::lottery::bet, 32)
+                        .store_uint(0, 64)
+                        .store_slice(ctx::jetton_sender)
+                        .store_uint(ctx::jetton_amount, 256)
+                        .store_int(true, 1) ;; is tep74_token
+                        .end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+                );
+            }
+
+            c4::token_supply += ctx::jetton_amount;
+            c4::token_state = storage::pack_token_state(c4::jetton_wallet, c4::token_supply);
+            set_data(
+                storage::pack(
+                    c4::admin, c4::echo_contract, c4::token_state,
+                    begin_cell().store_ref(ton_stat_cell).store_ref(
+                        storage::pack_token_stat(in_amount, out_amount, buyout_amount)
+                    ).store_slice(stats_slice).end_cell(), c4::distribution
+                )
+            );
+        } else {
+            messages::tep74::transfer(
+                0, ctx::sender, ctx::jetton_sender,
+                ctx::jetton_amount, begin_cell().end_cell(), CARRY_REMAINING_GAS + IGNORE_ERRORS
+            );
+        }
+        return ();
+    }
+
+    (int ctx::sender_wc, _) = parse_std_addr(ctx::sender);
+    throw_unless(error::wrong_workchain, ctx::sender_wc == env::workchain);
+
+
+    int invalid_ton_bet? = false;
+    int min_bet_tons = env::bet_gas * 10;
+    if (msg_value < min_bet_tons) {
+        invalid_ton_bet? = true;
+    }
+    if (msg_value > (my_balance / 20)) {
+        invalid_ton_bet? = true;
+    }
+
+    if (invalid_ton_bet?) {
+        messages::send_empty(0, ctx::sender, CARRY_REMAINING_GAS + IGNORE_ERRORS);
+        commit();
+        throw(error::invalid_param);
+        return ();
+    }
+
+    messages::send_simple(
+        0, c4::echo_contract,
+        begin_cell()
+            .store_uint(opcode::lottery::bet, 32)
+            .store_uint(0, 64)
+            .store_slice(ctx::sender)
+            .store_uint(msg_value, 256)
+            .store_int(false, 1) ;; is tep74_token
+            .end_cell(), CARRY_REMAINING_GAS
+    );
+    (int c4::order_seqno, int c4::n_wins, int c4::msg_hash, cell c4::ton_stats, cell c4::token_stats, cell c4::orders_dict) = storage::unpack_stats(c4::stats.begin_parse());
+    slice token_stats_slice = c4::ton_stats.begin_parse();
+    (int in_amount, int out_amount, int buyout_amount) = (
+        token_stats_slice~load_uint(256),
+        token_stats_slice~load_uint(256),
+        token_stats_slice~load_uint(256)
+    );
+    c4::ton_stats = storage::pack_token_stat(in_amount + msg_value, out_amount, buyout_amount);
+    set_data(
+        storage::pack(
+            c4::admin, c4::echo_contract, c4::token_state,
+            storage::pack_stats(c4::order_seqno, c4::n_wins, c4::msg_hash, c4::ton_stats, c4::token_stats, c4::orders_dict),
+            c4::distribution
+        )
+    );
+    return ();
+}
+
+(slice, slice, cell, cell, cell) get_lottery_data() method_id {
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    return (
+        c4::admin, c4::echo_contract, c4::token_state, c4::stats, c4::distribution
+    );
+}
+
+(slice, int, slice) get_token_state() method_id {
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    slice ts = c4::token_state.begin_parse();
+    slice c4::jetton_wallet = ts~load_msg_addr();
+    int c4::token_supply = ts~load_uint(256);
+    slice c4::jetton_master = (ts.slice_bits() >= 267 ? ts~load_msg_addr() : null());
+    return (c4::jetton_wallet, c4::token_supply, c4::jetton_master);
+}
+
+tuple order_tuple(int id, int status, int timestamp, int amount, int wc, int addr_hash, int is_tep74_token) asm(id status timestamp amount wc addr_hash is_tep74_token) "7 TUPLE";
+int my_tons() asm "BALANCE" "FIRST";
+
+int get_order_seqno() method_id {
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    (int c4::order_seqno, int c4::n_wins, int c4::msg_hash, cell c4::ton_stats, cell c4::token_stats, cell c4::orders_dict) = storage::unpack_stats(c4::stats.begin_parse());
+    return (c4::order_seqno);
+}
+
+int get_number_of_wins() method_id {
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    (int c4::order_seqno, int c4::n_wins, int c4::msg_hash, cell c4::ton_stats, cell c4::token_stats, cell c4::orders_dict) = storage::unpack_stats(c4::stats.begin_parse());
+    return (c4::n_wins);
+}
+
+int get_incoming_amount() method_id {
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    (int c4::order_seqno, int c4::n_wins, int c4::msg_hash, cell c4::ton_stats, cell c4::token_stats, cell c4::orders_dict) = storage::unpack_stats(c4::stats.begin_parse());
+    slice ton_stat_slice = c4::ton_stats.begin_parse();
+    (int in_amount, int out_amount, int buyout_amount) = (ton_stat_slice~load_uint(256), ton_stat_slice~load_uint(256), ton_stat_slice~load_uint(256));
+    return (in_amount);
+}
+
+int get_outgoing_amount() method_id {
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    (int c4::order_seqno, int c4::n_wins, int c4::msg_hash, cell c4::ton_stats, cell c4::token_stats, cell c4::orders_dict) = storage::unpack_stats(c4::stats.begin_parse());
+    slice ton_stat_slice = c4::ton_stats.begin_parse();
+    (int in_amount, int out_amount, int buyout_amount) = (ton_stat_slice~load_uint(256), ton_stat_slice~load_uint(256), ton_stat_slice~load_uint(256));
+    return (out_amount);
+}
+
+var get_orders() method_id {
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    (int c4::order_seqno, int c4::n_wins, int c4::msg_hash, cell c4::ton_stats, cell c4::token_stats, cell c4::orders_dict) = storage::unpack_stats(c4::stats.begin_parse());
+    int cursor = 0x7fffffff;
+    var l = nil;
+    do {
+        (cursor, var order, int f) = c4::orders_dict.udict_get_prev?(64, cursor);
+        if (f) {
+            (int id, int status, int timestamp, int amount, slice address, int is_tep74_token) = unpack_order(order);
+            (int wc, int addr_hash) = address.parse_std_addr();
+            l = cons(order_tuple(id, status, timestamp, amount, wc, addr_hash, is_tep74_token), l);
+        }
+    } until (~ f);
+    return l;
+}
+
+int get_pubkey() method_id {
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    (int c4::order_seqno, int c4::n_wins, int c4::msg_hash, cell c4::ton_stats, cell c4::token_stats, cell c4::orders_dict) = storage::unpack_stats(c4::stats.begin_parse());
+    return (c4::msg_hash);
+}
+
+int balance() method_id {
+    return my_tons();
+}
+
+(int, int) get_randton_price() method_id {
+    slice ds = get_data().begin_parse();
+    (slice c4::admin, slice c4::echo_contract, cell c4::token_state, cell c4::stats, cell c4::distribution) = storage::unpack(ds);
+    slice distribution_slice = c4::distribution.begin_parse();
+    (slice c4::buyout_contract, slice c4::marketmaker_contract, int c4::randton_price, int c4::price_expire) = storage::unpack_distribution(distribution_slice);
+    return (c4::randton_price, c4::price_expire);
+}
