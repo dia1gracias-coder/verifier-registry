@@ -1,0 +1,203 @@
+
+#include "stdlib.fc";
+
+(slice, slice) __asm_ldrefrtos(slice) asm "LDREFRTOS";  ;; takes one reference and parses it
+builder __asm_stbref(builder, builder) asm "STBREF";    ;; stores left builder as ref to the right
+(builder, ()) __asm_append_sha256(builder, builder) asm "ONE HASHEXTA_SHA256";
+int __asm_int_sha256(builder) asm "ONE HASHEXT_SHA256";
+int __asm_slices_eq(slice, slice) asm "SDEQ";
+cell __asm_mycode() asm "MYCODE";
+
+const int op::move_jet = 0x10000000;
+const int op::transfer = 0x0f8a7ea5;
+const int op::t_notify = 0x7362d09c;
+
+(int, slice) load_bounced_sender(cell in_msg) inline {
+    slice in_msg = in_msg.begin_parse();
+    int b = in_msg~load_uint(4) & 1;
+    return (b, in_msg~load_msg_addr());
+}
+
+() just_credit((slice, slice) ds, int credit_amount, int credit_rebase) impure inline_ref {
+    (slice owner, slice jar) = ds;
+    int had_jettons = jar~load_int(96);
+    int old_rebase  = jar~load_uint(128);
+    
+    int new_rebase = max(old_rebase, credit_rebase);
+    int jettons = muldiv(had_jettons, new_rebase, old_rebase)
+                + muldiv(credit_amount, new_rebase, credit_rebase);
+    begin_cell()
+        .store_slice(owner)
+        .store_int(jettons, 96)
+        .store_uint(new_rebase, 128)
+        .store_slice(jar)
+        .end_cell()
+        .set_data();
+}
+
+builder get_state_init_repr(slice owner) inline_ref {
+    throw_unless(65, owner.slice_bits() == 267);
+    builder si_repr = begin_cell()
+        .store_uint(0x02013400000000 | (__asm_mycode().cell_depth() << 16), 56)
+        .store_uint(__asm_mycode().cell_hash(), 256);
+    si_repr~__asm_append_sha256(begin_cell()
+        .store_uint(0x007B, 16)
+        .store_slice(owner).store_uint(48, 224 + 5));   ;; data cell representation
+    return si_repr;
+}
+(builder, ()) ~write_destination_init(builder msg, slice owner) inline {
+    cell init = begin_cell().store_slice(owner).store_uint(1, 224)      ;; don't provide starting balance (I COULD)
+        .__asm_stbref(begin_cell().store_uint(6, 5).store_ref(__asm_mycode()))
+        .end_cell();
+    msg~store_uint(1024, 11);
+    msg~store_uint(init.cell_hash(), 256);
+    return ~store_ref(msg, init);
+}
+(builder, ()) ~write_destination_noinit(builder msg, slice owner) inline {
+    msg~store_uint(1024, 11);
+    msg~__asm_append_sha256(get_state_init_repr(owner));
+    return (msg, ());
+}
+
+const slice tax_destination = "UQCyoez1VF4HbNNq5Rbqfr3zKuoAjKorhK-YZr7LIIiVrX0-"a;
+
+
+;; storage#_ owner:MsgAddressInt jettons:int96 active_rebase:uint128 = Storage;
+
+;; must_settings#_ init_dest_jw:bool exp_rebase:uint128 custom_init_fwd:(Maybe ^Cell) = Settings;
+
+;; transfer#0f8a7ea5 invert:bool query_id:uint63 amount:(VarUInteger 16) to:MsgAddressInt
+;;      excesses_dummy:MsgAddressInt custom_payload:(Maybe ^Settings)
+;;      fwd_ton:(VarUInteger 16) fwd_cell:(Either Cell ^Cell) = InMsgBody;
+
+;; move_jet#10000000 amount:int96 rebase:uint128 from:MsgAddressInt fwd_ton:(VarUInteger 16)
+;;      custom_init:(Maybe ^Cell) fwd_cell:(Either Cell ^Cell) = InMsgBody = OutMsgBody;
+
+;; t_notify#7362d09c invert:bool query_id:uint63 amount:(VarUInteger 16) sender:MsgAddress
+;;      fwd_cell:(Either Cell ^Cell) = OutMsgBody;
+
+
+() recv_internal(int balance, int coins, cell in_msg, slice in_msg_body) {
+    (int bounced, slice sender) = in_msg.load_bounced_sender();
+    if (bounced) {
+        ;; message was initially produced by us, so we just need to check if opcode is `move_jet`
+        in_msg_body~skip_bits(32);
+        if (in_msg_body~load_uint(32) == op::move_jet) {
+            int amount = in_msg_body~load_int(96);
+            int rebase = in_msg_body~load_uint(128);
+            
+            slice ds = get_data().begin_parse();
+            slice owner = ds~load_msg_addr();
+            just_credit((owner, ds), amount, rebase);
+        }
+        return ();
+    }
+    
+    int op = in_msg_body~load_uint(32);
+    if (op == op::transfer) {
+        slice ds = get_data().begin_parse();
+        slice owner = ds~load_msg_addr();
+        throw_unless(63, __asm_slices_eq(owner, sender));
+        int jettons = ds~load_int(96);
+        int cur_rebase = ds~load_uint(128);
+        
+        int invert = in_msg_body~load_uint(64) >> 63;
+        int amount = in_msg_body~load_coins() * (1 - invert * 2);
+        slice to = in_msg_body~load_msg_addr();
+        in_msg_body~load_msg_addr();
+        
+        int init_destination_jw = 1;
+        cell custom_init_fwd = null();
+        if (in_msg_body~load_uint(1)) {
+            slice settings = in_msg_body~__asm_ldrefrtos();
+            init_destination_jw = settings~load_uint(1);
+            amount = muldiv(amount, cur_rebase, settings~load_uint(128));
+            custom_init_fwd = settings~load_dict();
+        }
+        
+        int fwd_ton = in_msg_body~load_coins();
+        throw_unless(64, balance >= fwd_ton + 33554432);    ;; 34 milliTON required in addition to forward
+        
+        int tax = muldiv(amount, 3, 100);
+        amount -= tax;
+        
+        builder msg = begin_cell().store_uint(0x18, 6);
+        builder msg_tax = msg;
+        msg_tax~write_destination_noinit(tax_destination);
+        msg_tax~store_coins(8388608);    ;; 8 milliTON for tax crediting
+        msg_tax~store_uint(op::move_jet, 107 + 32);
+        msg_tax~store_int(tax, 96);
+        msg_tax~store_uint(cur_rebase, 128);
+        msg_tax~store_slice(owner);
+        msg_tax~store_uint(0, 4 + 1 + 1);
+        
+        if init_destination_jw {
+            msg~write_destination_init(to);
+            msg~store_uint((6 << 32) | op::move_jet, 4 + 108 + 32);
+        } else {
+            msg~write_destination_noinit(to);
+            msg~store_uint(op::move_jet, 4 + 107 + 32);
+        }
+        msg~store_int(amount, 96);
+        msg~store_uint(cur_rebase, 128);
+        msg~store_slice(owner);
+        msg~store_coins(fwd_ton);
+        msg~store_maybe_ref(in_msg_body~load_maybe_ref());
+        
+        msg_tax.end_cell().send_raw_message(0);
+        msg.end_cell().send_raw_message(128);
+    } elseif (op == op::move_jet) {
+        int amount = in_msg_body~load_int(96);
+        int rebase = in_msg_body~load_uint(128);
+        slice from = in_msg_body~load_msg_addr();
+        
+        int exp_hash_part = __asm_int_sha256(get_state_init_repr(from));
+        (int wc, int hash_part) = sender.parse_std_addr();
+        throw_if(63, (hash_part != exp_hash_part) | wc);
+        
+        int fwd_ton = in_msg_body~load_coins();
+        cell init = in_msg_body~load_maybe_ref();
+        slice forward = in_msg_body;
+        
+        slice ds = get_data().begin_parse();
+        slice owner = ds~load_msg_addr();
+        
+        if (fwd_ton) {
+            builder notification = begin_cell().store_uint(0x18, 6).store_slice(owner);
+            if (init.cell_null?()) {
+                notification~store_uint(op::t_notify, 4 + 107 + 32);
+            } else {
+                notification~store_ref(init);
+                notification~store_uint((6 << 32) | op::t_notify, 4 + 108 + 32);
+            }
+            notification~store_int(amount < 0, 64);
+            notification~store_coins(abs(amount));
+            notification~store_slice(from);
+            notification~store_slice(forward);
+            notification.end_cell().send_raw_message(2 + 128);
+        }
+        
+        just_credit((owner, ds), amount, rebase);
+    }
+}
+
+_ get_wallet_data() method_id {
+    slice ds = get_data().begin_parse();
+    slice owner = ds~load_msg_addr();
+    int jettons = ds~load_int(96);
+    return (jettons, owner, my_address(), __asm_mycode());
+}
+
+cell jetton_content() asm
+    "B{B5EE9C720101090100D700010300C00102012002040143BFF082EB663B57A00192F4A6AC467288DF2DFEDDB9DA1BEE28F6521C8BEBD21F1EC00300800068747470733A2F2F726174696E676572732E707974686F6E616E7977686572652E636F6D2F74782D67726F75702D6578706C6F7265722F69636F6E2E706E6702014805070141BF4546A6FFE1B79CFDD86BAD3DB874313DCDE2FB05E6A74AA7F3552D9617C79D13060020004261446F6C7068696E204A6F6B65730141BF6ED4F942A7848CE2CB066B77A1128C6A1FF8C43F438A2DCE24612BA9FFAB8B0308000A0042414A4F}"
+    "B>boc PUSHREF";
+
+_ get_jetton_data() method_id {
+    return (-1, -1, tax_destination, jetton_content(), __asm_mycode());
+}
+
+_ get_wallet_address(slice owner) method_id {
+    builder addr = begin_cell();
+    addr~write_destination_noinit(owner);
+    return addr.end_cell().begin_parse();
+}
