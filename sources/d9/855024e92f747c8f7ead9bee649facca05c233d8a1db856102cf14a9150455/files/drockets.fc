@@ -1,0 +1,64 @@
+#include "imports/stdlib.fc";
+
+const op::increase = "op::increase"c; ;; create an opcode from string using the "c" prefix, this results in 0x7e8764ef opcode in this case
+
+;; storage variables
+
+;; id is required to be able to create different instances of counters
+;; since addresses in TON depend on the initial state of the contract
+global int ctx_id;
+global int ctx_counter;
+
+;; load_data populates storage variables using stored data
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    ctx_id = ds~load_uint(32);
+    ctx_counter = ds~load_uint(32);
+
+    ds.end_parse();
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(ctx_id, 32)
+            .store_uint(ctx_counter, 32)
+            .end_cell()
+    );
+}
+
+() send_grams(slice addr, int amount) {
+    var message = begin_cell()
+                .store_uint(0, 32) ;;op
+                .store_uint(0, 64) ;;query_id
+                .store_slice(addr)
+                .end_cell();
+    send_raw_message(message, 0);
+}
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    int amount_received = msg_value;
+    int amount_to_return = 60000000;
+
+    if (amount_received >= 80000000) {
+        ;; slice sender_address = get_msg_sender(in_slice);
+        slice sender_address = in_msg_body~load_msg_addr();
+        send_grams(sender_address, amount_to_return);
+        return ();
+    }
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
