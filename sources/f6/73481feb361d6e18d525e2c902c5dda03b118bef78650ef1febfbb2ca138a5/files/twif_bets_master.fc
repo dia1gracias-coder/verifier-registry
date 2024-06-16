@@ -1,0 +1,131 @@
+;; TWIF Bets master smart contract
+;; Made by @whooaaami
+
+#include "imports/stdlib.fc";
+#include "imports/consts.fc";
+#include "imports/op-codes.fc";
+#include "imports/calculate-jetton-address.fc";
+
+const op::deploy = "op::deploy"c;
+const op::change_owner = "op::change_owner"c;
+const op::return_balance = "op::return_balance"c;
+
+
+(slice, cell, cell) load_data() inline {
+    var ds = get_data().begin_parse();
+    
+    var owner = ds~load_msg_addr();
+
+    return (
+        owner, ;; owner address
+        ds~load_ref(), ;; bet code
+        ds~load_ref() ;; jetton wallet code
+    );
+}
+
+() save_data(slice owner_address, cell bet_code, cell jetton_wallet_code) impure inline {
+    set_data(begin_cell()
+        .store_slice(owner_address)
+        .store_ref(bet_code)
+        .store_ref(jetton_wallet_code)
+        .end_cell());
+}
+
+
+;; Calculate state init for bet
+cell calculate_bet_state_init(slice user_wallet, slice user_jetton_wallet, slice jetton_master, int bet_outcome, cell bet_code) {
+    cell data = (
+        begin_cell()
+        .store_slice(my_address())
+        .store_slice(user_wallet)
+        .store_slice(user_jetton_wallet)
+        .store_slice(jetton_master)
+        .store_uint(0, 64)
+        .store_uint(bet_outcome, 32)
+        .end_cell()
+    );
+
+    return begin_cell().store_uint(0, 2).store_dict(bet_code).store_dict(data).store_uint(0, 1).end_cell();
+}
+
+;; Calculate address for bet
+slice calculate_bet_address(int wc, cell state_init) {
+    return begin_cell().store_uint(4, 3).store_int(wc, 8).store_uint(cell_hash(state_init), 256).end_cell().begin_parse();
+}
+
+;; Deploy bet to net
+() deploy_bet(slice user_wallet, slice user_jetton_wallet, slice jetton_master, int bet_outcome, cell bet_code, int amount) impure {
+    cell state_init = calculate_bet_state_init(user_wallet, user_jetton_wallet, jetton_master, bet_outcome, bet_code);
+    slice bet_address = calculate_bet_address(workchain(), state_init);
+
+    var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(bet_address)
+            .store_coins(amount)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(state_init);
+
+    send_raw_message(msg.end_cell(), 1);
+}
+
+
+() recv_internal(cell in_msg_full, slice in_msg_body) impure {
+    if(in_msg_body.slice_empty?()) {
+        return (); ;; just accept TON
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ingone all bounced messages
+        return (); ;; just accept TON
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    var (owner_address, bet_code, jetton_wallet_code) = load_data();
+
+    throw_unless(401, equal_slices(sender_address, owner_address));
+
+    if (op == op::deploy) {
+        return ();
+    }
+    if (op == op::change_owner) {
+        slice new_owner = in_msg_body~load_msg_addr();
+        save_data(new_owner, bet_code, jetton_wallet_code);
+        return ();
+    }
+    if (op == op::return_balance) {
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op, 32)
+            .store_uint(query_id, 64);
+        raw_reserve(50000000, 0); ;; 0.05 TON
+        send_raw_message(msg.end_cell(), 128);
+        return ();
+    }
+    
+    throw(0xffff);
+}
+
+
+;; Get methods
+
+slice get_info() method_id {
+    var (owner, _, _) = load_data();
+    return owner;
+}
+
+slice get_capper_address(slice user_address, slice jetton_wallet_address, slice jetton_master_address, int bet_outcome) method_id {
+    var (_, bet_code, _) = load_data();
+
+    cell state_init = calculate_bet_state_init(user_address, jetton_wallet_address, jetton_master_address, bet_outcome, bet_code); 
+    slice capper_address = calculate_bet_address(workchain(), state_init);
+
+    return capper_address;
+}
