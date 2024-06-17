@@ -1,0 +1,95 @@
+#include "stdlib.fc";
+
+int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
+int transfer_fee() asm "10000000 PUSHINT"; ;; 0.01 TON
+
+(slice, int) load_data() inline {
+    var ds = get_data().begin_parse();
+    return 
+    (ds~load_msg_addr(), ;; owner_address
+        ds~load_coins() ;; daily_checkin_value
+    );
+}
+
+() save_data(slice owner_address, int daily_checkin_value) impure inline {
+    set_data(begin_cell()
+    .store_slice(owner_address)
+    .store_coins(daily_checkin_value)
+    .end_cell());
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    var (owner_address, daily_checkin_value) = load_data();
+
+    if (op == 1) { ;; daily checkin
+        throw_unless(400, msg_value == daily_checkin_value);
+
+        var withdraw_msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(sender_address)
+        .store_coins(msg_value - (msg_value * 56) / 100)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+        send_raw_message(withdraw_msg.end_cell(), 1);
+
+        return ();
+    }
+    if (op == 2) { ;; change daily checkin value
+        throw_unless(401, equal_slices(sender_address, owner_address));
+        int new_daily_checkin_value = in_msg_body~load_coins();
+        save_data(owner_address, new_daily_checkin_value);
+        return ();
+    }
+    if (op == 3) { ;; change owner
+        throw_unless(401, equal_slices(sender_address, owner_address));
+        slice new_owner = in_msg_body~load_msg_addr();
+        save_data(new_owner, daily_checkin_value);
+        return ();
+    }
+    if (op == 4) { ;; give reward
+        throw_unless(401, equal_slices(sender_address, owner_address));
+        slice winner_address = in_msg_body~load_msg_addr();
+        int winner_reward = in_msg_body~load_coins();
+        [int balance, _] = get_balance();
+        throw_unless(402, winner_reward <= balance);
+
+        var withdraw_msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(winner_address)
+        .store_coins(winner_reward)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+
+        send_raw_message(withdraw_msg.end_cell(), 64);
+
+        return ();
+    }
+    if(op == 5) { ;; withdraw ton
+        throw_unless(401, equal_slices(sender_address, owner_address));
+        [int balance, _] = get_balance();
+        var withdraw_msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(sender_address)
+        .store_coins(balance - msg_value)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+
+        send_raw_message(withdraw_msg.end_cell(), 128);
+
+        return ();
+    }
+
+    throw(0xffff);
+}
