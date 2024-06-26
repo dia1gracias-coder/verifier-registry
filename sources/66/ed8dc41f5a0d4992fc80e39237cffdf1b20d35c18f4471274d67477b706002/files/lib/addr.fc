@@ -1,0 +1,20 @@
+#pragma version 0.4.4;
+
+#include "./std.fc";
+
+const slice addr::NONE = "00"s;
+
+const int addr::errs::BAD_WORKCHAIN = 333;
+
+int workchain(slice addr) inline {
+	(int wc, _) = parse_std_addr(addr);
+	return wc;
+}
+
+() basechain!(slice addr) inline {
+	throw_if(addr::errs::BAD_WORKCHAIN, addr.workchain());
+}
+
+int none?(slice addr) inline {
+	return equal_slice_bits(addr, addr::NONE);
+}

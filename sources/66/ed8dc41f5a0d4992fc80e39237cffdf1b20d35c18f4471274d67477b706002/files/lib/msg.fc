@@ -1,0 +1,69 @@
+#pragma version 0.4.4;
+
+#include "./std.fc";
+#include "./ext.fc";
+
+const int msg::errs::UNKNOWN_OP = 0xffff;
+
+const int msg::flags::NON_BOUNCEABLE = 0x10;
+const int msg::flags::BOUNCEABLE = 0x18;
+
+const int msg::sendmodes::REGULAR = 0;
+const int msg::sendmodes::PAY_FEES_SEPARATELY = 1;
+const int msg::sendmodes::IGNORE_ERRORS = 2;
+const int msg::sendmodes::BOUNCE_ON_ACTION_FAIL = 16;
+const int msg::sendmodes::DESTROY = 32;
+const int msg::sendmodes::CARRY_ALL_REMAINING_MESSAGE_VALUE = 64;
+const int msg::sendmodes::CARRY_ALL_BALANCE = 128;
+
+(slice, int) ~bounced?(slice msg) inline {
+	int bounced? = msg~load_uint(4) & 1;
+	return (msg, bounced?);
+}
+
+(slice, ()) ~skip_bounced_prefix(slice msg) inline {
+	msg~skip_bits(32);
+	return (msg, ());
+}
+
+(slice, int) ~load_fwd_fee(slice msg) inline {
+	msg~load_msg_addr(); ;; skip `dest`
+	msg~load_coins();    ;; skip `value`
+	msg~skip_dict();     ;; skip extracurrency collection
+	msg~load_coins();    ;; skip `ihr_fee`
+	int fwd_fee = msg~load_coins();
+
+	return (msg, fwd_fee);
+}
+
+() msg::send(slice dest, int value, int op, int query_id, builder body, int mode) impure inline {
+	var msg = begin_cell()
+		.store_uint(msg::flags::BOUNCEABLE, 6)
+		.store_slice(dest)
+		.store_coins(value)
+		.store_uint(0, 107)
+		.store_uint(op, 32)
+		.store_uint(query_id, 64);
+
+	ifnot (body.null?()) {
+		msg = msg.store_builder(body);
+	}
+
+	send_raw_message(msg.end_cell(), mode);
+}
+
+() msg::send_nobounce(slice dest, int value, int op, int query_id, builder body, int mode) impure inline {
+	var msg = begin_cell()
+		.store_uint(msg::flags::NON_BOUNCEABLE, 6)
+		.store_slice(dest)
+		.store_coins(value)
+		.store_uint(0, 107)
+		.store_uint(op, 32)
+		.store_uint(query_id, 64);
+
+	ifnot (body.null?()) {
+		msg = msg.store_builder(body);
+	}
+
+	send_raw_message(msg.end_cell(), mode);
+}

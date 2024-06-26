@@ -1,0 +1,21 @@
+#pragma version 0.4.4;
+
+#include "./std.fc";
+
+cell calculate_state_init(cell code, cell data) inline {
+	return begin_cell()
+		.store_uint(0, 1 + 1) ;; split_depth:(Maybe (## 5)) special:(Maybe TickTock)
+		.store_maybe_ref(code)
+		.store_maybe_ref(data)
+		.store_uint(0, 1) ;; (HashmapE 256 SimpleLib)
+	.end_cell();
+}
+
+slice calculate_address(cell state_init, int mc?) inline {
+	return begin_cell()
+		.store_uint(4, 3)
+		.store_uint(mc?, 8)
+		.store_uint(cell_hash(state_init), 256)
+	.end_cell()
+	.begin_parse();
+}

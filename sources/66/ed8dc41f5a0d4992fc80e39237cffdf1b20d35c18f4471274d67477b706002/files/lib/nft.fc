@@ -1,0 +1,16 @@
+#pragma version 0.4.4;
+
+;; Opcodes
+;; Item
+const int nft::ops::TRANSFER = "transfer query_id:uint64 new_owner:MsgAddress response_destination:MsgAddress custom_payload:Maybe ^Cell forward_amount:VarUInteger 16 forward_payload:Either Cell ^Cell = InternalMsgBody"c & 0x7fffffff;
+const int nft::ops::OWNERSHIP_ASSIGNED = "ownership_assigned query_id:uint64 prev_owner:MsgAddress forward_payload:Either Cell ^Cell = InternalMsgBody"c & 0x7fffffff;
+const int nft::ops::GET_STATIC_DATA = "get_static_data query_id:uint64 = InternalMsgBody"c & 0x7fffffff;
+const int nft::ops::REPORT_STATIC_DATA = "report_static_data query_id:uint64 index:uint256 collection:MsgAddress = InternalMsgBody"c | 0x80000000;
+;; Collection
+const int nft::ops::GET_ROYALTY_PARAMS = "get_royalty_params query_id:uint64 = InternalMsgBody"c & 0x7fffffff;
+const int nft::ops::REPORT_ROYALTY_PARAMS = "report_royalty_params query_id:uint64 numerator:uint16 denominator:uint16 destination:MsgAddress = InternalMsgBody"c | 0x80000000;
+
+;; Errors
+const int nft::errs::UNAUTHORIZED = 401;
+const int nft::errs::INSUFFICIENT_BALANCE = 402;
+const int nft::errs::NOT_ALLOWED = 405;
