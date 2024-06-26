@@ -1,0 +1,198 @@
+#pragma version 0.4.4;
+
+#include "./lib/prelude.fc";
+
+#include "./imports/gas.fc";
+#include "./imports/ops.fc";
+#include "./imports/errs.fc";
+
+global int init?;
+global int storage::index;
+global slice storage::collection;
+
+global slice storage::owner;
+global cell storage::content;
+
+() load_data() impure inline {
+	slice ds = get_data().begin_parse();
+
+	init? = false;
+	storage::index = ds~load_uint(20);
+	storage::collection = ds~load_msg_addr();
+
+	ifnot (ds.slice_empty?()) {
+		init? = true;
+		storage::owner = ds~load_msg_addr();
+		storage::content = ds~load_ref();
+	}
+
+	ds.end_parse();
+}
+
+() store_data() impure inline {
+	set_data(
+		begin_cell()
+			.store_uint(storage::index, 20)
+			.store_slice(storage::collection)
+			.store_slice(storage::owner)
+			.store_ref(storage::content)
+		.end_cell()
+	);
+}
+
+() recv_internal(int self::balance, int msg::value, cell msg, slice msg::body) impure {
+	;; skip empty messages
+	if (msg::body.slice_empty?()) {
+		return ();
+	}
+
+	;; skip bounced messages
+	slice cs = msg.begin_parse();
+	if (cs~bounced?()) {
+		return ();
+	}
+
+	slice msg::src = cs~load_msg_addr();
+
+	int msg::op = msg::body~load_uint(32);
+	int msg::query_id = msg::body~load_uint(64);
+
+	load_data();
+	if (msg::op == ops::internal::MINT) {
+		throw_unless(
+			nft::errs::NOT_ALLOWED,
+			(~ init?) & equal_slice_bits(msg::src, storage::collection)
+		);
+
+		slice owner = msg::body~load_msg_addr();
+		cell content = msg::body~load_ref();
+
+		cell notifications = msg::body~load_dict();
+		int counter = 0;
+		do {
+			var (_, notification, f?) = notifications~udict::delete_get_min(8);
+			if (f?) {
+				counter += 1;
+				throw_if(errs::TOO_MANY_NOTIFICATIONS, counter >= 250);
+
+				slice dest = notification~load_msg_addr();
+				int value = notification~load_coins();
+
+				msg::send(
+					dest,
+					value,
+					ops::MINT_NOTIFICATION,
+					msg::query_id,
+					null(),
+					msg::sendmodes::PAY_FEES_SEPARATELY | msg::sendmodes::BOUNCE_ON_ACTION_FAIL
+				);
+			}
+		} until (~ f?);
+
+		int min_balance = self::balance - msg::value + due_payment();
+		raw_reserve(
+			max(
+				min_balance,
+				calculate_nft_item_min_storage_fee()
+			),
+			reserve::modes::AT_MOST
+		);
+		builder body = begin_cell().store_slice(addr::NONE).store_slice(msg::body);
+		msg::send(
+			owner,
+			0,
+			nft::ops::OWNERSHIP_ASSIGNED,
+			msg::query_id,
+			body,
+			msg::sendmodes::CARRY_ALL_BALANCE | msg::sendmodes::BOUNCE_ON_ACTION_FAIL
+		);
+
+		storage::owner = owner;
+		storage::content = content;
+		store_data();
+
+		return ();
+	}
+	if (msg::op == nft::ops::TRANSFER) {
+		throw_unless(
+			nft::errs::UNAUTHORIZED,
+			equal_slice_bits(msg::src, storage::owner)
+		);
+
+		slice owner = msg::body~load_msg_addr();
+		ifnot (owner.none?()) {
+			owner.basechain!();
+		}
+
+		slice excesses_dest = msg::body~load_msg_addr();
+		int send_excesses? = (~ excesses_dest.none?());
+		if (send_excesses?) {
+			excesses_dest.basechain!();
+		}
+
+		msg::body~skip_maybe_ref(); ;; skip `custom_payload`
+		int fwd_amount = msg::body~load_coins();
+
+		int send_notification? = (~ owner.none?()) & fwd_amount > 0;
+		if (send_notification?) {
+			builder body = begin_cell().store_slice(storage::owner).store_slice(msg::body);
+			msg::send(
+				owner,
+				fwd_amount,
+				nft::ops::OWNERSHIP_ASSIGNED,
+				msg::query_id,
+				body,
+				msg::sendmodes::PAY_FEES_SEPARATELY | msg::sendmodes::BOUNCE_ON_ACTION_FAIL
+			);
+		}
+
+		if (send_excesses?) {
+			int min_balance = self::balance - msg::value + due_payment();
+			raw_reserve(
+				max(
+					min_balance,
+					calculate_nft_item_min_storage_fee()
+				),
+				reserve::modes::AT_MOST
+			);
+			msg::send(
+				excesses_dest,
+				0,
+				ops::EXCESSES,
+				msg::query_id,
+				null(),
+				msg::sendmodes::CARRY_ALL_BALANCE | msg::sendmodes::IGNORE_ERRORS
+			);
+		}
+
+		storage::owner = owner;
+		store_data();
+
+		return ();
+	}
+	if (msg::op == nft::ops::GET_STATIC_DATA) {
+		builder body = begin_cell().store_uint(storage::index, 256).store_slice(storage::collection);
+		msg::send_nobounce(
+			msg::src,
+			0,
+			nft::ops::REPORT_STATIC_DATA,
+			msg::query_id,
+			body,
+			msg::sendmodes::CARRY_ALL_REMAINING_MESSAGE_VALUE
+		);
+		return ();
+	}
+
+	throw(msg::errs::UNKNOWN_OP);
+}
+
+(int, int, slice, slice, cell) get_nft_data() method_id {
+	load_data();
+	return (
+		init?,
+		storage::index,
+		storage::collection,
+		storage::owner,
+		storage::content
+	);
+}

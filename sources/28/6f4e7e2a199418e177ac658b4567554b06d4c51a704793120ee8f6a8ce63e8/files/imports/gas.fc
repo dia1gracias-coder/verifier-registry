@@ -1,0 +1,46 @@
+#pragma version 0.4.4;
+
+#include "./../lib/prelude.fc";
+
+const MIN_STORAGE_DURATION = 5 * 365 * 24 * 60 * 60; ;; 5 years
+
+const int NFT_ITEM_STORAGE_BITS = 5738;
+const int NFT_ITEM_STORAGE_CELLS = 13;
+
+const int NFT_ITEM_INIT_STATE_BITS = 5636;
+const int NFT_ITEM_INIT_STATE_CELLS = 13;
+
+const int NFT_COLLECTION_STORAGE_BITS = 14589;
+const int NFT_COLLECTION_STORAGE_CELLS = 35;
+
+const int NFT_COLLECTION_INIT_STATE_BITS = 14519;
+const int NFT_COLLECTION_INIT_STATE_CELLS = 35;
+
+const int SEND_MINT_GAS_CONSUMPTION = 12230;
+const int RECEIVE_MINT_GAS_CONSUMPTION = 10594;
+
+int forward_init_state_overhead() inline {
+	return get_simple_forward_fee(
+		workchains::BASECHAIN,
+		NFT_ITEM_INIT_STATE_BITS,
+		NFT_ITEM_INIT_STATE_CELLS
+	);
+}
+
+int calculate_nft_item_min_storage_fee() inline {
+	return get_storage_fee(
+		workchains::BASECHAIN,
+		MIN_STORAGE_DURATION,
+		NFT_ITEM_STORAGE_BITS,
+		NFT_ITEM_STORAGE_CELLS
+	);
+}
+
+int calculate_nft_collection_min_storage_fee() inline {
+	return get_storage_fee(
+		workchains::BASECHAIN,
+		MIN_STORAGE_DURATION,
+		NFT_COLLECTION_STORAGE_BITS,
+		NFT_COLLECTION_STORAGE_CELLS
+	);
+}

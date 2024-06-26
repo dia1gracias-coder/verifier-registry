@@ -1,0 +1,10 @@
+#pragma version 0.4.4;
+
+const int ops::TRANSFER_OWNERSHIP = "transfer_ownership query_id:uint64 new_owner:MsgAddress = InternalMsgBody"c & 0x7fffffff;
+const int ops::ACCEPT_OWNERSHIP = "transfer_ownership query_id:uint64 = InternalMsgBody"c & 0x7fffffff;
+
+const int ops::MINT = "mint query_id:uint64 referrer:MsgAddress index:uint20 = InternalMsgBody"c & 0x7fffffff;
+const int ops::internal::MINT = "internal_mint query_id:uint64 = InternalMsgBody"c & 0x7fffffff;
+
+const int ops::MINT_NOTIFICATION = "mint_notification query_id:uint64 = InternalMsgBody"c | 0x80000000;
+const int ops::REFUND = "refund query_id:uint64 = InternalMsgBody"c | 0x80000000;
