@@ -1,0 +1,84 @@
+#include "imports/stdlib.fc";
+#include "error-code.fc";
+#include "op-codes.fc";
+
+const int min_tons_for_storage = 10000000; ;;ONE_TON / 100 -> 0.01TON;
+
+(slice, int) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (ds~load_msg_addr(), ds~load_uint(64));
+}
+
+() save_data(slice admin, int counter) impure inline {
+    set_data(begin_cell()
+        .store_slice(admin)
+        .store_uint(counter, 64)
+        .end_cell());
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    (slice admin_address, int txcount) = load_data();
+    int op = in_msg_body~load_uint(32);
+    if (op == 1) {
+        in_msg_body~skip_bits(64); ;; db tid added
+        int time = in_msg_body~load_uint(64);
+        throw_unless(error::wrong_data, (time > 0) & (time < now()));
+        in_msg_body.end_parse();
+        txcount += 1;
+        save_data(admin_address, txcount);
+        return ();
+    }
+    if (op == op::withdraw_tons) {
+        throw_unless(error::not_admin, equal_slices(sender_address, admin_address));
+        int query_id = in_msg_body~load_uint(64);
+        int all_or = in_msg_body~load_int(32);
+        int withdraw = my_balance;
+        if (all_or) {
+            _ = in_msg_body~load_coins();
+        } else {
+            withdraw = in_msg_body~load_coins();
+        }
+        withdraw -= (msg_value + min_tons_for_storage);
+        throw_if(error::not_enough_tons, withdraw < 0);
+        raw_reserve(min_tons_for_storage, 2); ;; 최대 min_tons_for_storage는 건들지 못한다.
+
+        builder msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(sender_address)
+            .store_coins(withdraw)
+            .store_uint(0, 107)
+            .store_uint(op::excesses, 32)
+            .store_uint(query_id, 64)
+            ;
+        send_raw_message(msg.end_cell(), 2);
+        return();
+    }
+    if (op == op::change_admin) {
+        throw_unless(error::not_admin, equal_slices(sender_address, admin_address));
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+        save_data(new_admin_address, txcount);
+        return();
+    }
+    throw(error::unknown_op);
+}
+
+(int) get_total_tx() method_id {
+    (_, int tx) = load_data();
+    return tx;
+}
+
+(slice) get_admin_address() method_id {
+    (slice admin_address, _) = load_data();
+    return admin_address;
+}
