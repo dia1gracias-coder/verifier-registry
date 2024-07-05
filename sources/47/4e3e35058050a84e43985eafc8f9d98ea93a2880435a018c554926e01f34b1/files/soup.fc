@@ -1,0 +1,93 @@
+#include "imports/stdlib.fc";
+
+
+
+;; 使用 "c" 前綴從字串創建操作碼，在此情況下，結果是 0x7e8764ef 操作碼
+const op_in = "op_in"c; 
+
+
+
+;; 儲存變數
+;; id 是必須的，用於創建不同的計數器實例
+;; 因為 TON 中的地址取決於合約的初始狀態
+global int ctx_id;
+global int ctx_counter;
+
+
+
+;; load_data 使用存儲的數據填充儲存變數
+() load_data() impure { 
+    ;; 雖然 get_data 和 begin_parse 是純粹的讀取操作
+    ;; 但由於 end_parse 檢查 slice 是否為空並可能拋出異常，因此需要標記為 impure
+
+    var ds = get_data().begin_parse(); ;; cell get_data() asm "c4 PUSH";
+    ;; get_data 返回合約儲存區 c4 的 cell
+    ;; begin_parse 將 cell 轉換成 slice
+
+    ctx_id = ds~load_uint(32);
+    ctx_counter = ds~load_uint(32);
+    ;; 讀取操作會消耗 slice 當中的位元
+    ;; 內部 TVM 讀資料的時候會把相應的位元推入 Stack
+
+    ds.end_parse();
+    ;; end_parse 檢查 slice 解析過程是否完整
+    ;; 數據遺漏時會拋出異常
+}
+
+;; save_data 將儲存變數作為一個 cell 永久存儲到合約
+() save_data() impure {
+
+    set_data(  ;; () set_data(cell c) impure asm "c4 POP";
+    ;; 用於將 cell 存儲到合約當中的 c4 register
+    ;; 這會直接改變合約的狀態
+
+        begin_cell() ;; builder begin_cell() asm "NEWC";
+            .store_uint(ctx_id, 32)
+            .store_uint(ctx_counter, 32)
+            ;; builder store_uint(builder b, int x, int len) asm(x b len) "STUX";
+            
+            .end_cell() ;; cell end_cell(builder b) asm "ENDC";
+    );
+}
+
+;; recv_internal 是合約的主要函數，在收到來自其他合約的消息時調用
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; 忽略所有空消息
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; 忽略所有反彈消息
+        return ();
+    }
+
+    load_data(); ;; 在此處填充儲存變數
+
+    int op = in_msg_body~load_uint(32); ;; 根據約定，傳入消息的前 32 位是操作碼
+    int query_id = in_msg_body~load_uint(64); ;; 根據約定，接下來的 64 位包含 "query id"，儘管這並非總是如此
+
+    if (op == op_in) {
+        int increase_by = in_msg_body~load_uint(32);
+        ctx_counter += increase_by;
+        save_data();
+        return ();
+    }
+
+    throw(0xffff); ;; 如果消息包含的操作碼不為本合約所知，則拋出異常
+}
+
+;; get 方法是使用 HTTP API 等方便讀取合約數據的方法
+;; 它們用 method_id 標記
+;; 注意，與許多其他智能合約虛擬機不同，get 方法不能被其他合約調用
+
+;; method_id 讓我們可透過名稱呼叫函數
+int get_counter() method_id {
+    load_data();
+    return ctx_counter;
+}
+
+int get_id() method_id {
+    load_data();
+    return ctx_id;
+}
