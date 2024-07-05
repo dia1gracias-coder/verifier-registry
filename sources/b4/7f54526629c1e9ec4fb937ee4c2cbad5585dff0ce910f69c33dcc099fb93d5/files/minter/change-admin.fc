@@ -1,0 +1,17 @@
+#include "./storage.fc";
+
+;;
+;; Changes the admin address to the provided one.
+;;
+;; sender_address:Address
+;; in_msg_body:
+;;   ...
+;;   new_admin_address:Address
+;;
+() on_change_admin(slice sender_address, slice in_msg_body) impure {
+    (int total_supply, slice admin_address, cell content, cell wallet_code) = load_data();
+    throw_unless(73, equal_slices(sender_address, admin_address));
+
+    slice new_admin_address = in_msg_body~load_msg_addr();
+    save_data(total_supply, new_admin_address, content, wallet_code);
+}

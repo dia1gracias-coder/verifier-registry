@@ -1,0 +1,60 @@
+#include "../libs/stdlib.fc";
+#include "../libs/utils.fc";
+#include "./storage.fc";
+
+;;
+;; Mints tokens to the provided address, forwarding any amount and master message in the process.
+;;
+;; on_mint_tokens(
+;;   (
+;;     x op : int(32)
+;;     x query_id : int(64)
+;;     to_address : Address          Account of the destination wallet's owner
+;;     total_ton_amount : Coins      Amount of TONs to send to the wallet
+;;     (
+;;       op : uint(32)
+;;       query_id : uint(64)
+;;       jetton_amount : Coins       Amount of jettons to mint
+;;       issuer_address : Address    Account of the issuer
+;;       response_address : Address  Account to respond to with any excess TONs
+;;       forward_ton_amount: Coins   Amount of TONs to forward to the jetton wallet owner's account
+;;       forward_payload
+;;     )
+;;   )
+;;   sender_address : Address
+;; )
+;;
+() on_mint_tokens(slice in_msg_body, slice sender_address) impure {
+
+    (int total_supply, slice admin_address, cell content, cell wallet_code) = load_data();
+
+    throw_unless(73, equal_slices(sender_address, admin_address));
+
+    slice to_address = in_msg_body~load_msg_addr();
+    int total_ton_amount = in_msg_body~load_coins();
+
+    ;; TODO: check that the balance is indeed enough to send the forward_ton_amount - or does that happen implicitly?
+
+    cell master_msg = in_msg_body~load_ref(); ;; RENAME: send_token_request / send_token_request_body
+    
+    slice master_msg_body = master_msg.begin_parse();
+    master_msg_body~skip_bits(32 + 64); ;; op + query_id
+    int jetton_amount = master_msg_body~load_coins();
+
+    cell init = create_wallet_init(to_address, my_address(), wallet_code);
+    slice to_wallet_address = init_to_wallet_address(init);
+
+    var out_msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to_wallet_address)
+        .store_coins(total_ton_amount)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(init)
+        .store_ref(master_msg)
+        .end_cell();
+  
+    send_raw_message(out_msg, 1); ;; 1 = pay transfer fees separately, revert on errors
+
+    int new_supply = total_supply + jetton_amount;
+    save_data(new_supply, admin_address, content, wallet_code);
+}

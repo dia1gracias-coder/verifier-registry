@@ -1,0 +1,39 @@
+int workchain() asm "0 PUSHINT";
+
+cell create_wallet_data(int balance, slice owner_address, slice minter_address, cell wallet_code) inline {
+  return  begin_cell()
+    .store_coins(balance)
+    .store_slice(owner_address)
+    .store_slice(minter_address)
+    .store_ref(wallet_code)
+    .end_cell();
+}
+
+cell create_wallet_init(slice owner_address, slice minter_address, cell wallet_code) inline {
+  cell data = create_wallet_data(0, owner_address, minter_address, wallet_code);
+  return begin_cell()
+    .store_uint(0, 2)
+    .store_dict(wallet_code)
+    .store_dict(data)
+    .store_uint(0, 1)
+    .end_cell();
+}
+
+slice init_to_wallet_address(cell init) inline {
+  return begin_cell()
+    .store_uint(4, 3)
+    .store_int(workchain(), 8)
+    .store_uint(cell_hash(init), 256)
+    .end_cell()
+    .begin_parse();
+}
+
+slice create_wallet_address(slice owner_address, slice minter_address, cell wallet_code) inline {
+  cell init = create_wallet_init(owner_address, minter_address, wallet_code);
+  return init_to_wallet_address(init);
+}
+
+() ensure_same_chain(slice address) impure {
+  (int address_workchain, _) = parse_std_addr(address);
+  throw_unless(333, address_workchain == workchain());
+}
