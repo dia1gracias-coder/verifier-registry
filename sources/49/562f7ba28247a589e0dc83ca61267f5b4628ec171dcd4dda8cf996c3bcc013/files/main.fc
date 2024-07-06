@@ -1,0 +1,20 @@
+#include "imports/stdlib.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  ;; We start by creating a cell slice from the begining of the cell
+  slice cellSlice = in_msg_full.begin_parse();
+  ;; The first 4 bytes are the flags
+  int flags = cellSlice~load_uint(4);
+  ;; Then load the message address
+  slice sender_address = cellSlice~load_msg_addr();
+
+  ;; Saving the address in the storage
+  set_data(begin_cell().store_slice(sender_address).end_cell());
+}
+
+;; slice is the return type
+;; this is a function that returns the address of the last sender saved in the storage
+slice get_the_last_sender() method_id {
+  slice dataStorage = get_data().begin_parse();
+  return dataStorage~load_msg_addr();
+}
