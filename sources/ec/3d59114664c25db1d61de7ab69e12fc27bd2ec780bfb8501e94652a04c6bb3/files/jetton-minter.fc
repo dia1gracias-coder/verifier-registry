@@ -1,0 +1,757 @@
+#include "imports/stdlib.fc";
+#include "imports/params.fc";
+#include "imports/constants.fc";
+#include "imports/jetton-utils.fc";
+#include "imports/op-codes.fc";
+#include "imports/utils.fc";
+#include "imports/discovery-params.fc";
+
+#pragma version >=0.2.0;
+
+(int, slice, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_coins(), ;; total_supply
+        ds~load_msg_addr(), ;; admin_address
+        ds~load_ref(), ;; content
+        ds~load_ref() ;; jetton_wallet_code
+    );
+}
+
+() save_data(int total_supply, slice admin_address, cell content, cell jetton_wallet_code) impure inline {
+    set_data(begin_cell()
+      .store_coins(total_supply)
+      .store_slice(admin_address)
+      .store_ref(content)
+      .store_ref(jetton_wallet_code)
+      .end_cell()
+    );
+}
+
+(int, slice, cell, cell, cell, cell, cell, cell, cell) load_extended_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_coins(), ;; total_supply
+        ds~load_msg_addr(), ;; admin_address
+        ds~load_ref(), ;; content
+        ds~load_ref(), ;; jetton_wallet_code
+        ds~load_dict(), ;; claims_count
+        ds~load_dict(), ;; degree_heats
+        ds~load_dict(), ;; claims_data
+        ds~load_dict(), ;; claim_times
+        ds~load_dict()  ;; resources_data
+    );
+}
+
+() save_extended_data(int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) impure inline {
+    set_data(begin_cell()
+      .store_coins(total_supply)
+      .store_slice(admin_address)
+      .store_ref(content)
+      .store_ref(jetton_wallet_code)
+      .store_dict(claims_count)
+      .store_dict(degree_heats)
+      .store_dict(claims_data)
+      .store_dict(claim_times)
+      .store_dict(resources_data)
+      .end_cell()
+    );
+}
+
+() mint_tokens(slice to_address, cell jetton_wallet_code, int amount, cell master_msg) impure {
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to_wallet_address)
+            .store_coins(amount)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(state_init)
+            .store_ref(master_msg);
+    send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+slice int_to_slice(int value) inline {
+    return begin_cell().store_uint(value, 32).end_cell().begin_parse();
+}
+
+slice fixed_point_to_slice(int value, int decimals) inline {
+    return begin_cell().store_uint(value, 64).store_uint(decimals, 8).end_cell().begin_parse();
+}
+
+(int, int) slice_to_fixed_point(slice s) inline {
+    return (s~load_uint(64), s~load_uint(8));
+}
+
+int power(int base, int exp) inline {
+    int result = 1;
+    int i = 0;
+    while (i < exp) {
+        result *= base;
+        i += 1;
+    }
+    return result;
+}
+
+() claim_resource(slice sender_address, slice resource_name) impure {
+    int resource_id = string_hash(resource_name); ;; Convert resource name to hash
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+
+    int current_time = now();
+    var (claims_opt, found) = udict_get?(claims_count, 256, resource_id);
+    int claims = found ? claims_opt~load_uint(32) : 0;
+    claims = claims + 1;
+    claims_count = udict_set(claims_count, 256, resource_id, int_to_slice(claims));
+
+    int base = 1000000; ;; 定点数基数
+    int heat = base * power(11, claims) / power(10, claims); ;; 使用定点数计算热度
+    degree_heats = udict_set(degree_heats, 256, resource_id, fixed_point_to_slice(heat, 6));
+
+    cell claim_data = begin_cell()
+        .store_slice(sender_address)
+        .store_uint(current_time, 32)
+        .store_uint(heat, 64)
+        .store_slice(resource_name)
+        .end_cell();
+    claims_data = udict_set(claims_data, 256, resource_id, claim_data.begin_parse());
+
+    cell resource_claim_data = begin_cell()
+        .store_slice(sender_address)
+        .store_uint(current_time, 32)
+        .end_cell();
+    resources_data = udict_set(resources_data, 256, resource_id, resource_claim_data.begin_parse());
+
+    save_extended_data(total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data);
+}
+
+() send_internal_message(slice to, int amount, int bounce, int flags) inline {
+    cell msg = begin_cell()
+        .store_slice(to)
+        .store_uint(bounce, 1)
+        .store_uint(flags, 1)
+        .end_cell();
+    send_raw_message(msg, amount);
+}
+
+int to_nano(int ton_value) inline {
+    return ton_value * 1000000000;
+}
+
+(int, slice, int) get_min_entry(cell dict, int key_len) inline {
+    var (entry_key, entry_value, found) = udict_get_next?(dict, key_len, 0);
+    return (entry_key, entry_value, found);
+}
+
+(int, slice, int) get_next_entry(cell dict, int key_len, int prev_key) inline {
+    var (entry_key, entry_value, found) = udict_get_next?(dict, key_len, prev_key);
+    return (entry_key, entry_value, found);
+}
+
+(int) claim_reward(slice sender_address) impure {
+    ;; 加载扩展数据
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+
+    ;; 计算发送者的哈希值
+    int sender_hash = slice_hash(sender_address);
+
+    ;; 获取最后领取奖励的时间
+    var (last_claim_time_opt, found) = udict_get?(claim_times, 256, sender_hash);
+    int last_claim_time = found ? last_claim_time_opt~load_uint(32) : 0;
+    int current_time = now();
+
+    ;; 检查领取奖励是否太早
+    throw_if(100, current_time - last_claim_time < 3600);
+
+    int total_reward = 0;
+    ;; 获取 claims_data 字典中的最小条目
+    var (resource_id, claim_cell_opt, found) = get_min_entry(claims_data, 256);
+    while (found) {
+        slice claim_data = claim_cell_opt;
+        slice user_address = claim_data~load_msg_addr();
+        int claim_time = claim_data~load_uint(32);
+        int heat = claim_data~load_uint(64);
+
+        ;; 获取资源 ID 对应的声明次数
+        var (claims_opt, found_claims) = udict_get?(claims_count, 256, resource_id);
+        int claims = found_claims ? claims_opt~load_uint(32) : 1;
+        if (equal_slices(user_address, sender_address)) {
+            total_reward += heat / claims;
+        }
+
+        ;; 获取下一个条目
+        var (next_resource_id, next_claim_cell_opt, next_found) = get_next_entry(claims_data, 256, resource_id);
+        resource_id = next_resource_id;
+        claim_cell_opt = next_claim_cell_opt;
+        found = next_found;
+    }
+
+    ;; 更新 claim_times 字典
+    claim_times = udict_set(claim_times, 256, sender_hash, int_to_slice(current_time));
+
+    ;; 发送奖励Jetton代币
+    mint_tokens(sender_address, jetton_wallet_code, total_reward, begin_cell().end_cell());
+
+    ;; 保存扩展数据
+    save_extended_data(total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data);
+
+    ;; 返回奖励值
+    return total_reward;
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+      (int total_supply, slice admin_address, cell content, cell jetton_wallet_code) = load_data();
+    return (total_supply, -1, admin_address, content, jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+      (int total_supply, slice admin_address, cell content, cell jetton_wallet_code) = load_data();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code);
+}
+
+(cell) get_claims(slice claimer_address) method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    int loop = 1;
+    while (data.slice_bits() > 0 & loop) {
+        slice claim_data = data;
+        slice user_address = claim_data~load_msg_addr();
+        int claim_time = claim_data~load_uint(32);
+        int heat = claim_data~load_uint(64);
+        int resource_name_len = claim_data.slice_bits() / 8;
+        var resource_name_bits = claim_data~load_bits(resource_name_len * 8);
+        if (equal_slices(user_address, claimer_address)) {
+            result = result.store_slice(int_to_slice(resource_id));
+            result = result.store_slice(user_address);
+            result = result.store_uint(claim_time, 32);
+            result = result.store_uint(heat, 64);
+            result = result.store_slice(resource_name_bits);
+        }
+        var (next_resource_id, next_data, next_found) = get_next_entry(claims_data, 256, resource_id);
+        resource_id = next_resource_id;
+        data = next_data;
+        loop = next_found;
+    }
+    return result.end_cell();
+}
+
+(cell) get_all_claims() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    int loop = 1;
+    while (data.slice_bits() > 0 & loop) {
+        slice claim_data = data;
+        slice user_address = claim_data~load_msg_addr();
+        int claim_time = claim_data~load_uint(32);
+        int heat = claim_data~load_uint(64);
+        int resource_name_len = claim_data.slice_bits() / 8;
+        var resource_name_bits = claim_data~load_bits(resource_name_len * 8);
+        
+        result = result.store_slice(int_to_slice(resource_id));
+        result = result.store_slice(user_address);
+        result = result.store_uint(claim_time, 32);
+        result = result.store_uint(heat, 64);
+        result = result.store_slice(resource_name_bits);
+        
+        var (next_resource_id, next_data, next_found) = get_next_entry(claims_data, 256, resource_id);
+        resource_id = next_resource_id;
+        data = next_data;
+        loop = next_found;
+    }
+    return result.end_cell();
+}
+
+(cell) get_all_claims_step1() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    return begin_cell().end_cell();
+}
+(cell) get_all_claims_step2() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    return result.end_cell();
+}
+(cell) get_all_claims_step3() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    return result.end_cell();
+}
+
+(cell) debug_load_extended_data() method_id {
+    var (total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data) = load_extended_data();
+    return begin_cell().store_uint(200, 32).end_cell();  ;; 简单返回，确保数据加载正确
+}
+
+(cell) debug_check_admin_address() method_id {
+    var (total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data) = load_extended_data();
+    
+    ;; 简单返回 admin_address 的 slice_bits 以检查其值
+    return begin_cell().store_uint(admin_address.slice_bits(), 32).end_cell();
+}
+
+(slice) debug_return_admin_address() method_id {
+    var (total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data) = load_extended_data();
+    
+    ;; 直接返回 admin_address
+    return admin_address;
+}
+
+(cell) debug_check_more_fields() method_id {
+    var (total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data) = load_extended_data();
+    
+    if (total_supply < 0) {
+        return begin_cell().store_uint(201, 32).end_cell();  ;; 调试信息：total_supply 有问题
+    }
+    if (admin_address.slice_bits() == 0) {
+        return begin_cell().store_uint(202, 32).end_cell();  ;; 调试信息：admin_address 有问题
+    }
+    if (content.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(203, 32).end_cell();  ;; 调试信息：content 有问题
+    }
+    if (jetton_wallet_code.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(204, 32).end_cell();  ;; 调试信息：jetton_wallet_code 有问题
+    }
+
+    return begin_cell().store_uint(200, 32).end_cell();  ;; 所有数据都正确
+}
+
+(cell) debug_check_claims_data_comprehensive() method_id {
+    var (total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data) = load_extended_data();
+    
+    if (claims_data.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(207, 32).end_cell();  ;; 调试信息：claims_data 有问题
+    }
+
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    
+    if (found == 0) {
+        return begin_cell().store_uint(105, 32).end_cell();  ;; 调试信息：claims_data 为空
+    }
+    
+    return begin_cell().store_uint(107, 32).end_cell();  ;; 调试信息：找到条目
+}
+
+(cell) get_all_claims_step4() method_id {
+    var (total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data) = load_extended_data();
+    builder result = begin_cell();
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    int loop = 1;
+
+    ;; 检查是否找到条目
+    if (found == 0) {
+        return begin_cell().store_uint(103, 32).end_cell();  ;; 调试信息：没有找到条目
+    }
+
+    ;; 添加调试日志，检查 data 和 loop 的值
+    if (data.slice_bits() == 0) {
+        return begin_cell().store_uint(100, 32).end_cell();  ;; 调试信息：data 为空
+    }
+
+    if (loop == 0) {
+        return begin_cell().store_uint(101, 32).end_cell();  ;; 调试信息：loop 为 0
+    }
+
+    while (data.slice_bits() > 0 & loop) {
+        slice claim_data = data;
+        
+        ;; 再次检查 claim_data 的值
+        if (claim_data.slice_bits() == 0) {
+            return begin_cell().store_uint(104, 32).end_cell();  ;; 调试信息：claim_data 为空
+        }
+
+        loop = 0;  ;; 暂时结束循环
+    }
+    return result.end_cell();
+}
+
+(cell) debug_check_extended_data() method_id {
+    var (total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data) = load_extended_data();
+
+    if (total_supply < 0) {
+        return begin_cell().store_uint(201, 32).end_cell();  ;; 调试信息：total_supply 有问题
+    }
+    if (admin_address.slice_bits() == 0) {
+        return begin_cell().store_uint(202, 32).end_cell();  ;; 调试信息：admin_address 有问题
+    }
+    if (content.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(203, 32).end_cell();  ;; 调试信息：content 有问题
+    }
+    if (jetton_wallet_code.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(204, 32).end_cell();  ;; 调试信息：jetton_wallet_code 有问题
+    }
+    if (claims_count.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(205, 32).end_cell();  ;; 调试信息：claims_count 有问题
+    }
+    if (degree_heats.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(206, 32).end_cell();  ;; 调试信息：degree_heats 有问题
+    }
+    if (claims_data.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(207, 32).end_cell();  ;; 调试信息：claims_data 有问题
+    }
+    if (claim_times.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(208, 32).end_cell();  ;; 调试信息：claim_times 有问题
+    }
+    if (resources_data.begin_parse().slice_bits() == 0) {
+        return begin_cell().store_uint(209, 32).end_cell();  ;; 调试信息：resources_data 有问题
+    }
+
+    return begin_cell().store_uint(200, 32).end_cell();  ;; 所有数据都正确
+}
+
+(cell) debug_check_claims_data() method_id {
+    var (total_supply, admin_address, content, jetton_wallet_code, claims_count, degree_heats, claims_data, claim_times, resources_data) = load_extended_data();
+    
+    ;; 检查 claims_data 是否为空
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    
+    if (found == 0) {
+        return begin_cell().store_uint(105, 32).end_cell();  ;; 调试信息：claims_data 为空
+    }
+    
+    return begin_cell().store_uint(107, 32).end_cell();  ;; 调试信息：找到条目
+}
+
+
+(cell) get_all_claims_step5() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    int loop = 1;
+
+    while (data.slice_bits() > 0 & loop) {
+        slice claim_data = data;
+
+        ;; 添加调试日志，检查 claim_data 的值
+        if (claim_data.slice_bits() == 0) {
+            return begin_cell().store_uint(102, 32).end_cell();  ;; 调试信息：claim_data 为空
+        }
+
+        slice user_address = claim_data~load_msg_addr();
+        int claim_time = claim_data~load_uint(32);
+        int heat = claim_data~load_uint(64);
+        int resource_name_len = claim_data.slice_bits() / 8;
+        var resource_name_bits = claim_data~load_bits(resource_name_len * 8);
+        
+        loop = 0;  
+    }
+    return result.end_cell();
+}
+(cell) get_all_claims_step6() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    int loop = 1;
+    while (data.slice_bits() > 0 & loop) {
+        slice claim_data = data;
+        if (claim_data.slice_bits() == 0) {
+            return begin_cell().store_uint(102, 32).end_cell();  ;; 调试信息：claim_data 为空
+        }
+
+        slice user_address = claim_data~load_msg_addr();
+        int claim_time = claim_data~load_uint(32);
+        int heat = claim_data~load_uint(64);
+        int resource_name_len = claim_data.slice_bits() / 8;
+        var resource_name_bits = claim_data~load_bits(resource_name_len * 8);
+
+        result = result.store_slice(int_to_slice(resource_id));
+        result = result.store_slice(user_address);
+        result = result.store_uint(claim_time, 32);
+        result = result.store_uint(heat, 64);
+        result = result.store_slice(resource_name_bits);
+
+        loop = 0;  
+    }
+    return result.end_cell();
+}
+(cell) get_all_claims_step7() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    int loop = 1;
+    while (data.slice_bits() > 0 & loop) {
+        slice claim_data = data;
+        if (claim_data.slice_bits() == 0) {
+            return begin_cell().store_uint(102, 32).end_cell();  ;; 调试信息：claim_data 为空
+        }
+
+        slice user_address = claim_data~load_msg_addr();
+        int claim_time = claim_data~load_uint(32);
+        int heat = claim_data~load_uint(64);
+        int resource_name_len = claim_data.slice_bits() / 8;
+        var resource_name_bits = claim_data~load_bits(resource_name_len * 8);
+
+        result = result.store_slice(int_to_slice(resource_id));
+        result = result.store_slice(user_address);
+        result = result.store_uint(claim_time, 32);
+        result = result.store_uint(heat, 64);
+        result = result.store_slice(resource_name_bits);
+
+        var (next_resource_id, next_data, next_found) = get_next_entry(claims_data, 256, resource_id);
+        resource_id = next_resource_id;
+        data = next_data;
+        loop = next_found;
+    }
+    return result.end_cell();
+}
+
+(cell) get_latest_claims(int count) method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    int claim_counter = 0;
+    int loop = 1;
+
+    while (data.slice_bits() > 0 & loop & (claim_counter < count)) {
+        slice claim_data = data;
+        slice user_address = claim_data~load_msg_addr();
+        int claim_time = claim_data~load_uint(32);
+        int heat = claim_data~load_uint(64);
+        int resource_name_len = claim_data.slice_bits() / 8;
+        var resource_name_bits = claim_data~load_bits(resource_name_len * 8);
+        
+        result = result.store_slice(int_to_slice(resource_id));
+        result = result.store_slice(user_address);
+        result = result.store_uint(claim_time, 32);
+        result = result.store_uint(heat, 64);
+        result = result.store_slice(resource_name_bits);
+        
+        var (next_resource_id, next_data, next_found) = get_next_entry(claims_data, 256, resource_id);
+        resource_id = next_resource_id;
+        data = next_data;
+        loop = next_found;
+        claim_counter += 1;
+    }
+    return result.end_cell();
+}
+
+(cell) get_resource_claims(slice resource_name) method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    int resource_id = string_hash(resource_name);
+    var (data, found) = udict_get?(resources_data, 256, resource_id);
+    if (found) {
+        while (data.slice_bits() > 0) {
+            slice claim_data = data;
+            slice user_address = claim_data~load_msg_addr();
+            int claim_time = claim_data~load_uint(32);
+            result = result.store_slice(user_address);
+            result = result.store_uint(claim_time, 32);
+        }
+    }
+    return result.end_cell();
+}
+
+(cell) debug_get_data_structure() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    result = result.store_uint(1000, 32);  ;; 标记数据类型
+    result = result.store_uint(total_supply, 64);
+    result = result.store_slice(admin_address);
+    return result.end_cell();
+}
+
+(cell) debug_get_claim_data() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell claims_count, cell degree_heats, cell claims_data, cell claim_times, cell resources_data) = load_extended_data();
+    builder result = begin_cell();
+    var (resource_id, data, found) = get_min_entry(claims_data, 256);
+    if (found) {
+        slice claim_data = data;
+        slice user_address = claim_data~load_msg_addr();
+        int claim_time = claim_data~load_uint(32);
+        int heat = claim_data~load_uint(64);
+        result = result.store_uint(1001, 32);  ;; 标记数据类型
+        result = result.store_slice(user_address);
+        result = result.store_uint(claim_time, 32);
+        result = result.store_uint(heat, 64);
+    }
+    return result.end_cell();
+}
+
+(cell) debug_get_static_json() method_id {
+    builder result = begin_cell();
+    result = result.store_uint(123, 8); ;; '{'
+    result = result.store_uint(34, 8); ;; '"'
+    result = result.store_uint(116, 8); ;; 't'
+    result = result.store_uint(111, 8); ;; 'o'
+    result = result.store_uint(116, 8); ;; 't'
+    result = result.store_uint(97, 8); ;; 'a'
+    result = result.store_uint(108, 8); ;; 'l'
+    result = result.store_uint(95, 8); ;; '_'
+    result = result.store_uint(115, 8); ;; 's'
+    result = result.store_uint(117, 8); ;; 'u'
+    result = result.store_uint(112, 8); ;; 'p'
+    result = result.store_uint(112, 8); ;; 'p'
+    result = result.store_uint(108, 8); ;; 'l'
+    result = result.store_uint(121, 8); ;; 'y'
+    result = result.store_uint(34, 8); ;; '"'
+    result = result.store_uint(58, 8); ;; ':'
+    result = result.store_uint(32, 8); ;; ' '
+    result = result.store_uint(49, 8); ;; '1'
+    result = result.store_uint(48, 8); ;; '0'
+    result = result.store_uint(48, 8); ;; '0'
+    result = result.store_uint(48, 8); ;; '0'
+    result = result.store_uint(48, 8); ;; '0'
+    result = result.store_uint(48, 8); ;; '0'
+    result = result.store_uint(48, 8); ;; '0'
+    result = result.store_uint(125, 8); ;; '}'
+    return result.end_cell();
+}
+
+int debug_get_int() method_id {
+    return 1802;
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_bits() == 0) {
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code) = load_data();
+
+    if (op == op::mint()) {
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        cell master_msg = in_msg_body~load_ref();
+        slice master_msg_cs = master_msg.begin_parse();
+        master_msg_cs~skip_bits(32 + 64);
+        int jetton_amount = master_msg_cs~load_coins();
+        mint_tokens(to_address, jetton_wallet_code, amount, master_msg);
+        save_data(total_supply + jetton_amount, admin_address, content, jetton_wallet_code);
+        return ();
+    }
+
+    if (op == op::burn_notification()) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(74,
+            equal_slices(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+        );
+        save_data(total_supply - jetton_amount, admin_address, content, jetton_wallet_code);
+        slice response_address = in_msg_body~load_msg_addr();
+        if (response_address.preload_uint(2) != 0) {
+            var msg = begin_cell()
+                .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+                .store_slice(response_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::excesses(), 32)
+                .store_uint(query_id, 64);
+            send_raw_message(msg.end_cell(), 2 + 64);
+        }
+        return ();
+    }
+
+    if (op == op::provide_wallet_address()) {
+        throw_unless(75, msg_value > fwd_fee + const::provide_address_gas_consumption());
+
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_uint(1);
+
+        cell included_address = include_address?
+            ? begin_cell().store_slice(owner_address).end_cell()
+            : null();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::take_wallet_address(), 32)
+            .store_uint(query_id, 64);
+
+        if (is_resolvable?(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code));
+        } else {
+            msg = msg.store_uint(0, 2);
+        }
+        send_raw_message(msg.store_maybe_ref(included_address).end_cell(), 64);
+        return ();
+    }
+
+    if (op == 3) {
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        save_data(total_supply, new_admin_address, content, jetton_wallet_code);
+        return ();
+    }
+
+    if (op == 4) {
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        save_data(total_supply, admin_address, in_msg_body~load_ref(), jetton_wallet_code);
+        return ();
+    }
+
+    if (op == 1001) {
+        cell resource_name_cell = in_msg_body~load_ref(); ;; Corrected from load_bytes
+        slice resource_name = resource_name_cell.begin_parse();
+        claim_resource(sender_address, resource_name);
+        return ();
+    }
+
+    if (op == 1002) {
+        claim_reward(sender_address);
+        return ();
+    }
+
+    if (op == 1003) {
+        cell all_claims = get_all_claims();
+        send_raw_message(begin_cell().store_slice(sender_address).store_ref(all_claims).end_cell(), 0);
+        return ();
+    }
+
+    if (op == 1004) {
+        cell latest_claims = get_latest_claims(20);
+        send_raw_message(begin_cell().store_slice(sender_address).store_ref(latest_claims).end_cell(), 0);
+        return ();
+    }
+
+    if (op == 1005) {
+        cell claims = get_claims(sender_address);
+        send_raw_message(begin_cell().store_slice(sender_address).store_ref(claims).end_cell(), 0);
+        return ();
+    }
+
+    if (op == 1006) {
+        cell resource_name_cell = in_msg_body~load_ref();
+        slice resource_name = resource_name_cell.begin_parse();
+        cell resource_claims = get_resource_claims(resource_name);
+        send_raw_message(begin_cell().store_slice(sender_address).store_ref(resource_claims).end_cell(), 0);
+        return ();
+    }
+
+    if (op == 2001) {
+        cell debug_data = debug_get_data_structure();
+        send_raw_message(begin_cell().store_slice(sender_address).store_ref(debug_data).end_cell(), 0);
+        return ();
+    }
+
+    if (op == 2002) {
+        cell debug_claim_data = debug_get_claim_data();
+        send_raw_message(begin_cell().store_slice(sender_address).store_ref(debug_claim_data).end_cell(), 0);
+        return ();
+    }
+    
+    if (op == 2003) {
+        cell debug_claim_data = debug_get_static_json();
+        send_raw_message(begin_cell().store_slice(sender_address).store_ref(debug_claim_data).end_cell(), 0);
+        return ();
+    }
+    throw(0xffff);
+}
