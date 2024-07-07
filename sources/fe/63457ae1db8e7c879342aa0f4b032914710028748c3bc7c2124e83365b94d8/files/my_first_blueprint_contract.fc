@@ -1,0 +1,112 @@
+#include "imports/stdlib.fc";
+
+const const::min_tons_for_storage = 1000000000; ;; 1 TON
+
+(slice, int, slice) load_data() inline {
+  slice dataStorage = get_data().begin_parse();
+  return (
+    dataStorage~load_msg_addr(), ;; Load the last sender address
+    dataStorage~load_uint(32), ;; Load the total sum
+    dataStorage~load_msg_addr() ;; Load the owner address
+  );
+}
+
+() save_data(slice last_sender, int total, slice owner) impure inline {
+  builder data = begin_cell()
+    .store_slice(last_sender)
+    .store_uint(total, 32)
+    .store_slice(owner);
+
+  set_data(data.end_cell());
+}
+
+
+;; ############################
+;; ###### Main function #######
+;; ############################
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  slice cellSlice = in_msg_full.begin_parse();
+  cellSlice~load_uint(4); ;; Flags
+  slice sender_address = cellSlice~load_msg_addr();
+
+  int op = in_msg_body~load_uint(4);
+
+  var (_, total, owner_address) = load_data(); ;; Load the contract's data
+
+  ;; Increment the total and deposit
+  if (op == 1) {
+    ;; load from the sender info, the value to increment the total
+    int increment_by = in_msg_body~load_uint(32); ;; 32-bit unsigned integer
+
+    save_data(sender_address, total + increment_by, owner_address); ;; Save the new data
+
+    return();
+  }
+
+  ;; Deposit
+  if (op == 2) {
+    save_data(sender_address, total, owner_address); ;; Save the new data
+    return();
+  }
+
+  ;; Withdraw
+  if (op == 3) {
+    save_data(sender_address, total, owner_address); ;; Save the new data
+
+    ;; Throw if the sender is not the owner
+    throw_unless(103, equal_slice_bits(sender_address, owner_address));
+
+    int withdraw_amount = in_msg_body~load_coins();
+    ;; Throw if the balance is not enough to withdraw
+    throw_if(104, my_balance < withdraw_amount);
+
+    int return_value = min(withdraw_amount, my_balance - const::min_tons_for_storage);
+
+    ;; https://docs.ton.org/develop/smart-contracts/messages#message-layout
+    cell msg = begin_cell()
+      .store_uint(0x18, 6) ;; default flags
+      .store_slice(sender_address)
+      .store_coins(return_value)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; default message headers
+      .end_cell();
+
+    send_raw_message(msg, 1); ;; mode 1: 0 ordinary message + 1 pay transfer fees separately
+
+    return();
+  }
+
+  ;; ;; Burn this contract
+  if (op == 4) {
+    save_data(sender_address, total, owner_address); ;; Save the new data
+
+    ;; Throw if the sender is not the owner
+    throw_unless(105, equal_slice_bits(sender_address, owner_address));
+
+    ;; Send all the balance to the owner
+    cell msg = begin_cell()
+      .store_uint(0x18, 6) ;; default flags
+      .store_slice(owner_address)
+      .store_coins(my_balance)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; default message headers
+      .end_cell();
+
+    send_raw_message(msg, 128 + 32); ;; (128) Carry all the balance and (32) destroy the contract
+
+    return();
+  }
+
+  throw(777); ;; The error code is arbitrary, but must be higher than 1
+}
+
+;; ######################
+;; ###### Getters #######
+;; ######################
+
+(slice, int, slice) get_contract_storage_data() method_id {
+  return load_data();
+}
+
+int balance() method_id {
+  var [balance, _] = get_balance();
+  return balance;
+}
