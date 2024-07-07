@@ -1,0 +1,163 @@
+#include "imports/stdlib.fc";
+
+const int op::change_admin = 0x0AB0BAE0;
+const int op::withdraw = 0x0AB0BAE1;
+const int op::init = 0x0AB0BAE2;
+const int op::withdraw_percent = 0x0AB0BAE3;
+const int op::withdraw_percent_to_addr = 0x0AB0BAE4;
+const int op::withdraw_to_addr = 0x0AB0BAE5;
+const int op::configure = 0x0AB0BAE6;
+const int op::le_epic_gamba_time = 0x7AB7BAE7;
+const int op::upgrade = 0x0AB0BAE8;
+const int op::bounce! = 0x0AB0BAE9;
+const int op::withdraw_nanos = 0x0AB0BAEA;
+const int op::withdraw_nanos_to_addr = 0x0AB0BAEB;
+
+const int err::unauthorized = 0xBEEF;
+const int err::bad_request = 0xEBAD;
+const int err::forbidden = 0xDEAD;
+
+int equal_slices (slice a, slice b) asm "SDEQ";
+
+() send_msg(slice addr, int mode, int coins, slice text) impure inline_ref {
+    send_raw_message(
+        begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(addr)
+            .store_coins(coins)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+            .store_uint(1, 1)
+            .store_ref(begin_cell().store_uint(0, 32).store_slice(text).end_cell())
+        .end_cell(),
+        mode
+    );
+}
+
+() upgrade(cell new_data, cell new_code) impure asm "SETCODE" "c4 POPCTR";
+
+() pack_data(slice addr, int dividend, int divisor, int payout_extra, int comission, int hash) impure inline_ref {
+    set_data(
+        begin_cell()
+        .store_slice(addr)
+        .store_uint(dividend, 32)
+        .store_uint(divisor, 32)
+        .store_uint(payout_extra, 7)
+        .store_uint(comission, 5)
+        .store_uint(hash, 256)
+        .end_cell()
+    );
+}
+
+(slice, int, int, int, int, int) unpack_data() impure inline_ref {
+    slice ds = get_data().begin_parse();
+    return (ds~load_msg_addr(), ds~load_uint(32), ds~load_uint(32), ds~load_uint(7), ds~load_uint(5), ds~load_uint(256));
+}
+
+(int, int) gamble(cell msg_full, int dividend, int divisor, int hash) impure inline_ref {
+    int randhash = slice_hash(
+        begin_cell()
+            .store_uint(now(), 64)
+            .store_uint(hash, 256)
+            .store_uint(cur_lt(), 64)
+            .store_ref(msg_full)
+        .end_cell()
+        .begin_parse()
+    );
+    randomize(randhash);
+    return (rand(divisor) < dividend, randhash);
+}
+
+slice get_admin() method_id  {
+    slice ds = get_data().begin_parse();
+    return ds~load_msg_addr();
+}
+
+(int, int, int, int) get_settings() method_id {
+    slice ds = get_data().begin_parse();
+    slice donctare = ds~load_msg_addr();
+    return (ds~load_uint(32), ds~load_uint(32), ds~load_uint(7), ds~load_uint(5));
+}
+
+() recv_internal(int contract_nanos, int msg_nanos, cell msg_full, slice msg_body) impure { 
+    var cs = msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    if (flags & 1) { ;; this is a bounce, we omnom the tokens
+        return ();
+    }
+    slice sender = cs~load_msg_addr();
+    throw_if(err::bad_request, msg_body.slice_bits() < 96);
+    int op = msg_body~load_uint(32);
+    int query_id = msg_body~load_uint(64);
+    if (op == op::bounce!) {
+        send_msg(sender, 0, muldiv(msg_nanos, 50, 100), "Trolol🚽");
+    } elseif ((op == op::withdraw) | (op == op::withdraw_to_addr)) {
+        throw_unless(err::unauthorized, equal_slices(sender, get_admin()));
+        if (op == op::withdraw_to_addr) {
+            throw_if(err::bad_request, msg_body.slice_bits() < 256);
+            send_msg(msg_body~load_msg_addr(), 128, 0, "🐻💸💰😎");
+        } else {
+            send_msg(sender, 128, 0, "🐻💸💰😎");
+        }
+    } elseif ((op == op::withdraw_percent) | (op == op::withdraw_percent_to_addr)) {
+        throw_unless(err::unauthorized, equal_slices(sender, get_admin()));
+        throw_if(err::bad_request, msg_body.slice_bits() < 7);
+        int percent = msg_body~load_uint(7);
+        throw_if(err::bad_request, (percent < 1) | (percent > 100));
+        if (op == op::withdraw_percent_to_addr) {
+            throw_if(err::bad_request, msg_body.slice_bits() < 256);
+            send_msg(msg_body~load_msg_addr(), 0, muldiv(contract_nanos, percent, 100), "🐻💸💰😎");
+        } else {
+            send_msg(sender, 0, muldiv(contract_nanos, percent, 100), "🐻💸💰😎");
+        }
+    } elseif ((op == op::withdraw_nanos) | (op == op::withdraw_nanos_to_addr)) {
+        throw_unless(err::unauthorized, equal_slices(sender, get_admin()));
+        throw_if(err::bad_request, msg_body.slice_bits() < 256);
+        int nanos = msg_body~load_uint(256);
+        throw_if(err::bad_request, contract_nanos < nanos);
+        if (op == op::withdraw_nanos_to_addr) {
+            throw_if(err::bad_request, msg_body.slice_bits() < 256);
+            send_msg(msg_body~load_msg_addr(), 0, nanos, "🐻💸💰😎");
+        } else {
+            send_msg(sender, 0, nanos, "🐻💸💰😎");
+        }
+    } elseif (op == op::change_admin) { ;; this changes the admin of the contract
+        throw_unless(err::unauthorized, equal_slices(sender, get_admin()));
+        throw_if(err::bad_request, msg_body.slice_bits() < 256);
+        (slice old_addr, int dividend, int divisor, int payout_extra, int commission, int hash) = unpack_data();
+        slice new_addr = msg_body~load_msg_addr();
+        pack_data(new_addr, dividend, divisor, payout_extra, commission, hash);
+    } elseif (op == op::init) { ;; this binds the contract to a specific address and sets the initial state
+        throw_unless(err::forbidden, get_data().begin_parse().slice_bits() == 0);
+        pack_data(sender, 450000000, 1000000000, 40, 10, 0);
+    } elseif (op == op::upgrade) {
+        throw_unless(err::unauthorized, equal_slices(sender, get_admin()));
+        cell new_data = msg_body~load_ref();
+        cell new_code = msg_body~load_ref();
+        upgrade(new_data, new_code);
+    } elseif (op == op::configure) { ;; this changes the contract's parameters
+        throw_unless(err::unauthorized, equal_slices(sender, get_admin()));
+        throw_if(err::bad_request, msg_body.slice_bits() < 76);
+        (slice addr, int olddivd, int olddivr, int oldpayout, int oldcomission, int hash) = unpack_data();
+        int dividend = msg_body~load_uint(32);
+        int divisor = msg_body~load_uint(32);
+        int payout_extra = msg_body~load_uint(7);
+        int comission = msg_body~load_uint(5);
+        throw_unless(err::bad_request, 
+                (divisor > dividend) 
+                & (payout_extra > comission) 
+                & (dividend > 0) 
+                & (divisor > 0) 
+                & (payout_extra > 0) 
+                & (comission >= 0)
+        );
+        pack_data(addr, dividend, divisor, payout_extra, comission, hash);
+    } elseif (op == op::le_epic_gamba_time) { ;; this is where the magic happens
+        (slice address, int dividend, int divisor, int payout_extra, int comission, int hash) = unpack_data();
+        (int success, int newhash) = gamble(msg_full, dividend, divisor, hash);
+        pack_data(address, dividend, divisor, payout_extra, comission, newhash);
+        if (success) {
+            int winnings = muldiv(msg_nanos, payout_extra - comission, 100);
+            send_msg(sender, 64, winnings, "🍀🐻🍀");
+        } else { return (); } ;; see below
+    } else { return (); } ;; else omnom go the tokens
+}
