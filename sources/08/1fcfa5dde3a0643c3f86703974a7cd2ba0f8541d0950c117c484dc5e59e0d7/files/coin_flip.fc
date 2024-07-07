@@ -1,0 +1,148 @@
+#include "imports/stdlib.fc";
+
+const const::min_bet = 100000000; ;; 0.1 TON
+const const::max_bet = 50000000000; ;; 50 TON
+
+global slice data::admin_address;
+global int data::fee_percent;
+global int data::bip_base;
+global int data::is_win;
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    data::admin_address = ds~load_msg_addr();
+    data::fee_percent = ds~load_uint(32);
+    data::bip_base = ds~load_uint(32);
+    data::is_win = ds~load_uint(32);
+}
+
+() save_data() impure {
+    set_data(begin_cell()
+        .store_slice(data::admin_address)
+        .store_uint(data::fee_percent, 32)
+        .store_uint(data::bip_base, 32)
+        .store_uint(data::is_win, 32)
+    .end_cell());
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+    slice cs = in_msg.begin_parse();
+    int flags = cs~load_uint(4); ;; first 4 bytes are flags
+    slice sender_address = cs~load_msg_addr(); ;; get the address
+
+    int op = in_msg_body~load_uint(32); ;; OP Code
+
+    load_data();
+
+    ;; Deposit TON to Contract
+    if (op == 0) {
+        ;
+    }
+    ;; Play Game
+    elseif (op == 1) {
+        ;; Check that the best is within the min and max bet
+        throw_unless(110, msg_value >= const::min_bet);
+        throw_unless(110, msg_value <= const::max_bet);
+
+        var [balance, _] = get_balance();
+        int win = msg_value * 2;
+
+        int fee = msg_value / data::bip_base * data::fee_percent; ;; Set fee as 2.5%
+        win -= fee;
+
+        ;; Check that the potential win is within the balance
+        throw_unless(111, win < balance);
+
+        randomize_lt();
+        int x = rand(100); ;; generate a random number (either 0 or 1)
+
+        data::is_win = 0;
+        save_data();
+        
+        if (x < 49) { ;; user won
+            data::is_win = 1;
+            save_data();
+
+            int msg_mode = 3;            
+
+            cell msg = begin_cell()
+            .store_uint(0x18, 6) ;; default values
+            .store_slice(sender_address)
+            .store_coins(win)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+
+            send_raw_message(msg, msg_mode);
+
+        }
+    }
+    ;; Set fee_amount and bip_base
+    elseif (op == 2) {
+        if (equal_slices(sender_address, data::admin_address)) {
+            data::fee_percent = in_msg_body~load_uint(32);
+            data::bip_base = in_msg_body~load_uint(32);
+        }
+    }
+    ;; Withdraw
+    elseif (op == 3) {
+        if (equal_slices(sender_address, data::admin_address)) {
+            var [balance, _] = get_balance();
+            var withdraw_amount = in_msg_body~load_uint(32);
+
+            if (withdraw_amount > balance) {
+                withdraw_amount = balance;
+            }
+
+            int msg_mode = 3;
+
+            cell msg = begin_cell()
+            .store_uint(0x18, 6) ;; default values
+            .store_slice(sender_address)
+            .store_coins(withdraw_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+
+            send_raw_message(msg, msg_mode);
+        }
+    }
+    ;; Transfer ownership
+    elseif (op == 4) {
+        if (equal_slices(sender_address, data::admin_address)) {
+            data::admin_address = in_msg_body~load_msg_addr();
+        }
+    }   
+    ;; Initialize
+    elseif (op == 5) {
+        data::admin_address = sender_address;
+        data::fee_percent = in_msg_body~load_uint(32);
+        data::bip_base = in_msg_body~load_uint(32);
+    }
+    
+    save_data();
+    
+}
+
+int balance() method_id {
+    var [balance, _] = get_balance();
+    return balance;
+}
+
+slice getAdmin() method_id {
+    load_data();
+    return data::admin_address;
+}
+
+int getFeePercent() method_id {
+    load_data();
+    return data::fee_percent;
+}
+
+int getBipBase() method_id {
+    load_data();
+    return data::bip_base;
+}
+
+int getStatus() method_id {
+    load_data();
+    return data::is_win;
+}
