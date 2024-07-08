@@ -1,0 +1,45 @@
+#include "imports/stdlib.fc";
+
+;; Storage variables
+global int value;
+
+;; Load method
+() load() impure {
+    slice ds = get_data().begin_parse();
+    value = ds~load_uint(32);
+    ds.end_parse();
+}
+
+;; Save method
+() save() impure {
+    set_data(
+        begin_cell()
+            .store_uint(value, 32)
+        .end_cell()
+    );
+}
+
+;; Receive method
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    
+    load();
+    
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == 1) { ;; Set operation
+        value = in_msg_body~load_uint(32);
+        save();
+        return ();
+    }
+    
+    throw(0xffff); ;; If the message contains an op that is not known
+}
+
+;; Get method
+int get_value() method_id {
+    load();
+    return value;
+}
