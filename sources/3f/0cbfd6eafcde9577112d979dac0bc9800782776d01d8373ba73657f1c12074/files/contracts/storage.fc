@@ -1,0 +1,18 @@
+global slice data::admin;
+
+;; context globals
+global int context::bounced?;
+global int context::op;
+global int context::query_id;
+global slice context::sender;
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    data::admin = ds~load_msg_addr();
+}
+
+() save_data() impure {
+    set_data(begin_cell()
+        .store_slice(data::admin)
+    .end_cell());
+}

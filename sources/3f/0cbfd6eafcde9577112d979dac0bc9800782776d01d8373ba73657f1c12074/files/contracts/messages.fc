@@ -1,0 +1,8 @@
+() send_tons(slice to_address, int amount, int mode) impure inline {
+    send_raw_message(begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(to_address)
+        .store_coins(amount)
+        .store_uint(0, 107)
+    .end_cell(), mode);
+}
