@@ -1,0 +1,46 @@
+#include "imports/stdlib.fc";
+
+(int, int) load_data() inline {
+    ;; Get contract storage cell and parse it to slice
+    slice ds = get_data().begin_parse();
+
+    ;; Load u32 nonce from the parsed slice
+    int nonce = ds~load_uint(32);
+
+    ;; Load u64 counter from the parsed slice
+    int total = ds~load_uint(64);
+
+    return (nonce, total);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; Handle intput message body validation
+    throw_if(35, in_msg_body.slice_bits() < 32);
+
+    ;; Load u32 input from input message
+    int n = in_msg_body~load_uint(32);
+
+    ;; Load current total from storage
+    (int nonce, int total) = load_data();
+
+    ;; Increment counter valuer
+    total += n;
+
+    ;; Store cell into the contract storage
+    set_data(
+        ;; Initialize the cell builder
+        begin_cell()
+            ;; Store the counter value
+            .store_uint(nonce, 32)
+            ;; Store the counter value
+            .store_uint(total, 64)
+            ;; Finalize the cell
+            .end_cell()
+    );
+}
+
+int get_total() method_id {
+    (_, int total) = load_data();
+    return total;
+}
+
