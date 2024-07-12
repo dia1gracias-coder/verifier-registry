@@ -1,0 +1,172 @@
+#include "imports/stdlib.fc";
+
+global slice storage::owner_address;
+global int storage::fee_percent;
+global int storage::bet_min;
+global cell storage::insurances;
+
+
+const op::heads_or_tails = "heads_or_tails"c;
+const op::new_insurance = "new_insurance"c;
+const op::set_fee_percent = "set_fee_percent"c;
+const op::set_bet_min = "set_bet_min"c;
+const op::collect_fees = "collect_fees"c;
+
+
+() load_storage() impure inline {
+    slice ds = get_data().begin_parse();
+
+    storage::owner_address = ds~load_msg_addr();
+    storage::fee_percent = ds~load_uint(8);
+    storage::bet_min = ds~load_coins();
+    storage::insurances = ds~load_dict();
+}
+
+() save_storage() impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(storage::owner_address)
+            .store_uint(storage::fee_percent, 8)
+            .store_coins(storage::bet_min)
+            .store_dict(storage::insurances)
+            .end_cell()
+    );
+}
+
+() send_transaction(slice address, int value) impure inline {
+    var msg = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(address)
+    .store_coins(value)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(0, 32)
+    .store_slice("Doubled!")
+    .end_cell();
+
+    send_raw_message(msg, 0);
+}
+
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    load_storage();
+
+    slice sender_address = cs~load_msg_addr();
+
+    (int op, int query_id) = (in_msg_body~load_uint(32), in_msg_body~load_uint(64));
+
+    if (equal_slice_bits(sender_address, storage::owner_address)) {
+        if (op == op::set_bet_min) {
+            int new_bet_min = in_msg_body~load_coins();
+            throw_if(700, new_bet_min > 5000000000); ;; 5
+            throw_if(701, new_bet_min < 100000000); ;; 0.1
+            
+            storage::bet_min = new_bet_min;
+            save_storage();
+            return();
+        }
+
+        if  (op == op::set_fee_percent) {
+            int new_fee_percent = in_msg_body~load_uint(8);
+            throw_if(702, new_fee_percent <= 5);
+            throw_if(703, new_fee_percent > 0);
+
+            storage::fee_percent = new_fee_percent;
+            save_storage();
+            return ();
+        }
+
+        ;; if (op == op::collect_fees) {
+        ;;     int claim_amount = in_msg_body~load_coins();
+        ;;     throw_if(704, claim_amount <= 0);
+        ;;     throw_if(705, my_balance - claim_amount < 10000000000);
+
+        ;;     send_transaction(sender_address, claim_amount);
+        ;;     return ();
+        ;; }
+    }
+
+    throw_if(706, msg_value < storage::bet_min);
+    throw_if(707, msg_value > 100000000000); ;; 100
+
+    int sender_hash = string_hash(sender_address);
+    (cell insurance, int is_insurance) = udict_get_ref?(storage::insurances, 256, sender_hash);
+
+    if (op == op::new_insurance) {
+        throw_if(708, is_insurance);
+        
+        cell new_insurance = begin_cell()
+            .store_uint(0, 1)
+            .store_coins(msg_value)
+            .end_cell();
+        
+        storage::insurances~udict_set_ref(256, sender_hash, new_insurance);
+        
+        save_storage();
+        return ();
+    }
+
+    if (op == op::heads_or_tails) {
+        int side = in_msg_body~load_uint(1);
+        randomize_lt();
+        int result = rand(2);
+        if (result == side ) { ;; won
+            int won_amount = msg_value * 2 / 100 * (100 - storage::fee_percent);
+            if (is_insurance) {
+                storage::insurances~udict_delete?(256, sender_hash);
+            }
+            send_transaction(sender_address, won_amount);
+        } else { 
+            if (is_insurance) {
+                slice insurance_slice = insurance.begin_parse();
+                int lost_once = insurance_slice~load_uint(1);
+                if (lost_once == 0) {
+                    cell updated_insurance = begin_cell()
+                        .store_uint(1, 1)
+                        .store_coins(msg_value)
+                        .end_cell();
+                    storage::insurances~udict_set_ref(256, sender_hash, updated_insurance);
+                    save_storage();
+                    return ();
+                }
+
+                int insurance_amount = insurance_slice~load_coins();
+                storage::insurances~udict_delete?(256, sender_hash);
+                send_transaction(sender_address, insurance_amount * 4);
+            }
+        }
+    }
+}
+
+(int, int) get_insurance(slice address) method_id {
+    load_storage();
+    int hash = string_hash(address);
+    (cell insurance, int is_insurance) = udict_get_ref?(storage::insurances, 256, hash);
+    if (is_insurance) {
+        slice insurance_slice = insurance.begin_parse();
+        int lost_once = insurance_slice~load_uint(1);
+        int amount = insurance_slice~load_coins();
+        return (lost_once, amount);
+    }
+    return (-1, -1);
+}
+
+int get_bet_min() method_id {
+    load_storage();
+    return storage::bet_min;
+}
+
+int get_fee_percent() method_id {
+    load_storage();
+    return storage::fee_percent;
+}
