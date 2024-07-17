@@ -1,0 +1,51 @@
+#include "../libs/stdlib.fc";
+#include "../libs/utils.fc";
+#include "../op-codes.fc";
+
+const int provide_wallet_address_gas_consumption = 10000000;
+
+slice skip_until_fwd_fee(cell in_msg) impure {
+  slice in_msg_slice = in_msg.begin_parse();
+  in_msg_slice~load_uint(4);    ;; skip flags
+  in_msg_slice~load_msg_addr(); ;; skip sender
+  in_msg_slice~load_msg_addr(); ;; skip dst
+  in_msg_slice~load_coins();    ;; skip value
+  in_msg_slice~skip_bits(1);    ;; skip extracurrency collection
+  in_msg_slice~load_coins();    ;; skip ihr_fee
+  return in_msg_slice;
+}
+
+() ensure_enough_value(int msg_value, cell in_msg) impure {
+  slice in_msg_slice = skip_until_fwd_fee(in_msg);
+  int fwd_fee = in_msg_slice~load_coins();
+  int forward_payload_fee = muldiv(fwd_fee, 3, 2);
+  throw_unless(75, msg_value > forward_payload_fee + provide_wallet_address_gas_consumption);
+}
+
+() on_provide_wallet_address(int msg_value, cell in_msg, slice in_msg_body, slice sender_address, int query_id) impure {
+  ensure_enough_value(msg_value, in_msg);
+
+  (_, _, _, cell wallet_code) = load_data();
+  slice user_address = in_msg_body~load_msg_addr();
+  int include_address? = in_msg_body~load_uint(1);
+
+  cell included_address = include_address?
+    ? begin_cell().store_slice(user_address).end_cell()
+    : null();
+
+  var out_msg = begin_cell()
+    .store_uint(0x18, 6)
+    .store_slice(sender_address)
+    .store_coins(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(op::receive_wallet_address, 32)
+    .store_uint(query_id, 64);
+
+  if (is_resolvable?(user_address)) {
+    out_msg = out_msg.store_slice(create_wallet_address(user_address, my_address(), wallet_code));
+  } else {
+    out_msg = out_msg.store_uint(0, 2); ;; addr_none
+  }
+    
+  send_raw_message(out_msg.store_maybe_ref(included_address).end_cell(), 64);
+}

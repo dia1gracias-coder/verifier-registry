@@ -1,0 +1,17 @@
+#include "storage.fc";
+
+;;
+;; Changes the jetton content metadata.
+;;
+;; sender_address:Address
+;; in_msg_body:
+;;   ...
+;;   content:^Cell
+;;
+() on_change_content(slice sender_address, slice in_msg_body) impure {
+  (int total_supply, slice admin_address, cell content, cell wallet_code) = load_data();
+  throw_unless(73, equal_slices(sender_address, admin_address));
+
+  cell content = in_msg_body~load_ref();
+  save_data(total_supply, admin_address, content, wallet_code);
+}

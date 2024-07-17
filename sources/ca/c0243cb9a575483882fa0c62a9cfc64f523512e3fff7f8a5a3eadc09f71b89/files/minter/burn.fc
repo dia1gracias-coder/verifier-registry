@@ -1,0 +1,44 @@
+#include "../libs/utils.fc";
+#include "storage.fc";
+
+;;
+;; Burns jettons by subtracting the given amount from the total supply.
+;;
+;; sender_address:Address
+;; in_msg_body:
+;;   ...
+;;   amount_to_burn:Coins Amount of jettons to burn
+;;   burner_address:Address Address of the burner's TON account
+;;   response_address:Address Address to respond to
+;;
+;; Throws:
+;;   74: Sender address (i.e. the issuing wallet) is not the same as the address computed from the burnet address
+;;
+() on_burn(
+  slice sender_address,
+  int query_id,
+  slice in_msg_body
+) impure {
+  int amount_to_burn = in_msg_body~load_coins();
+  slice burner_address = in_msg_body~load_msg_addr();
+  slice response_address = in_msg_body~load_msg_addr();
+
+  (int total_supply, slice admin_address, cell content, cell wallet_code) = load_data();
+
+  slice burner_jetton_wallet_address = create_wallet_address(burner_address, my_address(), wallet_code);
+  throw_unless(74, equal_slices(sender_address, burner_jetton_wallet_address));
+
+  save_data(total_supply - amount_to_burn, admin_address, content, wallet_code);
+
+  if (response_address.preload_uint(2) != 0) {
+    var response_msg = begin_cell()
+      .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+      .store_slice(response_address)
+      .store_coins(0)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_uint(op::excesses, 32)
+      .store_uint(query_id, 64);
+    
+    send_raw_message(response_msg.end_cell(), 2 + 64);
+  }
+}
