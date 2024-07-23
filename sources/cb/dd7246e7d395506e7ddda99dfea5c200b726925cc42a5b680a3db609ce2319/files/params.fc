@@ -1,0 +1,11 @@
+int workchain() asm "0 PUSHINT";
+
+() force_chain(slice addr) impure {
+    (int wc, _) = parse_std_addr(addr);
+    throw_unless(333, wc == workchain());
+}
+
+int builder_null?(builder b) asm "ISNULL";
+
+int mint_end_time() asm "1722286800 PUSHINT"; ;; todo (Mon Jul 29 2024 21:00:00 GMT+0000)
+int transfer_start_time() asm "1722286800 PUSHINT"; ;; todo (Mon Jul 29 2024 21:00:00 GMT+0000)
