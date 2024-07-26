@@ -1,0 +1,39 @@
+const int op::deploy = 0x923b38fa;
+const int op::init = 0xc674e474;
+
+;; set
+const int op::set_fee = 0xeee16f7d;
+const int op::set_bet_amount = 0x9961d20e;
+const int op::transfer_ownership = 0xb516d5ff;
+
+
+const int op::transfer = 0x4034a3c0;
+const int op::transfer_notification = 0xf189f909;
+const int op::internal_transfer = 0x8f962e18;
+const int op::excesses = 0x3a70c2c;
+
+const int op::burn = 0x55521d04;
+const int op::burn_notification = 0xc8eebb0e;
+
+;; Withdraw Ton or Jetton
+const int op::withdraw_tons = 0xa38b63c;
+const int op::withdraw_jettons = 0x18a9ed91;
+
+;; Play Game
+const int op::play_tons = 0xbfe5fcb4;
+const int op::play_jettons = 0x57baefa;
+
+const int op::provide_wallet_address = 0x1257ff16;
+const int op::take_wallet_address = 0xb1a51c70;
+
+;; Minter
+const int op::mint = 0x318f361;
+const int op::change_admin = 0xd4deb03b;
+const int op::change_content = 0xec29200;
+
+(slice, (int)) ~load_op(slice s) inline { return s.load_uint(32); }
+(slice, (int)) ~load_query_id(slice s) inline { return s.load_uint(64); }
+builder store_op(builder b, int op) inline { return b.store_uint(op, 32); }
+builder store_query_id(builder b, int query_id) inline { return b.store_uint(query_id, 64); }
+
+const deposit_notification = "internal_transfer"c;

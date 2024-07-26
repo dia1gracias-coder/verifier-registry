@@ -1,0 +1,260 @@
+#include "imports/stdlib.fc";
+#include "imports/messages.fc";
+#include "imports/op-codes.fc";
+#include "imports/error-codes.fc";
+#include "params.fc";
+#include "jetton-utils.fc";
+
+global int min_ton; ;; 0.1 TON
+global int max_ton; ;; 50 TON
+
+global int min_jetton; ;; 1,000 Jetton(FLIP)
+global int max_jetton; ;; 250,000,000 Jetton
+
+global slice data::admin_address;
+global int data::fee_percent;
+global int data::bip_base;
+global int data::is_win;
+global int data::count_play;
+global cell data::jetton_wallet_code;
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    data::admin_address = ds~load_msg_addr();
+    data::fee_percent = ds~load_uint(32);
+    data::bip_base = ds~load_uint(32);
+    data::is_win = ds~load_uint(32);
+    data::count_play = ds~load_uint(32);
+    data::jetton_wallet_code = ds~load_ref();
+}
+
+() save_data() impure {
+    set_data(begin_cell()
+        .store_slice(data::admin_address)
+        .store_uint(data::fee_percent, 32)
+        .store_uint(data::bip_base, 32)
+        .store_uint(data::is_win, 32)
+        .store_uint(data::count_play, 32)
+        .store_ref(data::jetton_wallet_code)
+    .end_cell());
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    cs~skip_bits(32); ;; first 4 bytes are flags
+    slice sender_address = cs~load_msg_addr(); ;; get the address
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = muldiv(cs~load_coins(), 3, 2); ;; we use message fwd_fee for estimation of forward_payload costs
+
+    int op = in_msg_body~load_op(); ;; OP Code
+    int query_id = in_msg_body~load_query_id();
+    load_data();
+
+    ;; Deposit TON to Contract
+    if (op == op::deploy) {
+        ;
+    }
+    ;; Initialize
+    elseif (op == op::init) {
+        data::admin_address = sender_address;
+        data::fee_percent = in_msg_body~load_uint(32);
+        data::bip_base = in_msg_body~load_uint(32);
+    }
+    ;; PlayTon Game
+    elseif (op == op::play_tons) {
+        ;; Check that the best is within the min and max bet
+        throw_unless(110, msg_value >= min_ton);
+        throw_unless(110, msg_value <= max_ton);
+
+        var [balance, _] = get_balance();
+        int win_value = msg_value * 2;
+
+        int fee = msg_value / data::bip_base * data::fee_percent; ;; Set fee as 2.5%
+        win_value -= fee;
+
+        ;; Check that the potential win is within the balance
+        throw_unless(111, win_value < balance);
+
+        randomize_lt();
+        int x = rand(100); ;; generate a random number (either 0 or 1)
+
+        data::is_win = 0;
+        data::count_play += 1;
+        
+        if (x < 49) { ;; user won
+            data::is_win = 1;
+            int msg_mode = 3;
+            cell msg = begin_cell()
+                .store_uint(0x18, 6) ;; default values
+                .store_slice(sender_address)
+                .store_coins(win_value)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+
+            send_raw_message(msg, msg_mode);
+        }
+    }
+    ;; PlayJetton Game
+    elseif (op == op::play_jettons) {
+        ;; Check that the best is within the min and max bet
+        throw_unless(120, msg_value >= min_jetton);
+        throw_unless(120, msg_value <= max_jetton);
+        throw_unless(error::unauthorized_mint_request, equal_slices(sender_address, data::admin_address));
+
+        slice to_address = in_msg_body~load_msg_addr();
+        int jetton_amount = in_msg_body~load_coins();
+        int forward_ton_amount = in_msg_body~load_coins();
+        int total_ton_amount = in_msg_body~load_coins();
+        throw_unless(error::discovery_fee_not_matched, total_ton_amount > forward_ton_amount);
+        
+        ;; var [balance, _] = get_wallet_data(); ;; Jetton balance
+        cell state_init = calculate_jetton_wallet_state_init(sender_address, my_address(), data::jetton_wallet_code);
+        slice to_wallet_address = calculate_jetton_wallet_address(state_init); ;; Jetton wallet address???
+
+        ;; calculate win value
+        int win_value = msg_value * 2;
+
+        int fee = msg_value / data::bip_base * data::fee_percent; ;; Set fee as 2.5%
+        win_value -= fee;
+
+        ;; Check that the potential win is within the balance
+        ;; throw_unless(111, win_value < balance);
+
+        randomize_lt();
+        int x = rand(100); ;; generate a random number (either 0 or 1)
+
+        data::is_win = 0;
+        data::count_play += 1;
+        
+        if (x < 49) { ;; user won
+            data::is_win = 1;
+            cell send_request = begin_cell()
+                .store_op(op::internal_transfer)
+                .store_query_id(query_id)
+                .store_coins(msg_value) ;; max 124 bit, jetton value
+                .store_uint(0, 2) ;; from_address, addr_none$00
+                .store_slice(my_address()) ;; response_address, 3 + 8 + 256 = 267 bit
+                .store_coins(forward_ton_amount) ;; forward_amount, 4 bit if zero
+                .store_uint(0, 1) ;; no forward_payload, 1 bit
+            .end_cell();
+
+            var msg = begin_cell()
+            .store_msg_flag(msg_flag::bounceable)
+            .store_slice(to_wallet_address)
+            .store_coins(win_value)
+            .store_msgbody_prefix_stateinit(state_init, send_request);
+            
+            send_raw_message(msg.end_cell(), PAY_FEES_SEPARATELY); ;; pay transfer fees separately, revert on errors
+        }
+    }
+    ;; Set fee_amount and bip_base
+    elseif (op == op::set_fee) {
+        if (equal_slices(sender_address, data::admin_address)) {
+            data::fee_percent = in_msg_body~load_uint(32);
+            data::bip_base = in_msg_body~load_uint(32);
+        }
+    }
+    ;; Transfer ownership
+    elseif (op == op::transfer_ownership) {
+        if (equal_slices(sender_address, data::admin_address)) {
+            data::admin_address = in_msg_body~load_msg_addr();
+        }
+    }   
+    ;; Withdraw Ton
+    elseif (op == op::withdraw_tons) {
+        if (equal_slices(sender_address, data::admin_address)) {
+            var [balance, _] = get_balance();
+            var withdraw_amount = in_msg_body~load_uint(32);
+
+            if (withdraw_amount > balance) {
+                withdraw_amount = balance;
+            }
+
+            int msg_mode = 3;
+
+            cell msg = begin_cell()
+            .store_uint(0x18, 6) ;; default values
+            .store_slice(sender_address)
+            .store_coins(withdraw_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+
+            send_raw_message(msg, msg_mode);
+        }
+    }
+    ;; Withdraw Jetton
+    elseif (op == op::withdraw_jettons) {
+        if (equal_slices(sender_address, data::admin_address)) {
+            var [balance, _] = get_balance();
+            var withdraw_amount = in_msg_body~load_uint(32);
+
+            if (withdraw_amount > balance) {
+                withdraw_amount = balance;
+            }
+
+            int msg_mode = 3;
+
+            cell msg = begin_cell()
+            .store_uint(0x18, 6) ;; default values
+            .store_slice(sender_address)
+            .store_coins(withdraw_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+
+            send_raw_message(msg, msg_mode);
+        }
+    }
+    ;; Set trading ton and jetton amount
+    elseif (op == op::set_bet_amount) {
+        if (equal_slices(sender_address, data::admin_address)) {
+            min_ton = in_msg_body~load_uint(32);
+            max_ton = in_msg_body~load_uint(32);
+            min_jetton = in_msg_body~load_uint(32);
+            max_jetton = in_msg_body~load_uint(32);
+        }
+    }
+    
+    save_data();
+}
+
+int balance() method_id {
+    var [balance, _] = get_balance();
+    return balance;
+}
+
+slice getAdmin() method_id {
+    load_data();
+    return data::admin_address;
+}
+
+int getFeePercent() method_id {
+    load_data();
+    return data::fee_percent;
+}
+
+int getBipBase() method_id {
+    load_data();
+    return data::bip_base;
+}
+
+int getStatus() method_id {
+    load_data();
+    return data::is_win;
+}
+
+int getCountPlay() method_id {
+    load_data();
+    return data::count_play;
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    load_data();
+    return calc_user_wallet(owner_address, my_address(), data::jetton_wallet_code);
+}
+
