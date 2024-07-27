@@ -1,0 +1,501 @@
+#include "imports/stdlib.fc";
+#include "imports/opcodes.fc";
+#include "imports/message_mode.fc";
+
+(slice, (int)) ~load_std_addr (slice s) asm "LDMSGADDR SWAP REWRITESTDADDR SWAP ISZERO 699 THROWIFNOT";
+
+{-
+    storage#_ start_time:uint32 reports:Maybe (Hashmap 16 MsgAddressInt) lecturer_address:MsgAddressInt goal:uint64 left:int64 payments:Maybe (Hashmap 16 uint64) = Storage
+-}
+
+;; storage variables
+global int start_time; ;; uint32
+global int duration; ;; uint16
+global int goal; ;;uint64
+global int left; ;;left
+global slice service_address; ;; MsgAddressInt
+global slice lecturer_address; ;; MsgAddressInt
+global cell places; ;; Maybe (Hashmap 16 MsgAddressInt)
+global cell payments; ;; Maybe (Hashmap 16 uint64)
+global cell reports; ;; Maybe (Hashmap 16 MsgAddressInt)
+
+const int version = 1;
+const int MINIMUM_PAYMENT = 100000000; ;; minimal payment 1 ton = 1000000000
+const int START_LESSON_PRICE = 1000000000; ;; minimal payment 1 ton = 1000000000
+const int SERVICE_FEE_AMOUNT = 5; ;; percents
+const int PLACES_COMISSION_BUDGET = 5; ;; percents
+const int END_FUNDING_PERIOD = 7200; ;; seconds, 2 hours before start_time
+const int END_REPORTING_PERIOD = 7200; ;; seconds, 2 hours after start_time
+const int MAX_DURATION = 64800; ;; 18 hours
+
+() load_data () impure {
+    var ds = get_data().begin_parse();
+
+    start_time = ds~load_uint(32);
+    duration = ds~load_uint(16);
+    service_address = ds~load_msg_addr();
+    ;; manager_address = ds~load_msg_addr(); ;; deprecated, use places
+    lecturer_address = ds~load_msg_addr();
+    goal = ds~load_uint(64);
+    left = ds~load_int(64);
+    places = ds~load_dict();
+    payments = ds~load_dict();
+    reports = ds~load_dict();
+
+    ds.end_parse();
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(start_time, 32)
+            .store_uint(duration, 16)
+            .store_slice(service_address)
+        ;; .store_slice(manager_address) ;; deprecated, use places
+            .store_slice(lecturer_address)
+            .store_uint(goal, 64)
+            .store_int(left, 64)
+            .store_dict(places)
+            .store_dict(payments)
+            .store_dict(reports)
+        .end_cell()
+    );
+}
+
+slice account_to_address (int account) {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(0, 8)
+        .store_uint(account, 256)
+    .end_cell().begin_parse();
+}
+
+int total_payments() impure {
+    load_data();
+
+    (int key, slice val, int f?) = payments.udict_get_min?(16);
+    int total_amount = 0;
+    while (f?) {
+        slice sender_address = val~load_msg_addr();
+        int time = val~load_uint(32);
+        int amount = val~load_uint(64);
+
+        total_amount += amount;
+        (key, val, f?) = payments.udict_get_next?(16, key);
+    }
+
+    return total_amount;
+}
+
+int getPlaceAmount (slice place_address) impure {
+    load_data();
+
+    int total_amount = 0;
+    
+    (int key, slice payment, int f?) = payments.udict_get_min?(16);
+
+    while (f?) {
+        slice _sender_address = payment~load_msg_addr();            
+        int _place_date = payment~load_uint(32); 
+        int _amount = payment~load_uint(64); 
+        slice _place_address = payment~load_msg_addr(); 
+
+        if(equal_slice_bits(_place_address, place_address)) {
+            total_amount += _amount;
+        }
+
+        (key, payment, f?) = payments.udict_get_next?(16, key);
+    }
+
+    return total_amount;
+}
+
+int is_unique_place(slice place_address) impure {
+    int is_unique = true;
+
+    (int key, slice val, int f?) = places.udict_get_min?(16);
+
+    while (f?) {
+        slice _address = val~load_msg_addr();
+
+        if(equal_slice_bits(_address, place_address)) {
+            is_unique = false;
+            f? = false;
+        } else {
+            (key, val, f?) = places.udict_get_next?(16, key);
+        }
+    }
+
+    return is_unique;
+}
+
+() destroy () impure {
+    load_data();
+    
+    send_raw_message(begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(service_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 32)
+        .store_slice("Service fee")
+    .end_cell(), message_mode::all_not_reserved + message_mode::destroy_if_zero);
+    ;; ~dump(4);
+}
+
+() rollbackDeploy (slice sender_address) impure {
+    load_data();
+
+    send_raw_message(begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 32)
+        .store_slice("Deployment canceled")
+    .end_cell(), message_mode::all_not_reserved + message_mode::destroy_if_zero);
+    ;; ~dump(4);
+}
+
+() return_money () impure {
+    load_data();
+
+    (int key, slice val, int f?) = payments~udict::delete_get_min(16);
+    ;; ~dump(2);
+    while (f?) {
+        slice sender_address = val~load_msg_addr();
+        int time = val~load_uint(32);
+        int amount = val~load_uint(64);
+
+        send_raw_message(begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 32)
+            .store_slice("Refund of payment")
+        .end_cell(), message_mode::ignore_errors);
+        ;; ~dump(3);
+        (key, val, f?) = payments~udict::delete_get_min(16);
+    }
+
+    destroy();
+}
+
+() make_payout () impure {
+    load_data();
+
+    int my_balance = get_balance().pair_first();
+    int payments_amount = total_payments();
+    int payout = payments_amount - (payments_amount * (SERVICE_FEE_AMOUNT + PLACES_COMISSION_BUDGET) / 100);
+    int places_budget = payments_amount * PLACES_COMISSION_BUDGET / 100;
+    
+    send_raw_message(begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(lecturer_address)
+        .store_coins(payout)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 32)
+        .store_slice("Payment for a lecture")
+    .end_cell(), message_mode::sender_pay_fee + message_mode::ignore_errors);
+
+    (int key, slice place, int f?) = places.udict_get_min?(16);
+
+    while (f?) {
+        slice place_address = place~load_msg_addr();
+        int place_amount = getPlaceAmount(place_address);
+
+        if (place_amount > 0 & is_unique_place(place_address)) {
+            int place_koef = place_amount / payments_amount;
+            int place_fee = payments_amount * PLACES_COMISSION_BUDGET * place_koef;
+
+            send_raw_message(begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(place_address)
+                .store_coins(place_fee)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 32)
+                .store_slice("Fee for a place")
+            .end_cell(), message_mode::sender_pay_fee + message_mode::ignore_errors);
+        }       
+
+        (key, place, f?) = places.udict_get_next?(16, key);
+    }
+
+    destroy();
+}
+
+int senderHasPayments (slice address) impure {
+    load_data();
+
+    int hasPayments = false;
+    (int key, slice val, int f?) = payments.udict_get_min?(16);
+    while (f?) {
+        slice v = val;
+        if(equal_slice_bits(val~load_msg_addr(), address)) {
+            hasPayments = true;
+            f? = false;
+        } else {
+            (key, val, f?) = payments.udict_get_next?(16, key);
+        }
+    }
+
+    return hasPayments;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+
+    ;; if (cs.slice_bits() == 729) {
+    ;;     cs~skip_last_bits(49);
+    ;; } else {
+    ;;     cs~skip_last_bits(33);
+    ;; }
+    ;; int init? = cs.slice_last(1).preload_uint(1);
+    ;; if (init? == 1) {
+    ;;     if(msg_value < START_LESSON_PRICE) {
+    ;;         var flags = cs~load_uint(4);
+    ;;         (_, slice sender_original) = cs.load_msg_addr();
+
+    ;;         rollbackDeploy(sender_original);
+    ;;         throw(801);
+    ;;     }
+
+    ;;     return ();
+    ;; }
+
+    ;; ignore all empty messages
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    ;; ignore all bounced messages
+    var flags = cs~load_uint(4);
+    if (flags & 1) { 
+        return ();
+    }
+    
+    load_data(); ;; here we populate the storage variables      
+
+    int reached = left <= 0;
+    (_, slice sender_original) = cs.load_msg_addr();
+    int sender = cs~load_std_addr();
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::pay()) {
+        ;; throw_if(708, equal_slice_bits(sender_original, manager_address)); ;; deprecated, use places
+        throw_if(700, msg_value < MINIMUM_PAYMENT);
+        throw_if(701, now() >= start_time);
+        
+        slice place_address = in_msg_body~load_msg_addr();
+        
+        throw_if(717, ~ is_unique_place(place_address));
+
+        (int last_payment, _, int f?) = payments.udict_get_max?(16);
+        
+        if (~ f?) {
+            last_payment = 0;
+        }
+        
+        payments~udict_set(16, last_payment + 1, begin_cell().store_slice(sender_original).store_uint(now(), 32).store_uint(msg_value, 64).store_slice(place_address).end_cell().begin_parse());
+        left -= msg_value;
+        
+        save_data();
+        return ();
+    }
+
+    if (op == op::add_places()) {
+        cell new_places = in_msg_body~load_dict();
+        (int key, slice new_place, int f_new?) = new_places.udict_get_min?(16);
+        (int last_place, _, int f?) = places.udict_get_max?(16);
+        
+        throw_if(716, now() >= start_time - END_FUNDING_PERIOD);      
+        throw_if(717, ~ f_new?); ;; if empty the dictionary
+
+        if (~ f?) {
+            last_place = 0;
+        }
+
+        while (f_new?) {  
+            slice place_address = new_place~load_msg_addr();        
+
+            ;; if (is_unique_place(place_address)) {
+            places~udict_set(16, last_place + 1, begin_cell().store_slice(place_address).store_uint(now(), 32).end_cell().begin_parse());
+            ;; }
+            
+            (key, new_place, f?) = new_places.udict_get_next?(16, key);
+        }
+       
+        save_data();
+        return ();
+    }
+
+    elseif (op == op::report()) {
+        throw_if(715, equal_slice_bits(sender_original, service_address));
+        ;; throw_if(714, equal_slice_bits(sender_original, manager_address)); ;; deprecated, use places
+        throw_if(709, equal_slice_bits(sender_original, lecturer_address));
+        throw_unless(702, now() > start_time + duration);
+        throw_if(703, ~ senderHasPayments(sender_original));
+
+        (int last_report, _, int f?) = reports.udict_get_max?(16);
+
+        if (~ f?) {
+            last_report = 0;
+        }
+        
+        reports~udict_set(16, last_report + 1, begin_cell().store_slice(sender_original).store_uint(now(), 32).end_cell().begin_parse());
+
+        save_data();
+        return ();
+    }
+
+    elseif (op == op::solve()) {
+        throw_unless(715, ~ equal_slice_bits(sender_original, service_address));
+        ;; throw_unless(704, equal_slice_bits(sender_original, manager_address)); ;; deprecated, use places
+        throw_unless(705, now() >= start_time + duration);
+
+        int report_no = in_msg_body~load_uint(16);
+        int approved? = in_msg_body~load_uint(1);
+
+        (_, _, int f?) = reports.udict_get_max?(16);
+        throw_unless(706, f?);
+
+        if(approved?) {
+            return_money();
+        } else {
+            reports~udict_delete?(16, report_no);
+            ;; ;; ~dump([16, report]);
+        }
+
+        save_data();
+        return ();
+    }
+
+    elseif (op == op::cancel()) {
+        ;; ~dump(0);
+        throw_unless(707, equal_slice_bits(sender_original, lecturer_address));
+        ;; ~dump(1);
+        return_money();
+
+        save_data();
+        return ();
+    }
+
+    elseif (op == op::destroy()) {
+        throw_unless(713, equal_slice_bits(sender_original, my_address()));
+        destroy();
+
+        save_data();
+        return ();
+    }
+
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+() recv_external (slice in_msg_body) impure {
+    load_data();
+
+    int reached = left <= 0;
+    int my_balance = get_balance().pair_first();
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::try_start()) {
+        throw_unless(710, now() >= start_time - END_FUNDING_PERIOD);
+        if (~ reached) {
+            accept_message();
+            return_money();
+        }
+    }
+
+    elseif (op == op::try_payout()) {
+        throw_unless(711, now() >= start_time + duration + END_REPORTING_PERIOD);
+        (_, _, int f?) = reports.udict_get_max?(16);
+        throw_if(712, f?);
+        accept_message();
+        make_payout();
+    }
+}
+
+;; get-methods
+
+(int, int, int, int, slice, slice, int, int, int) get_all_data () method_id {
+    load_data();
+
+    (int key, slice place, int f?) = places.udict_get_min?(16);
+    int places_count = 0;
+    while (f?) {
+        places_count += 1;
+        (key, place, f?) = places.udict_get_next?(16, key);
+    }
+
+    (int key, slice report, int f?) = reports.udict_get_min?(16);
+    int reports_count = 0;
+    while (f?) {
+        reports_count += 1;
+        (key, report, f?) = reports.udict_get_next?(16, key);
+    }
+
+    (int key, slice payment, int f?) = payments.udict_get_min?(16);
+    int payments_count = 0;
+    while (f?) {
+        payments_count += 1;
+        (key, payment, f?) = payments.udict_get_next?(16, key);
+    }
+
+    return (start_time, duration, goal, left, service_address, lecturer_address, places_count, payments_count, reports_count);
+}
+
+(int, int) get_left_goal () method_id {
+    load_data();
+
+    return (left, goal);
+}
+
+int get_start_time () method_id {
+    load_data();
+
+    return start_time;
+}
+
+cell get_payments_by_user (slice address) method_id {
+    load_data();
+
+    cell user_payments = new_dict();
+    int i = 1;
+    (int key, slice val, int f?) = payments.udict_get_min?(16);
+    while (f?) {
+        slice v = val;
+        if(equal_slice_bits(val~load_msg_addr(), address)) {
+            user_payments~udict_set(16, i, v);
+            i = i + 1;
+        }
+
+        (key, val, f?) = payments.udict_get_next?(16, key);
+    }
+
+    return begin_cell().store_dict(user_payments).end_cell();
+}
+
+int get_total_payments_by_place (slice place_address) method_id {
+    load_data();
+
+    return getPlaceAmount(place_address);
+}
+
+cell get_places () method_id {
+    load_data();
+
+    return begin_cell().store_dict(places).end_cell();
+}
+
+cell get_payments () method_id {
+    load_data();
+
+    return begin_cell().store_dict(payments).end_cell();
+}
+
+cell get_reports () method_id {
+    load_data();
+
+    return begin_cell().store_dict(reports).end_cell();
+}
+
+int get_version () method_id {
+    return version;
+}
