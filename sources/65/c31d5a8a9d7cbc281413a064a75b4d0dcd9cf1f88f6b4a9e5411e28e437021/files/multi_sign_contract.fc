@@ -1,0 +1,172 @@
+#include "imports/stdlib.fc";
+#include "imports/types.fc";
+
+const op::update_signers = "op::update_signers"c;
+const op::mint = "op::mint"c;
+const op::test = "op::test"c;
+const op::empty_msg = "op::empty_msg"c;
+
+;; load_data populates storage variables using stored data
+(slice, cell) load_data() impure {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),
+        ds~load_nonempty_dict()
+    );
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data(slice admin_address, cell signers) impure {
+    set_data(
+        begin_cell()
+            .store_slice(admin_address)
+            .store_nonempty_dict(signers)
+            .end_cell()
+    );
+}
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+
+
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+
+
+    slice cs = in_msg_full.begin_parse();
+    ~strdump("CS");
+    int flags = cs~load_uint(4);
+    ~dump(flags);
+    if (flags & 1) { ;; ignore all bounced messages
+        ~strdump("Ignore message");
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    (slice admin_address, cell signers) = load_data(); ;; here we populate the storage variables
+
+    int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+    int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
+
+    if (op == 3) { ;; change admin
+        throw_unless(73, equal_slice_bits(sender_address, admin_address));
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        save_data(new_admin_address, signers);
+        return ();
+    }
+
+    if (op == op::update_signers) { ;; change signers
+        throw_unless(73, equal_slice_bits(sender_address, admin_address));
+        cell newSigners = in_msg_body~load_nonempty_dict();
+        save_data(admin_address, newSigners);
+        return ();
+    }
+
+    if (op == op::empty_msg) { ;; change signers
+        return ();
+    }
+
+    if (op == op::mint) { ;; mint tokens
+        (slice admin_address, cell signers) = load_data();
+
+        ;; cell dataCustom = begin_cell().store_uint(2, 32).end_cell();
+
+        slice signature1 = in_msg_body~load_bits(512);
+        slice validator_address = in_msg_body~load_msg_addr();
+        cell data = in_msg_body~load_ref();
+        int hash = slice_hash(data.begin_parse());
+
+        ~strdump("hash");
+        ~dump(hash);
+
+
+        ;; ~strdump("Cell data 1 sent");
+        ;; ~dump(data);
+        ;; ~dump(data.begin_parse()~preload_bits(32));
+
+        (int workchain, int publicKey) = parse_std_addr(validator_address);
+        ;; cell data = begin_cell().store_uint(2, 32).end_cell();
+
+        ;; ~strdump("Cell data 2");
+        ;; ~dump(cell_data);
+        ;; ~strdump("Validator address");
+        ;; ~dump(validator_address);
+        ;; ~strdump("Validator publicKey");
+        ;; ~dump(publicKey);
+        ;; ~strdump("Validator workchain");
+        ;; ~dump(workchain);
+        ;; ~strdump("Signature");
+        ;; ~dump(signature1);
+        ~strdump("Public key");
+        ~dump(publicKey);
+        ;; ~strdump("Hash");
+        ;; ~dump(hash);
+
+        int res = check_signature(
+            hash,
+            signature1,
+            publicKey
+        );
+        ~strdump("Result of check");
+        ~dump(res);
+
+
+        var msg_body = begin_cell()
+            .store_uint(op::empty_msg, 32)
+            .store_uint(query_id, 64)
+            .store_uint(res, 4)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_uint(0x10, 6) ;; we should not bounce here cause receiver can have uninitialized contract
+            .store_slice(my_address())
+            .store_coins(0)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body);
+
+        send_raw_message(msg.end_cell(), 1);
+        return ();
+    }
+
+    ;; if (op == op::test) {
+    ;;     ;; mint tokens
+    ;;     ~strdump("Point 0");
+    ;;     slice testBits = in_msg_body~load_bits(4);
+    ;;
+    ;;     ~strdump("Point 1");
+    ;;     ~dump(testBits);
+    ;;
+    ;;     return ();
+    ;; }
+    ~strdump("Point 0xffff");
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+;; get methods are a means to conveniently read contract data using, for example, HTTP APIs
+;; they are marked with method_id
+;; note that unlike in many other smart contract VMs, get methods cannot be called by other contracts
+
+slice get_admin_address() method_id {
+    (slice admin_address, _) = load_data();
+    return admin_address;
+}
+
+cell get_signers() method_id {
+    (_, cell signers) = load_data();
+    return signers;
+}
+
+;; cell get_check_signature() method_id {
+;;     (_, cell signers) = load_data();
+;;
+;;     ;; slice sl = signers.udict_get?(8, 1)
+;;
+;;     ~dump(sl);
+;;     ;; slice = signers = sl~load_dict();
+;;
+;;
+;;     cell newCell = begin_cell().store_uint(2, 32).end_cell();
+;;     return newCell;
+;; }
