@@ -1,0 +1,129 @@
+#include "imports/stdlib.fc";
+
+;; 是否初始化
+global int inited;
+;; 支付通道状态
+global int state;
+;; 管理员，可设置支付通道状态
+global slice admin;
+;; 可提取的金额
+global int claimable_amount;
+;; addr1, rate1, claimed, addr2, rate2, claimed, addr3, rate3, claimed
+global cell beneficiarys;
+
+global int storage_parse_level;
+
+const int error::already_inited = 100;
+const int error::not_authorized = 101;
+const int error::not_enough_money_for_init = 102;
+const int error::wrong_tag = 104;
+const int error::outdated_state = 105;
+const int error::quarantin_already_active = 106;
+const int error::no_quarantined_state = 107;
+const int error::seqno_regress = 108;
+const int error::quarantine_already_challenged = 115;
+const int error::unauthorized_challenge = 109;
+const int error::quarantin_not_finished = 110;
+const int error::too_late_for_quarantin_challenge = 111;
+const int error::too_late_to_settle_conditionals = 112;
+const int error::too_early_to_close = 113;
+const int error::wrong_channel_id = 114;
+
+;; 未初始化，不能进行任何操作
+const int state::uninited = 0;
+;; 可支付不可提取收益
+const int state::open = 1;
+;; 不可支付，不可提取收益
+const int state::close = 2;
+;; 可支付，可提取收益
+const int state::freeze = 3;
+
+const int storage::full = 1;
+const int storage::light = 0;
+
+const int op::init = 0xf8888880;
+
+() load_storage (int level) impure;
+() save_storage () impure;
+() init_payment() impure;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    init_payment();
+}
+
+;;  加载数据
+
+() load_storage (int level) impure {
+  storage_parse_level = level;
+  slice cs = get_data().begin_parse();
+  inited = cs~load_int(1);
+  state = cs~load_int(32);
+  admin = cs~load_msg_addr();
+  claimable_amount = cs~load_uint(256);
+
+  if (level >= storage::full) {
+    beneficiarys = cs~load_ref();
+  }
+
+}
+
+;; 存储数据
+
+() save_storage () impure {
+  int level = storage_parse_level;
+  builder storage = begin_cell();
+
+  storage = storage.store_int(inited, 1)
+                .store_int(state, 32)
+                .store_slice(admin)
+                .store_uint(claimable_amount, 256);
+    if (level >= storage::full) {
+        storage.store_maybe_ref(beneficiarys);
+    }
+
+    set_data(storage.end_cell());
+}
+
+;; 初始化
+
+() init_payment() impure {
+    load_storage(storage::full);
+    throw_unless(error::already_inited, ~ inited);
+    
+    inited = true;
+    state = state::open;
+    admin = "UQBsmOZnYxsqkzrSmziOh5OLGOSfYIYMUCdkM6zp0JhYT-Sp";
+    claimable_amount = 0;
+    beneficiarys = begin_cell()
+                    .store_slice("addr1")
+                    .store_uint(7500, 32)
+                    .store_uint(0, 256)
+                    .store_slice("addr2")
+                    .store_uint(2000, 32)
+                    .store_uint(0, 256)
+                    .store_slice("addr3")
+                    .store_uint(500, 32)
+                    .store_uint(0, 256)                    
+                    .end_cell();
+
+    return save_storage();
+}
+
+;; 获取详情
+_ get_payment_data () method_id {
+    load_storage(storage::full);
+
+    slice cs = beneficiarys.begin_parse();
+
+
+    return (
+        inited,
+        state,
+        admin,
+        claimable_amount,
+        [cs.load_msg_addr(), cs.load_uint(32), cs.load_uint(256)],
+        [cs.load_msg_addr(), cs.load_uint(32), cs.load_uint(256)],
+        [cs.load_msg_addr(), cs.load_uint(32), cs.load_uint(256)]
+
+    );
+}
