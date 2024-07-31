@@ -1,0 +1,339 @@
+#include "imports/stdlib.fc";
+#include "codes.fc"; 
+
+const op::upgrade = "op::upgrade"c;
+const op::buy = "op::buy"c;
+const op::coin = "op::coin"c;
+const op::setting_gas = "op::setting_gas"c;
+const op::update_owner = "op::update_owner"c;
+const op::update_admin = "op::update_admin"c;
+const op::update_limit_boost = "op::update_limit_boost"c;
+const op::withdraw = "op::withdraw"c;
+
+global slice ctx_owner_address;
+global slice ctx_admin_address;
+global int ctx_owner_pub_key; 
+global int ctx_limit_boost;
+global cell ctx_boosts;
+global cell ctx_nonces;
+global cell ctx_auto_claims;
+global cell ctx_gachas;
+global int v;
+global int gas_base;
+global int ctx_buy_count;
+global int ctx_buy_amount;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    v = ds~load_uint(32);
+    var ctx_setting_cell = ds~load_ref();
+    var ctx_setting_cell_ds = ctx_setting_cell.begin_parse();
+    ctx_admin_address = ctx_setting_cell_ds~load_msg_addr();
+    gas_base = ctx_setting_cell_ds~load_uint(256);
+    var ctx_buy_statistic_cell_ds = ctx_setting_cell_ds~load_ref().begin_parse();
+    ctx_buy_count = ctx_buy_statistic_cell_ds~load_uint(256);
+    ctx_buy_amount = ctx_buy_statistic_cell_ds~load_uint(256);
+    ctx_buy_statistic_cell_ds.end_parse();
+    ctx_setting_cell_ds.end_parse();
+
+    ctx_owner_address = ds~load_msg_addr();
+    ctx_owner_pub_key = ds~load_uint(256);
+    ctx_limit_boost = ds~load_uint(256);
+
+    var ctx_dicts_cell = ds~load_ref();
+    var ctx_dicts_ds = ctx_dicts_cell.begin_parse();
+    ctx_boosts = ctx_dicts_ds~load_dict();
+    ctx_nonces = ctx_dicts_ds~load_dict();
+    ctx_auto_claims = ctx_dicts_ds~load_dict();
+    ctx_gachas = ctx_dicts_ds~load_dict();
+    ctx_dicts_ds.end_parse();
+    ds.end_parse();
+}
+
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(v,32)
+            .store_ref(begin_cell().store_slice(ctx_admin_address).store_uint(gas_base,256).store_ref(begin_cell().store_uint(ctx_buy_count,256).store_uint(ctx_buy_amount,256).end_cell()).end_cell())
+            .store_slice(ctx_owner_address)
+            .store_uint(ctx_owner_pub_key,256)
+            .store_uint(ctx_limit_boost,256)
+            .store_ref(begin_cell().store_dict(ctx_boosts).store_dict(ctx_nonces).store_dict(ctx_auto_claims).store_dict(ctx_gachas).end_cell())
+            .end_cell()
+    );
+}
+builder create_msg(int flags, slice to_address, int value) inline {
+    return begin_cell()
+            .store_uint(flags, 6)
+            .store_slice(to_address)
+            .store_coins(value)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+}
+builder create_msg_body(int flags, slice to_address, int value, cell body) inline {
+    return begin_cell()
+            .store_uint(flags, 6)
+            .store_slice(to_address)
+            .store_coins(value)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(body);
+}
+int get_value_from_dict(cell dict, int key){
+    int value = 0;
+    var (value_slice,success) = dict.udict_get?(256,key);
+    if (success) {
+        value = value_slice~load_uint(256);
+    }
+    return value;
+}
+(cell,()) set_value_to_dict(cell dict, int key, int value){
+    slice value_slice = begin_cell().store_uint(value, 256).end_cell().begin_parse();
+    dict~udict_set(256,key,value_slice);
+    return (dict,());
+}
+int get_value_from_dict_2l(cell dict, int key1, int key2){
+    int value = 0;
+    var (sub_dict,success) = dict.udict_get_ref?(256,key1);
+    if (success) {
+        var (value_slice, boost_count_success) = sub_dict.udict_get?(256,key2);
+        if (boost_count_success) {
+            value = value_slice~load_uint(256);
+        }           
+    }
+    return value;
+}
+slice get_value_from_dict_2l_slice(cell dict, int key1, int key2){
+    slice value = begin_cell().store_uint(0,96).end_cell().begin_parse();
+    var (sub_dict,success) = dict.udict_get_ref?(256,key1);
+    if (success) {
+        var (value_slice, boost_count_success) = sub_dict.udict_get?(256,key2);
+        if (boost_count_success) {
+            value = value_slice;
+        }           
+    }
+    return value;
+}
+(cell,()) set_value_to_dict_2l(cell dict, int key1, int key2, int value){
+    slice value_slice = begin_cell().store_uint(value, 256).end_cell().begin_parse();
+    ;; cell sub_dict = null();
+    var (sub_dict,success) = dict.udict_get_ref?(256,key1);
+    if (success) {
+        sub_dict~udict_set(256,key2,value_slice);
+        dict~udict_set_ref(256,key1,sub_dict);
+    } else {
+        var new_sub_dict = new_dict();
+        new_sub_dict~udict_set(256,key2,value_slice);
+        dict~udict_set_ref(256,key1,new_sub_dict);
+    }
+    return (dict,());
+}
+(cell,()) set_value_to_dict_2l_slice(cell dict, int key1, int key2, slice value_slice){
+    ;; slice value_slice = begin_cell().store_uint(value, 256).end_cell().begin_parse();
+    ;; cell sub_dict = null();
+    var (sub_dict,success) = dict.udict_get_ref?(256,key1);
+    if (success) {
+        sub_dict~udict_set(256,key2,value_slice);
+        dict~udict_set_ref(256,key1,sub_dict);
+    } else {
+        var new_sub_dict = new_dict();
+        new_sub_dict~udict_set(256,key2,value_slice);
+        dict~udict_set_ref(256,key1,new_sub_dict);
+    }
+    return (dict,());
+}
+;;opcode, type, amount, nonce, deadline
+(slice,(int, int, int, int, int)) load_buy_boost_data_from_msg(slice data){
+    int date = data~load_uint(256);
+    ;; int item_type = 0; 
+    int amount = 0;
+    int nonce = 0;
+    int deadline = 0;
+    int item_type = data~load_uint(32);
+    cell sub_cell = data~load_ref();
+    slice sub_data = sub_cell.begin_parse();
+    int amount = sub_data~load_uint(256);
+    int nonce = sub_data~load_uint(256);
+    int deadline = sub_data~load_uint(256); 
+
+    return (data,(date, item_type, amount, nonce, deadline));
+}
+(cell) create_signature(slice sender,int op_code, int date,  int itemType, int amount, int nonce, int deadline){
+    var sub_cell = begin_cell()
+    .store_uint(amount, 256)
+    .store_uint(nonce, 256)
+    .store_uint(deadline,256).end_cell();
+    var message_cell = begin_cell()
+        .store_slice(sender)
+        .store_uint(op_code,32)
+        .store_uint(date,256)
+        .store_uint(itemType,32)
+        .store_ref(sub_cell)
+        .end_cell();
+    return message_cell;
+}
+(slice,(cell,slice,int,int,int,int,int)) load_signature_and_data(slice in_msg_body, slice sender_address, int op) {
+    var signature_data = in_msg_body~load_ref();
+    slice signature = in_msg_body~load_bits(512);
+    var signature_data_slice = signature_data.begin_parse();
+    var (date, itemType, amount, nonce, deadline) = signature_data_slice~load_buy_boost_data_from_msg();
+    signature_data_slice.end_parse();
+    var message_cell = create_signature(sender_address,op,date,itemType,amount,nonce,deadline);
+    return (in_msg_body,(message_cell, signature, date, itemType,amount,nonce, deadline));
+}
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { 
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    var (ws, addr) = parse_std_addr(sender_address);
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32); 
+    int query_id = in_msg_body~load_uint(64); 
+
+    if(op == op::buy){
+        var (message_cell,signature,date, itemType,amount,nonce,deadline) = in_msg_body~load_signature_and_data(sender_address,op);
+        throw_unless(error::invalid_signature, check_signature(cell_hash(message_cell), signature, ctx_owner_pub_key));
+        throw_unless(error::invalid_deadline, deadline >= now());
+        throw_unless(error::invalid_value, msg_value >= amount + gas_base);
+        var (_,nonce_used) = ctx_nonces.udict_get?(256,nonce);
+        throw_if(error::invalid_nonce,nonce_used);
+        ctx_nonces~udict_set(256,nonce,begin_cell().store_uint(1,32).end_cell().begin_parse());
+        if(itemType == 5){
+            ;;Gacha
+            var gacha_count = ctx_gachas.get_value_from_dict(addr);
+            gacha_count = gacha_count + 1;
+            ctx_gachas~set_value_to_dict(addr,gacha_count);
+        } elseif (itemType == 4){
+            ;;Auto
+            var last_buy = ctx_auto_claims.get_value_from_dict(addr);
+            throw_unless(error::buy_limit, last_buy == 0); 
+            ctx_auto_claims~set_value_to_dict(addr,now());
+        } else {
+            ;;Boost
+            slice boost_count = ctx_boosts.get_value_from_dict_2l_slice(date,addr);
+            var item1 = boost_count~load_uint(32);
+            var item2 = boost_count~load_uint(32);
+            var item3 = boost_count~load_uint(32);
+            throw_unless(error::buy_limit, item1 + item2 + item3 < ctx_limit_boost);
+            if(itemType == 1){
+                item1 = item1 + 1;
+            } elseif (itemType == 2){
+                item2 = item2 + 1;
+            } elseif (itemType == 3) {
+                item3 = item3 + 1;
+            } else {
+                throw(0xffff);
+            }
+           
+            boost_count = begin_cell().store_uint(item1,32).store_uint(item2,32).store_uint(item3,32).end_cell().begin_parse();
+            ctx_boosts~set_value_to_dict_2l_slice(date,addr,boost_count); 
+        }
+        ctx_buy_count += 1;
+        ctx_buy_amount += amount;
+        builder msg = create_msg(0x10,ctx_owner_address,amount);
+        send_raw_message(msg.end_cell(),1);
+        save_data();
+        return ();
+    }
+    if(op == op::update_limit_boost){
+        throw_unless(error::invalid_sender, equal_slice_bits(ctx_admin_address,sender_address));
+        var new_limit_boost = in_msg_body~load_uint(256);
+        ctx_limit_boost = new_limit_boost;
+        save_data();
+        return ();
+    }
+    if(op == op::setting_gas){
+        throw_unless(error::invalid_sender, equal_slice_bits(ctx_admin_address,sender_address));
+        int new_gas = in_msg_body~load_uint(256);
+        gas_base = new_gas;
+        save_data();
+        return ();
+    }
+    if(op == op::update_owner){
+        throw_unless(error::invalid_sender, equal_slice_bits(ctx_admin_address,sender_address));
+        var new_owner = in_msg_body~load_msg_addr();
+        ctx_owner_address = new_owner;
+        save_data();
+        return ();
+    }
+    if(op == op::update_admin){
+        throw_unless(error::invalid_sender, equal_slice_bits(ctx_admin_address,sender_address));
+        ctx_admin_address = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+    if(op == op::coin){
+        return ();
+    }
+    if(op == op::upgrade){
+        throw_unless(error::invalid_sender, equal_slice_bits(ctx_admin_address,sender_address));
+        cell code = in_msg_body~load_ref();
+        set_code(code);
+        return ();
+    }
+    if(op == op::withdraw){
+        throw_unless(error::invalid_sender, equal_slice_bits(ctx_admin_address,sender_address)); 
+        int amount = in_msg_body~load_uint(256);
+        var msg = create_msg(0x10,ctx_owner_address,amount);
+        send_raw_message(msg.end_cell(),1); 
+        save_data();
+        return ();
+    }
+
+    throw(0xffff); 
+}
+
+slice get_admin_address() method_id {
+    load_data();
+    return ctx_admin_address; 
+}
+slice get_owner_address() method_id {
+    load_data();
+    return ctx_owner_address; 
+}
+int get_limit_boost() method_id {
+    load_data();
+    return ctx_limit_boost;
+}
+int get_owner_public_key() method_id {
+    load_data();
+    return ctx_owner_pub_key; 
+}
+int get_gas_base() method_id {
+    load_data();
+    return gas_base; 
+}
+int get_buy_count() method_id {
+    load_data();
+    return ctx_buy_count; 
+}
+int get_buy_amount() method_id {
+    load_data();
+    return ctx_buy_amount; 
+}
+slice get_boost_count(int date, slice address) method_id {
+    load_data();
+    var (ws,addr) = parse_std_addr(address);
+    var value = ctx_boosts.get_value_from_dict_2l_slice(date,addr);
+    return value;
+}
+int get_auto_claim_timestamp( slice address) method_id {
+    load_data();
+    var (ws,addr) = parse_std_addr(address);
+    var value = ctx_auto_claims.get_value_from_dict(addr);
+    return value;
+}
+int get_gacha_count(slice address) method_id {
+    load_data();
+    var (ws,addr) = parse_std_addr(address);
+    var value = ctx_gachas.get_value_from_dict(addr);
+    return value;
+}
