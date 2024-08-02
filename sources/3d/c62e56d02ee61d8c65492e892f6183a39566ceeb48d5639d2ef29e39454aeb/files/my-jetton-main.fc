@@ -1,0 +1,237 @@
+#include "messages.fc";
+#include "imports/stdlib.fc";
+#include "op-codes.fc";
+#include "my-utils.fc";
+
+
+;; 保存数据
+;; total_supply<币种单位>		    已发行的jettons总量
+;; mintable<布尔类型>         		指示jettons数量是否可以增加的标志    -1  or  0
+;; admin_address<地址类型>		    管理员地址。  (MsgAddressInt) - 控制Jetton的智能合约地址,
+;; content<单元格类型>			    token元数据地址。 符合 Token Data Standard #64 的数据
+;; jetton_wallet_code<单元格类型>	    该jetton的钱包代码,   就是用户钱包合约的字节码
+() save_data(int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell test_cell) impure inline_ref {
+    set_data(
+        begin_cell()
+            .store_coins(total_supply)
+            .store_slice(admin_address)
+            .store_ref(content)
+            .store_ref(jetton_wallet_code)
+            .store_ref(test_cell)
+            .end_cell()
+    );
+}
+;; 加载数据
+(int, slice, cell, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_coins(), ;; total_supply 发行量
+        ds~load_msg_addr(), ;; admin_address 管理员地址
+        ds~load_ref(), ;; content 元数据
+        ds~load_ref(), ;; jetton_wallet_code 钱包代码
+        ds~load_ref()
+    );
+}
+
+
+
+;; 铸造新的代币
+() mint_token(slice to_address, int jetton_amount, slice gas_return_address, cell jetton_wallet_code) impure {
+
+    ;; a、因为要计算，子合约的地址，这个时候，有可能子合约并没有初始化， 故第一步为，生成子合约初始化数据
+    ;; 生成初始化数据
+    cell init_data = create_walll_init_data(to_address, my_address(), jetton_wallet_code);
+    cell init_state = build_contract_state_init(jetton_wallet_code, init_data);
+
+    ;;b、通过初始化数据， 计算子钱包合约地址
+    slice user_waller_addresss = calc_contract_address_state(init_state);
+
+
+    ;;c、调用子合约，internal_transfer内部接收方法
+    cell msg_body = begin_cell()
+        .store_uint(op::internal_transfer(), 32)
+        .store_uint(0, 64)
+        .store_coins(jetton_amount) ;; 转账的 token 代币数量）。
+        .store_slice(gas_return_address)  ;; 无关紧要
+        .store_slice(gas_return_address) ;; gas 退回地址）。
+        .end_cell();
+
+    ;; 发送可以初始化的消息
+    messages::send_with_stateinit(0, user_waller_addresss, init_state, msg_body, 64);
+}
+
+() handel_bounce(slice sender_address, slice in_msg_body) impure {
+    ~strdump("收到回调信息");
+
+    in_msg_body~skip_bits(32);
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::internal_transfer()) {
+
+
+        ;; 原始铸造金额
+        int jetton_amount = in_msg_body~load_coins();
+
+
+        ;; ;;
+        ;; slice response_address = in_msg_body~load_msg_addr();
+        ;;
+        ;; int forward_ton_amount = in_msg_body~load_coins();
+        ;;
+        ;; slice forward_payload = in_msg_body~load_msg_addr();
+
+
+        (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell test_cell) = load_data();
+
+        save_data(total_supply - jetton_amount, admin_address, content, jetton_wallet_code, test_cell);
+        return ();
+    }
+
+    throw(620);
+}
+
+;; 入口方法
+;;var msg = begin_cell() // 开始创建一个新的单元（cell）
+;;     .store_uint(0, 1) // 存储一个标记（1 位），通常用于标识消息类型或状态
+;;     .store_uint(1, 1) // 存储标志位（1 位），表示 ihr_fee 存储费用
+;;     .store_uint(1, 1) // 存储标志位（1 位），表示允许消息弹回（bounceable）
+;;     .store_uint(0, 1) // 存储标志位（1 位），表示这条消息本身不是弹回的消息（not a bounce message）
+
+;;     .store_slice(source) // 存储源地址的切片（slice），表示消息的发送方
+;;     .store_slice(destination) // 存储目标地址的切片（slice），表示消息的接收方
+;;
+;;     // 序列化 CurrencyCollection，表示货币集合，这里包括金额和额外的货币种类
+;;
+;;     .store_coins(amount) // 存储主要金额（amount），表示转账的主要货币量
+;;     .store_dict(extra_currencies) // 存储额外的货币种类（字典），表示非主要货币类型及其数量
+;;     .store_coins(0) // 存储 IHR 费用，设为 0，表示不需要支付 IHR 费用
+;;     .store_coins(fwd_value) // 存储转发费用（forward fee），表示消息转发的费用
+;;     .store_uint(cur_lt(), 64) // 存储当前交易的逻辑时间（logical time），使用 64 位无符号整数表示
+;;     .store_uint(now(), 32) // 存储当前交易的 UNIX 时间戳（unixtime），使用 32 位无符号整数表示
+;;     .store_uint(0, 1) // 存储一个标志位（1 位，值为 0），表示没有初始化字段（init-field），即没有附加合约代码或数据
+;;     .store_uint(0, 1) // 存储一个标志位（1 位，值为 0），表示消息体不是原位（in-place），即使用完整消息体（either message body）
+;;     .store_slice(msg_body) // 存储消息体（slice），这是消息的实际内容
+;;   .end_cell(); // 完成单元的构建，返回构建好的消息单元（cell）
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+
+
+    ;;------不处理空数据， 空数据直接返回
+    if (in_msg_body.slice_empty?()) {
+        ;; slice a = in_msg_full.begin_parse();
+        ;; ~dump(a~load_uint(4));
+        ;; ~dump(a~load_msg_addr());
+        return ();
+    }
+
+    ;; 解析消息头数据
+    slice sc = in_msg_full.begin_parse();
+
+    ;; 得到消息标记
+    int flags = sc~load_uint(4);
+
+
+    ;; 获取到发件人信息
+    slice sender_address = sc~load_msg_addr();
+
+    ;; 忽略所有被退回的消息
+    ;; 0x18  0x10  , 这里按位与，即按位否定后，会是0
+    if (flags & 1) {
+        handel_bounce(sender_address, in_msg_body);
+        return ();
+    }
+
+
+
+    ;; 读取消息主体
+    int op = in_msg_body~load_uint(32); ;; 操作码
+    int query_id = in_msg_body~load_uint(64); ;;查询ID
+
+    ;; 读取原来的数据
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell test_cell) = load_data();
+
+    ;; int a = 322223;
+    ;; ~strdump("test data");
+    ;; ~dump(a);
+
+    if (op == op::excesses()) {
+        return ();
+    }
+    if (op == op::mint()) {
+
+
+        ;; 铸造新币
+        ;; ● to_address<地址类型> :   发行到那个地址
+        ;; ● jetton_amount<币类型> :   要发行的数量
+        ;; ● gas_return_address<地址类型> :   gas 返回到那个地址
+
+        slice to_address = in_msg_body~load_msg_addr();
+
+        ;; 要发行的数量
+        int jetton_amount = in_msg_body~load_coins();
+
+        ;; gas 返回到那个地址
+        slice gas_return_address = in_msg_body~load_msg_addr();
+
+
+        ;; ~strdump("非管理员调用");
+        ;;  1、效验是否管理员，调用当前接口
+        throw_unless(501, equal_slice_bits(sender_address, admin_address));
+
+        ;; 2、效验铸造金额，必须大于 0
+        throw_unless(620, jetton_amount > 0);
+
+
+        ;; 3、调用当前接口，携带的gas 不少于0.015
+        throw_unless(630, msg_value > 15000000);
+
+
+
+
+        ;; 发起铸造
+        mint_token(to_address, jetton_amount, gas_return_address, jetton_wallet_code);
+
+
+        save_data(total_supply + jetton_amount, admin_address, content, jetton_wallet_code, test_cell);
+
+        return ();
+    }
+
+    throw(888);
+}
+
+
+
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell test_cell) = load_data();
+    return (total_supply, -1, admin_address, content, jetton_wallet_code);
+}
+
+
+slice get_wallet_address(slice owner_address) method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell test_cell) = load_data();
+
+    ;; 生成初始化数据
+    cell init_data = create_walll_init_data(owner_address, my_address(), jetton_wallet_code);
+    cell init_state = build_contract_state_init(jetton_wallet_code, init_data);
+
+    ;;b、通过初始化数据， 计算子钱包合约地址
+    slice user_waller_addresss = calc_contract_address_state(init_state);
+    return user_waller_addresss;
+}
+
+
+
+int get_op() method_id {
+    return op::mint();
+}
+
+
+cell get_test_cell() method_id {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code, cell test_cell) = load_data();
+    return test_cell;
+}
+
+
+

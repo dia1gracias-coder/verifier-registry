@@ -1,0 +1,64 @@
+#include "imports/stdlib.fc";
+
+
+;; cell build_wallet_contract_init_data() {
+;;     return begin_cell()
+;;         .store_int()
+;;
+;;     ;
+;; }
+
+;; 创建合约使用的， 生成合约初始化的数据
+cell build_contract_state_init(cell init_code, cell init_data) {
+    return begin_cell()
+        .store_uint(0, 1) ;; split_depth:(Maybe (## 5)) 可选的 split_depth
+        .store_uint(0, 1) ;; special:(Maybe TickTock) 可选的 special 字段
+        .store_uint(1, 1) ;; (Maybe ^Cell) 可选的第一个单元引用
+        .store_uint(1, 1) ;; (Maybe ^Cell) 可选的第二个单元引用
+        .store_uint(0, 1) ;; (HashmapE 256 SimpleLib) 可选的 HashmapE
+        .store_ref(init_code) ;; 存储引用，指向初始化代码
+        .store_ref(init_data) ;; 存储引用，指向初始化数据
+        .end_cell();
+}
+
+;; 根据合约的初始化数据， 来计算合约地址
+slice calc_contract_address_state(cell state_init)  method_id {
+    var future_address = begin_cell()
+        .store_uint(2, 2) ;; addr_std$10
+        .store_uint(0, 1) ;; anycast:(Maybe Anycast)
+        .store_uint(0, 8) ;; 这个比较重要， 是工作链ID
+        .store_uint(cell_hash(state_init), 256) ;; address:bits256
+        .end_cell();
+    return future_address.begin_parse();
+}
+
+;; 根据合约字节码， 跟合约初始数据， 来计算合约地址
+slice calc_contract_address_code_data(cell init_code, cell init_data) {
+    cell state = build_contract_state_init(init_code, init_data);
+    return calc_contract_address_state(state);
+}
+
+
+;; 用户钱包的初始化cell
+cell create_walll_init_data(slice to_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+    return begin_cell()
+        .store_coins(0) ;; 可用余额
+        .store_slice(to_address) ;; 管理员地址
+        .store_slice(jetton_master_address) ;; 主合约地址
+        .store_ref(jetton_wallet_code) ;; 钱包代码
+        .end_cell();
+}
+
+
+
+;; 计算用户钱包地址
+slice calculate_user_jetton_wallet_address(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+
+    ;; 生成初始化数据
+    cell init_data = create_walll_init_data(owner_address, jetton_master_address, jetton_wallet_code);
+    cell init_state = build_contract_state_init(jetton_wallet_code, init_data);
+
+    ;;b、通过初始化数据， 计算子钱包合约地址
+    slice user_waller_addresss = calc_contract_address_state(init_state);
+    return user_waller_addresss;
+}
