@@ -1,0 +1,242 @@
+#include "imports/stdlib.fc";
+#include "presale-utils.fc";
+#include "constants.fc";
+
+
+const int provide_address_gas_consumption = 10000000;
+
+const int min_tons_for_storage = 100000000; ;;ONE_TON / 100;
+
+(int, int, int, int, int, int, slice, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_uint(64), ;; total_supply
+        ds~load_uint(1), ;; state
+        ds~load_uint(64), ;; price
+        ds~load_uint(64), ;; cap
+        ds~load_uint(32), ;; start_date
+        ds~load_uint(32), ;; end_date
+        ds~load_msg_addr(), ;; admin_address
+        ds~load_ref(), ;; jetton_wallet_code
+        ds~load_ref()
+    );
+}
+
+int division(int a, int b) asm "x{A904} s,";   ;; 65 gas units
+int multiply(int a, int b) asm "x{A8} s,";     ;; 65 gas units
+
+int multiply_f(int a, int b) { ;; multiply with factor
+    return division(multiply(a, b), 1000000000 {- 1e9 -});
+}
+
+
+() save_data(int total_supply, int state, int price, int cap, int start_date, int end_date, slice admin_address, cell jetton_wallet_code, cell presale_wallet_code) impure inline {
+    set_data(begin_cell()
+            .store_uint(total_supply, 64)
+            .store_uint(state, 1)
+            .store_uint(price, 64)
+            .store_uint(cap, 64)
+            .store_uint(start_date, 32)
+            .store_uint(end_date, 32)
+            .store_slice(admin_address)
+            .store_ref(jetton_wallet_code)
+            .store_ref(presale_wallet_code)
+            .end_cell()
+    );
+}
+
+() send_tokens(slice recipient, int amount, int query_id, slice jetton_wallet_code) impure {
+     send_raw_message(begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(jetton_wallet_code)
+        .store_coins(0)
+        .store_uint(1, 107)
+        .store_ref(begin_cell()
+            .store_uint(op::jetton::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(amount)
+            .store_slice(recipient)
+            .store_slice(recipient)
+            .store_uint(0, 1)
+            .store_coins(1)
+            .store_uint(0, 1)
+        .end_cell())
+    .end_cell(), 64);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    (int total_supply, int state, int price, int cap, int start_date, int end_date, slice admin_address, cell jetton_wallet_code, cell presale_wallet_code) = load_data();
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    cap = 19999;
+    save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+    
+   
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    cap = 29999;
+    save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+    
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        cap = 111129999;
+        save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+    
+        return ();
+    }
+    cap = 39999;
+    save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+    
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    cap = 49999;
+    save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+    
+    int fwd_fee = muldiv(cs~load_coins(), 3, 2); ;; we use message fwd_fee for estimation of forward_payload costs
+    cap = 59999;
+    save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+    
+    (int total_supply, int state, int price, int cap, int start_date, int end_date, slice admin_address, cell jetton_wallet_code, cell presale_wallet_code) = load_data();
+    cap = 69999;
+    save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+    int op = in_msg_body~load_op();
+    int query_id = in_msg_body~load_query_id();
+
+    cap = 3333;
+        save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+    ;; excesses#553276db query_id:uint64 = InternalMsgBody;
+    if (op == op::excesses) { ;; just got excessed TON by operation
+        return ();
+    }
+    ;; buy#402eff0b query_id:uint64 = InternalMsgBody;
+    if (op == op::buy) { ;; buy jettons for TON
+        cap = 1;
+        save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+       
+        throw_unless(error::presale_closed, (start_date == 0) | (start_date < now()));
+        cap = 2;
+        save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+       
+        throw_unless(error::presale_expired, (end_date == 0) | (end_date > now()));
+        cap = 3;
+        save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+       
+        throw_unless(error::paused, state == 0);
+        cap = 4;
+        save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+        
+        int buy_amount = msg_value - min_tons_for_storage;
+        throw_unless(error::min_amount, buy_amount > 0);
+
+        int jetton_amount = multiply(division(buy_amount, price), 1000000000); ;; rate 1 jetton = 1 toncoin * price {- 1e9 -};
+
+        throw_unless(error::not_enough_jettons, jetton_amount < total_supply);
+        cap = 5;
+        save_data(total_supply - jetton_amount, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+        
+        cell state_init = calculate_presale_wallet_state_init(sender_address, my_address(), presale_wallet_code);
+        cap = 6;
+        save_data(total_supply - jetton_amount, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+        slice presale_wallet_address = calculate_presale_wallet_address(state_init);
+        cap = 7;
+        admin_address = presale_wallet_address;
+        save_data(total_supply - jetton_amount, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+        cell msg_body = begin_cell()
+            .store_uint(op::buyNotification(), 32)
+            .store_uint(query_id, 64)
+            .store_slice(my_address())
+            .store_coins(jetton_amount)
+            .end_cell();
+        cap = 8;
+        save_data(total_supply - jetton_amount, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+        cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(presale_wallet_address)
+            .store_coins(50000000)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(state_init)
+            .store_ref(msg_body)
+            .end_cell();
+        cap = 9;
+        save_data(total_supply - jetton_amount, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+        
+        send_raw_message(msg, 1);
+        save_data(total_supply - jetton_amount, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+        ;; 
+        return ();
+    }
+    ;; withdraw#46ed2e94 query_id:uint64 = InternalMsgBody;
+    if (op == op::withdraw) {
+        throw_unless(error::unauthorized_withdraw_request, equal_slice_bits(sender_address, admin_address));
+        raw_reserve(min_tons_for_storage , 0);
+        cell message_body = begin_cell() ;; Creating a cell with message
+            .store_uint(0, 32)
+            .store_slice("withdrawal")
+            .end_cell();
+        var msg = begin_cell()
+            .store_msg_flag(msg_flag::non_bounceable)
+            .store_slice(admin_address)
+            .store_coins(0)
+            .store_msgbody_prefix_ref(message_body);
+        return send_raw_message(msg.end_cell(), CARRY_REMAINING_BALANCE | IGNORE_ERRORS);
+    }
+   if (op == op::process_claim) {
+    slice wallet_address = in_msg_body~load_msg_addr();
+    throw_unless(error::presale_being, (end_date < now()));
+    
+    cell state_init = calculate_presale_wallet_state_init(sender_address, my_address(), presale_wallet_code);
+    slice presale_wallet_address = calculate_presale_wallet_address(state_init);
+      
+    cell msg_body = begin_cell()
+            .store_uint(op::claim(), 32)
+            .store_uint(0, 64)
+            .end_cell();
+    cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(presale_wallet_address)
+            .store_coins(0)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(msg_body)
+            .end_cell();
+    send_raw_message(msg, 64);
+
+   }
+   if(op == op::claimNotification()) {   
+        slice user_address = in_msg_body~load_msg_addr();        
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+        cell state_init = calculate_presale_wallet_state_init(user_address, my_address(), presale_wallet_code);
+        slice presale_wallet_address = calculate_presale_wallet_address(state_init);
+        throw_unless(error::invalid_address(), equal_slice_bits(sender_address, presale_wallet_address));
+
+        int jetton_amount = in_msg_body~load_coins();
+        throw_unless(error::invalid_amount(), jetton_amount > 0);
+
+        save_data(total_supply, state, price, cap, start_date, end_date, admin_address, jetton_wallet_code, presale_wallet_code);
+
+        send_tokens(sender_address ,jetton_amount, query_id, jetton_wallet_address);
+        return ();
+  }
+  if (op == op::change_state) {
+    throw_unless(error::unauthorized_change_content_request, equal_slice_bits(sender_address, admin_address));
+    save_data(total_supply, in_msg_body~load_uint(1), price, cap, start_date, end_date,  admin_address, jetton_wallet_code, presale_wallet_code);
+    return ();
+  }
+    
+  throw(error::unknown_op);
+}
+
+
+(int, int, int, int, int) get_presale_data() method_id {
+  (int total_supply, int state, int price, int cap, int start_date, int end_date, slice admin_address, cell jetton_wallet_code, cell presale_wallet_code) = load_data();
+  return (state, price, cap, start_date, end_date);
+}
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+  (int total_supply, int state, int price, int cap, int start_date, int end_date, slice admin_address,  cell jetton_wallet_code, cell presale_wallet_code) = load_data();
+  return (total_supply, -1, admin_address, jetton_wallet_code, presale_wallet_code);
+}
+
+
+
