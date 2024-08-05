@@ -1,0 +1,26 @@
+int workchain() asm "0 PUSHINT";
+
+cell pack_presale_wallet_data(int balance, slice owner_address, slice presale_master_address, cell presale_wallet_code) inline {
+   return  begin_cell()
+            .store_slice(owner_address)
+            .store_slice(presale_master_address)
+            .store_coins(balance)
+           .end_cell();
+}
+
+cell calculate_presale_wallet_state_init(slice owner_address, slice presale_master_address, cell presale_wallet_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(presale_wallet_code)
+          .store_dict(pack_presale_wallet_data(0, owner_address, presale_master_address, presale_wallet_code))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_presale_wallet_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(workchain(), 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
