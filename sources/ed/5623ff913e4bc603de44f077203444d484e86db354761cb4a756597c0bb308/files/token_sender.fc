@@ -1,0 +1,155 @@
+#include "imports/stdlib.fc";
+
+const int MSG_OP_SIZE = 32;
+const int MSG_QUERY_ID_SIZE = 64;
+const op::sendTon = "op::sendTon"c; ;; create an opcode from string using the "c" prefix, this results in 0x7e8764ef opcode in this case
+const op::sendJetton = "op::sendJetton"c; ;; create an opcode from string using the "c" prefix, this results in 0x7e8764ef opcode in this case
+const op::startSendJetton = "op::startSendJetton"c; ;; create an opcode from string using the "c" prefix, this results in 0x7e8764ef opcode in this case
+
+;; const op::send = "op::send"c; ;; create an opcode from string using the "c" prefix, this results in 0x7e8764ef opcode in this case
+const int op::internal_transfer = 0xae42e5a4;
+() set_actions(cell actions) impure asm "c5 POP";
+cell my_code() asm "MYCODE";
+(slice, ()) ~skip_query_id(slice s) inline {
+    return (s.skip_bits(MSG_QUERY_ID_SIZE), ());
+}
+(slice, int) ~load_op(slice s) inline {
+    return s.load_uint(MSG_OP_SIZE);
+}
+(slice, int) ~load_msg_flags(slice s) inline {
+    return s.load_uint(4);
+}
+
+() transfer_jetton(slice to_address, int amount, slice jetton_wallet_address,int gas,int forward_ton_amount,slice from_user,slice msg) impure {
+    cell msg_body = begin_cell()
+        .store_uint(0xf8a7ea5, 32)  ;;op (transfer)
+        .store_uint(0, 64)  ;; query_id
+        .store_coins(amount)  ;; amount
+        .store_slice(to_address)  ;;destination
+        .store_slice(from_user)  ;; response_destination
+        .store_uint(0, 1) ;; custom_payload
+        .store_coins(forward_ton_amount)  ;; forward_ton_amount
+        .store_uint(0, 1)  ;; forward_payload
+        .store_ref(
+            begin_cell()
+                .store_uint(0, 32)  ;; no op for comment
+                .store_slice(msg)
+            .end_cell()
+        )
+        .end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(jetton_wallet_address)
+        .store_coins(gas) ;; TON for gas
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body)
+        .end_cell();
+
+    send_raw_message(msg, 1);  ;; mode 1 to pay transfer fees from contract balance
+}
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int msg_value,cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    (int op, int query_id) = (in_msg_body~load_uint(32), in_msg_body~load_uint(64));
+    if (op == 0x7362d09c) {
+        (int jetton_amount, slice from_user) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+        cell ref_cs = in_msg_body~load_ref(); 
+        slice ref_ds = ref_cs.begin_parse();
+        (int transferred_op, int query_id, slice sender,slice jetton_wallet_address,slice msg) = (ref_ds~load_uint(32),ref_ds~load_uint(64), ref_ds~load_msg_addr(),ref_ds~load_msg_addr(),ref_ds~load_ref().begin_parse());
+        if (transferred_op == op::startSendJetton) {
+                var gasFee = ref_ds~load_coins();
+                var forward_ton_amount = ref_ds~load_coins();
+                var dict = ref_ds~load_dict();
+                int i = 0;
+                do {
+                    (i, var cs, var f) = dict.idict_get_next?(16,i);
+                    if (f) {
+                        transfer_jetton(cs~load_msg_addr(),cs~load_coins(),jetton_wallet_address,gasFee,forward_ton_amount,from_user,msg);
+                    }
+                } until (~ f);
+                ;; int balance = get_balance().pair_first();
+
+                ;; var msg = begin_cell()
+                ;;     .store_uint(0x18, 6)
+                ;;     .store_slice(from_user)
+                ;;     .store_coins(0)
+                ;;     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; 106 zeroes + 0 as a separator
+                ;;     .store_slice("refund gas")
+                ;;     .end_cell();
+                ;; send_raw_message(msg, 64);
+                return ();
+        }
+    }
+    if (op == op::sendTon) {
+         cell string_ref = in_msg_body~load_ref();
+        slice string_slice = string_ref.begin_parse();
+        ;; 读取字符串内容
+        slice storeStringRefTail = string_slice~load_bits(string_slice.slice_bits());
+        var dict = in_msg_body~load_dict();
+        int i = -1;
+        do {
+            (i, var cs, var f) = dict.idict_get_next?(16, i);
+            if (f) {
+                var msg = begin_cell()
+                        .store_uint(0x10, 6)
+                        .store_slice(cs~load_msg_addr())
+                        .store_coins(cs~load_coins())
+                        .store_uint(0, 1) 
+                        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; 106 zeroes + 0 as a separator
+                        .store_uint(0, 32)  ;; 操作码 0 表示简单转账
+                        .store_slice(storeStringRefTail)
+                        .end_cell();
+                send_raw_message(msg, 3);
+                ;; send_raw_message(cs~load_ref(), 3);
+            }
+        } until (~ f);
+        ;; int balance = get_balance().pair_first();
+        ;; var msg = begin_cell()
+        ;;     .store_uint(0x18, 6)
+        ;;     .store_slice(sender_address)
+        ;;     .store_coins(0)
+        ;;     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; 106 zeroes + 0 as a separator
+        ;;     .store_slice("refund gas")
+        ;;     .end_cell();
+        ;; send_raw_message(msg, 64);
+        ;; int balance = get_balance().pair_first();
+
+        ;; var msg = begin_cell()
+        ;;     .store_uint(0x18, 6)
+        ;;     .store_slice(sender_address)
+        ;;     .store_coins(0)
+        ;;     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; 106 zeroes + 0 as a separator
+        ;;     .store_slice("refund")
+        ;;     .end_cell();
+        ;; send_raw_message(msg, 128);
+        return ();
+
+    }
+
+
+
+  
+}
+
+;; get methods are a means to conveniently read contract data using, for example, HTTP APIs
+;; they are marked with method_id
+;; note that unlike in many other smart contract VMs, get methods cannot be called by other contracts
+
+;; int get_counter() method_id {
+;;     load_data();
+;;     return ctx_counter;
+;; }
+
+;; int get_id() method_id {
+;;     load_data();
+;;     return ctx_id;
+;; }
