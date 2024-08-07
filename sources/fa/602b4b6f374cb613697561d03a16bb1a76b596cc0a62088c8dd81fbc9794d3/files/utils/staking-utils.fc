@@ -1,0 +1,31 @@
+int workchain() asm "0 PUSHINT";
+
+cell pack_stake_wallet_data(slice owner_address, slice stake_master_address, cell stake_wallet_code) inline {
+   return  begin_cell()
+            .store_slice(owner_address)
+            .store_slice(stake_master_address)
+            .store_coins(0)
+            .store_coins(0)
+           .end_cell();
+}
+
+cell calculate_stake_wallet_state_init(slice owner_address, slice stake_master_address, cell stake_wallet_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(stake_wallet_code)
+          .store_dict(pack_stake_wallet_data(owner_address, stake_master_address, stake_wallet_code))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_stake_wallet_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(workchain(), 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+slice calc_user_stake_wallet(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+  return calculate_stake_wallet_address(calculate_stake_wallet_state_init(owner_address, jetton_master_address, jetton_wallet_code));
+}
