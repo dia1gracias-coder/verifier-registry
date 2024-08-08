@@ -1,0 +1,22 @@
+const int LOG_DEPLOY = 1;
+const int LOG_BRIDGE_OUT = 2;
+
+() emit_log (int topic, builder data) impure inline {
+    ;; 1023 - (4+2+9+256+64+32+2) = 654 bit free
+
+    var msg = begin_cell()
+            .store_uint(12, 4)         ;; ext_out_msg_info$11 src:MsgAddressInt ()
+            .store_uint(1, 2)          ;; addr_extern$01
+            .store_uint(256, 9)        ;; len:(## 9)
+            .store_uint(topic, 256); ;; external_address:(bits len)
+
+    if (data.builder_bits() > 1023 - (4 + 2 + 9 + 256 + 64 + 32 + 2) ) {
+        msg = msg.store_uint(1, 64 + 32 + 2) ;; created_lt, created_at, init:Maybe, body:Either
+                .store_ref(begin_cell().store_builder(data).end_cell());
+    } else {
+        msg = msg.store_uint(0, 64 + 32 + 2) ;; created_lt, created_at, init:Maybe, body:Either
+                .store_builder(data);
+    }
+
+    send_raw_message(msg.end_cell(), SEND_MODE_REGULAR);
+}

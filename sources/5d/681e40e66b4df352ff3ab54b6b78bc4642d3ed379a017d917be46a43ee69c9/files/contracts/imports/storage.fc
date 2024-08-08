@@ -1,0 +1,14 @@
+cell build_endpoint_storage_cell(slice bridge_master_address, slice jetton_master_address, slice jetton_wallet_address, slice mapper_address, int destination_chain_id) {
+    cell addresses = 
+        begin_cell()
+            .store_slice(jetton_master_address)
+            .store_slice(jetton_wallet_address)
+            .store_slice(mapper_address)
+        .end_cell();
+
+    return begin_cell()
+        .store_slice(bridge_master_address)
+        .store_ref(addresses)
+        .store_uint(destination_chain_id, 16)
+    .end_cell();
+}

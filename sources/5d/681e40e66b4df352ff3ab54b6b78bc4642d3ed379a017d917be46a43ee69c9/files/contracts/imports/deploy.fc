@@ -1,0 +1,45 @@
+#include "errors.fc";
+#include "storage.fc";
+
+slice calculate_address_from_state_init(cell state_init) inline {
+    return begin_cell()
+            .store_uint(4, 3)  ;; addr_std$10 : Integer 2; anycast:(Maybe Anycast) = 0 : Maybe Anycast
+            .store_uint(0, 8)  ;; workchain_id:int8
+            .store_uint(cell_hash(state_init), 256)
+            .end_cell()
+        .begin_parse();
+}
+
+cell get_endpoint_state_init(slice bridge_master_address, slice jetton_master_address, int destination_chain_id, cell endpoint_code) inline {
+    throw_unless(error::destination_chain_id_too_long, destination_chain_id <= 0xffff);
+    cell endpoint_data = build_endpoint_storage_cell(
+        bridge_master_address, 
+        jetton_master_address,
+        bridge_master_address, ;; jeton_wallet_address must be set after deploy
+        bridge_master_address, ;; mapper_address must be set after deploy
+        destination_chain_id);
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_maybe_ref(endpoint_code)
+        .store_maybe_ref(endpoint_data)
+        .store_uint(0, 1)
+    .end_cell();
+}
+
+cell get_mapper_state_init(slice bridge_master_address, int destination_chain_id, cell destination_token_name, cell mapper_code) inline {
+    throw_unless(error::destination_chain_id_too_long, destination_chain_id <= 0xffff);
+
+    cell mapper_data = begin_cell()
+        .store_slice(bridge_master_address)
+        .store_slice(bridge_master_address)
+        .store_uint(destination_chain_id, 16)
+        .store_ref(destination_token_name)
+    .end_cell();
+
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_maybe_ref(mapper_code)
+        .store_maybe_ref(mapper_data)
+        .store_uint(0, 1)
+    .end_cell();
+}

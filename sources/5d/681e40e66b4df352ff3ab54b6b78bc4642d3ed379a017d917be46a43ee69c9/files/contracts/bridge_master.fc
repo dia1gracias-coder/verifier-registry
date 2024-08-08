@@ -1,0 +1,194 @@
+#include "imports/stdlib.fc";
+#include "imports/deploy.fc";
+#include "imports/opcodes.fc";
+#include "imports/messages.fc";
+#include "imports/logs.fc";
+
+;; storage scheme
+;; storage#_ owner_address:MsgAddress chain_id:(uint 16) sequence:(uint 64) endpoint_code:^Cell mapper_code:^Cell = Storage;
+
+(slice, int, int, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+
+    return (
+        ds~load_msg_addr(),  ;; owner_address
+        ds~load_int(16),  ;; chain_id
+        ds~load_int(64),  ;; sequence
+        ds~load_ref(), ;; endpoint_code
+        ds~load_ref()  ;; mapper_code
+    );
+}
+
+() save_data(slice owner_address, int chain_id, int sequence, cell endpoint_code, cell mapper_code) impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(owner_address)
+            .store_int(chain_id, 16)
+            .store_int(sequence, 64)
+            .store_ref(endpoint_code)
+            .store_ref(mapper_code)
+        .end_cell()
+    );
+}
+
+() deploy_endpoint_with_mapper(slice jetton_master_address, slice jetton_wallet_address, int destination_chain_id, cell destination_token_name, cell endpoint_code, cell mapper_code) impure inline {
+    ;; calculate stateinit and address of endpoint
+    cell endpoint_state_init = get_endpoint_state_init(my_address(), jetton_master_address, destination_chain_id, endpoint_code);
+    slice endpoint_address = calculate_address_from_state_init(endpoint_state_init);
+    ;; calculate stateinit and address of mapper
+    cell mapper_state_init = get_mapper_state_init(my_address(), destination_chain_id, destination_token_name, mapper_code);
+    slice mapper_address = calculate_address_from_state_init(mapper_state_init);
+
+    int deploy_value = 5000000;
+
+    ;; deploy endpoint
+    var endpoint_deploy_msg = begin_cell()
+            .store_msg_flags(NON_BOUNCEABLE) ;; don't bounce, might already be initialized
+            .store_slice(endpoint_address)
+            .store_coins(deploy_value)
+            .store_msg_body_header(4 + 2 + 1)
+            .store_ref(endpoint_state_init)
+            .store_uint(0, 1)
+            .store_uint(op::init, 32)
+            .store_slice(mapper_address)
+            .store_slice(jetton_wallet_address)
+        .end_cell();
+    send_raw_message(endpoint_deploy_msg, SEND_MODE_REGULAR);
+    ;; deploy mapper
+    var mapper_deploy_msg = begin_cell()
+            .store_msg_flags(NON_BOUNCEABLE) ;; don't bounce, might already be initialized
+            .store_slice(mapper_address)
+            .store_coins(deploy_value)
+            .store_msg_body_header(4 + 2 + 1)
+            .store_ref(mapper_state_init)
+            .store_uint(0, 1)
+            .store_uint(op::init, 32)
+            .store_slice(endpoint_address)
+        .end_cell();
+    send_raw_message(mapper_deploy_msg, SEND_MODE_REGULAR);
+    ;; emit
+    emit_log(LOG_DEPLOY,
+        begin_cell()
+            .store_slice(jetton_master_address)
+            .store_uint(destination_chain_id, 16)
+            .store_ref(destination_token_name)
+            .store_slice(endpoint_address)
+            .store_slice(mapper_address)
+    );
+}
+
+() verify_is_owner(slice address) impure inline_ref {
+    (slice owner_address, _, _, _, _) = load_data();
+    throw_unless(error::sender_not_owner, equal_slices(address, owner_address));
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+
+    if(op == op::master::deploy) {
+        (slice owner_address, _, _, cell endpoint_code, cell mapper_code) = load_data();
+        throw_unless(error::sender_not_owner, equal_slices(sender_address, owner_address));
+
+        slice jetton_master_address = in_msg_body~load_msg_addr();
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+        int destination_chain_id = in_msg_body~load_uint(16);
+        cell destination_token_name = in_msg_body~load_ref();
+
+        deploy_endpoint_with_mapper(jetton_master_address, jetton_wallet_address, destination_chain_id, destination_token_name, endpoint_code, mapper_code);
+        
+        return();
+    } elseif(op == op::payload_notification) {
+        (slice owner_address, int chain_id, int sequence, cell endpoint_code, cell mapper_code) = load_data();
+        {-
+            TODO: check that this comes from a mapper_address
+            take payload data (destinationChainId and destinationTokenName)
+            calculate mapper_address
+            compare to sender_address
+
+            this might require changing of the payload builder and move it from mapper to here
+        -}
+        slice body = in_msg_body~load_ref().begin_parse();
+        int nonce = body~load_uint(64);
+        cell payload = body~load_ref();
+        (_, int emitter) = parse_std_addr(my_address());
+        emit_log(LOG_BRIDGE_OUT, begin_cell()
+            .store_uint(emitter, 256)
+            .store_uint(chain_id, 16) ;; chain_id
+            .store_uint(sequence, 64) ;; sequence
+            .store_uint(nonce, 64)    ;; nonce
+            .store_ref(payload)
+        );
+
+        save_data(owner_address, chain_id ,sequence + 1, endpoint_code, mapper_code);
+
+        return();
+    } elseif (op == op::upgrade::master) {
+        verify_is_owner(sender_address);
+
+        cell code = in_msg_body~load_ref();
+
+        set_code(code);
+
+        return();
+    } elseif (op == op::upgrade::endpoint) {
+        verify_is_owner(sender_address);
+
+        slice endpoint_address = in_msg_body~load_msg_addr();
+        cell code = in_msg_body~load_ref();
+
+        send_internal_message_to(endpoint_address, op::upgrade::endpoint, code);
+
+        return();
+    } elseif (op == op::upgrade::mapper) {
+        verify_is_owner(sender_address);
+        
+        slice mapper_address = in_msg_body~load_msg_addr();
+        cell code = in_msg_body~load_ref();
+
+        send_internal_message_to(mapper_address, op::upgrade::mapper, code);
+
+        return();
+    }
+
+    throw(0xffff);
+}
+
+int chain_id() method_id {
+    (_, int chain_id, _, _, _) = load_data();
+    return chain_id;
+}
+
+int sequence() method_id {
+    (_, _, int sequence, _, _) = load_data();
+    return sequence;
+}
+
+slice owner_address() method_id {
+    (slice owner_address, _, _, _, _) = load_data();
+    return owner_address;
+}
+
+slice get_endpoint_address(slice jetton_master_address, int destination_chain_id) method_id {
+    (_, _, _, cell endpoint_code, _) = load_data();
+    cell endpoint_state_init = get_endpoint_state_init(my_address(), jetton_master_address, destination_chain_id, endpoint_code);
+    return calculate_address_from_state_init(endpoint_state_init);
+}
+
+slice get_mapper_address(int destination_chain_id, cell destination_token_name) method_id {
+    (_, _, _, _, cell mapper_code) = load_data();
+    cell mapper_state_init = get_mapper_state_init(my_address(), destination_chain_id, destination_token_name, mapper_code);
+    return calculate_address_from_state_init(mapper_state_init);
+}
