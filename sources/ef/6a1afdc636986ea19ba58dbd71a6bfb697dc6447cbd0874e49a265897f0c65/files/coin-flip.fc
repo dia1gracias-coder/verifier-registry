@@ -1,0 +1,239 @@
+#include "imports/stdlib.fc";
+#include "imports/op-codes.fc";
+#include "imports/params.fc";
+#include "imports/jetton-utils.fc"; ;; https://github.com/ton-blockchain/token-contract/blob/main/ft/jetton-utils.fc
+#include "imports/store.fc";
+#include "imports/coinflip-utils.fc";
+
+const MIN_JETTON_STORAGE = 10000000;     ;; 0.01 TON
+const JETTON_GAS_COMPUTATION = 10000000; ;; 0.01 TON
+const TRADING_FEE = 200; ;; 2 %
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }    
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of forward_payload costs    
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    
+    load_data();
+    
+    ;; Play Ton
+    if(op == OP_PLAY_TON) {
+        ;; Check that the best is within the min and max bet
+        throw_unless(ERROR::WRONG_MIN_TON_AMOUNT, msg_value >= store::min_betting_ton);
+        throw_unless(ERROR::WRONG_MAX_TON_AMOUNT, msg_value <= store::max_betting_ton);
+        
+        var [balance, _] = get_balance();
+        int win_amount = msg_value * 2;
+        int betting_amount = (win_amount  - win_amount * TRADING_FEE / 10000);
+
+        ;; Check that the potential win is within the balance
+        throw_unless(ERROR::WRONG_INSUFFICIENT_TON_AMOUNT, win_amount < balance);
+
+        store::is_win = 0;
+        store::count_play += 1;
+
+        randomize_lt();
+        int win_num = rand(100);
+        save_data();
+
+        ;; user win
+        if (win_num < 48) {
+            store::is_win = 1;
+            int msg_mode = 3;
+
+            cell msg = begin_cell()
+                .store_uint(0x18, 6) ;; default values
+                .store_slice(sender_address)
+                .store_coins(betting_amount)
+                .store_uint(0, 107)
+                .end_cell();
+                
+            send_raw_message(msg, 3);
+            save_data();
+            return ();  
+        } else { ;; user lost 
+            return ();
+        }
+    }
+
+    ;; Play Jetton
+    if (op == OP_TRANSFER_NOTIFICATION) {
+        ;; slice token_address = in_msg_body~load_msg_addr();
+        ;; throw_unless(ERROR::WRONG_JETTON_WALLET, equal_slices(store::jetton_address, token_address));
+
+        int jetton_amount = in_msg_body~load_coins();
+        slice jetton_sender = in_msg_body~load_msg_addr();
+        int noPayload = in_msg_body~load_uint(1); 
+        if (noPayload == -1 ) {
+            return ();
+        }
+           
+        int betting_amount = (jetton_amount * 2 - jetton_amount * TRADING_FEE / 10000);
+        int sub_op = in_msg_body~load_uint(32);
+
+        
+        if( sub_op == OP_PLAY_JETTON ) {
+            throw_unless(ERROR::UNAUTHORIZED_DEPOSIT_REQUEST, equal_slices(sender_address, store::coinflip_jetton_address));
+            ;; store::admin = coinflip_jetton_address;
+            ;; save_data();
+            ;; return ();
+            
+            ;; Check that the best is within the min and max bet
+            throw_unless(ERROR::WRONG_MIN_TON_AMOUNT, jetton_amount >= store::min_betting_jetton);
+            throw_unless(ERROR::WRONG_MAX_TON_AMOUNT, jetton_amount <= store::max_betting_jetton);
+            
+            store::is_win = 0;
+
+            randomize_lt();
+            int win_num = rand(100); ;; generate a random number (either 0 or 1)
+            
+            if (win_num < 48) {
+                store::count_play += 1;
+                store::is_win = 1;
+            
+                transfer_token(0, jetton_sender, betting_amount, 230000000, sender_address);
+            }
+            save_data();
+        }
+        return ();
+    }
+
+    ;; Withdraw Ton
+    if (op == OP_WITHDRAW_TON) {
+        ;; if (equal_slices(sender_address, data::admin_address)) {
+        ;; throw_unless(ERROR::WRONG_ADMIN_ADDRESS, equal_slices(sender_address, store::admin));
+        
+        var [balance, _] = get_balance();
+        var withdraw_ton_amount = in_msg_body~load_coins();
+
+        if (withdraw_ton_amount > balance) {
+            withdraw_ton_amount = balance;
+        }
+        
+        int msg_mode = 3;
+
+        cell msg = begin_cell()
+            .store_uint(0x18, 6) ;; default values
+            .store_slice(sender_address)
+            .store_coins(withdraw_ton_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+
+        send_raw_message(msg, msg_mode);
+        save_data();
+        return ();
+    }
+    
+    ;; Withdraw Jetton
+    if (op == OP_WITHDRAW_JETTON) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice jetton_contract = in_msg_body~load_msg_addr();
+       
+        throw_unless(ERROR::WRONG_ADMIN_ADDRESS, equal_slices(sender_address, store::admin));
+
+        transfer_token(0, sender_address, jetton_amount, 230000000, jetton_contract);
+        return ();
+    }
+
+    ;; Transfer ownership
+    if (op == OP_TRANSFER_OWNERSHIP) {
+        throw_unless(ERROR::WRONG_ADMIN_ADDRESS, equal_slices(sender_address, store::admin));
+        store::admin = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+
+    ;; op == 32 set jettonMasterAddress
+    if (op == OP_SET_TOKEN_WALLET) {
+        throw_unless(ERROR::WRONG_ADMIN_ADDRESS, equal_slices(sender_address, store::admin));
+        slice token_wallet_address = in_msg_body~load_msg_addr();
+        store::token_wallet_address = token_wallet_address;
+        save_data();
+        return ();
+    }
+
+    ;; op == 41 set coinflip jetton address
+    if (op == OP_SET_COINFLIP_JETTON) {
+        throw_unless(ERROR::WRONG_ADMIN_ADDRESS, equal_slices(sender_address, store::admin));
+        slice coinflip_jetton_address = in_msg_body~load_msg_addr();
+        store::coinflip_jetton_address = coinflip_jetton_address;
+        save_data();
+        return ();
+    }
+
+    if (op == OP_CODE_UPGRADE & equal_slices(sender_address, store::admin) ) {
+        throw_unless(ERROR::WRONG_ADMIN_ADDRESS, equal_slices(sender_address, store::admin));
+        cell code = in_msg_body~load_ref();
+        set_code(code);
+        return ();
+    }
+
+    throw(0xffff);
+    save_data();
+    return ();
+}
+
+;; get jetton data
+(int, int, slice) get_jetton_data() method_id {
+    load_data();
+
+    return (
+        store::total_supply,
+        -1,
+        store::token_wallet_address
+    );
+}
+
+;;  * Returns the version number of the contract.
+int version() method_id {
+    return 101;
+}
+
+int balance() method_id {
+    var [balance, _] = get_balance();
+    return balance;
+}
+
+slice getAdmin() method_id {
+    load_data();
+    return store::admin;
+}
+
+slice getCoinflipJettonAddress() method_id {
+    load_data();
+    return store::coinflip_jetton_address;
+}
+
+int getCountPlay() method_id {
+    load_data();
+    return store::count_play;
+}
+
+int getFeePercent() method_id {
+    load_data();
+    return TRADING_FEE;
+}
+
+int getStatus() method_id {
+    load_data();
+    return store::is_win;
+}
+
+(int, int, int, int) getBettingAmount() method_id {
+    load_data();
+    return (store::total_supply, store::max_betting_ton, store::min_betting_jetton, store::max_betting_jetton);
+}
