@@ -1,0 +1,47 @@
+#include "params.fc";
+
+cell pack_lauchpad_pool_data (slice pad_address, slice owner_address, slice jetton_master, int fee, cell pool_code, cell wallet_code) inline {
+    return  begin_cell()
+            .store_slice(jetton_master)
+            .store_slice(owner_address)
+            .store_slice(pad_address)
+            .store_coins(fee)
+            .store_coins(0)
+            .store_coins(0)
+            .store_coins(0)
+            .store_coins(0)
+            .store_ref(pool_code)
+            .store_ref(wallet_code)
+            .end_cell();
+}
+{-
+    _ split_depth:(Maybe (## 5)) special:(Maybe TickTock)
+      code:(Maybe ^Cell) data:(Maybe ^Cell)
+      library:(HashmapE 256 SimpleLib) = StateInit;
+-}
+cell calculate_launchpad_pool_state_init (slice pad_address, slice owner_address, slice jetton_master, int fee, cell pool_code, cell wallet_code) inline {
+    return begin_cell()
+            .store_uint(0,1 + 1) ;; split_depth (Maybe = 0) and special (Maybe = 0)
+            .store_maybe_ref(pool_code)
+            .store_maybe_ref(pack_lauchpad_pool_data(pad_address, owner_address, jetton_master, fee, pool_code, wallet_code))
+            .store_uint(0,1) ;; libraries - empty cell
+            .end_cell();
+}
+
+{-
+  addr_std$10 anycast:(Maybe Anycast)
+   workchain_id:int8 address:bits256  = MsgAddressInt;
+-}
+slice calc_pool_address(cell state_init) inline {
+    return begin_cell().store_uint(4, 3) ;; 0x100 : $10 + anycast (Maybe = 0)
+            .store_int(workchain, 8)
+            .store_uint(
+                    cell_hash(state_init), 256)
+            .end_cell()
+            .begin_parse();
+}
+
+(slice) calc_jetton_pool (slice pad_address, slice owner_address, slice jetton_master, int fee, cell pool_code, cell wallet_code) inline {
+    return calc_pool_address(calculate_launchpad_pool_state_init(pad_address, owner_address, jetton_master, fee, pool_code, wallet_code));
+}
+
