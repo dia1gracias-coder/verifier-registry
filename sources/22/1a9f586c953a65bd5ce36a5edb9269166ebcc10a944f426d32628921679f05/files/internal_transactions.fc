@@ -1,0 +1,50 @@
+#include "imports/stdlib.fc";
+
+() handle_transfer(slice cs) impure;
+() send_transfer(slice target_address, int amount) impure;
+cell build_message(slice target_address, int amount) inline;
+
+() recv_internal(int msg_value, cell msg_data) {
+    slice cs = msg_data.begin_parse();
+    int op = cs~load_uint(32);
+    if (op == 0x2) {
+        handle_transfer(cs);
+    }
+}
+
+() handle_transfer(slice cs) impure {
+    int amount = cs~load_coins();
+    slice target_address = cs~load_msg_addr();
+    send_transfer(target_address, amount);
+}
+
+() send_transfer(slice target_address, int amount) impure {
+    send_raw_message(
+        build_message(
+            target_address,
+            amount
+        ),
+        3  ;; mode
+    );
+}
+
+cell build_message(slice target_address, int amount) inline {
+    ;; Создаем тело сообщения
+    cell message_body = begin_cell()
+        .store_uint(0, 32)
+        .store_slice("Hello from b-tec")
+    .end_cell();
+  
+    ;; Создаем сообщение
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)  ;; Тип сообщения
+        .store_slice(target_address)  ;; Адрес получателя
+        .store_coins(amount)  ;; Сумма перевода
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)  ;; Заголовки сообщения по умолчанию
+        .store_uint(1, 1)  ;; Устанавливаем бит в 1, чтобы указать, что ячейка будет продолжаться
+        .store_ref(message_body)  ;; Добавляем тело сообщения
+    .end_cell();
+    
+    return msg;
+}
+
