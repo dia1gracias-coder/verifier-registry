@@ -1,0 +1,205 @@
+#include "imports/stdlib.fc";
+
+;; NFT collection smart contract
+;; source: https://github.com/ton-blockchain/token-contract/blob/main/nft/nft-collection.fc
+
+;; error code
+;; 331 - input value less than mint fee
+;; 332 - signature expired
+;; 333 - signature invalid
+;; 334 - input value less than boost fee
+;; 335 - item index out of range
+;; 336 - only owner
+
+int workchain() asm "0 PUSHINT";
+
+(slice, slice, int, int, cell, cell) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(), ;; owner_address
+        ds~load_msg_addr(), ;; signer_public_key
+        ds~load_uint(64), ;; next_item_index
+        ds~load_uint(64), ;; boost_fee
+        ds~load_ref(), ;; content
+        ds~load_ref() ;; nft_item_code
+    );
+}
+
+() save_data(slice owner_address, slice signer_address, int next_item_index, int boost_fee, cell content, cell nft_item_code) impure inline {
+    set_data(begin_cell()
+        .store_slice(owner_address)
+        .store_slice(signer_address)
+        .store_uint(next_item_index, 64)
+        .store_uint(boost_fee, 64)
+        .store_ref(content)
+        .store_ref(nft_item_code)
+        .end_cell()
+    );
+}
+
+cell calculate_nft_item_state_init(int item_index, cell nft_item_code) {
+    cell data = begin_cell().store_uint(item_index, 64).store_slice(my_address()).end_cell();
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_dict(nft_item_code)
+        .store_dict(data)
+        .store_uint(0, 1)
+        .end_cell();
+}
+
+slice calculate_nft_item_address(int wc, cell state_init) {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(wc, 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}
+
+() deploy_nft_item(int item_index, cell nft_item_code, int amount, cell nft_content) impure {
+    cell state_init = calculate_nft_item_state_init(item_index, nft_item_code);
+    slice nft_address = calculate_nft_item_address(workchain(), state_init);
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(nft_address)
+        .store_coins(amount)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(nft_content);
+    send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+() emit_random_seed(slice sender_address) impure {
+    randomize_lt();
+    int x = random();
+
+    ;; source: https://docs.ton.org/develop/func/cookbook#how-to-send-a-simple-message
+    cell msg = begin_cell()
+        .store_uint(0x18, 6) ;; flags
+        .store_slice(sender_address) ;; destination address
+        .store_coins(0) ;; amount of nanoTons to send
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; default message headers (see sending messages page)
+        .store_uint(0, 32) ;; zero opcode - means simple transfer message with comment
+        .store_uint(x, 256) ;; random seed
+        .end_cell();
+    send_raw_message(msg, 3); ;; pay fees separately, ignore errors
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+
+    var (owner_address, signer_address, next_item_index, boost_fee, content, nft_item_code) = load_data();
+    (int workchain, int signer_public_key) = parse_std_addr(signer_address);
+
+    if (op == 1) { ;; mint / deploy new nft
+        int mint_fee = in_msg_body~load_uint(64);
+        throw_unless(331, msg_value >= mint_fee);
+        int expiry = in_msg_body~load_uint(64);
+        throw_unless(332, expiry > now());
+
+        int amount_to_nft_item = in_msg_body~load_coins();
+        slice a = in_msg_body~load_ref().begin_parse();
+        var signature = a~load_bits(512);
+        slice data = begin_cell()
+            .store_slice(sender_address)
+            .store_uint(workchain, 32)
+            .store_coins(mint_fee)
+            .store_uint(expiry, 64)
+            .end_cell()
+            .begin_parse();
+        int is_valid = check_signature(slice_hash(data), signature, signer_public_key);
+        throw_unless(333, is_valid);
+
+        cell nft_message = in_msg_body~load_ref();
+        deploy_nft_item(next_item_index, nft_item_code, amount_to_nft_item, nft_message);
+        ;; update next index of nft item
+        next_item_index += 1;
+        save_data(owner_address, signer_address, next_item_index, boost_fee, content, nft_item_code);
+
+        emit_random_seed(sender_address);
+
+        return ();
+    }
+    if (op == 2) { ;; boost
+        var (_, _, next_item_index, boost_fee, _, nft_item_code) = load_data();
+        throw_unless(334, msg_value >= boost_fee);
+        
+        int item_index = in_msg_body~load_uint(64);
+        throw_unless(335, item_index != 0); ;; 0 is not a valid item_index
+        throw_unless(335, item_index < next_item_index); ;; item_index of nft_item haven't deployed yet
+
+        emit_random_seed(sender_address);
+
+        return ();
+    }
+    if (op == 3) { ;; withdraw fees
+        throw_unless(336, equal_slices(sender_address, owner_address));
+
+        int amount = in_msg_body~load_uint(64);
+
+        cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+            .end_cell();
+        send_raw_message(msg, 1); ;; paying fees, revert on errors
+
+        return ();
+    }
+    if (op == 4) { ;; change boost fee
+        throw_unless(336, equal_slices(sender_address, owner_address));
+
+        int new_boost_fee = in_msg_body~load_uint(64);
+        save_data(owner_address, signer_address, next_item_index, new_boost_fee, content, nft_item_code);
+
+        return ();
+    }
+    if (op == 5) { ;; change owner
+        throw_unless(336, equal_slices(sender_address, owner_address));
+
+        slice new_owner_address = in_msg_body~load_msg_addr();
+        save_data(new_owner_address, signer_address, next_item_index, boost_fee, content, nft_item_code);
+
+        return ();
+    }
+    if (op == 6) { ;; change signer
+        throw_unless(336, equal_slices(sender_address, owner_address));
+
+        slice new_signer_address = in_msg_body~load_msg_addr();
+        save_data(owner_address, new_signer_address, next_item_index, boost_fee, content, nft_item_code);
+
+        return ();
+    }
+    throw(0xffff); ;; invalid op
+}
+
+;; Get methods
+
+(int, cell, slice, slice, int) get_collection_data() method_id {
+var (owner_address, signer_address, next_item_index, boost_fee, content, _) = load_data();
+  return (next_item_index, content, owner_address, signer_address, boost_fee);
+}
+
+slice get_nft_address_by_index(int index) method_id {
+    var (_, _, _, _, _, nft_item_code) = load_data();
+    cell state_init = calculate_nft_item_state_init(index, nft_item_code);
+    return calculate_nft_item_address(workchain(), state_init);
+}
+
+cell get_nft_content(int index, cell individual_nft_content) method_id {
+    return individual_nft_content;
+}
