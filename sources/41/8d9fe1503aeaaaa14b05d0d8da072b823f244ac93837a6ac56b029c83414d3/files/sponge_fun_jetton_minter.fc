@@ -1,0 +1,223 @@
+#include "imports/stdlib.fc";
+#include "imports/op-codes.fc";
+#include "imports/workchain.fc";
+#include "imports/jetton-utils.fc";
+#include "imports/gas.fc";
+
+;; storage variables
+
+;; total_supply:Coins 
+;; mintable:Bool
+;; admin_address:MsgAddress 
+;; jetton_wallet_code:^Cell 
+;; metadata_uri:^Cell = Storage;
+global int total_supply;
+global int mintable;
+global slice admin_address;
+global cell jetton_wallet_code;
+global cell metadata_uri;
+
+;; load_data populates storage variables using stored data
+() load_data() impure {
+
+    var ds = get_data().begin_parse();
+
+    total_supply = ds~load_coins();
+    mintable = ds~load_bool();
+    admin_address = ds~load_msg_addr();
+    jetton_wallet_code = ds~load_ref();
+    metadata_uri = ds~load_ref();
+
+    ds.end_parse();
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_coins(total_supply)
+            .store_bool(mintable)
+            .store_slice(admin_address)
+            .store_ref(jetton_wallet_code)
+            .store_ref(metadata_uri)
+            .end_cell()
+    );
+}
+
+() mint_tokens(slice to_address, cell jetton_wallet_code, cell master_msg, int need_state_init) impure inline {
+
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+
+    ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+    var msg = begin_cell()
+    .store_msg_flags_and_address_none(BOUNCEABLE)
+    .store_slice(to_wallet_address) ;; dest
+    .store_coins(0);
+
+    if (need_state_init) {
+        msg = msg.store_statinit_ref_and_body_ref(state_init, master_msg);
+    } else {
+        msg = msg.store_only_body_ref(master_msg);
+    }
+
+    send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    int msg_flags = in_msg_full_slice~load_msg_flags();
+
+    if (msg_flags & 1) { ;; is bounced
+        in_msg_body~skip_bounced_prefix();
+        ;; process only mint bounces
+        ifnot (in_msg_body~load_op() == op::internal_transfer) {
+            return ();
+        }
+        in_msg_body~skip_query_id();
+        int jetton_amount = in_msg_body~load_coins();
+        load_data();
+        total_supply -= jetton_amount;
+        if(jetton_amount > 0){
+            mintable = TRUE;
+        }
+        save_data();
+        return ();
+    }
+
+    slice sender_address = in_msg_full_slice~load_msg_addr();
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+    load_data();
+
+    if (op == op::mint_to_airdrop_contract) {
+        throw_unless(error::not_mintable, mintable);
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        check_same_workchain(to_address);
+        cell master_msg = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        ;; see internal_transfer TL-B layout in jetton.tlb
+        slice master_msg_slice = master_msg.begin_parse();
+        throw_unless(error::invalid_op, master_msg_slice~load_op() == op::internal_transfer);
+        master_msg_slice~skip_query_id();
+
+        ;; send all token to airdrop contract first, but just can 35% can be claimed.
+        int jetton_amount = master_msg_slice~load_coins();
+        throw_unless(error::invalid_airdrop_amount, jetton_amount == MAX_SUPPLY);
+        throw_unless(error::not_have_enough_amount, total_supply + jetton_amount <= MAX_SUPPLY);
+
+        master_msg_slice~load_msg_addr(); ;; from_address
+        master_msg_slice~load_msg_addr(); ;; response_address
+        int forward_ton_amount = master_msg_slice~load_coins(); ;; forward_ton_amount
+        check_either_forward_payload(master_msg_slice); ;; either_forward_payload
+
+        mint_tokens(to_address, jetton_wallet_code, master_msg, TRUE);
+        total_supply += jetton_amount;
+        if(total_supply == MAX_SUPPLY) {
+            mintable = FALSE;
+        }
+        save_data();
+        return ();
+    }
+
+    if (op == op::burn_notification) {
+        ;; see burn_notification TL-B layout in jetton.tlb
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(error::not_valid_wallet,
+            equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+        );
+        total_supply -= jetton_amount;
+        save_data();
+        slice response_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        if (~ is_address_none(response_address)) {
+            ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+            var msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(response_address) ;; dest
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_op(op::excesses)
+            .store_query_id(query_id);
+            send_raw_message(msg.end_cell(), SEND_MODE_IGNORE_ERRORS | SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        }
+        return ();
+    }
+
+    if (op == op::provide_wallet_address) {
+        ;; see provide_wallet_address TL-B layout in jetton.tlb
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_bool();
+        in_msg_body.end_parse();
+
+        cell included_address = include_address?
+        ? begin_cell().store_slice(owner_address).end_cell()
+        : null();
+
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+        var msg = begin_cell()
+        .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_prefix_only_body()
+        .store_op(op::take_wallet_address)
+        .store_query_id(query_id);
+
+        if (is_same_workchain(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code));
+        } else {
+            msg = msg.store_address_none();
+        }
+
+        cell msg_cell = msg.store_maybe_ref(included_address).end_cell();
+
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        return ();
+    }
+
+    if (op == op::change_admin) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        admin_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+        save_data();
+        return ();
+    }
+
+    if (op == op::change_metadata_uri) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        metadata_uri = begin_cell().store_slice(in_msg_body).end_cell();
+        save_data();
+        return ();
+    }
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }
+
+    throw(error::wrong_op);
+}
+
+cell build_content_cell(slice metadata_uri) inline {
+    cell content_dict = new_dict();
+    content_dict~set_token_snake_metadata_entry("uri"H, metadata_uri);
+    content_dict~set_token_snake_metadata_entry("decimals"H, "9");
+    return create_token_onchain_metadata(content_dict);
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    load_data();
+    return (total_supply, mintable, admin_address, build_content_cell(metadata_uri.begin_parse()), jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    load_data();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code);
+}
+
+int get_smc_balance() method_id {
+    [int balance, _] = get_balance(); ;; get_balance() returns tuple [(int)balance of TON, (cell)extra currency]
+    return balance;
+}
