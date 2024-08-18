@@ -1,0 +1,222 @@
+#include "imports/stdlib.fc";
+#include "op_codes.fc";
+
+;; CONSTANTS
+const int const::min_tons_for_storage = 50000000; ;; 0.05 TON
+const int const::address_size = 264; ;; 256 + 8
+
+;; ERRORS
+const int error::not_admin_role = 101;
+const int error::not_whitelisted = 102;
+const int error::insufficient_ton_balance = 103;
+
+;; GLOBALS
+global slice admin;
+global cell whitelist;
+
+() load_data() impure inline {
+    var ds = get_data().begin_parse();
+
+    admin = ds~load_msg_addr();
+    whitelist = ds~load_dict();
+    ds.end_parse();
+}
+
+() save_data() impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(admin)
+            .store_dict(whitelist)
+            .end_cell()
+    );
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; WHITELIST UTILS FUNCTIONS ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+slice _pack_address(slice address) inline {
+    (int wc, int address_hash) = parse_std_addr(address);
+    return begin_cell().store_int(wc, 8).store_uint(address_hash, 256).end_cell().begin_parse();
+}
+
+(slice, int) dict_get?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTGET" "NULLSWAPIFNOT";
+
+int _is_whitelisted(slice address) inline {
+    (slice whitelist_slice, int found) = whitelist.dict_get?(const::address_size, _pack_address(address));
+    if(found == 0){
+        return 0;
+    }
+    return whitelist_slice~load_uint(1);
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ACTION FUNCTIONS         ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+() add_whitelist(slice sender, slice address) impure {
+    throw_unless(error::not_admin_role, equal_slice_bits(sender, admin));
+    if(_is_whitelisted(address)){
+        return ();
+    }
+    whitelist~dict_set_builder(const::address_size, _pack_address(address), begin_cell().store_uint(1, 1));
+    save_data();
+    return ();
+}
+
+() remove_whitelist(slice sender, slice address) impure {
+    throw_unless(error::not_admin_role, equal_slice_bits(sender, admin));
+    if(_is_whitelisted(address)){
+        whitelist~dict_set_builder(const::address_size, _pack_address(address), begin_cell().store_uint(0, 1));
+        save_data();
+        return ();
+    }
+}
+
+() reset_whitelist(slice sender) impure {
+    throw_unless(error::not_admin_role, equal_slice_bits(admin, sender));
+    set_data(
+        begin_cell()
+            .store_slice(admin)
+            .store_uint(0, 1)
+            .end_cell()
+    );
+    return ();
+}
+
+() transfer_admin_role(slice sender, slice new_admin) impure {
+    throw_unless(error::not_admin_role, equal_slice_bits(sender, admin));
+    admin = new_admin;
+    save_data();
+    return ();
+}
+
+() withdraw_ton(slice sender, slice to, int amount) impure {
+    throw_unless(error::not_whitelisted, _is_whitelisted(sender));
+    var [balance, _] = get_balance();
+    int claimable_amount = balance - const::min_tons_for_storage;
+    throw_unless(error::insufficient_ton_balance, claimable_amount >= amount);
+
+    cell message_body = begin_cell()
+    .store_uint(0, 32)
+    .store_slice("Hunny Play withdraw TON")
+    .end_cell();
+
+    cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+            .store_uint(1, 1)
+            .store_ref(message_body)
+            .end_cell();
+    send_raw_message(msg, 1);
+
+    return ();
+}
+
+() withdraw_jetton(slice sender, slice to, int amount, slice jetton_wallet, int query_id) impure {
+    throw_unless(error::not_whitelisted, _is_whitelisted(sender));
+
+    cell message_body = begin_cell()
+    .store_uint(0, 32)
+    .store_slice("Hunny Play withdraw Jetton")
+    .end_cell();
+
+    cell message_ref = begin_cell()
+            .store_uint(op::transfer(), 32)
+            .store_uint(query_id, 64)
+            .store_coins(amount)
+            .store_slice(to)
+            .store_slice(to)
+            .store_uint(0, 1)
+            .store_coins(10000000)
+            .store_uint(1, 1)
+            .store_ref(message_body)
+            .end_cell();
+
+    cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(jetton_wallet)
+            .store_coins(0)
+            .store_uint(1, 107)
+            .store_ref(message_ref)
+            .end_cell();
+
+    send_raw_message(msg, 64);
+    save_data();
+    return ();
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ENTRY FUNCTIONS          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+    slice sender = cs~load_msg_addr();
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if(op == op::normalTonTransfer()){
+        return();   ;; ignore normal Ton received messages
+    }
+    if(op == op::transfer_notification()){
+        return();   ;; ignore Jetton received messages
+    }
+    if(op == op::withdrawTon()){
+        slice to = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        withdraw_ton(sender, to, amount);
+        return ();
+    }
+    if(op == op::withdrawJetton()){
+        slice to = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        slice jetton_wallet = in_msg_body~load_msg_addr();
+        withdraw_jetton(sender, to, amount, jetton_wallet, query_id);
+        return ();
+    }
+    if (op == op::addWhitelist()) {
+        slice address = in_msg_body~load_msg_addr();
+        add_whitelist(sender, address);
+        return ();
+    }
+    if (op == op::removeWhitelist()) {
+        slice address = in_msg_body~load_msg_addr();
+        remove_whitelist(sender, address);
+        return ();
+    }
+    if (op == op::resetWhitelist()) {
+        reset_whitelist(sender);
+        return ();
+    }
+    if(op == op::transferAdminRole()) {
+        slice new_admin = in_msg_body~load_msg_addr();
+        transfer_admin_role(sender, new_admin);
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; VIEW FUNCTIONS           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+slice get_admin() method_id {
+    load_data();
+    return admin;
+}
+
+int is_whitelisted(slice address) method_id {
+    load_data();
+    return _is_whitelisted(address);
+}
