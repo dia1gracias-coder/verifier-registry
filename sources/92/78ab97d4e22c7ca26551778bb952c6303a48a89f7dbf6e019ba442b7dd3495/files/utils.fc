@@ -1,0 +1,34 @@
+#include "imports/stdlib.fc";
+
+;; todo checkme
+const int workchain = 0;
+
+cell pack_reward_claimer_wallet_init_data(slice owner_address, slice reward_claimer_parent_address, cell reward_claimer_wallet_code) inline {
+    ;; todo checkme
+    return begin_cell()
+    ;; init balance = 0
+        .store_coins(0)
+        .store_slice(owner_address)
+        .store_slice(reward_claimer_parent_address)
+        .store_ref(reward_claimer_wallet_code)
+        .end_cell();
+}
+
+cell calculate_reward_claimer_wallet_state_init(slice owner_address, slice reward_claimer_parent_address, cell reward_claimer_wallet_code) inline {
+    ;; todo checkme
+    return begin_cell()
+        .store_uint(0, 1 + 1)
+        .store_dict(reward_claimer_wallet_code)
+        .store_dict(pack_reward_claimer_wallet_init_data(owner_address, reward_claimer_parent_address, reward_claimer_wallet_code))
+        .store_uint(0, 1)
+        .end_cell();
+}
+
+slice calculate_reward_claimer_wallet_address(cell state_init) inline {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(workchain, 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}
