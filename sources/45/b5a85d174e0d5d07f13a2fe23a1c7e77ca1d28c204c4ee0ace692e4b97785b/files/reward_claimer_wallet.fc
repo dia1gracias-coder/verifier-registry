@@ -1,0 +1,109 @@
+#include "imports/stdlib.fc";
+#include "error-codes.fc";
+#include "op-codes.fc";
+#include "utils.fc";
+
+(int, int, slice, slice, cell) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_uint(64),
+        ds~load_coins(),
+        ds~load_msg_addr(),
+        ds~load_msg_addr(),
+        ds~load_ref()
+    );
+}
+
+() save_data(int seq, int balance, slice owner_address, slice reward_claimer_parent_address, cell reward_claimer_wallet_code) impure {
+    set_data(
+        begin_cell()
+            .store_uint(seq, 64)
+            .store_coins(balance)
+            .store_slice(owner_address)
+            .store_slice(reward_claimer_parent_address)
+            .store_ref(reward_claimer_wallet_code)
+            .end_cell()
+    );
+}
+
+() internal_report(slice sender_address, int reported_seq, int reported_amount) impure {
+    (int seq, int balance, slice owner_address, slice reward_claimer_parent_address, cell reward_claimer_wallet_code) = load_data();
+
+    throw_unless(error::wallet_internal_report_wrong_sender_address, equal_slice_bits(sender_address, reward_claimer_parent_address));
+    throw_unless(error::wallet_internal_report_wrong_seq, reported_amount > seq);
+
+    save_data(reported_seq, balance + reported_amount, owner_address, reward_claimer_parent_address, reward_claimer_wallet_code);
+}
+
+;; in_msg_body: coins
+() claim(slice sender_address, int claim_amount) impure {
+    (int seq, int balance, slice owner_address, slice reward_claimer_parent_address, cell reward_claimer_wallet_code) = load_data();
+
+    throw_unless(error::wallet_claim_wrong_sender_address, equal_slice_bits(sender_address, owner_address));
+    throw_unless(error::wallet_claim_balance_not_enough, balance >= claim_amount);
+
+    var msg_body = begin_cell()
+        .store_uint(op::internal_claim, 32)
+        .store_slice(owner_address)
+        .store_coins(claim_amount)
+        .end_cell();
+
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(reward_claimer_parent_address)
+        .store_coins(0)
+        ;; 这里一开始是 4 + 2 + 1 不行， 改成 1 就行了，不知道这个 flag 是干嘛的
+        ;; done: 参考 modern_jetton, 1 大概就是表示不需要 init 的，且后面有接 cell 类型 body 的 msg
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body);
+
+    ;; 这里 mode=64也是最好的解决方案，把所有入站剩余值都转发到 parent 合约中
+    send_raw_message(msg.end_cell(), 64);
+
+    save_data(seq, balance - claim_amount, owner_address, reward_claimer_parent_address, reward_claimer_wallet_code);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::internal_report) {
+        int seq = in_msg_body~load_uint(64);
+        int reported_amount = in_msg_body~load_coins();
+
+        internal_report(sender_address, seq, reported_amount);
+        return ();
+    }
+
+    if (op == op::claim) {
+        int claim_amount = in_msg_body~load_coins();
+
+        claim(sender_address, claim_amount);
+
+        return ();
+    }
+
+    throw(error::unknown_op);
+}
+
+(int, int, slice, slice, cell) get_contract_storage_data() method_id {
+    (int seq, int balance, slice owner_address, slice reward_claimer_parent_address, cell reward_claimer_wallet_code) = load_data();
+    return (seq, balance, owner_address, reward_claimer_parent_address, reward_claimer_wallet_code);
+}
+
+int get_contract_balance() method_id {
+    var [balance, _] = get_balance();
+    return balance;
+}
+
+
