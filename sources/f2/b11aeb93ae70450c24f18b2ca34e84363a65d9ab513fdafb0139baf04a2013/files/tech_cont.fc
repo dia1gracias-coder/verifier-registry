@@ -1,0 +1,179 @@
+#include "imports/stdlib.fc";
+
+const op::increase = "op::increase"c; ;; create an opcode from string using the "c" prefix, this results in 0x7e8764ef opcode in this case
+
+;; storage variables
+
+;; id is required to be able to create different instances of counters
+;; since addresses in TON depend on the initial state of the contract
+global int ctx_id;
+global int ctx_counter;
+
+;; ;; load_data populates storage variables using stored data
+;; () load_data() impure {
+;;     var ds = get_data().begin_parse();
+
+;;     ctx_id = ds~load_uint(32);
+;;     ctx_counter = ds~load_uint(32);
+
+;;     ds.end_parse();
+;; }
+
+;; ;; save_data stores storage variables as a cell into persistent storage
+;; () save_data() impure {
+;;     set_data(
+;;         begin_cell()
+;;             .store_uint(ctx_id, 32)
+;;             .store_uint(ctx_counter, 32)
+;;             .end_cell()
+;;     );
+;; }
+
+;; Storage structure
+(int, slice, cell, int) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_uint(32),  ;; balance
+        ds~load_msg_addr(),  ;; owner
+        ds~load_dict(),  ;; bets
+        ds~load_uint(0)  ;; is_paused
+    );
+}
+
+() save_data(int balance, slice owner, cell bets, int is_paused) impure inline {
+    set_data(begin_cell()
+        .store_uint(balance, 32)
+        .store_slice(owner)
+        .store_dict(bets)
+        .store_uint(is_paused, 1)
+        .end_cell());
+}
+
+int generate_random(int user_entropy) inline {
+    var block_hash = now();
+    var combined_entropy = block_hash ^ user_entropy;
+    return cell_hash(begin_cell().store_uint(combined_entropy, 256).end_cell()) % 2;
+}
+
+
+;; int generate_random(int user_entropy) inline {
+;;     var block_hash = now();
+;;     var combined_entropy = block_hash ^ user_entropy;
+;;     return cell_hash(begin_cell().store_uint(combined_entropy, 256).end_cell()) % 2;
+;; }
+
+() place_bet(int amount, int prediction, int user_entropy, slice sender_address) impure {
+    ;; var (balance, owner, bets, is_paused) = load_data();
+
+        int num = 1000000;
+    ;; throw_unless(102, ~ is_paused);  ;; Ensure the contract is not paused
+    ;; throw_unless(103, amount >= 1000);  ;; Validate bet amount
+    ;; throw_unless(105, user_entropy > 0);  ;; Validate user entropy
+
+    ;; var user = my_address();
+    ;; var (bet_slice, found?) = bets.udict_get?(256, slice_hash(user));
+    ;; throw_unless(100, found?);  ;; Ensure bet exists
+
+    ;; var outcome = generate_random(user_entropy);
+    ;; if (outcome == prediction) {
+    if (true) {
+        var win_amount = amount;
+        var msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(sender_address)
+            .store_coins(num)
+            .store_uint(0, 1) 
+            .end_cell();
+        send_raw_message(msg, 0);
+    } 
+    ;; else {
+    ;;     balance += amount;
+    ;; }
+
+    ;; bets~udict_delete?(256, slice_hash(user));
+    ;; save_data(balance, owner, bets, is_paused);
+}
+() transfer_to_wallet(slice recipient, int amount) {
+    ;; recipient: A slice containing the recipient's address
+    ;; amount: The amount of nanograms (1 TON = 1,000,000,000 nanograms) to transfer
+
+    ;; int num = 1000000;
+    ;; Create an outbound message
+    var out_msg = begin_cell()
+        .store_uint(0x10, 6)        ;; msg_flags: 0x10 means carry remaining gas and don't create a new cell
+        .store_slice(recipient)     ;; Store the recipient address
+        .store_coins(amount)        ;; Store the amount to transfer
+        .store_uint(0, 1)           ;; Bounce flag set to 0 (don't bounce the message if it fails)
+        .end_cell();                ;; End the cell creation
+
+    ;; Send the message
+    send_raw_message(out_msg, 0);  ;; The second argument is the flag, 1 = carry remaining gas
+}
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell msg_body, slice in_msg) {
+    if (in_msg.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    ;; slice cs = in_msg.begin_parse();
+    ;; int flags = cs~load_uint(4);
+    ;; if (flags & 1) { ;; ignore all bounced messages
+    ;;     return ();
+    ;; }
+    slice sender_slice = in_msg~load_msg_addr();
+;;   slice sender_address = cs~load_msg_addr();
+
+    ;; slice sender_slice = in_msg~load_msg_addr();
+    ;; sender_address = sender_slice~load_ref();
+    ;; load_data(); ;; here we populate the storage variables
+
+    int op = in_msg~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+
+
+    ;; if (op == 0x00001234) { ;; place_bet
+        int amount = in_msg~load_uint(32);
+        int prediction = in_msg~load_uint(1);
+        int user_entropy = in_msg~load_uint(32);
+        ;; place_bet(amount, prediction, user_entropy, sender_slice);
+        int transfer_amount = msg_value / 2;
+        transfer_to_wallet(sender_slice, transfer_amount);
+
+    ;; } else {
+    ;;     throw(101);  ;; Unknown operation
+    ;; }
+
+    
+        ;; var msg = begin_cell()
+        ;;     .store_uint(0x10, 6)
+        ;;     .store_slice(sender_slice)
+        ;;     .store_coins(amount)
+        ;;     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        ;;     .end_cell();
+        ;; send_raw_message(msg, 0);
+        
+        ;; cell msg = begin_cell()
+        ;;     .store_uint(0x10, 6)
+        ;;     .store_slice(sender_slice)
+        ;;     .store_coins(num)
+        ;;     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        ;;     .end_cell();
+        ;; send_raw_message(msg, 0);
+
+    ;; throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+
+
+;; get methods are a means to conveniently read contract data using, for example, HTTP APIs
+;; they are marked with method_id
+;; note that unlike in many other smart contract VMs, get methods cannot be called by other contracts
+
+;; int get_counter() method_id {
+;;     load_data();
+;;     return ctx_counter;
+;; }
+
+;; int get_id() method_id {
+;;     load_data();
+;;     return ctx_id;
+;; }
