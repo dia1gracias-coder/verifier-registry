@@ -1,0 +1,109 @@
+#include "imports/stdlib.fc";
+
+const int msg_flag::bounceable = 0x18;
+
+builder store_zeros(builder b, int n) asm "STZEROES";
+
+slice addr_none() asm "b{00} PUSHSLICE";
+
+const int TRADE_FEE = 200000000; ;; 0.2 TON
+
+const int vault::swap = 0xe3a0d482;
+const int jetton::transfer = 0x0f8a7ea5;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        ;; NOTE: Ignore bounced messages.
+        return ();
+    }
+
+    ;; body参数参数解析
+    ;; 1. op
+    ;; int op = in_msg_body~load_uint(32);
+    in_msg_body~load_uint(32); ;; skip op
+    ;; 2. query_id
+    ;; int query_id = in_msg_body~load_uint(64); 
+    in_msg_body~load_uint(64);  ;; skip query_id
+    ;; 3. amount
+    int amountIn = in_msg_body~load_coins();
+    ;; 4. to_owner_address
+    ;; slice  to_owner_address = in_msg_body~load_msg_addr();
+    in_msg_body~load_msg_addr();  ;; skip to_owner_address
+    ;; 5. response_address
+    ;; slice response_address = in_msg_body~load_msg_addr();
+    in_msg_body~load_msg_addr();  ;; skip response_address
+    ;; 6. custom_payload
+    ;; cell custom_payload = in_msg_body~load_dict();
+    in_msg_body~load_dict(); ;; skip custom_payload
+    ;; 7. forward_ton_amount
+    ;; int forward_ton_amount = in_msg_body~load_coins();
+    in_msg_body~load_coins();  ;; skip forward_ton_amount
+    ;; 8. forward_payload
+    slice either_forward_payload = in_msg_body;
+
+    ;; forward_payload 参数解析
+    ;; 9. dexId
+    ;; int dexId = either_forward_payload~load_uint(8);
+    either_forward_payload~load_uint(8);  ;; skip dexId
+    ;; 10. contract Jetton Walltet Address(本合约的SCALE的JettonWallet)
+    slice self_jetton_wallet = either_forward_payload~load_msg_addr();
+    ;; 11. either_forward_ton_amount
+    int either_forward_ton_amount = either_forward_payload~load_uint(32);
+    ;; 12. sub_body
+    slice sub_body = either_forward_payload;
+
+    ;; sub_body 参数解析
+    ;; 13. jetton_vault_address
+    slice jetton_vault_address = sub_body~load_msg_addr();
+    ;; 14. pool_address 
+    slice pool_address = sub_body~load_msg_addr();
+    ;; 15.recipient_addr 
+    slice recipient_addr = sub_body~load_msg_addr();
+
+
+    cell forwardPayload = begin_cell()
+        .store_uint(vault::swap, 32)
+        .store_uint(0, 64) ;; query_id:int64
+        ;; .store_coins(either_forward_ton_amount - TRADE_FEE) ;; amount:Coins # subtract gas
+        ;; _:SwapStep
+        .store_slice(pool_address) ;; pool_addr:MsgAddressInt
+        .store_uint(0, 1) ;; kind:SwapKind
+        .store_coins(0) ;; limit:Coins
+        .store_maybe_ref(null()) ;; next:(Maybe ^SwapStep)
+        ;; swap_params:^SwapParams
+        .store_ref(
+            begin_cell()
+                .store_uint(now() + 60 * 5, 32) ;; deadline:Timestamp # 5 min
+                .store_slice(recipient_addr) ;; recipient_addr:MsgAddressInt
+                .store_slice(addr_none()) ;; referral_addr:MsgAddress
+                .store_maybe_ref(null()) ;; fulfill_payload:(Maybe ^Cell)
+                .store_maybe_ref(null()) ;; reject_payload:(Maybe ^Cell)
+                .end_cell()
+        )
+        .end_cell();
+
+    cell body = begin_cell()
+        .store_uint(jetton::transfer, 32)
+        .store_uint(0, 64) ;; query_id:int64
+        .store_coins(amountIn) ;; amount:Coins # subtract gas
+        .store_slice(jetton_vault_address)
+        .store_slice(addr_none()) ;; response destination
+        .store_maybe_ref(null()) ;; no custom payload
+        .store_coins(either_forward_ton_amount) ;; forward amount - if >0, will send notification message
+        .store_uint(1, 1) ;; we store forwardPayload as a reference
+        .store_ref(forwardPayload)
+        .end_cell();
+
+    send_raw_message(
+        begin_cell()
+            .store_uint(msg_flag::bounceable, 6)
+            .store_slice(self_jetton_wallet) ;; 当前合约的scale jettonWallte合约地址
+            .store_coins(either_forward_ton_amount) ;; gas费用
+            .store_zeros(1 + 4 + 4 + 64 + 32 + 1)
+            .store_maybe_ref(body)
+            .end_cell(),
+        0
+    );
+}
