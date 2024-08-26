@@ -1,0 +1,176 @@
+#include "imports/stdlib.fc";
+#include "imports/deploy.fc";
+#include "imports/messages.fc";
+#include "imports/opcodes.fc";
+#include "imports/outbound.fc";
+#include "imports/inbound.fc";
+#include "imports/payload.fc";
+#include "imports/errors.fc";
+
+(slice, int, int, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+
+    return (
+        ds~load_msg_addr(), ;; owner_address
+        ds~load_int(16), ;; chain_id
+        ds~load_int(64), ;; sequence
+        ds~load_ref()  ;; resolver_code
+    );
+}
+
+() save_data(slice owner_address, int chain_id, int sequence, cell resolver_code) impure inline {
+    cell data = begin_cell()
+        .store_slice(owner_address)
+        .store_int(chain_id, 16)
+        .store_int(sequence, 64)
+        .store_ref(resolver_code)
+    .end_cell();
+
+    set_data(data);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+
+    if(op == op::deploy::locking) {
+        (slice owner, _, _, cell resolver_code) = load_data();
+        throw_unless(error::sender_not_owner, equal_slice_bits(owner, sender_address));
+
+        slice wallet_or_minter_address = in_msg_body~load_msg_addr();
+        int destination_chain_id = in_msg_body~load_int(16);
+        cell token_class = in_msg_body~load_ref();
+        int locking = 2; ;; bitwose 10
+        int deploy_value = 5000000; ;; 0.05 ton
+
+        send_raw_message(
+            create_deploy_message_builder(
+                resolver_code, 
+                build_outbound_init_data(wallet_or_minter_address), 
+                deploy_value
+            )
+            .store_uint(op::init::outbound, 32)
+            .store_uint(destination_chain_id, 16)
+            .store_ref(token_class)
+            .end_cell(),
+            SEND_MODE_REGULAR
+        );
+
+        send_raw_message(
+            create_deploy_message_builder(
+                resolver_code,
+                build_inbound_init_data(destination_chain_id, token_class),
+                deploy_value
+            )
+            .store_uint(op::init::inbound, 32)
+            .store_uint(locking, 2)
+            .store_slice(wallet_or_minter_address)
+            .end_cell(), 
+            SEND_MODE_REGULAR
+        );
+    } elseif (op == op::transfer_notification) {
+        (_, _, _, cell resolver_code) = load_data();
+        slice address = get_outbound_address_internal(resolver_code, sender_address);
+
+        ;; TODO: how to handle a case when outbound is not initialized yet?
+        ;; what happens with jettons that are transferred to this wallet?
+
+        int query_id = in_msg_body~load_uint(64);
+        int amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+
+        cell msg_body = begin_cell()
+            .store_uint(query_id, 64)
+            .store_uint(amount, 256)
+            .store_slice(from_address)
+            .store_slice(sender_address)
+            .end_cell();
+
+        cell msg = begin_cell()
+            .store_msg_flags(NON_BOUNCEABLE)
+            .store_slice(address)
+            .store_coins(0)
+            .store_msg_body_header(0)
+            .store_uint(op::query::outbound, 32)
+            .store_ref(msg_body)
+        .end_cell();
+
+        send_raw_message(msg, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+    } elseif (op == op::result::outbound) {
+        (slice owner_address, int chain_id, int sequence, cell resolver_code) = load_data();
+        slice result_message = in_msg_body~load_ref().begin_parse();
+
+        int query_id = result_message~load_uint(64);
+        int amount = result_message~load_uint(256);
+        slice recipient = result_message~load_msg_addr();
+        int destination_chain_id = result_message~load_uint(16);
+        cell token_class = result_message~load_ref();
+
+        cell payload = encode_payload(amount, destination_chain_id, token_class, recipient);
+
+        save_data(owner_address, chain_id ,sequence + 1, resolver_code);
+
+        emit_outbound(chain_id, sequence, query_id, payload);
+    } elseif (op == op::upgrade) {
+        (slice owner_address, _, _, _) = load_data();
+        throw_unless(error::sender_not_owner, equal_slice_bits(owner_address, sender_address));
+
+        cell code = in_msg_body~load_ref();
+        set_code(code);
+    } elseif (op == op::upgrade::resolver) {
+        (slice owner_address, _, _, _) = load_data();
+        throw_unless(error::sender_not_owner, equal_slice_bits(owner_address, sender_address));
+
+        slice resolver_address = in_msg_body~load_msg_addr();
+        cell code = in_msg_body~load_ref();
+
+        cell msg = begin_cell()
+            .store_msg_flags(NON_BOUNCEABLE)
+            .store_slice(resolver_address)
+            .store_coins(0)
+            .store_msg_body_header(0)
+            .store_uint(op::upgrade::resolver, 32)
+            .store_ref(code)
+        .end_cell();
+
+        send_raw_message(msg, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+    } else {
+        throw(0xffff);
+    }
+}
+
+(slice, int, int, cell) get_gateway_data() method_id {
+    return load_data();
+}
+
+int get_next_sequence() method_id {
+    (_, _, int sequence, _) = load_data();
+    return sequence;
+}
+
+slice get_inbound_address(int destination_chain_id, cell token_class) method_id {
+    (_, _, _, cell resolver_code) = load_data();
+    return get_inbound_address_internal(resolver_code, destination_chain_id, token_class);
+}
+
+slice get_outbound_address(slice wallet_or_minter) method_id {
+    (_, _, _, cell resolver_code) = load_data();
+    return get_outbound_address_internal(resolver_code, wallet_or_minter);
+}
+
+slice get_owner_address() method_id {
+    (slice owner_address, _, _, _) = load_data();
+    return owner_address;
+}

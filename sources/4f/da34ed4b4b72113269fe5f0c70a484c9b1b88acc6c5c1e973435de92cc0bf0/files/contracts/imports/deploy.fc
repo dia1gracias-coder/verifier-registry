@@ -1,0 +1,31 @@
+#include "messages.fc";
+
+slice calculate_address_from_state_init(cell state_init) inline {
+    return begin_cell()
+            .store_uint(4, 3)  ;; addr_std$10 : Integer 2; anycast:(Maybe Anycast) = 0 : Maybe Anycast
+            .store_uint(0, 8)  ;; workchain_id:int8 TODO update to use a correct one!
+            .store_uint(cell_hash(state_init), 256)
+            .end_cell()
+        .begin_parse();
+}
+
+cell build_state_init(cell code, cell data) inline {
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_maybe_ref(code)
+        .store_maybe_ref(data)
+        .store_uint(0, 1)
+    .end_cell();
+}
+
+builder create_deploy_message_builder(cell code, cell init, int deploy_value) inline {
+    cell state_init = build_state_init(code, init);
+    slice address = calculate_address_from_state_init(state_init);
+    return begin_cell()
+            .store_msg_flags(NON_BOUNCEABLE) ;; don't bounce, might already be initialized
+            .store_slice(address)
+            .store_coins(deploy_value)
+            .store_msg_body_header(4 + 2 + 1)
+            .store_ref(state_init)
+            .store_uint(0, 1);
+}

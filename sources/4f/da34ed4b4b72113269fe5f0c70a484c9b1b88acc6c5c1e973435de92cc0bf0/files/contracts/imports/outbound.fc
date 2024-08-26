@@ -1,0 +1,28 @@
+#include "logs.fc";
+
+cell build_outbound_init_data(slice address) inline {
+    return begin_cell()
+    .store_slice(my_address()) ;; gateway_address
+    .store_slice(address) ;; wallet_or_minter_address
+    .store_uint(0, 16) ;; destination_chain_id
+    .store_uint(0, 2) ;; locking
+    .store_maybe_ref(null()) ;; token_class
+    .end_cell();
+}
+
+slice get_outbound_address_internal(cell code, slice address) inline {
+    cell state_init = build_state_init(code, build_outbound_init_data(address));
+    return calculate_address_from_state_init(state_init);
+}
+
+() emit_outbound(int chain_id, int sequence, int query_id, cell payload) impure inline {
+    (_, int emitter) = parse_std_addr(my_address());
+    int nonce = query_id == 0 ? cur_lt() : query_id;
+    emit_log(LOG_BRIDGE_OUT, begin_cell()
+            .store_uint(emitter, 256)
+            .store_uint(chain_id, 16)   ;; chain_id
+            .store_uint(sequence, 64)   ;; sequence
+            .store_uint(nonce, 256)     ;; nonce
+            .store_ref(payload)
+    );
+}

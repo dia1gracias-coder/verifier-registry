@@ -1,0 +1,14 @@
+cell build_inbound_init_data(int destination_chain_id, cell token_class) inline {
+    return begin_cell()
+    .store_slice(my_address()) ;; gateway_address
+    .store_slice(my_address())  ;; wallet_or_minter_address
+    .store_uint(destination_chain_id, 16) ;; destination_chain_id
+    .store_uint(0, 2) ;; locking
+    .store_maybe_ref(token_class) ;; token_class
+    .end_cell();
+}
+
+slice get_inbound_address_internal(cell code, int destination_chain_id, cell token_class) inline {
+    cell state_init = build_state_init(code, build_inbound_init_data(destination_chain_id, token_class));
+    return calculate_address_from_state_init(state_init);
+}

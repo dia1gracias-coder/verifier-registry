@@ -1,0 +1,25 @@
+const int MSG_BODY_HEADER_BITS = 1 + 4 + 4 + 64 + 32 + 1 + 1;
+
+const int BOUNCEABLE = 0x18;
+const int NON_BOUNCEABLE = 0x10;
+
+const int SEND_MODE_REGULAR = 0;
+const int SEND_MODE_PAY_FEES_SEPARETELY = 1;
+const int SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE = 64;
+
+builder store_msg_flags(builder b, int msg_flag) inline { return b.store_uint(msg_flag, 6); }
+
+builder store_msg_body_header(builder b, int bits) inline { return b.store_uint(bits, MSG_BODY_HEADER_BITS); }
+
+() send_internal_message_to(slice dest, int op, cell body) impure inline {
+    cell msg = begin_cell()
+            .store_msg_flags(BOUNCEABLE)
+            .store_slice(dest)
+            .store_coins(0)
+            .store_msg_body_header(0)
+            .store_uint(op, 32)
+            .store_ref(body)
+        .end_cell();
+
+    send_raw_message(msg, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+}

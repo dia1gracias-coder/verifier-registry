@@ -1,0 +1,14 @@
+cell encode_payload(int amount, int destination_chain_id, cell token_class, slice recipient) inline {
+    (_, int y, _) = compute_data_size(token_class, 4);
+    cell encoded_token = begin_cell()
+                .store_uint(amount, 256)
+                .store_uint(0, 256) ;; instance - for fungible always zero
+                .store_uint(y / 8, 16) ;; token_class length
+                .store_ref(token_class)
+            .end_cell();
+    return begin_cell()
+            .store_uint(destination_chain_id, 16)
+            .store_slice(recipient)
+            .store_ref(encoded_token)
+        .end_cell();
+}
