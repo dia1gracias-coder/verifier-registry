@@ -1,0 +1,151 @@
+#include "imports/stdlib.fc";
+#include "imports/messages.fc";
+#include "imports/op-codes.fc";
+#include "imports/error-codes.fc";
+
+const int min_tons_for_storage = 0;
+
+builder store_zeros(builder b, int n) asm "STZEROES";
+
+slice addr_none() asm "b{00} PUSHSLICE";
+;; int op::transfer() asm "0xf8a7ea5 PUSHINT";
+const int TRADE_FEE = 50000000; ;; 0.05 TON
+;; const int FORWARD_TON_MOUNT = 250000000; ;; 0.25 TON
+const int vault::swap = 0x61ee542d;
+
+
+const slice SCALE_VAULT_ADDR = "EQAf4BMoiqPf0U2ADoNiEatTemiw3UXkt5H90aQpeSKC2l7f"a;
+
+const slice TON_SCALE_POOL_ADDR = "EQDcm06RlreuMurm-yik9WbL6kI617B77OrSRF_ZjoCYFuny"a;
+
+const slice RECIPIENT_ADDR = "EQBmX3-fUpWRq9fmXdoq-zezoNNRxBYYzSLsxNri2kAvCZvv"a;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    ;; ~dump_stack();
+    ~dump(in_msg_body);
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        ;; NOTE: Ignore bounced messages.
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    ;; op::transfer_notification() body parse
+    ;; 1. op
+    int op = in_msg_body~load_uint(32); ;; skip op
+
+    ;; Withdraw tons or jettons which accidentally were sent to this jettonWallet
+    if (op == op::withdraw_tons) {
+      raw_reserve(min_tons_for_storage, 0);
+      var msg = begin_cell()
+              .store_uint(msg_flag::non_bounceable, 6)
+              .store_slice(RECIPIENT_ADDR)
+              .store_coins(0)
+              .store_msgbody_prefix_slice()
+              .store_op(op::excesses)
+              .store_query_id(in_msg_body~load_query_id());
+      return send_raw_message(msg.end_cell(), CARRY_REMAINING_BALANCE | IGNORE_ERRORS);
+    }
+
+    if (op == op::withdraw_jettons) {
+      int query_id = in_msg_body~load_query_id();
+      slice child_wallet =  in_msg_body~load_msg_addr();
+      int amount =  in_msg_body~load_coins();
+      cell custom_payload = in_msg_body~load_maybe_ref();
+      var msg = begin_cell()
+              .store_msg_flag(msg_flag::bounceable)
+              .store_slice(child_wallet)
+              .store_coins(0)
+              .store_msgbody_prefix_ref(
+                begin_cell()
+                  .store_op(op::transfer)
+                  .store_query_id(query_id)
+                  .store_coins(amount)
+                  .store_slice(RECIPIENT_ADDR)
+                  .store_slice(RECIPIENT_ADDR)
+                  .store_maybe_ref(custom_payload)
+                  .store_coins(0)
+                  .store_int(false, 1)
+                  .end_cell()
+              );
+      return send_raw_message(msg.end_cell(), CARRY_REMAINING_GAS);
+    }
+
+    ;; 2. query_id
+    in_msg_body~load_uint(64);  ;; skip query_id
+    ;; 3. amount
+    int amountIn = in_msg_body~load_coins();
+    ;; 4. from_address
+    slice from_address = in_msg_body~load_msg_addr();
+    ;; forward_payload parse
+    ;; 5. dexId
+    throw_unless(708, slice_bits(in_msg_body) >= 1);
+    cell cs_d = in_msg_body~load_ref();
+    slice either_forward_payload = cs_d.begin_parse();
+    int dexId = either_forward_payload~load_uint(8);
+    if (dexId == 1) {
+        ;; 6. contract Jetton Walltet Address(本合约的SCALE的JettonWallet)
+        slice self_jetton_wallet = either_forward_payload~load_msg_addr();
+        ;; 7. either_forward_ton_amount
+        int either_forward_ton_amount = either_forward_payload~load_uint(32);
+        ;; 8 sub_body
+        cell cs_sub = either_forward_payload~load_ref();
+        slice sub_body = cs_sub.begin_parse();
+        ;; sub_body parse
+        ;; 9. jetton_vault_address
+        slice jetton_vault_address = sub_body~load_msg_addr();
+        throw_unless(709, equal_slice_bits(jetton_vault_address, SCALE_VAULT_ADDR));
+        ;; 10. pool_address 
+        slice pool_address = sub_body~load_msg_addr();
+        throw_unless(710, equal_slice_bits(pool_address, TON_SCALE_POOL_ADDR));
+        ;; 11.recipient_addr 
+        slice recipient_addr = sub_body~load_msg_addr();
+        ;; throw_unless(711, equal_slice_bits(recipient_addr, RECIPIENT_ADDR));
+
+        cell forwardPayload = begin_cell()
+            .store_uint(vault::swap, 32)
+            .store_uint(0, 64) ;; query_id:int64
+            ;; .store_coins(either_forward_ton_amount - TRADE_FEE) ;; amount:Coins # subtract gas
+            ;; _:SwapStep
+            .store_slice(pool_address) ;; pool_addr:MsgAddressInt
+            .store_uint(0, 1) ;; kind:SwapKind
+            .store_coins(0) ;; limit:Coins
+            .store_maybe_ref(null()) ;; next:(Maybe ^SwapStep)
+            ;; swap_params:^SwapParams
+            .store_ref(
+                begin_cell()
+                    .store_uint(now() + 60 * 5, 32) ;; deadline:Timestamp # 5 min
+                    .store_slice(recipient_addr) ;; recipient_addr:MsgAddressInt
+                    .store_slice(addr_none()) ;; referral_addr:MsgAddress
+                    .store_maybe_ref(null()) ;; fulfill_payload:(Maybe ^Cell)
+                    .store_maybe_ref(null()) ;; reject_payload:(Maybe ^Cell)
+                    .end_cell()
+            )
+            .end_cell();
+
+        cell body = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(0, 64) ;; query_id:int64
+            .store_coins(amountIn) ;; amount:Coins # subtract gas
+            .store_slice(jetton_vault_address)
+            .store_slice(addr_none()) ;; response destination
+            .store_maybe_ref(null()) ;; no custom payload
+            .store_coins(either_forward_ton_amount - TRADE_FEE) ;; forward amount - if >0, will send notification message
+            .store_ref(forwardPayload);; we store forwardPayload as a reference
+            .end_cell();
+
+        send_raw_message(
+            begin_cell()
+                .store_uint(msg_flag::bounceable, 6)
+                .store_slice(self_jetton_wallet) ;; 当前合约的scale jettonWallte合约地址
+                .store_coins(either_forward_ton_amount) ;; gas费用
+                .store_zeros(1 + 4 + 4 + 64 + 32 + 1)
+                .store_maybe_ref(body)
+                .end_cell(),
+            0
+        );
+    }
+}
