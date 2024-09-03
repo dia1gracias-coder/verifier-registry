@@ -1,0 +1,115 @@
+;; Jetton Vault smart contract
+#pragma version >=0.4.3;
+
+#include "./imports/stdlib.fc";
+#include "./utils/op-codes.fc";
+#include "./utils/jetton-utils.fc";
+
+(slice, slice, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    var data = (
+        ds~load_msg_addr(), ;; admin_address
+        ds~load_msg_addr(), ;; minter_address
+        ds~load_ref()       ;; jetton_wallet_code
+    );
+    ds.end_parse();
+    return data;
+}
+
+() save_data(slice admin_address, slice minter_address, cell jetton_wallet_code) impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(admin_address)
+            .store_slice(minter_address)
+            .store_ref(jetton_wallet_code)
+        .end_cell()
+    );
+}
+
+{- Main -}
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    int msg_flags = in_msg_full_slice~load_msg_flags();
+    if (is_bounced(msg_flags)) {
+        return ();
+    }
+    ;; sender address
+    slice sender_address = in_msg_full_slice~load_msg_addr();
+
+    ;; to get op and queri_id from msg
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+
+    (slice admin_address, slice minter_address, cell jetton_wallet_code) = load_data();
+
+    ;; vault's wallet address
+    ;; cell vault_state_init = calculate_jetton_wallet_state_init(my_address(), minter_address, jetton_wallet_code);
+    ;; slice vault_wallet_address = calculate_jetton_wallet_address(vault_state_init);
+
+
+    if (op == op::excesses) {
+        return (); ;; just accept coins
+    } elseif (op == op::mint) {     ;; mint to target address by admin
+        throw_unless(error::not_owner, equal_slices_bits(admin_address, sender_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        check_same_workchain(to_address);
+        int ton_amount = in_msg_body~load_coins(); ;; ton_amount as gas_fee
+        cell master_msg = in_msg_body~load_ref();
+
+        cell msg_body = begin_cell()
+            .store_op(op::mint)
+            .store_query_id(query_id)
+            .store_slice(to_address)    ;; to_owner address
+            .store_coins(ton_amount) ;; transfer ton amount
+            .store_msgbody_prefix_ref(master_msg)
+            .end_cell();
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(minter_address) ;;
+            .store_coins(ton_amount)
+            .store_msgbody_prefix_ref(msg_body);
+        send_raw_message(msg.end_cell(), SEND_MODE_PAY_FEES_SEPARATELY);
+
+    } elseif (op == op::withdraw_ton) {
+        throw_unless(error::not_owner, equal_slices_bits(admin_address, sender_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        int ton_amount = in_msg_body~load_coins();
+        cell message_body = begin_cell()
+            .store_uint(op::excesses, 32)
+            .store_uint(query_id, 64)
+            .end_cell();
+
+        cell message = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to_address)
+            .store_coins(ton_amount)
+            .store_uint(1, 107)
+            .store_ref(message_body)
+            .end_cell();
+        send_raw_message(message, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+    }
+    if (op == 3) { ;; change admin
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        save_data(new_admin_address, minter_address, jetton_wallet_code);
+        return ();
+    }
+    if (op == 5) { ;; change minter
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        slice new_minter_address = in_msg_body~load_msg_addr();
+        save_data(admin_address, new_minter_address, jetton_wallet_code);
+        return ();
+    }
+}
+
+{-
+    --- Get Method ---
+-}
+
+(slice, slice) get_bridge_info() method_id {
+    (slice admin_address, slice minter_address, cell _jetton_wallet_code) = load_data();
+    return (admin_address, minter_address);
+}
