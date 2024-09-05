@@ -1,0 +1,450 @@
+#include "imports/stdlib.fc";
+#include "utils.fc";
+#include "jetton/utils/constants.fc";
+#include "jetton/utils/jetton_utils.fc";
+
+
+
+global slice admin_address;
+global slice project_owner;
+global slice jetton_address;
+global int start_time;
+global int end_time;
+global int individual_limit;
+global int soft_cap;
+global cell jetton_wallet_code;
+global cell bill_code; ;;SC code to store users investments.
+global int tokens_for_presale;
+global int liquidity_percent;
+global int total_cap_raised;
+global int soft_halt;
+
+
+
+const int error::deposit_time_ended = 80;
+const int error::investor_withdrawal_not_allowed = 88;
+const int error::invalid_admin_withdrawal_request = 99;
+const int error::invalid_investor_withdrawal_request = 92;
+const int error::commission_already_withdrawn = 403;
+const int error::liquidity_allocation_already_withdrawn = 406;
+const int error::funds_transfered_to_owner_already = 408;
+const int error::operations_halted = 510;
+const int error::invalid_admin_override_request = 520;
+const int error::crowdfunding_halted = 550;
+const int error::invalid_investment_amount = 600;
+const int error::soft_cap_reached = 511;
+const int error::presale_time_ended = 400;
+const int error::individual_limit_crossed = 480;
+
+
+
+
+(slice,slice,int,int,int,int,int,int,int,int,int,int,cell,cell) load_data() impure inline {
+  slice ds = get_data().begin_parse();
+  slice admin_address = ds~load_msg_addr();
+  slice jetton_address = ds~load_msg_addr();
+  int start_time = ds~load_uint(64);
+  int end_time = ds~load_uint(64);
+  int individual_limit = ds~load_coins();
+  int soft_cap = ds~load_coins();
+  int total_cap_raised = ds~load_coins();
+  int tokens_for_presale = ds~load_coins();
+  int liquidity_percent = ds~load_int(16);
+  int is_liquidy_withdrawn = ds~load_int(8);
+  int is_commission_withdrawn = ds~load_int(8);
+  int soft_halt = ds~load_int(8);
+  cell jetton_wallet_code = ds~load_ref();
+  cell bill_code = ds~load_ref();
+  ds.end_parse();
+  return (admin_address,jetton_address,start_time,end_time,individual_limit,soft_cap,total_cap_raised,tokens_for_presale,liquidity_percent,is_liquidy_withdrawn,is_commission_withdrawn,soft_halt,jetton_wallet_code,bill_code);
+}
+
+() save_data(slice admin_address,slice jetton_address,int start_time,int end_time,int individual_limit,int soft_cap,int total_cap_raised,int tokens_for_presale,int liquidity_percent,int is_liquidy_withdrawn,int is_commission_withdrawn,int soft_halt,cell jetton_wallet_code,cell bill_code) impure inline {
+  set_data(
+    begin_cell()
+    .store_slice(admin_address)
+    .store_slice(jetton_address)
+    .store_uint(start_time,64)
+    .store_uint(end_time,64)
+    .store_coins(individual_limit)
+    .store_coins(soft_cap)
+    .store_coins(total_cap_raised)
+    .store_coins(tokens_for_presale)
+    .store_int(liquidity_percent,16)
+    .store_int(is_liquidy_withdrawn,8)
+    .store_int(is_commission_withdrawn,8)
+    .store_int(soft_halt,8)
+    .store_ref(jetton_wallet_code)
+    .store_ref(bill_code)
+    .end_cell()
+  );
+}
+
+int get_contract_balance() method_id {
+  [int balance, _] = get_balance();
+  return balance;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  slice cs = in_msg_full.begin_parse();
+
+  int flags = cs~load_uint(4);
+
+  if(flags & 1){ ;; handle bounce messages.
+    return();   ;; terminate contract execution.
+  }
+
+  slice sender_addr = cs~load_msg_addr();
+
+  (
+    slice admin_address,
+    slice jetton_address,
+    int start_time,
+    int end_time, 
+    int individual_limit,
+    int soft_cap,
+    int total_cap_raised,
+    int tokens_for_presale,
+    int liquidity_percent,
+    int is_liquidy_withdrawn,
+    int is_commission_withdrawn,
+    int soft_halt,
+    cell jetton_wallet_code,
+    cell bill_code) = load_data();
+
+  if(in_msg_body.slice_empty?()){
+    return();
+  }
+
+  int op = in_msg_body~load_uint(32);
+
+  if(op == "change_admin"c){
+    throw_unless(400,equal_slices(sender_addr,admin_address));
+    admin_address = in_msg_body~load_msg_addr();
+    save_data(admin_address,jetton_address,start_time,end_time,individual_limit,soft_cap,total_cap_raised,tokens_for_presale,liquidity_percent,is_liquidy_withdrawn,is_commission_withdrawn,soft_halt,jetton_wallet_code,bill_code);
+    return();
+  } 
+
+  if(op == "activate_soft_halt"c){
+    throw_unless(400,equal_slices(sender_addr,admin_address));
+    soft_halt = -1;
+    save_data(admin_address,jetton_address,start_time,end_time,individual_limit,soft_cap,total_cap_raised,tokens_for_presale,liquidity_percent,is_liquidy_withdrawn,is_commission_withdrawn,soft_halt,jetton_wallet_code,bill_code);
+    return();
+  }
+
+  if(op == "deactivate_soft_halt"c){
+    throw_unless(400,equal_slices(sender_addr,admin_address));
+    soft_halt = 0;
+    save_data(admin_address,jetton_address,start_time,end_time,individual_limit,soft_cap,total_cap_raised,tokens_for_presale,liquidity_percent,is_liquidy_withdrawn,is_commission_withdrawn,soft_halt,jetton_wallet_code,bill_code);
+    return();
+  }
+
+  if(op == "deposit"c){
+    if(now() > end_time){
+      throw(error::presale_time_ended);
+    }
+    if(soft_halt == -1){
+      throw(error::crowdfunding_halted);
+    }
+    throw_unless(error::deposit_time_ended,now() < end_time);
+    int amount = msg_value;
+    if(amount < MIN_AMOUNT_TO_INVEST){
+      throw(error::invalid_investment_amount);
+    }
+    if(amount > individual_limit){
+      throw(error::individual_limit_crossed);
+    }
+    cell state_init = calculate_bill_state_init(my_address(),sender_addr,individual_limit,bill_code);
+    slice bill_address = calculate_address_by_state_init(state_init);
+
+    cell investment_body = begin_cell()
+                          .store_uint(op::update_investment_to_bill,32)
+                          .store_coins(amount)
+                          .end_cell();
+    
+    builder msg = begin_cell()
+                  .store_uint(BOUNCEABLE,6)
+                  .store_slice(bill_address)
+                  .store_coins(10000000)
+                  .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+                  .store_ref(state_init)
+                  .store_ref(investment_body);
+    send_raw_message(msg.end_cell(),SEND_MODE_REGULAR);
+
+    total_cap_raised += amount;
+    save_data(admin_address,jetton_address,start_time,end_time,individual_limit,soft_cap,total_cap_raised,tokens_for_presale,liquidity_percent,is_liquidy_withdrawn,is_commission_withdrawn,soft_halt,jetton_wallet_code,bill_code);
+    return();
+  }
+
+  ;; opcode that will be used by admin address to withdraw commision 
+  if(op == "withdraw_commission"c){
+    throw_unless(400,equal_slices(sender_addr,admin_address));
+    if(now() < end_time){
+      throw(error::invalid_admin_withdrawal_request);
+    }
+    slice platform_address = in_msg_body~load_msg_addr();
+    if(is_commission_withdrawn != -1) {
+      int commision = (3) / (100);
+      int commision = total_cap_raised * commision;
+      
+      cell msg = begin_cell()
+                .store_uint(BOUNCEABLE,6)
+                .store_slice(platform_address)
+                .store_coins(commision)
+                .store_uint(0,1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+      send_raw_message(msg,1);
+      save_data(admin_address,jetton_address,start_time,end_time,individual_limit,soft_cap,total_cap_raised,tokens_for_presale,liquidity_percent,is_liquidy_withdrawn,-1,soft_halt,jetton_wallet_code,bill_code);
+    }
+ else {
+      throw(error::commission_already_withdrawn); ;;commission already withdrawn;
+    }
+    return();
+  }
+
+  ;; opcode to withdraw liquidity tons for the project
+  if(op == "withdraw_liquidty_allocation"c){
+    throw_unless(400,equal_slices(sender_addr,admin_address));
+    if(now() < end_time){
+      throw(error::invalid_admin_withdrawal_request);
+    }
+    if(is_liquidy_withdrawn != -1) {
+      int liquidity_amount = total_cap_raised * (3) / (100);
+      cell msg = begin_cell()
+              .store_uint(BOUNCEABLE,6)
+              .store_slice(admin_address)
+              .store_coins(liquidity_amount)
+              .store_uint(0,1 + 4 + 4 + 64 + 32 + 1 + 1)
+              .end_cell();
+      send_raw_message(msg,1);
+      save_data(admin_address,jetton_address,start_time,end_time,individual_limit,total_cap_raised,soft_cap,tokens_for_presale,liquidity_percent,-1,is_commission_withdrawn,soft_halt,jetton_wallet_code,bill_code);
+      return ();
+    }
+    else {
+      throw(error::liquidity_allocation_already_withdrawn); ;;throw error if liquidity already withdrawn
+    }
+    return();
+  }
+
+  ;; once project is successfully launched, then
+  ;; remaining funds are transfered to project owner by admin
+  if(op == "tx_to_project_owner"c){
+    throw_unless(400,equal_slices(sender_addr,admin_address));
+    slice to_address = in_msg_body~load_msg_addr();
+    if(is_liquidy_withdrawn == -1) {
+      int amount = get_contract_balance() - 1000000;
+      cell msg = begin_cell()
+                .store_uint(BOUNCEABLE,6)
+                .store_slice(to_address)
+                .store_coins(amount)
+                .store_uint(0,1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+      send_raw_message(msg,SEND_MODE_CARRY_ALL_BALANCE);
+      return();           
+    }
+    else {
+      throw(error::funds_transfered_to_owner_already); ;;error if funds transfer to project creator is not allowed yet
+    }
+    return();
+  }
+
+  ;; internal call from user wallet to request funds withdrawal if the crowdfunding does not reach soft cap
+  if(op == "investor_withdrawal_req"c){
+    if(total_cap_raised >= soft_cap){
+      throw(error::soft_cap_reached);
+    }
+    if(now() < end_time){
+      throw(error::invalid_investor_withdrawal_request);
+    } ;; not allowed if soft_cap is reached.
+    else { 
+      slice bill_address = calculate_bill_address(my_address(),individual_limit,sender_addr,bill_code);
+      cell msg = begin_cell()
+              .store_uint(0x18,6)
+              .store_slice(bill_address)
+              .store_coins(0)
+              .store_uint(0,1 + 4 + 4 + 64 + 32 + 1 + 1)
+              .store_uint(initiate_withdrawal,32)
+              .end_cell();
+      send_raw_message(msg,SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+    }
+  } 
+
+  ;; internal call from users bill smart contract
+  ;; the bill smart contract sends the address of the user and amount to refund
+  if(op == "process_investor_withdrawal"c){
+    slice user_address = in_msg_body~load_msg_addr();
+    throw_unless(420,equal_slices(sender_addr,calculate_bill_address(my_address(),individual_limit,user_address,bill_code)));
+    int total_user_deposit = in_msg_body~load_coins();
+    cell msg = begin_cell()
+              .store_uint(0x18,6)
+              .store_slice(user_address)
+              .store_coins(total_user_deposit)
+              .store_uint(0,1 + 4 + 4 + 64 + 32 + 1 + 1)
+              .end_cell();
+    send_raw_message(msg,SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+    return();
+  }
+
+  if(op == "jetton_claim_req"c){
+    if(now() < end_time){
+      throw(520);
+    }
+    if(total_cap_raised < soft_cap){
+      throw(502);
+    }
+    slice bill_address = calculate_bill_address(my_address(),individual_limit,sender_addr,bill_code);
+    cell msg = begin_cell()
+              .store_uint(0x18,6)
+              .store_slice(bill_address)
+              .store_coins(0)
+              .store_uint(0,1 + 4 + 4 + 64 + 32 + 1 + 1)
+              .store_uint(initiate_jetton_claim,32)
+              .end_cell();
+    send_raw_message(msg,SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+  }
+
+  if(op == "process_jetton_claim"c){
+    slice user_address = in_msg_body~load_msg_addr();
+    throw_unless(420,equal_slices(sender_addr,calculate_bill_address(my_address(),individual_limit,user_address,bill_code)));
+    int amount_invested_by_user = in_msg_body~load_coins() / 1000000000;
+    int tokens_per_ton = ((tokens_for_presale / (total_cap_raised / 1000000000)));
+    int tokens_to_send = amount_invested_by_user * (tokens_per_ton); 
+    cell state_init = calculate_jetton_wallet_state_init(my_address(),jetton_address,jetton_wallet_code);
+    slice jetton_wallet_address = calculate_jetton_wallet_address(state_init);
+
+    send_raw_message(
+      begin_cell()
+      .store_uint(0x18,6)
+      .store_slice(jetton_wallet_address)
+      .store_coins(0)
+      .store_uint(1,107)
+      .store_ref(
+        begin_cell()
+        .store_uint(op::jetton::transfer,32)
+        .store_uint(0,64)
+        .store_coins(tokens_to_send)
+        .store_slice(user_address)
+        .store_slice(user_address)
+        .store_uint(0,1)
+        .store_coins(0)
+        .store_uint(0,1)
+        .end_cell()
+      ).end_cell(),64);
+    return();
+  }
+
+  if(op == "admin_jetton_withdrawal"c){
+    if(soft_halt == 0){
+      throw(error::invalid_admin_override_request);
+    }
+    throw_unless(400,equal_slices(sender_addr,admin_address));
+
+    slice to_address = in_msg_body~load_msg_addr();
+    int amount = in_msg_body~load_coins();
+
+    cell state_init = calculate_jetton_wallet_state_init(my_address(),jetton_address,jetton_wallet_code);
+    slice jetton_wallet_address = calculate_jetton_wallet_address(state_init);
+    send_raw_message(
+      begin_cell()
+      .store_uint(0x18,6)
+      .store_slice(jetton_wallet_address)
+      .store_coins(100000000)
+      .store_uint(1,107)
+      .store_ref(
+        begin_cell()
+        .store_uint(op::jetton::transfer,32)
+        .store_uint(0,64)
+        .store_coins(amount)
+        .store_slice(to_address)
+        .store_slice(to_address)
+        .store_uint(0,1)
+        .store_coins(0)
+        .store_uint(0,1)
+        .end_cell()
+      ).end_cell(),64);
+    return();
+  }
+  if(op == "extend_time"c){
+    throw_unless(400,equal_slices(sender_addr,admin_address));
+    int new_end_time = in_msg_body~load_uint(64);
+    end_time = new_end_time;
+    save_data(admin_address,jetton_address,start_time,end_time,individual_limit,soft_cap,total_cap_raised,tokens_for_presale,liquidity_percent,is_liquidy_withdrawn,is_commission_withdrawn,soft_halt,jetton_wallet_code,bill_code);
+  }
+  
+  if(op == "admin_ton_withdrawal"c){
+    if(soft_halt == 0){
+      throw(error::invalid_admin_override_request);
+    }
+    throw_unless(400,equal_slices(sender_addr,admin_address));
+    slice to_address = in_msg_body~load_msg_addr();
+    int amount = in_msg_body~load_coins();
+
+    cell msg = begin_cell()
+                .store_uint(BOUNCEABLE,6)
+                .store_slice(to_address)
+                .store_coins(amount)
+                .store_uint(0,1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+    send_raw_message(msg,1);
+    return();
+  }
+}
+
+
+
+(slice,int,int,int,int,int,int,int) get_public_data() method_id {
+  load_data();
+
+  return (jetton_address,start_time,end_time,individual_limit,soft_cap,total_cap_raised,tokens_for_presale,liquidity_percent);
+}
+
+
+(int) get_fundraising_status() method_id {
+  load_data();
+  return soft_halt;
+}
+ 
+(slice) getAdmin() method_id {
+  load_data();
+  return admin_address;
+}
+
+(int) get_start_time() method_id {
+  load_data();
+  return start_time;
+}
+
+(int) get_end_time() method_id {
+  load_data();
+  return end_time;
+}
+
+(int) get_soft_cap() method_id {
+  load_data();
+  return soft_cap;
+}
+
+(int) get_total_cap_raised() method_id {
+  load_data();
+  return total_cap_raised;
+}
+
+(int) get_individual_limit() method_id {
+  load_data();
+  return individual_limit;
+}
+
+(int) check_valid_funding_round() method_id {
+  load_data();
+  return now() < end_time; 
+}
+
+(slice) getJettonAddress() method_id {
+  load_data();
+  return jetton_address;
+}
+
+(slice) get_bill_address(slice user_address) method_id {
+  load_data();
+  return calculate_bill_address(my_address(),individual_limit,user_address,bill_code);
+}

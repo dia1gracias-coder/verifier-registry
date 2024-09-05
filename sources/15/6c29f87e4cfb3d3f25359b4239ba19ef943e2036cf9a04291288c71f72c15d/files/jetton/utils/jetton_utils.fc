@@ -1,0 +1,41 @@
+#include "params.fc";
+
+const int BOUNCEABLE = 0x18;
+const int NON_BOUNCEABLE = 0x10;
+const int ONE_TON = 1000000000;
+const int SEND_MODE_REGULAR = 0;
+const int SEND_MODE_PAY_FEES_SEPARETELY = 1;
+const int SEND_MODE_IGNORE_ERRORS = 2;
+const int SEND_MODE_DESTROY = 32;
+const int SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE = 64;
+const int SEND_MODE_CARRY_ALL_BALANCE = 128;
+
+cell pack_jetton_wallet_data(int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+  return  begin_cell()
+            .store_coins(balance)
+            .store_slice(owner_address)
+            .store_slice(jetton_master_address)
+            .store_ref(jetton_wallet_code)
+           .end_cell();
+}
+
+cell calculate_jetton_wallet_state_init(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(jetton_wallet_code)
+          .store_dict(pack_jetton_wallet_data(0, owner_address, jetton_master_address, jetton_wallet_code))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_jetton_wallet_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(workchain(), 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+slice calculate_user_jetton_wallet_address(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+  return calculate_jetton_wallet_address(calculate_jetton_wallet_state_init(owner_address, jetton_master_address, jetton_wallet_code));
+}
