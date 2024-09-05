@@ -1,0 +1,96 @@
+{-
+    messages.func
+
+    Provides easy function to craft messages.
+-}
+
+const NORMAL = 0;
+const PAID_EXTERNALLY = 1;
+const IGNORE_ERRORS = 2;
+
+const DESTROY_IF_ZERO = 32;
+const CARRY_REMAINING_GAS = 64;
+const CARRY_ALL_BALANCE = 128;
+
+() messages::send_empty(int amount, slice to, int mode) impure inline_ref {
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(0, 107)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() messages::send_simple(int amount, slice to, cell body, int mode) impure inline_ref {
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(1, 107)
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() messages::send_nobounce(int amount, slice to, cell body, int mode) impure inline_ref {
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(1, 107)
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() messages::send_with_stateinit(int amount, slice to, cell state_init, cell body, int mode) impure inline_ref {
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(7, 108)
+        .store_ref(state_init)
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() messages::tep74::transfer(int ton_amount, slice jetton_wallet, slice to, int jetton_amount, cell payload, int mode) impure inline_ref {
+    messages::send_simple(
+        ton_amount, jetton_wallet,
+        begin_cell()
+            .store_uint(opcode::tep74::transfer, 32)
+            .store_uint(0, 64)
+            .store_coins(jetton_amount)
+            .store_slice(to)
+            .store_slice(my_address())
+            .store_uint(0, 1)
+            .store_coins(env::tep74::forward_ton_amount)
+            .store_maybe_ref(payload)
+            .end_cell(), mode
+    );
+}
+
+() messages::tep74::burn(int ton_amount, slice jetton_wallet, int jetton_amount, int mode) impure inline_ref {
+    messages::send_simple(
+        ton_amount, jetton_wallet,
+        begin_cell()
+            .store_uint(opcode::tep74::burn, 32)
+            .store_uint(0, 64)
+            .store_coins(jetton_amount)
+            .store_slice(my_address())
+            .end_cell(), mode
+    );
+}
+
+() messages::out_log_msg(cell msg, int mode) impure inline_ref {
+    send_raw_message(
+        begin_cell()
+            .store_uint(3, 2)
+            .store_uint(1, 2 + 2 + 64 + 32 + 1 + 1)
+            .store_ref(msg)
+            .end_cell(), mode
+    );
+}
+

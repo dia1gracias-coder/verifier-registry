@@ -1,0 +1,113 @@
+cell storage::pack_token_state(slice jetton_wallet, int token_supply) inline_ref {
+    return (
+        begin_cell()
+            .store_slice(jetton_wallet)
+            .store_uint(token_supply, 256)
+            .end_cell()
+    );
+}
+
+cell storage::pack_token_stat(int in_amount, int out_amount, int buyout_amount) inline_ref {
+    return (
+        begin_cell()
+            .store_uint(in_amount, 256)
+            .store_uint(out_amount, 256)
+            .store_uint(buyout_amount, 256)
+            .end_cell()
+    );
+}
+
+cell storage::pack_stats(int order_seqno, int n_wins, int hash, cell ton_stats, cell token_stats, cell orders_dict) inline_ref {
+    return (
+        begin_cell()
+            .store_uint(order_seqno, 256)
+            .store_uint(n_wins, 256)
+            .store_uint(hash, 256)
+            .store_ref(ton_stats)
+            .store_ref(token_stats)
+            .store_dict(orders_dict)
+            .end_cell()
+    );
+}
+
+
+(int, int, int, cell, cell, cell) storage::unpack_stats(slice cs) inline_ref {
+    return (
+        cs~load_uint(256),
+        cs~load_uint(256),
+        cs~load_uint(256),
+        cs~load_ref(),
+        cs~load_ref(),
+        cs~load_dict()
+    );
+}
+
+(slice, slice, int, int) storage::unpack_distribution(slice cs) inline_ref {
+    (slice buyout_contract, slice marketmaker_contract, int randton_price, int price_expire) = (
+        cs~load_msg_addr(), cs~load_msg_addr(), 0, 0
+    );
+    if (cs.slice_bits() >= 68) {
+        randton_price = cs~load_coins();
+        price_expire = cs~load_uint(64);
+    }
+    return (buyout_contract, marketmaker_contract, randton_price, price_expire);
+}
+
+(cell) storage::pack_distribution(slice buyout_contract, slice marketmaker_contract, int randton_price, int price_expire) inline_ref {
+    return (
+        begin_cell()
+            .store_slice(buyout_contract)
+            .store_slice(marketmaker_contract)
+            .store_coins(randton_price)
+            .store_uint(price_expire, 64)
+            .end_cell()
+    );
+}
+
+cell storage::pack(
+    slice admin, slice echo_contract, cell token_state, cell stats, cell distribution
+) inline_ref {
+    return (
+        begin_cell()
+            .store_slice(admin)
+            .store_slice(echo_contract)
+            .store_ref(token_state)
+            .store_ref(stats)
+            .store_ref(distribution)
+            .end_cell()
+    );
+}
+
+(slice, slice, cell, cell, cell) storage::unpack(slice cs) inline_ref {
+    return (
+        cs~load_msg_addr(),
+        cs~load_msg_addr(),
+        cs~load_ref(),
+        cs~load_ref(),
+        cs~load_ref()
+    );
+}
+
+(builder) pack_order(int id, int status, int timestamp, int amount, slice address, int is_tep74_token) inline {
+    return (
+        begin_cell()
+            .store_uint(id, 256)
+            .store_uint(status, 4)
+            .store_uint(timestamp, 64)
+            .store_coins(amount)
+            .store_slice(address)
+            .store_int(is_tep74_token, 1)
+    );
+}
+
+(int, int, int, int, slice, int) unpack_order(slice qs) inline {
+    return (
+        qs~load_uint(256),
+        qs~load_uint(4),
+        qs~load_uint(64),
+        qs~load_coins(),
+        qs~load_msg_addr(),
+        qs~load_int(1)
+    );
+}
+
