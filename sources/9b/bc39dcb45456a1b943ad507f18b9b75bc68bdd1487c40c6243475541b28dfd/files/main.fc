@@ -1,0 +1,83 @@
+#include "imports/stdlib.fc";
+#include "imports/params.fc";
+
+global slice data::owner_address;
+
+const int min_tons_for_storage = 1000000000; 
+const int workchain = 0;
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    data::owner_address = ds~load_msg_addr();
+}
+
+() save_data() impure inline {
+    set_data(begin_cell()
+        .store_slice(data::owner_address)
+    .end_cell());
+}
+
+int get_smc_balance() method_id {
+    [int balance, _] = get_balance();
+
+    return balance;
+}
+
+() recv_internal(int my_balance, cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        return ();
+    }
+    if (in_msg_body.slice_bits() < 32) {
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+    if (op == "checkin"c) {
+        return ();
+    }
+
+    load_data();
+
+    throw_unless(400, equal_slices(sender_address, data::owner_address));
+
+    if (op == "withdraw"c) {
+        int withdraw_amount = in_msg_body~load_coins();
+
+        throw_unless(401, get_smc_balance() >= withdraw_amount);
+
+        int send_amount = min(withdraw_amount, my_balance - min_tons_for_storage);
+
+        cell msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(data::owner_address)
+                .store_coins(withdraw_amount)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+        send_raw_message(msg, 1);
+
+        return ();
+    }
+
+    if(op == "change_owner"c) {
+        slice new_owner_address = in_msg_body~load_msg_addr();
+
+        force_chain(new_owner_address);
+
+        data::owner_address = new_owner_address;
+        save_data();
+
+        return ();
+    }
+
+    throw(404);
+}
+
+slice get_owner() method_id {
+    load_data();
+    return data::owner_address;
+}
