@@ -1,0 +1,36 @@
+#include "imports/stdlib.fc";
+const int op::setup = 0; const int op::deploy = 1; const int op::top_up = 2; const int op::withdraw = 3; 
+const int result::value_error = 0; const int result::loss = 1;
+global slice owner; global int min_bet; global int max_bet; global int mul_num; global int mul_denom; global slice sender_address;
+() load_data() impure inline { var ds = get_data().begin_parse();
+    owner = ds~load_msg_addr(); min_bet = ds~load_coins(); max_bet = ds~load_coins(); mul_num = ds~load_uint(16); mul_denom = ds~load_uint(16); ds.end_parse(); }
+() save_data() impure { set_data(begin_cell()
+    .store_slice(owner).store_coins(min_bet).store_coins(max_bet).store_uint(mul_num, 16).store_uint(mul_denom, 16).end_cell()); }
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4); if (flags & 1) { return (); }
+    slice sender_address = cs~load_msg_addr();
+    load_data();
+    ifnot (equal_slices(sender_address, owner)) {
+        if ((msg_value < min_bet) | (msg_value > max_bet)) { send_raw_message(begin_cell()
+            .store_uint(0x10, 6).store_slice(owner).store_uint(0, 111).store_slice(sender_address)
+            .store_uint(result::value_error, 2).end_cell(), 1); return (); }
+        randomize_lt();
+        int r = rand(2); ;; use "int r = 1;" & "int r = 0" for tests
+        if (r == 0) { send_raw_message(begin_cell() ;; victory
+            .store_uint(0x18, 6).store_slice(sender_address).store_coins(msg_value / mul_denom * mul_num)
+            .store_uint(0, 107).end_cell(), 1); return (); } 
+        else { send_raw_message(begin_cell()
+            .store_uint(0x10, 6).store_slice(owner).store_uint(0, 111).store_slice(sender_address)
+            .store_uint(result::loss, 2).end_cell(), 1); return (); } }
+    int op = in_msg_body~load_uint(32); if ((op == op::deploy) | (op == op::top_up)) { return (); }
+    int query_id = in_msg_body~load_uint(64);
+    if (op == op::setup) { 
+        owner = in_msg_body~load_msg_addr(); min_bet = in_msg_body~load_coins(); max_bet = in_msg_body~load_coins(); mul_num = in_msg_body~load_uint(16); mul_denom = in_msg_body~load_uint(16);
+        save_data(); return (); }
+    if (op == op::withdraw) { 
+        int w_amount = in_msg_body~load_coins();
+        send_raw_message(begin_cell().store_uint(0x18, 6).store_slice(owner).store_coins(w_amount).store_uint(0, 107).end_cell(), 1);
+        save_data(); return (); }
+    throw(0xffff); }
+cell get_smc_data() method_id { return get_data(); }
