@@ -1,0 +1,263 @@
+#include "stdlib.fc";
+#include "params.fc";
+
+;; Additional helper functions
+int equal_slices (slice a, slice b) asm "SDEQ";
+slice my_address() asm "MYADDR";
+int slice_hash(slice s) asm "HASHSU";
+
+;; Constants
+const int TOTAL_SUPPLY = 1000000000000000000; ;; 1 billion with 9 decimals
+const int DECIMALS = 9;
+
+;; Storage structure
+(slice, cell, cell, int) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(), ;; owner_address
+        ds~load_dict(), ;; tokens_dict
+        ds~load_dict(), ;; community_admins_dict
+        ds~load_uint(1) ;; paused
+    );
+}
+
+() save_data(slice owner_address, cell tokens_dict, cell community_admins_dict, int paused) impure inline {
+    set_data(begin_cell()
+        .store_slice(owner_address)
+        .store_dict(tokens_dict)
+        .store_dict(community_admins_dict)
+        .store_uint(paused, 1)
+    .end_cell());
+}
+
+;; Messages
+;; Messages
+int op::deploy_jetton() asm "0x29a9a317 PUSHINT";
+int op::deposit_reserve() asm "0x6682c4f7 PUSHINT";
+int op::set_community_admin() asm "0x5e4d1f7e PUSHINT";
+int op::pause_token() asm "0x1a2f2733 PUSHINT";
+int op::unpause_token() asm "0x15b625aa PUSHINT";
+int op::initialize() asm "0x00000001 PUSHINT";
+int op::pause() asm "0x7cf38cac PUSHINT";        ;; New line
+int op::unpause() asm "0x2a5de0f9 PUSHINT";      ;; New line
+int op::safe_withdraw() asm "0x5cfd4954 PUSHINT";  ;; New line	
+
+;; Jetton deployment helpers
+cell calculate_jetton_token_state_init(slice name, slice symbol, slice image, slice description, slice owner_address) {
+    cell data = begin_cell()
+        .store_slice(name)
+        .store_slice(symbol)
+        .store_slice(image)
+        .store_slice(description)
+        .store_slice(owner_address)
+    .end_cell();
+    
+    cell code = begin_cell().end_cell(); ;; Placeholder, replace with actual Jetton contract code
+    
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_dict(code)
+        .store_dict(data)
+        .store_uint(0, 1)
+    .end_cell();
+}
+
+slice calculate_jetton_token_address(cell state_init) {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(0, 8)
+        .store_uint(cell_hash(state_init), 256)
+    .end_cell()
+    .begin_parse();
+}
+
+;; Jetton deployment
+() deploy_jetton(slice sender_address, int msg_value, slice in_msg_body) impure {
+    throw_unless(405, msg_value >= DEPLOY_FEE);
+    var (owner_address, tokens_dict, community_admins_dict, paused) = load_data();
+    throw_unless(401, equal_slices(sender_address, owner_address));
+    throw_unless(402, ~ paused);
+
+    slice name = in_msg_body~load_bits(256);
+    slice symbol = in_msg_body~load_bits(256);
+    slice image = in_msg_body~load_bits(256);
+    slice description = in_msg_body~load_ref().begin_parse();
+
+    cell state_init = calculate_jetton_token_state_init(name, symbol, image, description, my_address());
+    slice jetton_address = calculate_jetton_token_address(state_init);
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(jetton_address)
+        .store_coins(0)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(begin_cell()
+            .store_uint(op::initialize(), 32)
+            .store_slice(owner_address)
+            .store_uint(TOTAL_SUPPLY, 64)
+            .store_uint(DECIMALS, 8)
+        .end_cell());
+    send_raw_message(msg.end_cell(), 64);
+
+    tokens_dict~udict_set(256, slice_hash(name), begin_cell().store_slice(jetton_address).end_cell().begin_parse());
+    save_data(owner_address, tokens_dict, community_admins_dict, paused);
+}
+
+;; Deposit reserve
+() deposit_reserve(slice sender_address, int msg_value, slice in_msg_body) impure {
+    var (owner_address, tokens_dict, community_admins_dict, paused) = load_data();
+    throw_unless(402, ~ paused);
+
+    slice token_name = in_msg_body~load_bits(256);
+    (slice jetton_address, int found?) = tokens_dict.udict_get?(256, slice_hash(token_name));
+    throw_unless(404, found?);
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(jetton_address)
+        .store_coins(msg_value)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::deposit_reserve(), 32)
+        .store_slice(sender_address);
+    send_raw_message(msg.end_cell(), 0);
+}
+
+;; Set community admin
+() set_community_admin(slice sender_address, slice in_msg_body) impure {
+    var (owner_address, tokens_dict, community_admins_dict, paused) = load_data();
+    throw_unless(401, equal_slices(sender_address, owner_address));
+
+    slice token_name = in_msg_body~load_bits(256);
+    slice community_admin_address = in_msg_body~load_msg_addr();
+
+    (slice jetton_address, int found?) = tokens_dict.udict_get?(256, slice_hash(token_name));
+    throw_unless(404, found?);
+
+    community_admins_dict~udict_set(256, slice_hash(token_name), begin_cell().store_slice(community_admin_address).end_cell().begin_parse());
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(jetton_address)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::set_community_admin(), 32)
+        .store_slice(community_admin_address);
+    send_raw_message(msg.end_cell(), 64);
+
+    save_data(owner_address, tokens_dict, community_admins_dict, paused);
+}
+
+;; Pause specific token
+() pause_token(slice sender_address, slice in_msg_body) impure {
+    var (owner_address, tokens_dict, community_admins_dict, paused) = load_data();
+    throw_unless(401, equal_slices(sender_address, owner_address));
+
+    slice token_name = in_msg_body~load_bits(256);
+    (slice jetton_address, int found?) = tokens_dict.udict_get?(256, slice_hash(token_name));
+    throw_unless(404, found?);
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(jetton_address)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::pause_token(), 32);
+    send_raw_message(msg.end_cell(), 64);
+}
+
+;; Unpause specific token
+() unpause_token(slice sender_address, slice in_msg_body) impure {
+    var (owner_address, tokens_dict, community_admins_dict, paused) = load_data();
+    throw_unless(401, equal_slices(sender_address, owner_address));
+
+    slice token_name = in_msg_body~load_bits(256);
+    (slice jetton_address, int found?) = tokens_dict.udict_get?(256, slice_hash(token_name));
+    throw_unless(404, found?);
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(jetton_address)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::unpause_token(), 32);
+    send_raw_message(msg.end_cell(), 64);
+}
+
+;; Getter methods
+slice get_jetton_address_by_name(slice name) method_id {
+    var (_, tokens_dict, _, _) = load_data();
+    (slice token_address, int found?) = tokens_dict.udict_get?(256, slice_hash(name));
+    throw_unless(404, found?);
+    return token_address;
+}
+
+cell get_jettons_list() method_id {
+    var (_, tokens_dict, _, _) = load_data();
+    return tokens_dict;
+}
+
+slice get_community_admin(slice name) method_id {
+    var (_, _, community_admins_dict, _) = load_data();
+    (slice admin_address, int found?) = community_admins_dict.udict_get?(256, slice_hash(name));
+    throw_unless(404, found?);
+    return admin_address;
+}
+
+;; Pause/Unpause factory
+() pause(slice sender_address) impure {
+    var (owner_address, tokens_dict, community_admins_dict, _) = load_data();
+    throw_unless(401, equal_slices(sender_address, owner_address));
+    save_data(owner_address, tokens_dict, community_admins_dict, true);
+}
+
+() unpause(slice sender_address) impure {
+    var (owner_address, tokens_dict, community_admins_dict, _) = load_data();
+    throw_unless(401, equal_slices(sender_address, owner_address));
+    save_data(owner_address, tokens_dict, community_admins_dict, false);
+}
+
+;; Safe withdraw
+() safe_withdraw(slice sender_address) impure {
+    var (owner_address, tokens_dict, community_admins_dict, paused) = load_data();
+    throw_unless(401, equal_slices(sender_address, owner_address));
+    raw_reserve(0, 4);
+    send_raw_message(begin_cell().store_uint(0x10, 6)
+        .store_slice(owner_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .end_cell(), 128);
+}
+
+;; Main contract logic
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == op::deploy_jetton()) {
+        deploy_jetton(sender_address, msg_value, in_msg_body);
+    } elseif (op == op::deposit_reserve()) {
+        deposit_reserve(sender_address, msg_value, in_msg_body);
+    } elseif (op == op::set_community_admin()) {
+        set_community_admin(sender_address, in_msg_body);
+    } elseif (op == op::pause()) {
+        pause(sender_address);
+    } elseif (op == op::unpause()) {
+        unpause(sender_address);
+    } elseif (op == op::pause_token()) {
+        pause_token(sender_address, in_msg_body);
+    } elseif (op == op::unpause_token()) {
+        unpause_token(sender_address, in_msg_body);
+    } elseif (op == op::safe_withdraw()) {
+        safe_withdraw(sender_address);
+    } else {
+        throw(0xffff);
+    }
+}
