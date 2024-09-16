@@ -1,0 +1,100 @@
+#include "imports/stdlib.fc";
+
+const const::min_tons_for_storage = 10000000; ;; 保底资金,0.01 TON
+
+const op::deposit = "op::deposit"c;
+const op::withdrawal = "op::withdrawal"c;
+
+(int, slice, slice) load_data() inline {
+  var ds = get_data().begin_parse();
+  return (
+    ds~load_uint(32), ;; counter_value
+    ds~load_msg_addr(), ;; the most recent sender
+    ds~load_msg_addr() ;; owner_address
+  );
+}
+
+() save_data(int counter_value, slice recent_sender, slice owner_address) impure inline {
+  set_data(begin_cell()
+    .store_uint(counter_value, 32) ;; counter_value
+    .store_slice(recent_sender) ;; the most recent sender
+    .store_slice(owner_address) ;; owner_address
+    .end_cell());
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+    return ();
+  }
+  slice cs = in_msg_full.begin_parse();
+  int flags = cs~load_uint(4);
+  slice sender = cs~load_msg_addr();
+
+  int op = in_msg_body~load_uint(32);
+  var (counter_value, recent_sender, owner_address) = load_data();
+
+  if (op == 0) {
+    save_data(0, sender, sender);
+    return ();
+  }
+  if (op == 1) {
+    int increment_by = in_msg_body~load_uint(32);
+    save_data(counter_value + increment_by, sender, owner_address);
+    return ();
+  }
+  
+  if (op == op::deposit){
+    ;; 只是接受资金,不需要做任何额外的操作 (贷记阶段)
+    return ();
+  }
+  if (op == op::withdrawal){
+    ;; throw_if() 满足条件就抛出错误
+    ;; throw_unless() 不满足条件就抛出错误
+    ;; equal_slices() 比较两个slice是否相等
+    ;; 发送者与合约拥有者一致才允许提款
+    throw_unless(103, equal_slices(sender, owner_address));
+  
+    ;; 提款金额
+    int withdraw_amount = in_msg_body~load_coins();
+    ;; get_balance()
+    var [balance, _] = get_balance();
+    ;; 确保余额足够
+    throw_unless(104, balance >= withdraw_amount);
+  
+    ;; 需要设置合约保底资金不能被提取,合约保留一定的金额以支付租金和其他必要的费用
+    ;; 实际提款金额
+    int return_value = min(withdraw_amount, balance - const::min_tons_for_storage);
+    ;; 发送内部信息,从合约内部发送代币
+    var msg = begin_cell()
+            ;; 4个标记位,还有2位是空的源地址,写入addr_none的序列化00,这里不管写什么值,系统都会重写为实际的源地址
+            .store_uint(0x18, 6)
+            ;; 目标地址,因为发件人请求合约将资金提取到他的地址上,所以直接写sender即可
+            .store_slice(sender)
+            .store_coins(return_value)
+            ;; 倒数第4个标记位,64位交易逻辑时间
+            ;; 倒数第3个标记位,32位交易时间戳
+            ;; 倒数第2个标记位,表示是否有初始化字段,0表示没有
+            ;; 倒数第1个标记位,表示是否有正文,0表示没有,如果是1,后续就要加上 store_slice(msg_body)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+    ;; mode=1, 发送普通信息,并从信息中单独支付转账费用
+    send_raw_message(msg, 1);
+    return ();
+  }
+  
+  throw(9999);
+}
+
+(int,slice,slice) get_contract_storage_data() method_id {
+  var (counter_value, recent_sender, owner_address) = load_data();
+  return (
+    counter_value,
+    recent_sender,
+    owner_address
+  );
+}
+
+int balance() method_id {
+  var [balance, _] = get_balance();
+  return balance;
+}
