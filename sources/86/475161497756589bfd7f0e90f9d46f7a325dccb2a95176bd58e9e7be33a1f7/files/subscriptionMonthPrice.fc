@@ -1,0 +1,54 @@
+#pragma version >=0.2.0;
+
+#include "imports/stdlib.fc";
+
+;; Структура хранения данных
+(int, slice, int) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_uint(64),  ;; current_price
+        ds~load_msg_addr(),  ;; owner_address
+        ds~load_uint(32)  ;; last_update_time
+    );
+}
+
+;; Сохранение данных
+() save_data(int current_price, slice owner_address, int last_update_time) impure inline {
+    set_data(begin_cell()
+        .store_uint(current_price, 64)
+        .store_slice(owner_address)
+        .store_uint(last_update_time, 32)
+        .end_cell());
+}
+
+;; Обновление цены (только владелец)
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; игнорируем пустые сообщения
+        return ();
+    }
+    
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; игнорируем все системные сообщения
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    
+    (int current_price, slice owner_address, int last_update_time) = load_data();
+    throw_unless(401, equal_slice_bits(sender_address, owner_address));
+    
+    int op = in_msg_body~load_uint(32);
+    if (op == 0x1234) { ;; Операция обновления цены
+        int new_price = in_msg_body~load_coins();
+        save_data(new_price, owner_address, now());
+        return ();
+    }
+    
+    throw(0xffff);
+}
+
+;; Получение текущей цены
+int get_price() method_id {
+    (int current_price, _, _) = load_data();
+    return current_price;
+}
