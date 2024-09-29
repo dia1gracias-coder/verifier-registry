@@ -1,0 +1,44 @@
+#include "imports/stdlib.fc";
+
+;; storage
+
+int load_data() inline 
+{
+    slice ldddd = get_data().begin_parse();
+    return ldddd~load_uint(32);
+}
+
+() save_data(int sd) impure inline
+{
+    set_data(
+        begin_cell()
+            .store_uint(sd, 32)
+            .end_cell()
+    );
+}
+
+;; message
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure 
+{
+    if (in_msg_body.slice_empty?())
+    {
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    var counter = load_data();
+
+    if (op == 1) 
+    {
+        save_data(counter + 1);
+    }
+}
+
+;; getters
+
+int get_counter() method_id
+{
+    return load_data();
+}
