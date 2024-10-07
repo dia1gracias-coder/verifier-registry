@@ -1,0 +1,38 @@
+;; #include "imports/stdlib.fc";
+
+(int, int, int, int) ecdsa_recover(int hash, int v, int r, int s) asm "ECRECOVER";
+
+int normalize_ecdsa_recovery_id(int v) inline {
+    if v >= 31 {
+        return v - 31;
+    }
+    if v >= 27 {
+        return v - 27;
+    }
+    return v;
+}
+
+(int, int, int, int) get_ecdsa_pub_key1(int hash, slice signature) method_id {
+    ;; v = normalize_ecdsa_recovery_id(v);
+    int r = signature~load_uint(256);
+    int s = signature~load_uint(256);
+    int v = signature~load_uint(8);
+
+    return ecdsa_recover(hash, v, r, s);
+}
+
+(int, int, int, int) get_ecdsa_pub_key2(int hash, int v, int r, int s) method_id {    
+    return ecdsa_recover(hash, v, r, s);
+}
+
+;; int verify_signature(int signer_pubkey, int hash, slice signature) {
+;;     int recovered_pubkey = 0;
+;;     (recovered_pubkey, _, _, _) = get_ecdsa_pub_key(hash, signature);
+;;     if (recovered_pubkey == signer_pubkey) {
+;;         return true;
+;;     }
+;;     return false;
+;; }
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+}
