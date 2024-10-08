@@ -1,0 +1,166 @@
+#include "imports/stdlib.fc";
+
+const op::set_sales_active = "op::set_sales_active"c; 
+const op::set_processing_price = "op::set_processing_price"c;  
+const op::update_price = "op::update_price"c; 
+const op::delete_price = "op::delete_price"c; 
+const op::withdraw = "op::withdraw"c; 
+const op::buy_diamonds = "op::buy_diamonds"c;
+
+global int _nonce;
+global slice owner;
+
+global int sales_active;
+global int processing_price;
+global cell pricing;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    
+    _nonce = ds~load_uint(32);    
+    owner = ds~load_msg_addr();        
+    sales_active = ds~load_uint(32);
+    processing_price = ds~load_coins();
+    pricing = ds~load_dict();    
+    ds.end_parse();
+}
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(_nonce, 32) ;; not neeed to store
+            .store_slice(owner) ;; not neeed to store
+            .store_uint(sales_active, 32)
+            .store_coins(processing_price)
+            .store_dict(pricing)
+        .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { 
+        return ();
+    }
+
+    slice sender_addr = cs~load_msg_addr();
+
+    load_data();
+        
+    int op = in_msg_body~load_uint(32); 
+    int query_id = in_msg_body~load_uint(64);
+    
+    if (op == op::buy_diamonds) {
+        int userId = in_msg_body~load_int(64);
+        int numberOfDiamonds = in_msg_body~load_uint(32);
+
+        (slice payload, int success) = udict_get?(pricing, 32, numberOfDiamonds);
+        throw_unless(404, success);    
+
+        int price = payload~load_uint(128);
+        throw_unless(104, msg_value >= price + processing_price);
+
+        ;;event
+
+        return ();
+
+    }
+
+    if (equal_slice_bits(sender_addr, owner)) {
+
+        if (op == op::set_sales_active) {
+            sales_active = in_msg_body~load_uint(32);
+            save_data();
+            return ();
+        }
+
+        if(op == op::delete_price) {
+            int numberOfDiamonds = in_msg_body~load_uint(32);
+            pricing~udict_delete?(32, numberOfDiamonds);
+            save_data();
+            return ();
+        }
+
+        if(op == op::update_price) {
+            int numberOfDiamonds = in_msg_body~load_uint(32);
+            int price = in_msg_body~load_uint(128);            
+
+            pricing~udict_set(32, numberOfDiamonds, 
+                begin_cell()
+                    .store_uint(price, 128)
+                .end_cell()
+                .begin_parse()
+            );            
+
+            save_data();
+            return ();
+        }
+        
+        if (op == op::set_processing_price) {
+            processing_price = in_msg_body~load_coins();
+            save_data();
+            return ();
+        }
+
+        if (op == op::withdraw) {
+            slice to =  in_msg_body~load_msg_addr();            
+            cell msg = begin_cell()
+                        .store_uint(0x18, 6)
+                        .store_slice(to)
+                        .store_coins(0)
+                        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                        .store_uint(0, 32)
+                        .store_slice("Withraw")
+                     .end_cell();
+            raw_reserve(100000000, 0);
+            send_raw_message(msg, 128); 
+            return ();
+        }
+
+    }
+
+    throw(0xffff);
+
+}
+
+() recv_external(slice in_msg) impure {
+    throw(0xffff);
+}
+
+int get_nonce() method_id {
+    load_data();
+    return _nonce;
+}
+
+slice get_owner() method_id {
+    load_data();
+    return owner;
+}
+
+int get_sales_active() method_id {
+    load_data();
+    return sales_active;
+}
+
+int get_processing_price() method_id {
+    load_data();
+    return processing_price;
+}
+
+cell get_pricing() method_id {
+    load_data();
+    return pricing;
+}
+
+int get_price(int numberOfDiamonds) method_id {
+    load_data();    
+    (slice payload, int success) = udict_get?(pricing, 32, numberOfDiamonds);
+    throw_unless(404, success);    
+    return payload~load_uint(128); 
+}   
