@@ -1,0 +1,72 @@
+#include "op-codes-vnst.fc";
+
+#pragma version >=0.4.3;
+
+int is_check(cell _cell_list, slice _address_to_check) impure inline {
+    slice cs = _cell_list.begin_parse();
+    int status = 1;
+    while (status == 1) {
+        if ( ~ cs.slice_empty?()) {
+            slice stored_address = cs~load_msg_addr();
+            if (equal_slices_bits(stored_address, _address_to_check)) {
+                return 1;
+            }
+        }
+
+        if (cs.slice_refs_empty?()) {
+            status = 0;
+        } else {
+            cell next_cell = cs~load_ref();
+            cs = next_cell.begin_parse();
+        }
+    }
+    return 0;
+}
+
+cell add_to_cell(cell _cell_list, slice _new_user) impure inline {
+    throw_unless(error::not_valid_wallet, is_check(_cell_list, _new_user) == 0);
+    
+    var cellBuilder = begin_cell();
+    cellBuilder = cellBuilder.store_slice(_new_user);
+    if ( ~ _cell_list.begin_parse().slice_empty?()) {
+        cellBuilder = cellBuilder.store_ref(_cell_list);
+    }
+
+    return cellBuilder.end_cell();
+}
+
+cell delete_from_cell(cell _cell_list, slice _address_to_remove) impure inline {
+    var new_list_builder = begin_cell();
+    slice cs = _cell_list.begin_parse();
+
+    while ( ~ cs.slice_empty?()) {
+        slice current_address = cs~load_msg_addr();
+
+        if ( ~ equal_slices_bits(current_address, _address_to_remove)) {
+            new_list_builder = new_list_builder.store_slice(current_address);
+        } else {
+            if (cs.slice_refs_empty?() == 0) {
+                cell next_cell = cs~load_ref();
+                return next_cell;
+            }
+        }
+        if (cs.slice_refs_empty?() == 0) {
+            cell next_cell = cs~load_ref();
+            cell updated_next_cell = delete_from_cell(next_cell, _address_to_remove);
+            
+            if ( ~ updated_next_cell.begin_parse().slice_empty?()) {
+                new_list_builder = new_list_builder.store_ref(updated_next_cell);
+            }
+        }
+    }
+
+    return new_list_builder.end_cell();
+}
+
+() check_moderator(cell moderator, slice sender_address) impure inline {
+    throw_unless(error::not_moderator, is_check(moderator, sender_address) == 1);
+}
+
+() check_owner(slice owner, slice sender_address) impure inline {
+    throw_unless(error::not_owner,equal_slices_bits(owner, sender_address));
+}

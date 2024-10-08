@@ -1,0 +1,327 @@
+#pragma version >=0.4.3;
+
+#include "stdlib.fc";
+#include "op-codes.fc";
+#include "workchain.fc";
+#include "jetton-utils.fc";
+#include "gas.fc";
+#include "./vnst-config/storage.fc";
+#include "./vnst-config/management-utils.fc";
+#include "./vnst-config/jetton-operations.fc";
+#include "./vnst-config/admin-functions.fc";
+#include "./vnst-config/helpers.fc";
+#include "./vnst-config/getters.fc";
+#include "./vnst-config/op-codes-vnst.fc";
+#include "./vnst-config/constant.fc";
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    int msg_flags = in_msg_full_slice~load_msg_flags();
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management);
+    if (msg_flags & 1) { 
+        in_msg_body~skip_bounced_prefix();
+        ifnot (in_msg_body~load_op() == op::internal_transfer) {
+            return ();
+        }
+        in_msg_body~skip_query_id();
+        int jetton_amount = in_msg_body~load_coins();
+        save_data(total_supply - jetton_amount, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, config_data, management);
+        return ();
+    }
+    slice sender_address = in_msg_full_slice~load_msg_addr();
+    int fwd_fee_from_in_msg = in_msg_full_slice~retrieve_fwd_fee();
+    int fwd_fee = get_original_fwd_fee(MY_WORKCHAIN, fwd_fee_from_in_msg); 
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management);
+    
+    if (op == op::top_up) {
+        return ();
+    }
+    
+    if (op == op::burn_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(error::not_valid_wallet,
+            equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+        );
+        save_data(total_supply - jetton_amount, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, config_data, management);
+        slice response_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        if (~ is_address_none(response_address) & ~ equal_slices_bits(my_address(), response_address) ) {
+            var msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(response_address)
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_op(op::excesses)
+            .store_query_id(query_id);
+            send_raw_message(msg.end_cell(), SEND_MODE_IGNORE_ERRORS | SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        }
+        return ();
+    }
+
+    if (op == op::provide_wallet_address) {
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_bool();
+        in_msg_body.end_parse();
+
+        cell included_address = include_address?
+        ? begin_cell().store_slice(owner_address).end_cell()
+        : null();
+        var msg = begin_cell()
+        .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_prefix_only_body()
+        .store_op(op::take_wallet_address)
+        .store_query_id(query_id);
+
+        if (is_same_workchain(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code));
+        } else {
+            msg = msg.store_address_none();
+        }
+
+        cell msg_cell = msg.store_maybe_ref(included_address).end_cell();
+
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        return ();
+    }
+
+    if (op == op::transfer_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        cell ref_cs = in_msg_body~load_ref(); 
+        slice ref_ds = ref_cs.begin_parse();
+        int transferred_op = ref_ds~load_uint(32);
+        int burn_ton_amount = ref_ds~load_coins();
+        int transfer_ton_amount = ref_ds~load_coins();
+        throw_unless(error::not_enough_gas_forward, msg_value > burn_ton_amount + transfer_ton_amount);
+        slice jetton_wallet_address = calculate_user_jetton_wallet_address(my_address(), my_address(), jetton_wallet_code);
+        int new_burn_fee =  burn_ton_amount * 1 / 2;
+        int new_transfer_fee = transfer_ton_amount * 1 / 2;
+
+        if(transferred_op == op::mint_vnst & equal_slices_bits(usdt_jetton_wallet, sender_address)) {
+            mint(from_address, new_transfer_fee, new_burn_fee, jetton_amount, query_id);
+        }
+        if(transferred_op == op::redeem & equal_slices_bits(jetton_wallet_address, sender_address) ) {
+            redeem(from_address, new_burn_fee, new_transfer_fee, jetton_amount, query_id);
+        }
+        return ();
+    }
+
+    if (op == op::mint) {
+        check_owner(admin_address, sender_address);
+        slice to_address = in_msg_body~load_msg_addr();
+        check_same_workchain(to_address);
+        int ton_amount = in_msg_body~load_coins();
+        cell master_msg = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+        slice master_msg_slice = master_msg.begin_parse();
+        throw_unless(error::invalid_op, master_msg_slice~load_op() == op::internal_transfer);
+        master_msg_slice~skip_query_id();
+        int jetton_amount = master_msg_slice~load_coins();
+        master_msg_slice~load_msg_addr(); ;; from_address
+        master_msg_slice~load_msg_addr(); ;; response_address
+        int forward_ton_amount = master_msg_slice~load_coins(); ;; forward_ton_amount
+        check_either_forward_payload(master_msg_slice); ;; either_forward_payload
+
+        check_amount_is_enough_to_transfer(ton_amount, forward_ton_amount, fwd_fee);
+
+        send_to_jetton_wallet(to_address, jetton_wallet_code, ton_amount, master_msg, TRUE);
+        save_data(total_supply + jetton_amount, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, config_data, management);
+        return ();
+    }
+    
+    if (op == op::call_to) {
+        check_owner(admin_address, sender_address);
+        slice to_address = in_msg_body~load_msg_addr();
+        int ton_amount = in_msg_body~load_coins();
+        cell master_msg = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        slice master_msg_slice = master_msg.begin_parse();
+        int master_op = master_msg_slice~load_op();
+        master_msg_slice~skip_query_id();
+        if (master_op == op::transfer) {
+            master_msg_slice~load_coins();
+            master_msg_slice~load_msg_addr();
+            master_msg_slice~load_msg_addr();
+            master_msg_slice~skip_maybe_ref();
+            int forward_ton_amount = master_msg_slice~load_coins();
+            check_either_forward_payload(master_msg_slice);
+
+            check_amount_is_enough_to_transfer(ton_amount, forward_ton_amount, fwd_fee);
+
+        } elseif (master_op == op::burn) {
+            master_msg_slice~load_coins();
+            master_msg_slice~load_msg_addr();
+            master_msg_slice~skip_maybe_ref();
+            master_msg_slice.end_parse();
+
+            check_amount_is_enough_to_burn(ton_amount);
+
+        } elseif (master_op == op::set_status) {
+            master_msg_slice~load_uint(STATUS_SIZE);
+            master_msg_slice.end_parse();
+        } else {
+            throw(error::invalid_op);
+        }
+        send_to_jetton_wallet(to_address, jetton_wallet_code, ton_amount, master_msg, FALSE);
+        return ();
+    }
+    
+    if (op == op::change_admin) {
+        check_owner(admin_address, sender_address);
+        next_admin_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+        save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, config_data, management);
+        return ();
+    }
+
+    if (op == op::claim_admin) {
+        check_owner(admin_address, sender_address);
+        in_msg_body.end_parse();
+        save_data(total_supply, next_admin_address, address_none(), jetton_wallet_code, metadata_uri, config_data, management);
+        return ();
+    }
+
+    if (op == op::change_metadata_uri) {
+        check_owner(admin_address, sender_address);
+        save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, begin_cell().store_slice(in_msg_body).end_cell(), config_data, management);
+        return ();
+    }
+
+    if (op == op::upgrade) {
+        check_owner(admin_address, sender_address);
+        cell new_code = in_msg_body~load_ref();
+        set_code(new_code);
+        return ();
+    }
+
+    if (op == op::add_moderator) {
+        check_owner(admin_address, sender_address);
+        slice _new_moderator = in_msg_body~load_msg_addr();
+        cell _moderator_list = add_to_cell(moderator,_new_moderator);
+        update_and_save_new_moderator(_moderator_list);
+        return ();
+    }
+
+    if (op == op::delete_moderator) {
+        check_owner(admin_address, sender_address);
+        slice _delete_moderator = in_msg_body~load_msg_addr();
+        check_moderator(moderator, _delete_moderator);
+        cell _moderator_list = delete_from_cell(moderator,_delete_moderator);
+        update_and_save_new_moderator(_moderator_list);
+        return ();
+    }
+
+    if (op == op::emergency_withdraw) {
+        check_owner(admin_address, sender_address);
+        int _ton_amount = in_msg_body~load_coins();
+        int _amount = in_msg_body~load_uint(256);
+        emergencyWithdraw(sender_address, _amount, _ton_amount ,query_id);
+        return ();
+    }
+
+    if (op == op::withdraw_usdt) {
+        check_owner(admin_address, sender_address);
+        int _ton_amount = in_msg_body~load_coins();
+        int _amount = in_msg_body~load_uint(256);
+        withdrawUSDT(sender_address, _amount, _ton_amount, query_id);
+        return ();
+    }
+
+    if (op == op::withdraw_operation_pool) {
+        check_owner(admin_address, sender_address);
+        int _ton_amount = in_msg_body~load_coins();
+        withdrawOperationPool(sender_address, _ton_amount, query_id);
+        return ();
+    }
+    if (op == op::set_usdt_jetton_wallet) {
+        check_owner(admin_address, sender_address);
+        slice _jetton_contract_address = in_msg_body~load_msg_addr();
+        update_and_save_usdt_jetton_wallet(_jetton_contract_address);
+        return ();
+    }
+    
+    if (op == op::vnst7265626f6f7420706f6f6c) {
+        check_moderator(moderator, sender_address);
+        int _market_price = in_msg_body~load_uint(128);
+        int _usdt_pool = in_msg_body~load_uint(128);
+        int _redeem_covered_price = in_msg_body~load_uint(128);
+        int _mint_covered_price = in_msg_body~load_uint(128);
+        vnst7265626f6f7420706f6f6c(_market_price, _usdt_pool, _redeem_covered_price, _mint_covered_price);
+        return ();
+    } 
+    if (op == op::vnst53657420436f766572) {
+        check_moderator(moderator, sender_address);
+        int _redeem_covered_amount = in_msg_body~load_uint(128);
+        int _mint_covered_amount = in_msg_body~load_uint(128);
+        vnst53657420436f766572(_redeem_covered_amount, _mint_covered_amount);
+        return ();
+    } 
+    if (op == op::set_max_mint_limit) {
+        check_moderator(moderator, sender_address);
+        int _max_mint_limit = in_msg_body~load_uint(128);
+        setMaxMintLimit(_max_mint_limit);
+        return ();
+    }
+    if (op == op::set_max_redeem_limit) {
+        check_moderator(moderator, sender_address);
+        int _max_redeem_limit = in_msg_body~load_uint(128);
+        setMaxRedeemLimit(_max_redeem_limit);
+        return ();
+    }
+
+    if (op == op::set_max_limit_verified_user) {
+        check_moderator(moderator, sender_address);
+        int _max_mint_limit = in_msg_body~load_uint(128);
+        int _max_redeem_limit = in_msg_body~load_uint(128);
+        setMaxLimitVerifiedUser(_max_mint_limit, _max_redeem_limit);
+        return ();
+    }
+
+    if (op == op::vnst73657420666565) {
+        check_moderator(moderator, sender_address);
+        int _redeem_fee = in_msg_body~load_uint(64);
+        vnst73657420666565(_redeem_fee);
+        return ();
+    }
+    if (op == op::vnst73657420666566) {
+        check_moderator(moderator, sender_address);
+        int _mint_fee = in_msg_body~load_uint(64);
+        vnst73657420666566( _mint_fee);
+        return ();
+    }
+    if (op == op::vnst191671e7f585a3817f) {
+        check_moderator(moderator, sender_address);
+        int _mint_status = in_msg_body~load_uint(1);
+        vnst191671e7f585a3817f(_mint_status);
+        return ();
+    } 
+    if (op == op::vnst5630dd9d602fe45ab7) {
+        check_moderator(moderator, sender_address);
+        int _redeem_status = in_msg_body~load_uint(1);
+        vnst5630dd9d602fe45ab7(_redeem_status);
+        return ();
+    }
+
+    if (op == op::withdraw_ton) {
+        check_owner(admin_address, sender_address);
+        int reverse_ton = in_msg_body~load_coins();
+        raw_reserve(reverse_ton, 0);
+        var msg = begin_cell()
+                    .store_uint(0x18, 6)
+                    .store_slice(sender_address)
+                    .store_coins(0)
+                    .store_uint(0, 107)
+                    .end_cell().send_raw_message(128);
+        return();
+    }
+
+    throw(error::wrong_op);
+}

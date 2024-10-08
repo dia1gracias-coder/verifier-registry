@@ -1,0 +1,170 @@
+#pragma version >=0.4.3;
+
+#include "storage.fc";
+#include "helpers.fc";
+#include "constant.fc";
+#include "op-codes-vnst.fc";
+
+(slice, int, int, int, int) mint(
+    slice _sender_address,
+    int _ton_amount,
+    int _foward_ton_amount,
+    int _amount_usdt,
+    int _query_id
+) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int redeem_fee, int mint_fee, int mint_status, int redeem_status) = load_fee_and_status(config_data);
+    (int min_redeem_limit, int max_redeem_limit, int min_mint_limit, int max_mint_limit, int max_mint_limit_verified_user, int max_redeem_limit_verified_user) = load_limit(config_data);
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    (int usdt_pool, int vnst_pool, int operation_pool, int k) = load_pool(config_data);
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management);
+
+    int _max_limit = is_check(verified_user, _sender_address) == 1 ? max_mint_limit_verified_user : max_mint_limit;
+    int amount = 0;
+    int error_code = 0;
+    slice refund_msg = "Refund";
+    
+    slice mint_msg = "Mint";
+
+    if (mint_status != 1) {
+        _internal_transfer(usdt_jetton_wallet, _sender_address, _amount_usdt, _ton_amount, _query_id, refund_msg);
+        error_code = error::wrong_op_1001;
+    }  
+    if (market_price < mint_covered_price) {
+        _internal_transfer(usdt_jetton_wallet, _sender_address, _amount_usdt, _ton_amount, _query_id, refund_msg);
+        error_code = error::wrong_op_1002;
+    }  
+    if (_amount_usdt < min_mint_limit) {
+        _internal_transfer(usdt_jetton_wallet, _sender_address, _amount_usdt, _ton_amount, _query_id, refund_msg);
+        error_code = error::wrong_op_1003;
+    }  
+    if (_amount_usdt > _max_limit) {
+        _internal_transfer(usdt_jetton_wallet, _sender_address, _amount_usdt, _ton_amount, _query_id, refund_msg);
+        error_code = error::wrong_op_1004;
+    }
+    if (error_code == 0) {
+        int _amount_usdt_mint = _amount_usdt - (_amount_usdt * mint_fee) / _rate_decimal;
+        int _operation_pool = operation_pool + (_amount_usdt - _amount_usdt_mint);
+        update_operation_pool(_operation_pool);
+
+        if (market_price == mint_covered_price) {
+            int amount_vnst_support_out = _getAmountVNSTSupport(_amount_usdt_mint);
+            if ( mint_covered_amount <= amount_vnst_support_out) {
+                _internal_transfer(usdt_jetton_wallet, _sender_address, _amount_usdt,_ton_amount, _query_id, refund_msg);
+            } else {
+                int _mint_covered_amount = mint_covered_amount - amount_vnst_support_out;
+                update_mint_covered_amount(_mint_covered_amount);
+                _send_to_jetton_wallet(_sender_address, _ton_amount, _foward_ton_amount, amount_vnst_support_out, _query_id, mint_msg);
+                amount = amount_vnst_support_out;
+            }
+        }
+        if (market_price > mint_covered_price) {
+            int amount_usdt_in_before_support = _getUSDTInBeforeCovered();
+
+            if (_amount_usdt_mint <= amount_usdt_in_before_support) {
+                int amount_vnst_out = _calculateVMM(usdt_pool, vnst_pool, _amount_usdt_mint);
+                _updatePool(vnst_pool - amount_vnst_out, usdt_pool + _amount_usdt_mint);
+                _send_to_jetton_wallet(_sender_address, _ton_amount, _foward_ton_amount, amount_vnst_out, _query_id, mint_msg);
+                amount = amount_vnst_out;
+            } else {
+                int amount_vnst_out = _calculateVMM(usdt_pool, vnst_pool, amount_usdt_in_before_support);
+                int amount_vnst_support_out = _getAmountVNSTSupport(_amount_usdt_mint - amount_usdt_in_before_support);
+                if ( mint_covered_amount <= amount_vnst_support_out) {
+                    _internal_transfer(usdt_jetton_wallet, _sender_address, _amount_usdt,_ton_amount, _query_id, refund_msg);
+                } else {
+                    int _mint_covered_amount = mint_covered_amount - amount_vnst_support_out;
+                    update_mint_covered_amount(_mint_covered_amount);
+                    _updatePool(vnst_pool - amount_vnst_out, usdt_pool + amount_usdt_in_before_support);
+                    _send_to_jetton_wallet(_sender_address, _ton_amount, _foward_ton_amount, amount_vnst_out + amount_vnst_support_out, _query_id, mint_msg);
+                    amount = amount_vnst_out + amount_vnst_support_out;
+                }
+            }
+        }
+    }
+    
+    return (_sender_address, _amount_usdt, amount, now(), market_price);
+}
+
+() redeem(
+    slice _sender_address,
+    int _burn_ton_amount,
+    int _transfer_ton_amount,
+    int _amount_vnst,
+    int _query_id
+) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management_user) = load_data();
+    (int redeem_fee, int mint_fee, int mint_status, int redeem_status) = load_fee_and_status(config_data);
+    (int min_redeem_limit, int max_redeem_limit, int min_mint_limit, int max_mint_limit, int max_mint_limit_verified_user, int max_redeem_limit_verified_user) = load_limit(config_data);
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    (int usdt_pool, int vnst_pool, int operation_pool, int k) = load_pool(config_data);
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management_user);
+
+    int _max_limit = is_check(verified_user, _sender_address) == 1 ? max_redeem_limit_verified_user : max_redeem_limit;
+    slice jetton_wallet_address = calculate_user_jetton_wallet_address(my_address(), my_address(), jetton_wallet_code);
+    slice redeem_msg = "Redeem";
+    slice refund_msg = "Refund";
+    int error_code = 0;
+
+    if (redeem_status != 1) {
+        _internal_transfer(jetton_wallet_address, _sender_address, _amount_vnst, _transfer_ton_amount, _query_id, refund_msg);
+        error_code = error::wrong_op_1001;
+    }  
+    if (market_price > redeem_covered_price) {
+        _internal_transfer(jetton_wallet_address, _sender_address, _amount_vnst, _transfer_ton_amount, _query_id, refund_msg);
+        error_code = error::wrong_op_1002;
+    }  
+    if (_amount_vnst < min_redeem_limit) {
+        _internal_transfer(jetton_wallet_address, _sender_address, _amount_vnst, _transfer_ton_amount, _query_id, refund_msg);
+        error_code = error::wrong_op_1003;
+    }  
+    if (_amount_vnst > _max_limit) {
+        _internal_transfer(jetton_wallet_address, _sender_address, _amount_vnst, _transfer_ton_amount, _query_id, refund_msg);
+        error_code = error::wrong_op_1004;
+    }
+
+    if(error_code == 0) {
+        if (market_price == redeem_covered_price) {
+            int amount_usdt_support_out = _getAmountUSDTSupport(_amount_vnst);
+            if (redeem_covered_amount < amount_usdt_support_out) {
+                _internal_transfer(jetton_wallet_address, _sender_address, _amount_vnst, _transfer_ton_amount, _query_id, refund_msg);
+                error_code = error::wrong_op_1005;
+            } else {
+                int _redeem_covered_amount = redeem_covered_amount -  amount_usdt_support_out;
+                update_redeem_covered_amount(_redeem_covered_amount);
+                int _operation_pool = operation_pool + (amount_usdt_support_out * redeem_fee) / _rate_decimal;
+                update_operation_pool(_operation_pool);
+                _burn_jetton(_sender_address, _burn_ton_amount, _amount_vnst, _query_id);
+                _internal_transfer(usdt_jetton_wallet, _sender_address, (amount_usdt_support_out * _rate_decimal - amount_usdt_support_out * redeem_fee) / _rate_decimal, _transfer_ton_amount, _query_id, redeem_msg);
+            }
+        }
+        if (market_price < redeem_covered_price) {
+            int amount_vnst_in_before_support = _getVNSTInBeforeCovered();
+
+            if (_amount_vnst <= amount_vnst_in_before_support) {
+                int amount_usdt_out = _calculateVMM(vnst_pool, usdt_pool, _amount_vnst);
+                _updatePool(vnst_pool + _amount_vnst, usdt_pool - amount_usdt_out);
+                int _operation_pool = operation_pool + (amount_usdt_out * redeem_fee) / _rate_decimal;
+                update_operation_pool(_operation_pool);
+
+                _burn_jetton(_sender_address, _burn_ton_amount, _amount_vnst, _query_id);
+                _internal_transfer(usdt_jetton_wallet, _sender_address,  (amount_usdt_out * _rate_decimal - amount_usdt_out * redeem_fee) / _rate_decimal, _transfer_ton_amount, _query_id, redeem_msg);
+            } else {
+                int amount_usdt_out = _calculateVMM(vnst_pool, usdt_pool, amount_vnst_in_before_support);
+                int amount_usdt_support_out = _getAmountUSDTSupport(_amount_vnst - amount_vnst_in_before_support);
+                if (redeem_covered_amount < amount_usdt_support_out) {
+                    _internal_transfer(jetton_wallet_address, _sender_address, _amount_vnst, _transfer_ton_amount, _query_id, refund_msg);
+                    error_code = error::wrong_op_1006;
+                } else {
+                    int _redeem_covered_amount = redeem_covered_amount - amount_usdt_support_out;
+                    update_redeem_covered_amount(_redeem_covered_amount);
+                    int sum_usdt_out = amount_usdt_out + amount_usdt_support_out;
+                    _updatePool(vnst_pool + amount_vnst_in_before_support, usdt_pool - amount_usdt_out);
+                    int _operation_pool = (operation_pool * _rate_decimal + (sum_usdt_out * redeem_fee)) / _rate_decimal;
+                    update_operation_pool(_operation_pool);
+                    _burn_jetton(_sender_address, _burn_ton_amount, _amount_vnst, _query_id);
+                    _internal_transfer(usdt_jetton_wallet, _sender_address, (sum_usdt_out * _rate_decimal - sum_usdt_out * redeem_fee) / _rate_decimal, _transfer_ton_amount, _query_id, redeem_msg);
+                }
+            }
+        }
+    }
+}

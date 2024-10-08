@@ -1,0 +1,48 @@
+#pragma version >=0.4.3;
+
+cell get_info_contract() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    return config_data;
+}
+
+int get_market_price() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    return market_price;
+}
+
+int get_operation_pool() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int usdt_pool, int vnst_pool, int operation_pool, int k) = load_pool(config_data);
+    return operation_pool;
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    return (total_supply, TRUE, admin_address, build_content_cell(metadata_uri.begin_parse()), jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code);
+}
+
+slice get_next_admin_address() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    return next_admin_address;
+}
+
+slice get_jetton_usdt_address() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management);
+    return usdt_jetton_wallet;
+}
+
+cell get_management() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    return management;
+}
+
+slice version() method_id {
+    return "v1!";
+}

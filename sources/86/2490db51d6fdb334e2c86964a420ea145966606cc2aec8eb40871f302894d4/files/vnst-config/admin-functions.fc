@@ -1,0 +1,81 @@
+#pragma version >=0.4.3;
+
+() setMaxMintLimit(
+    int _max_mint_limit
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int min_redeem_limit, int max_redeem_limit, int min_mint_limit, int max_mint_limit, int max_mint_limit_verified_user, int max_redeem_limit_verified_user) = load_limit(config_data);
+    update_and_save_limit(min_redeem_limit, max_redeem_limit, min_mint_limit, _max_mint_limit, max_mint_limit_verified_user, max_redeem_limit_verified_user);
+}
+
+() setMaxRedeemLimit(
+    int _max_redeem_limit
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int min_redeem_limit, int max_redeem_limit, int min_mint_limit, int max_mint_limit, int max_mint_limit_verified_user, int max_redeem_limit_verified_user) = load_limit(config_data);
+    update_and_save_limit(min_redeem_limit, _max_redeem_limit, min_mint_limit, max_mint_limit, max_mint_limit_verified_user, max_redeem_limit_verified_user);
+}
+
+() setMaxLimitVerifiedUser(
+    int _max_mint_limit_verified_user,
+    int _max_redeem_limit_verified_user
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int min_redeem_limit, int max_redeem_limit, int min_mint_limit, int max_mint_limit, int max_mint_limit_verified_user, int max_redeem_limit_verified_user) = load_limit(config_data);
+    update_and_save_limit(min_redeem_limit, max_redeem_limit, min_mint_limit, max_mint_limit, _max_mint_limit_verified_user, _max_redeem_limit_verified_user);
+}
+
+() vnst73657420666565(
+    int _redeem_fee
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int redeem_fee, int mint_fee, int mint_status, int redeem_status) = load_fee_and_status(config_data);
+    update_and_save_fee_and_status(_redeem_fee, mint_fee, mint_status, redeem_status);
+}
+
+() vnst73657420666566(
+    int _mint_fee
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int redeem_fee, int mint_fee, int mint_status, int redeem_status) = load_fee_and_status(config_data);
+    update_and_save_fee_and_status(redeem_fee, _mint_fee, mint_status, redeem_status);
+}
+
+() vnst191671e7f585a3817f(
+    int _mint_status
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int redeem_fee, int mint_fee, int mint_status, int redeem_status) = load_fee_and_status(config_data);
+    update_and_save_fee_and_status(redeem_fee, mint_fee, _mint_status, redeem_status);
+}
+
+() vnst5630dd9d602fe45ab7(
+    int _redeem_status
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int redeem_fee, int mint_fee, int mint_status, int redeem_status) = load_fee_and_status(config_data);
+    update_and_save_fee_and_status(redeem_fee, mint_fee, mint_status, _redeem_status);
+}
+
+() emergencyWithdraw(slice _sender_address, int _amount, int _ton_amount, int _query_id) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management);
+    _internal_transfer(usdt_jetton_wallet, _sender_address,_amount, _ton_amount,_query_id, "Emergency Withdraw");
+    update_operation_pool(0);
+}
+
+() withdrawUSDT(slice _sender_address, int _amount, int _ton_amount, int _query_id) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management);
+    _internal_transfer(usdt_jetton_wallet, _sender_address, _amount, _ton_amount, _query_id, "Withdraw USDT");
+     
+}
+
+() withdrawOperationPool(slice _sender_address, int _ton_amount, int _query_id) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int usdt_pool, int vnst_pool, int operation_pool, int k) = load_pool(config_data);
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management);
+    _internal_transfer(usdt_jetton_wallet, _sender_address, operation_pool, _ton_amount,_query_id, "Withdraw Operation Pool");
+    update_and_save_pool(usdt_pool, vnst_pool, 0, k);
+}
+

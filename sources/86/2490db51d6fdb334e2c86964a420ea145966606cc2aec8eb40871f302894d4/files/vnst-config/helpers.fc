@@ -1,0 +1,198 @@
+#pragma version >=0.4.3;
+#include "./storage.fc";
+#include "constant.fc";
+#include "op-codes-vnst.fc";
+
+int sqrt(int x) inline {
+    if (x <= 0) {
+        return 0;
+    }
+
+    int z = (x + 1) / 2;
+    int y = x;
+
+    while (z < y) {
+        y = z;
+        z = (x / z + z) / 2;
+    }
+
+    return y;
+}
+
+int _calculateVMM(
+    int _x,
+    int _y,
+    int _Dx
+) inline {
+    return (_y * _Dx) / (_x + _Dx);
+}
+
+int _getAmountVNSTSupport(int _amount_usdt_in) inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    return (_amount_usdt_in * mint_covered_price) / _rate_decimal;
+}
+
+int _getAmountUSDTSupport(int _amount_vnst_in) inline {
+     (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    return (_amount_vnst_in * _rate_decimal) / redeem_covered_price;
+}
+
+int _getUSDTInBeforeCovered() inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int usdt_pool, int vnst_pool, int operation_pool, int k) = load_pool(config_data);
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    return sqrt((k * _rate_decimal) / mint_covered_price) - usdt_pool;
+}
+
+int _getVNSTInBeforeCovered() inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int usdt_pool, int vnst_pool, int operation_pool, int k) = load_pool(config_data);
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);    
+    return sqrt((k * redeem_covered_price) / _rate_decimal) - vnst_pool;
+}
+
+() _updatePool(
+    int _vnst_pool,
+    int _usdt_pool
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int usdt_pool, int vnst_pool, int operation_pool, int k) = load_pool(config_data);
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    market_price = (vnst_pool * _rate_decimal) / usdt_pool;
+    update_and_save_pool(_usdt_pool, _vnst_pool, operation_pool, k);
+    update_and_save_price(market_price, redeem_covered_price, mint_covered_price, redeem_covered_amount, mint_covered_amount);
+}
+
+cell build_content_cell(slice metadata_uri) inline {
+    cell content_dict = new_dict();
+    content_dict~set_token_snake_metadata_entry("uri"H, metadata_uri);
+    content_dict~set_token_snake_metadata_entry("decimals"H, "6");
+    return create_token_onchain_metadata(content_dict);
+}
+
+() send_to_jetton_wallet(slice to_address, cell jetton_wallet_code, int ton_amount, cell master_msg, int need_state_init) impure inline {
+    raw_reserve(ONE_TON, RESERVE_REGULAR); ;; reserve for storage fees
+
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+
+    ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+    var msg = begin_cell()
+    .store_msg_flags_and_address_none(BOUNCEABLE)
+    .store_slice(to_wallet_address) ;; dest
+    .store_coins(ton_amount);
+
+    if (need_state_init) {
+        msg = msg.store_statinit_ref_and_body_ref(state_init, master_msg);
+    } else {
+        msg = msg.store_only_body_ref(master_msg);
+    }
+    send_raw_message(msg.end_cell(), SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+}
+
+() _send_to_jetton_wallet(
+    slice _sender_address,
+    int _ton_amount,
+    int _foward_ton_amount,
+    int _jetton_amount,
+    int _query_id,
+    slice _status
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    cell forward_payload = begin_cell()
+        .store_uint(0, 32)                        
+        .store_slice(_status)                     
+        .end_cell();
+    cell master_msg = begin_cell()
+            .store_uint(op::internal_transfer, 32)
+            .store_uint(_query_id, 64)
+            .store_coins(_jetton_amount)
+            .store_slice(_sender_address)
+            .store_slice(_sender_address)
+            .store_coins(_foward_ton_amount)
+            .store_maybe_ref(forward_payload)            
+            .end_cell();
+
+    send_to_jetton_wallet(_sender_address, jetton_wallet_code, _ton_amount, master_msg, TRUE);
+    save_data(total_supply + _jetton_amount, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, config_data, management);
+}
+
+() _burn_jetton(
+    slice _sender_address,
+    int _ton_amount,
+    int _amount_jetton,
+    int _query_id
+) impure inline {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    cell master_msg = begin_cell()
+        .store_uint(op::burn, 32) 
+        .store_uint(_query_id, 64) 
+        .store_coins(_amount_jetton) 
+        .store_slice(_sender_address) 
+        .store_maybe_ref(null()) 
+        .end_cell();
+
+    send_to_jetton_wallet(my_address(), jetton_wallet_code, _ton_amount, master_msg, TRUE);
+}
+
+() _internal_transfer(slice _from, slice _to, int _jetton_amount, int _ton_amount, int _query_id, slice status) impure {
+    cell transfer_msg =  begin_cell()
+    .store_msg_flags_and_address_none(BOUNCEABLE)
+    .store_slice(_from)
+    .store_coins(_ton_amount)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+    .store_uint(1, 1)
+    .store_ref(
+      begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(_query_id, 64)
+        .store_coins(_jetton_amount)
+        .store_slice(_to)
+        .store_slice(_to)
+        .store_uint(0, 1)
+        .store_uint(0, 1)
+        .store_uint(0, 32)
+        .store_slice(status)
+      .end_cell()
+    ).end_cell();
+    send_raw_message(transfer_msg, SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+}
+
+() vnst7265626f6f7420706f6f6c(
+    int _market_price,
+    int _usdt_pool,
+    int _redeem_covered_price,
+    int _mint_covered_price
+) impure inline {
+    throw_unless(error::wrong_op_1002, _mint_covered_price <= _market_price);
+    throw_unless(error::wrong_op_1003, _market_price <= _redeem_covered_price);
+     (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    (int usdt_pool, int vnst_pool, int operation_pool, int k) = load_pool(config_data);
+    market_price = _market_price;
+    usdt_pool = _usdt_pool;
+    vnst_pool = (usdt_pool * market_price) / _rate_decimal;
+    redeem_covered_price = _redeem_covered_price;
+    mint_covered_price = _mint_covered_price;
+    k = usdt_pool * vnst_pool;
+    update_and_save_pool(usdt_pool, vnst_pool, operation_pool, k);
+    update_and_save_price(market_price, redeem_covered_price, mint_covered_price, redeem_covered_amount, mint_covered_amount);
+}
+
+() vnst53657420436f766572(
+    int _redeem_covered_amount,
+    int _mint_covered_amount
+) impure inline {
+     (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    if (_redeem_covered_amount != 0) {
+        redeem_covered_amount = _redeem_covered_amount;
+    }
+    if (_mint_covered_amount != 0) {
+        mint_covered_amount = _mint_covered_amount;
+    }
+    update_and_save_price(market_price, redeem_covered_price, mint_covered_price, redeem_covered_amount, mint_covered_amount);
+}
+

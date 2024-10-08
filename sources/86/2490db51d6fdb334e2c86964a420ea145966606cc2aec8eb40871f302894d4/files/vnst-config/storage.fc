@@ -1,0 +1,273 @@
+#pragma version >=0.4.3;
+
+(int, slice, slice, cell, cell, cell, cell) load_data() inline { 
+    slice ds = get_data().begin_parse();
+    var data = (
+        ds~load_coins(), ;; total_supply
+        ds~load_msg_addr(), ;; admin_address
+        ds~load_msg_addr(), ;; next_admin_address
+        ds~load_ref(),  ;; jetton_wallet_code
+        ds~load_ref(),  ;; metadata url (contains snake slice without 0x0 prefix)
+        ds~load_ref(),  ;; config data
+        ds~load_ref()  ;; management
+    );
+    ds.end_parse();
+    return data;
+}
+
+() save_data(int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) impure inline { 
+    set_data(
+        begin_cell()
+        .store_coins(total_supply)
+        .store_slice(admin_address)
+        .store_slice(next_admin_address)
+        .store_ref(jetton_wallet_code)
+        .store_ref(metadata_uri)
+        .store_ref(config_data)
+        .store_ref(management)
+        .end_cell()
+    );
+}
+
+(cell, cell, cell, cell) load_config_data(cell config_data) inline {
+    slice ds = config_data.begin_parse();
+    return (
+        ds~load_ref(), ;; pool cell
+        ds~load_ref(), ;; price cell
+        ds~load_ref(), ;; limit cell
+        ds~load_ref()  ;; fee and status cell
+    );
+} 
+
+(cell, cell, slice) load_management(cell management) inline {
+    slice ds = management.begin_parse();
+    return (
+        ds~load_ref(), ;; moderator cell
+        ds~load_ref(), ;; verified user cell
+        ds~load_msg_addr() ;; usdt jetton wallet
+    );
+}
+
+(int, int, int, int) load_pool(cell config_data) inline {
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    slice ds = pool.begin_parse();
+    return (
+        ds~load_uint(128), ;; usdt_pool
+        ds~load_uint(128), ;; vnst_pool
+        ds~load_uint(128), ;; operation_pool
+        ds~load_uint(256) ;; k
+    );
+}
+
+() update_and_save_pool(int usdt_pool, int vnst_pool, int operation_pool, int k) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    cell updated_pool = begin_cell()
+        .store_uint(usdt_pool, 128)
+        .store_uint(vnst_pool, 128)
+        .store_uint(operation_pool, 128)
+        .store_uint(k, 256)
+        .end_cell();
+    
+    cell updated_config_data = begin_cell()
+        .store_ref(updated_pool)
+        .store_ref(price)
+        .store_ref(limit)
+        .store_ref(fee_and_status)
+        .end_cell();
+    
+    save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, updated_config_data, management);
+}
+
+(int, int, int, int, int) load_price(cell config_data) inline {
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    slice ds = price.begin_parse();
+    return (
+        ds~load_uint(128), ;; market_price
+        ds~load_uint(128), ;; redeem_covered_price
+        ds~load_uint(128), ;; mint_covered_price
+        ds~load_uint(128), ;; redeem_covered_amount
+        ds~load_uint(128) ;; mint_covered_amount
+    );
+}
+
+() update_and_save_price(int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    
+    cell updated_price = begin_cell()
+        .store_uint(market_price, 128)
+        .store_uint(redeem_covered_price, 128)
+        .store_uint(mint_covered_price, 128)
+        .store_uint(redeem_covered_amount, 128)
+        .store_uint(mint_covered_amount, 128)
+        .end_cell();
+    
+    cell updated_config_data = begin_cell()
+        .store_ref(pool)
+        .store_ref(updated_price)
+        .store_ref(limit)
+        .store_ref(fee_and_status)
+        .end_cell();
+        
+    save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, updated_config_data, management);
+}
+
+(int, int, int, int, int, int) load_limit(cell config_data) inline {
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    slice ds = limit.begin_parse();
+    return (
+        ds~load_uint(128), ;; min_redeem_limit
+        ds~load_uint(128), ;; max_redeem_limit
+        ds~load_uint(128), ;; min_mint_limit
+        ds~load_uint(128), ;; max_mint_limit
+        ds~load_uint(128), ;; max_mint_limit_verified_user
+        ds~load_uint(128)  ;; max_redeem_limit_verified_user
+    );
+}
+
+() update_and_save_limit(int min_redeem_limit, int max_redeem_limit, int min_mint_limit, int max_mint_limit, int max_mint_limit_verified_user, int max_redeem_limit_verified_user) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    cell updated_limit = begin_cell()
+        .store_uint(min_redeem_limit, 128)
+        .store_uint(max_redeem_limit, 128)
+        .store_uint(min_mint_limit, 128)
+        .store_uint(max_mint_limit, 128)
+        .store_uint(max_mint_limit_verified_user, 128)
+        .store_uint(max_redeem_limit_verified_user, 128)
+        .end_cell();
+    
+    cell updated_config_data = begin_cell()
+        .store_ref(pool)
+        .store_ref(price)
+        .store_ref(updated_limit)
+        .store_ref(fee_and_status)
+        .end_cell();
+    
+    save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, updated_config_data, management);
+}
+
+(int, int, int, int) load_fee_and_status(cell config_data) inline {
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    slice ds = fee_and_status.begin_parse();
+    return (
+        ds~load_uint(64), ;; redeem_fee
+        ds~load_uint(64), ;; mint_fee
+        ds~load_uint(1),  ;; mint_status (stored as 1-bit)
+        ds~load_uint(1)   ;; redeem_status (stored as 1-bit)
+    );
+}
+
+() update_and_save_fee_and_status(int redeem_fee, int mint_fee, int mint_status, int redeem_status) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+
+    cell updated_fee_and_status = begin_cell()
+        .store_uint(redeem_fee, 64)
+        .store_uint(mint_fee, 64)
+        .store_uint(mint_status, 1)
+        .store_uint(redeem_status, 1)
+        .end_cell();
+    
+    cell updated_config_data = begin_cell()
+        .store_ref(pool)
+        .store_ref(price)
+        .store_ref(limit)
+        .store_ref(updated_fee_and_status)
+        .end_cell();
+    
+    save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, updated_config_data, management);
+}
+
+() update_redeem_covered_amount(int _redeem_covered_amount) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    
+    cell updated_price = begin_cell()
+        .store_uint(market_price, 128)
+        .store_uint(redeem_covered_price, 128)
+        .store_uint(mint_covered_price, 128)
+        .store_uint(_redeem_covered_amount, 128)
+        .store_uint(mint_covered_amount, 128)
+        .end_cell();
+    
+    cell updated_config_data = begin_cell()
+        .store_ref(pool)
+        .store_ref(updated_price)
+        .store_ref(limit)
+        .store_ref(fee_and_status)
+        .end_cell();
+        
+    save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, updated_config_data, management);
+}
+
+() update_mint_covered_amount(int _min_covered_amount) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    (int market_price, int redeem_covered_price, int mint_covered_price, int redeem_covered_amount, int mint_covered_amount) = load_price(config_data);
+    
+    cell updated_price = begin_cell()
+        .store_uint(market_price, 128)
+        .store_uint(redeem_covered_price, 128)
+        .store_uint(mint_covered_price, 128)
+        .store_uint(redeem_covered_amount, 128)
+        .store_uint(_min_covered_amount, 128)
+        .end_cell();
+    
+    cell updated_config_data = begin_cell()
+        .store_ref(pool)
+        .store_ref(updated_price)
+        .store_ref(limit)
+        .store_ref(fee_and_status)
+        .end_cell();
+        
+    save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, updated_config_data, management);
+}
+
+() update_operation_pool(int _operation_pool) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell pool, cell price, cell limit, cell fee_and_status) = load_config_data(config_data);
+    (int usdt_pool, int vnst_pool, int operation_pool, int k) = load_pool(config_data);
+    cell updated_pool = begin_cell()
+        .store_uint(usdt_pool, 128)
+        .store_uint(vnst_pool, 128)
+        .store_uint(_operation_pool, 128)
+        .store_uint(k, 256)
+        .end_cell();
+    
+    cell updated_config_data = begin_cell()
+        .store_ref(updated_pool)
+        .store_ref(price)
+        .store_ref(limit)
+        .store_ref(fee_and_status)
+        .end_cell();
+    
+    save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, updated_config_data, management);
+}
+
+() update_and_save_usdt_jetton_wallet(slice _usdt_jetton_wallet) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management);
+    cell updated_management = begin_cell()
+        .store_ref(moderator)
+        .store_ref(verified_user)
+        .store_slice(_usdt_jetton_wallet)
+        .end_cell();
+    
+    save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, config_data, updated_management);
+}
+
+() update_and_save_new_moderator(cell new_moderator) impure {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell metadata_uri, cell config_data, cell management) = load_data();
+    (cell moderator, cell verified_user, slice usdt_jetton_wallet) = load_management(management);
+    cell updated_management = begin_cell()
+        .store_ref(new_moderator)
+        .store_ref(verified_user)
+        .store_slice(usdt_jetton_wallet)
+        .end_cell();
+    
+    save_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, metadata_uri, config_data, updated_management);
+}
