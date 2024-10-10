@@ -1,0 +1,318 @@
+#include "imports/utils.fc";
+
+global slice admin;
+global int stack_commission_rate;
+global int total_stack_fee;
+global cell codes;
+
+global cell stake_pool_code;
+global cell stake_pod_code;
+global cell lsd_token_master_code;
+global cell lsd_token_wallet_code;
+
+() save_data() impure inline {
+    codes = begin_cell()
+        .store_ref(stake_pool_code)
+        .store_ref(stake_pod_code)
+        .store_ref(lsd_token_master_code)
+        .store_ref(lsd_token_wallet_code)
+        .end_cell();
+
+    begin_cell()
+        .store_slice(admin)
+        .store_uint(stack_commission_rate, 16)
+        .store_coins(total_stack_fee)
+        .store_ref(codes)
+        .end_cell()
+        .set_data();
+}
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    admin = ds~load_msg_addr();
+    stack_commission_rate = ds~load_uint(16);
+    total_stack_fee = ds~load_coins();
+    codes = ds~load_ref();
+    ds.end_parse();
+
+    slice cs = codes.begin_parse();
+    stake_pool_code = cs~load_ref();
+    stake_pod_code = cs~load_ref();
+    lsd_token_master_code = cs~load_ref();
+    lsd_token_wallet_code = cs~load_ref();
+    cs.end_parse();
+}
+
+() new_stake_pool(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    s.end_parse();
+
+    ( int src_wc, _ ) = parse_std_addr(src);
+    throw_unless(err::only_basechain_allowed, src_wc == chain::base);
+    
+    int incoming_ton = get_incoming_value().pair_first();
+
+    throw_unless(err::insufficient_fee, incoming_ton >= new_stake_pool_fee());
+
+    ( builder stake_pool_address_builder, builder stake_pool_state_init, _ ) = create_stake_pool_address(src, my_address(), 
+        default_min_stake_amount, default_unbonding_seconds, default_platform_commission_rate, stack_commission_rate, stake_pod_code, stake_pool_code);
+    
+    ( builder lsd_token_master_address_builder, builder lsd_token_master_state_init, _ ) = create_lsd_token_master_address(stake_pool_address_builder,
+        lsd_token_wallet_code, lsd_token_master_code);
+    
+    int deploy_lsd_token_master_fee = lsd_token_master_storage_fee();
+
+    builder deploy_lsd_token_master = begin_cell()
+        .store_uint(op::top_up, 32)
+        .store_uint(query_id, 64);
+    send_msg(true, lsd_token_master_address_builder, lsd_token_master_state_init, deploy_lsd_token_master, deploy_lsd_token_master_fee, send::regular);
+
+    builder deploy_stake_pool = begin_cell()
+        .store_uint(op::init_lsd_token_master, 32)
+        .store_uint(query_id, 64)
+        .store_builder(lsd_token_master_address_builder);
+    send_msg(true, stake_pool_address_builder, stake_pool_state_init, deploy_stake_pool, fee::stake_pool_storage, send::regular);
+}
+
+() stack_fee_handler(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    s.end_parse();
+
+    int incoming_ton = get_incoming_value().pair_first();
+
+    total_stack_fee += incoming_ton;
+}
+
+
+() set_stack_commission_rate(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    stack_commission_rate = s~load_uint(16);
+    s.end_parse();
+
+    throw_unless(err::access_denied, equal_slice_bits(src, admin));
+
+    builder excess = begin_cell()
+        .store_uint(op::gas_excess, 32)
+        .store_uint(query_id, 64);
+    send_msg(false, src.to_builder(), null(), excess, 0, send::remaining_value + send::ignore_errors);
+}
+
+() withdraw_surplus(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    slice return_excess = s~load_msg_addr();
+    s.end_parse();
+
+    throw_unless(err::access_denied, equal_slice_bits(src, admin));
+
+    raw_reserve(stack_storage_fee(), reserve::exact);
+
+    builder excess = begin_cell()
+        .store_uint(op::gas_excess, 32)
+        .store_uint(query_id, 64);
+    send_msg(false, return_excess.to_builder(), null(), excess, 0, send::unreserved_balance + send::ignore_errors);
+
+    throw(0);
+}
+
+() transfer_admin(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    slice new_admin = s~load_msg_addr();
+    s.end_parse();
+
+    throw_unless(err::access_denied, equal_slice_bits(src, admin));
+    throw_if(err::invalid_parameters, new_admin.addr_none?());
+
+    admin = new_admin;
+
+    builder excess = begin_cell()
+        .store_uint(op::gas_excess, 32)
+        .store_uint(query_id, 64);
+    send_msg(false, src.to_builder(), null(), excess, 0, send::remaining_value + send::ignore_errors);
+}
+
+() upgrade_code(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    cell new_code = s~load_ref();
+    s.end_parse();
+
+    throw_unless(err::access_denied, equal_slice_bits(src, admin));
+
+    set_code(new_code);
+    set_c3(new_code.begin_parse().bless());
+
+    builder excess = begin_cell()
+        .store_uint(op::gas_excess, 32)
+        .store_uint(query_id, 64);
+    send_msg(false, src.to_builder(), null(), excess, 0, send::remaining_value + send::ignore_errors);
+}
+
+
+() set_stake_pool_code(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    cell new_code = s~load_ref();
+    s.end_parse();
+
+    throw_unless(err::access_denied, equal_slice_bits(src, admin));
+
+    stake_pool_code = new_code;
+
+    builder excess = begin_cell()
+        .store_uint(op::gas_excess, 32)
+        .store_uint(query_id, 64);
+    send_msg(false, src.to_builder(), null(), excess, 0, send::remaining_value + send::ignore_errors);
+}
+
+() set_stake_pod_code(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    cell new_code = s~load_ref();
+    s.end_parse();
+
+    throw_unless(err::access_denied, equal_slice_bits(src, admin));
+
+    stake_pod_code = new_code;
+
+    builder excess = begin_cell()
+        .store_uint(op::gas_excess, 32)
+        .store_uint(query_id, 64);
+    send_msg(false, src.to_builder(), null(), excess, 0, send::remaining_value + send::ignore_errors);
+}
+
+() set_lsd_token_master_code(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    cell new_code = s~load_ref();
+    s.end_parse();
+
+    throw_unless(err::access_denied, equal_slice_bits(src, admin));
+
+    lsd_token_master_code = new_code;
+
+    builder excess = begin_cell()
+        .store_uint(op::gas_excess, 32)
+        .store_uint(query_id, 64);
+    send_msg(false, src.to_builder(), null(), excess, 0, send::remaining_value + send::ignore_errors);
+}
+
+() set_lsd_token_wallet_code(slice src, slice s) impure inline {
+    int query_id = s~load_uint(64);
+    cell new_code = s~load_ref();
+    s.end_parse();
+
+    throw_unless(err::access_denied, equal_slice_bits(src, admin));
+
+    lsd_token_wallet_code = new_code;
+
+    builder excess = begin_cell()
+        .store_uint(op::gas_excess, 32)
+        .store_uint(query_id, 64);
+    send_msg(false, src.to_builder(), null(), excess, 0, send::remaining_value + send::ignore_errors);
+}
+
+
+() on_bounce(slice src, slice s) impure inline {
+    s~skip_bits(32);
+    int op = s~load_uint(32);
+    int query_id = s~load_uint(64);
+
+    throw(0);
+}
+
+() route_internal_message(int flags, slice src, slice s) impure inline {
+    if flags & 1 {
+        return on_bounce(src, s);
+    }
+
+    int op = s~load_uint(32);
+
+    if op == op::new_stake_pool {
+        return new_stake_pool(src, s);
+    }
+
+    if op == op::pay_stack_fee {
+        return stack_fee_handler(src, s);
+    }
+    
+    if op == op::set_stack_commission_rate {
+        return set_stack_commission_rate(src, s);
+    }
+    
+    if op == op::withdraw_surplus {
+        return withdraw_surplus(src, s);
+    }
+
+    if op == op::transfer_admin {
+        return transfer_admin(src, s);
+    }
+    
+    if op == op::upgrade_code {
+        return upgrade_code(src, s);
+    }
+    
+    if op == op::set_stake_pool_code {
+        return set_stake_pool_code(src, s);
+    }
+    
+    if op == op::set_stake_pod_code {
+        return set_stake_pod_code(src, s);
+    }
+    
+    if op == op::set_lsd_token_master_code {
+        return set_lsd_token_master_code(src, s);
+    }
+    
+    if op == op::set_lsd_token_wallet_code {
+        return set_lsd_token_wallet_code(src, s);
+    }
+
+    if op == op::top_up {
+        throw(0);
+    }
+
+    throw(err::invalid_op);
+}
+
+() recv_internal(cell in_msg_full, slice s) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice src = cs~load_msg_addr();
+
+    load_data();
+    route_internal_message(flags, src, s);
+    save_data();
+}
+
+
+;;
+;; get methods
+;;
+
+
+var get_stack_state() method_id {
+    load_data();
+
+    return
+        ( admin
+        , stack_commission_rate
+        , total_stack_fee
+        , stake_pool_code
+        , stake_pod_code
+        , lsd_token_master_code
+        , lsd_token_wallet_code
+        );
+}
+
+
+(slice, slice) get_contract_addresses(slice admin) method_id {
+    load_data();
+    
+    ( int wc, _ ) = parse_std_addr(admin);
+
+    throw_unless(err::only_basechain_allowed, wc == chain::base);
+
+    ( builder stake_pool_address_builder, _, _ ) = create_stake_pool_address(admin, my_address(), 
+        default_min_stake_amount, default_unbonding_seconds, default_platform_commission_rate, stack_commission_rate, stake_pod_code, stake_pool_code);
+
+    ( builder lsd_token_master_address_builder, _, _ ) = create_lsd_token_master_address(stake_pool_address_builder,
+        lsd_token_wallet_code, lsd_token_master_code);
+
+    return (stake_pool_address_builder.end_cell().begin_parse(), lsd_token_master_address_builder.end_cell().begin_parse());
+}
