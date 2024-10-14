@@ -1,0 +1,28 @@
+int workchain() asm "0 PUSHINT";
+
+;; RECORD
+cell pack_record_data(int limit, slice master_address, slice owner_address, int record_num) inline {
+   return  begin_cell()
+            .store_uint(limit, 64)
+            .store_slice(master_address)
+            .store_slice(owner_address)
+            .store_uint(record_num, 32)
+           .end_cell();
+}
+
+cell calculate_record_state_init(int limit, slice master_address, slice owner_address, int record_num, cell record_code) inline {
+  return begin_cell()
+          .store_uint(6, 5)
+          .store_ref(record_code)
+          .store_ref(pack_record_data(limit, master_address, owner_address, record_num))
+         .end_cell();
+}
+
+slice calculate_record_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(workchain(), 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+;;RECORD

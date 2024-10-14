@@ -1,0 +1,185 @@
+#include "imports/stdlib.fc";
+#include "errors.fc";
+#include "op-codes.fc";
+#include "utils.fc";
+#include "messages.fc";
+
+;; 6905(computational_gas_price) * 1000(cur_gas_price) * 10 = 69050000
+;; ceil(69050000) = 100000000 ~= 0.1 TON
+int gas_consumption() asm "100000000 PUSHINT";
+
+;; permissible tolerance = 0.05 TON
+int tolerance() asm "50000000 PUSHINT";
+
+;; minimal balance = 1 TON
+int minimal_balance() asm "1000000000 PUSHINT";
+
+int bounceble_message() asm "0x18 PUSHINT";
+int non_bounceble_message() asm "0x10 PUSHINT";
+
+int referral_init_record_balance_divider() asm "2 PUSHINT";
+int usual_init_record_balance_divider() asm "5 PUSHINT";
+
+;; message modes
+int pay_transfer_fees_separately() asm "1 PUSHINT";
+
+;; message flags
+int no_init_state_body_along() asm "0 PUSHINT";
+int no_init_state_body_separate() asm "1 PUSHINT";
+int has_not_empty_init_state_body_separate() asm "7 PUSHINT";
+
+;; message layout
+int default_message_layout() asm "107 PUSHINT";
+int init_message_layout() asm "108 PUSHINT";
+
+
+;; storage scheme
+
+(int, slice, slice, int, int, cell) load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    return (
+            ds~load_uint(64), ;; limit (deposit value)
+            ds~load_msg_addr(), ;; admin_address
+            ds~load_msg_addr(), ;; payment_address
+            ds~load_uint(32), ;; current record num
+            ds~load_uint(32), ;; last record num
+            ds~load_ref() ;; record code
+    );
+}
+
+() save_data(int limit, slice admin_address, slice payment_address, int current_record_num, int last_record_num, cell record_code) impure inline {
+    set_data(begin_cell()
+            .store_uint(limit, 64)
+            .store_slice(admin_address)
+            .store_slice(payment_address)
+            .store_uint(current_record_num, 32)
+            .store_uint(last_record_num, 32)
+            .store_ref(record_code)
+            .end_cell()
+    );
+}
+
+() send_ref_payout(int limit, slice ref_address) impure inline {
+    var msg = begin_cell()
+                .store_uint(bounceble_message(), 6)
+                .store_slice(ref_address)
+                .store_coins(limit / 10)
+                .store_uint(no_init_state_body_along(), default_message_layout())
+                .store_uint(0, 32)
+                .store_slice("TOPyramid refferal program payment");
+    send_raw_message(msg.end_cell(), pay_transfer_fees_separately());
+}
+
+() deploy_record_contract(int query_id, slice record_owner_address, slice record_address,
+                        int initial_record_balance, cell record_state_init) impure {
+    cell activate_record_msg_body = begin_cell()
+                .store_uint(op::activate(), 32)
+                .store_uint(query_id, 64)
+                .store_slice(record_owner_address)
+                .end_cell();
+    cell activate_record_msg = begin_cell()
+                .store_uint(non_bounceble_message(), 6)
+                .store_slice(record_address)
+                .store_coins(initial_record_balance)
+                .store_uint(has_not_empty_init_state_body_separate(), init_message_layout())
+                .store_ref(record_state_init)
+                .store_ref(activate_record_msg_body)
+                .end_cell();
+    send_raw_message(activate_record_msg, pay_transfer_fees_separately()); ;; pay transfer fees separately, revert on errors
+}
+
+() send_admin_royalty(int query_id, slice payment_address, int ton_amount) impure {
+    cell royalty_msg = begin_cell()
+                .store_uint(non_bounceble_message(), 6)
+                .store_slice(payment_address)
+                .store_coins(ton_amount)
+                .store_uint(no_init_state_body_along(), default_message_layout())
+                .end_cell();
+    send_raw_message(royalty_msg, pay_transfer_fees_separately()); ;; pay transfer fees separately, revert on errors
+}
+
+() send_payment(slice record_payment_address, int query_id, int limit) impure inline {
+    var send_payment_msg_body = begin_cell()
+                .store_uint(op::send_payment(), 32)
+                .store_uint(query_id, 64)
+                .end_cell();
+    var send_payment_msg = begin_cell()
+                .store_uint(non_bounceble_message(), 6)
+                .store_slice(record_payment_address)
+                .store_coins(limit)
+                .store_uint(no_init_state_body_separate(), default_message_layout())
+                .store_ref(send_payment_msg_body);
+    send_raw_message(send_payment_msg.end_cell(), pay_transfer_fees_separately()); ;; pay transfer fees separately, revert on errors
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    (int limit, slice admin_address, slice payment_address, int current_record_num, int last_record_num, cell record_code) = load_data();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    slice sender_address = cs~load_msg_addr();
+
+    if (op == op::make_deposit()){
+        throw_if(error::not_meet_limit(), (msg_value < limit - tolerance()));
+        int initial_record_balance = limit / usual_init_record_balance_divider();
+        ifnot (in_msg_body.slice_empty?()){ ;; check if slice has referral address
+            slice ref_address = in_msg_body~load_msg_addr();
+            ifnot (equal_slices(sender_address, ref_address)){
+                send_ref_payout(limit, ref_address);
+                my_balance -= limit / 10;
+                initial_record_balance = limit / referral_init_record_balance_divider();
+            }
+        }
+        send_admin_royalty(query_id, payment_address, limit / 10);
+        my_balance -= limit / 10;
+        slice base_owner_address = begin_cell().store_uint(0, 2).end_cell().begin_parse();
+        cell record_state_init = calculate_record_state_init(limit, my_address(), base_owner_address, last_record_num, record_code);
+        slice record_address = calculate_record_address(record_state_init);
+        deploy_record_contract(query_id, sender_address, record_address, initial_record_balance, record_state_init);
+        my_balance -= initial_record_balance;
+        last_record_num += 1;
+        if(my_balance > limit + minimal_balance()){
+            cell record_state_init = calculate_record_state_init(limit, my_address(), base_owner_address, current_record_num, record_code);
+            slice record_address = calculate_record_address(record_state_init);
+            send_payment(record_address, query_id, limit);
+            current_record_num += 1;
+        }
+        save_data(limit, admin_address, payment_address, current_record_num, last_record_num, record_code);
+        return();
+    }
+
+    if (op == op::make_balance()){
+        return();
+    }
+
+    if (op == op::change_payment_address()){
+        throw_unless(error::not_an_admin(), equal_slices(sender_address, admin_address));
+        (int limit, slice admin_address, slice payment_address, int current_record_num, int last_record_num, cell record_code) = load_data();
+        slice new_payment_address = in_msg_body~load_msg_addr();
+        save_data(limit, admin_address, new_payment_address, current_record_num, last_record_num, record_code);
+        return();
+    }
+
+    throw(error::unknown_op());
+}
+
+(int, slice, slice, int, int, cell) get_master_data() method_id {
+    (int limit, slice admin_address, slice payment_address, int current_record_num, int last_record_num, cell record_code) = load_data();
+    return (limit, admin_address, payment_address, current_record_num, last_record_num, record_code);
+}
+
+slice get_record_address(slice owner_address, int record_num) method_id {
+    (int limit, slice admin_address, slice payment_address, int current_record_num, int last_record_num, cell record_code) = load_data();
+    cell record_state_init = calculate_record_state_init(limit, my_address(), owner_address, record_num, record_code);
+    return calculate_record_address(record_state_init);
+}
