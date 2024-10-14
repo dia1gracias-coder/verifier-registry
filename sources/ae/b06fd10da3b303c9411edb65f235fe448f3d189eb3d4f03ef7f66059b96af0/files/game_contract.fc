@@ -1,0 +1,377 @@
+;; $RANDOM (random.tg) Yolo Contract 2024
+;;                author: t.me/s/delpydoc
+;;
+;; placedBet#_ amount:(VarUInteger 16) owner:MsgAddressInt = PlacedBet;
+;; queuedBet#_ amount:(VarUInteger 16) owner:MsgAddressInt rest_rounds:uint32 = QueuedBet;
+;;
+;; storage#_ admin:MsgAddressInt jetton_master:MsgAddressInt jetton_wallet:MsgAddressInt
+;;      round_seqno:uint64 next_round_at:uint64 bets_count:uint16 bets:(HashmapE 256 PlacedBet) bets_queue:(HashmapE 256 QueuedBet) = Storage;
+
+
+#include "imports/stdlib.fc";
+#include "imports/constants.fc";
+#include "imports/openlib-messages.fc";
+
+cell storage::pack(
+    slice admin_address, slice jetton_master, slice jetton_wallet,
+    int round_seqno, int next_round_at, int bets_count, cell bets, cell bets_queue
+) inline_ref {
+    return (
+        begin_cell()
+        .store_slice(admin_address)
+        .store_slice(jetton_master)
+        .store_slice(jetton_wallet)
+        .store_uint(round_seqno, 64)
+        .store_uint(next_round_at, 64)
+        .store_uint(bets_count, 16)
+        .store_dict(bets)
+        .store_dict(bets_queue)
+        .end_cell()
+    );
+}
+
+(int, int) encode_number_to_text(int number) {
+  int len = 0;
+  int value = 0;
+  int mult = 1;
+  do {
+    (number, int res) = number.divmod(10);
+    value = value + (res + 48) * mult;
+    mult = mult * 256;
+    len = len + 1;
+  } until (number == 0);
+  return (len, value);
+}
+
+int get_next_bet_start(cell bets) {
+    (int last_bet::start, slice last_bet::data, int last_bet::found?) = bets.udict_get_max?(256);
+    int next_bet::start = 0;
+    if (last_bet::found?) {
+        last_bet::data = last_bet::data~load_ref().begin_parse();
+        int last_bet::amount = last_bet::data~load_coins();
+        next_bet::start = last_bet::start + last_bet::amount;
+    }
+    return next_bet::start;
+}
+
+(int, int, int, cell, cell) make_next_round(
+    slice admin_address, slice jetton_master, slice jetton_wallet,
+    int round_seqno, int next_round_at, int bets_count, cell bets, cell bets_queue, int fee_disabled?
+) impure {
+    int next_bet::start = get_next_bet_start(bets);
+    if (next_bet::start == 0) {
+        next_round_at = now() + env::round_duration;
+        bets_count = 0;
+        bets = new_dict();
+        return (round_seqno, next_round_at, bets_count, bets, bets_queue);
+    }
+
+    ;; Pure random calculations
+    randomize_lt();
+    int lucky_ticket = rand(next_bet::start);
+    (int win_bet::start, slice win_bet::data, _) = bets.udict_get_preveq?(256, lucky_ticket);
+    win_bet::data = win_bet::data~load_ref().begin_parse();
+
+    ;; Prize distribution
+    int win_bet::amount = win_bet::data~load_coins();
+    slice win_bet::owner = win_bet::data~load_msg_addr();
+    int win::amount = next_bet::start * (env::fee_denominator - env::fee_nominator) / env::fee_denominator;
+    if (fee_disabled?) {
+        win::amount = next_bet::start;
+    }
+    (int t_len, int t_xt) = encode_number_to_text(round_seqno);
+    messages::tep74::transfer(
+        env::tep74::transfer_gas, jetton_wallet, win_bet::owner,
+        win::amount, begin_cell()
+            .store_uint(0, 32)
+            .store_uint(0x526f756e642023, 56) ;; Round #
+            .store_uint(t_xt, t_len * 8)
+            .end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+    );
+
+    ;; External-out log messages for game displaying
+    int new_round::next_round_at = now() + env::round_duration;
+    messages::out_log_msg(
+        begin_cell()
+        .store_uint(0xAA77AC, 32)
+        .store_uint(round_seqno, 64)
+        .store_uint(new_round::next_round_at, 64)
+        .store_uint(lucky_ticket, 256)
+        .store_slice(win_bet::owner)
+        .store_coins(win::amount)
+        .store_dict(bets)
+        .end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+    );
+
+    ;; Reset game variables, starting next round
+    round_seqno += 1;
+    next_round_at = new_round::next_round_at;
+    bets_count = 0;
+    bets = new_dict();
+
+    ;; Join into the next round the rest of the bets
+    cell new_bets_queue = new_dict();
+    do {
+        (bets_queue, int queue::id, slice queue::data, int queue::found?) = bets_queue.udict_delete_get_min(256);
+        if (queue::found?) {
+            queue::data = queue::data~load_ref().begin_parse();
+            int queue::bet::amount = queue::data~load_coins();
+            slice queue::bet::owner = queue::data~load_msg_addr();
+            int queue::bets_count = queue::data~load_uint(32);
+
+            if (bets_count < env::max_players) {
+                int next_bet::start = get_next_bet_start(bets);
+                bets~udict_set_ref(
+                    256, next_bet::start, begin_cell().store_coins(queue::bet::amount).store_slice(queue::bet::owner).end_cell()
+                );
+                bets_count += 1;
+                queue::bets_count -= 1;
+                messages::out_log_msg(
+                    begin_cell()
+                        .store_uint(0xAA77AF, 32) ;; External-out log messages for bets displaying
+                        .store_uint(round_seqno, 64)
+                        .store_uint(next_bet::start, 256)
+                        .store_coins(queue::bet::amount)
+                        .store_slice(queue::bet::owner)
+                        .end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+                );
+            }
+
+            if (queue::bets_count > 0) {
+                new_bets_queue~udict_set_ref(
+                    256, queue::id, begin_cell().store_coins(queue::bet::amount).store_slice(queue::bet::owner).store_uint(queue::bets_count, 32).end_cell()
+                );
+            }
+        }
+    } until (~ queue::found?);
+
+    return (round_seqno, next_round_at, bets_count, bets, new_bets_queue);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+    slice ctx::sender = cs~load_msg_addr();
+    int ctx::opcode = 0;
+    int ctx::query_id = 0;
+    if (in_msg_body.slice_bits() >= 96) {
+        ctx::opcode = in_msg_body~load_uint(32);
+        ctx::query_id = in_msg_body~load_uint(64);
+    }
+
+    slice ds = get_data().begin_parse();
+
+    ;; Emergency administration commands
+    slice c4::admin = ds~load_msg_addr();
+    if (ctx::opcode == opcode::game::withdraw) {
+        throw_unless(error::only_admin, equal_slices(ctx::sender, c4::admin));
+        int msg_mode = in_msg_body~load_uint(8);
+        cell raw_msg = in_msg_body~load_ref();
+        send_raw_message(raw_msg, msg_mode);
+        return ();
+    }
+    if (ctx::opcode == opcode::game::edit_code) {
+        throw_unless(error::only_admin, equal_slices(ctx::sender, c4::admin));
+        cell new_code = in_msg_body~load_maybe_ref();
+        cell new_data = in_msg_body~load_maybe_ref();
+        ifnot (new_code.null?()) {
+            set_code(new_code);
+        }
+        ifnot (new_data.null?()) {
+            set_data(new_data);
+        }
+        return ();
+    }
+
+    ;; Game initialization, retrieving token wallet address
+    (slice c4::jetton_master, slice c4::jetton_wallet) = (ds~load_msg_addr(), ds~load_msg_addr());
+    if (c4::jetton_wallet.preload_uint(2) == 0) {
+        if (equal_slices(ctx::sender, c4::jetton_master)) {
+            throw_unless(error::only_admin, ctx::opcode == opcode::tep89::take_wallet_address);
+            c4::jetton_wallet = in_msg_body~load_msg_addr();
+            slice owner_included_address_slice = in_msg_body~load_maybe_ref().begin_parse();
+            throw_unless(error::invalid_op, equal_slices(owner_included_address_slice, my_address()));
+            set_data(
+                storage::pack(
+                    c4::admin, c4::jetton_master, c4::jetton_wallet,
+                    0, 0, 0, new_dict(), new_dict()
+                )
+            );
+            return ();
+        }
+
+        throw_unless(error::invalid_op, ctx::opcode == opcode::game::init);
+        throw_unless(error::no_gas, my_balance >= env::storage_gas);
+        messages::send_simple(
+            0, c4::jetton_master,
+                begin_cell()
+                    .store_uint(opcode::tep89::provide_wallet_address, 32)
+                    .store_uint(0, 64)
+                    .store_slice(my_address())
+                    .store_int(true, 1)
+                    .end_cell(), CARRY_REMAINING_GAS
+        );
+        return ();
+    }
+    throw_unless(error::invalid_op, c4::jetton_wallet.preload_uint(2) == 2);
+
+    (int c4::round_seqno, int c4::next_round_at, int c4::bets_count, cell c4::bets, cell c4::bets_queue) = (ds~load_uint(64), ds~load_uint(64), ds~load_uint(16), ds~load_dict(), ds~load_dict());
+    ~dump([7770, c4::round_seqno, c4::next_round_at, now()]);
+    ds.end_parse();
+
+    if (ctx::opcode == opcode::tep74::excesses) {
+        return ();
+    }
+
+    ;; Accepting bets from any TON address throw TEP-74 token transfer
+    if (ctx::opcode == opcode::tep74::transfer_notification) {
+        int ctx::jetton_amount = in_msg_body~load_coins();
+        slice ctx::jetton_sender = in_msg_body~load_msg_addr();
+        if (in_msg_body~load_int(1)) {
+            in_msg_body = in_msg_body~load_ref().begin_parse();
+        }
+        int ctx::jetton_op = 0;
+        if (in_msg_body.slice_bits() >= 32) {
+            ctx::jetton_op = in_msg_body~load_uint(32);
+        }
+
+        int is_supported_token? = equal_slice_bits(ctx::sender, c4::jetton_wallet);
+        if (ctx::jetton_op == opcode::game::join) {
+            int params::round_seqno = in_msg_body~load_uint(64);
+            int params::expired_revoking = in_msg_body~load_int(1);
+            slice params::bets_owner = in_msg_body~load_msg_addr();
+            int params::bet_amount = max(in_msg_body~load_coins(), 1);
+            int params::bets_count = max(in_msg_body~load_uint(16), 1);
+
+            if ((params::bets_count * params::bet_amount) > ctx::jetton_amount) {
+                is_supported_token? = false;
+            }
+
+            int params::bets_gas = params::bets_count * env::bet_gas;
+            if (params::bets_gas > msg_value) {
+                is_supported_token? = false;
+            }
+
+            if (now() > c4::next_round_at) {
+                (
+                    c4::round_seqno, c4::next_round_at, c4::bets_count, c4::bets, c4::bets_queue
+                ) = make_next_round(
+                    c4::admin, c4::jetton_master, c4::jetton_wallet,
+                    c4::round_seqno, c4::next_round_at, c4::bets_count, c4::bets, c4::bets_queue, false
+                );
+            }
+
+            if (params::round_seqno < c4::round_seqno) {
+                if (params::expired_revoking) {
+                    is_supported_token? = false;
+                }
+            }
+            ~dump([7778, params::bet_amount, params::bets_count, ctx::jetton_amount]);
+            ~dump([7771, c4::round_seqno, params::round_seqno, params::expired_revoking, c4::next_round_at, now(), is_supported_token?]);
+
+            if (is_supported_token?) {
+                if (c4::bets_count < env::max_players) {
+                    int next_bet::start = get_next_bet_start(c4::bets);
+                    ~dump([7772, next_bet::start]);
+                    c4::bets~udict_set_ref(
+                        256, next_bet::start, begin_cell().store_coins(params::bet_amount).store_slice(params::bets_owner).end_cell()
+                    );
+                    c4::bets_count += 1;
+                    params::bets_count -= 1;
+                    messages::out_log_msg(
+                        begin_cell()
+                            .store_uint(0xAA77AF, 32) ;; External-out log messages for bets displaying
+                            .store_uint(c4::round_seqno, 64)
+                            .store_uint(next_bet::start, 256)
+                            .store_coins(params::bet_amount)
+                            .store_slice(params::bets_owner)
+                            .end_cell(), PAID_EXTERNALLY + IGNORE_ERRORS
+                    );
+                }
+
+                if (params::bets_count > 0) {
+                    int queue_id = cur_lt();
+                    c4::bets_queue~udict_set_ref(
+                        256, queue_id, begin_cell().store_coins(params::bet_amount).store_slice(params::bets_owner).store_uint(params::bets_count, 32).end_cell()
+                    );
+                }
+
+                raw_reserve(my_balance - msg_value + params::bets_gas, 0);
+                messages::send_nobounce(
+                    0, ctx::jetton_sender, begin_cell().end_cell(), CARRY_ALL_BALANCE + IGNORE_ERRORS
+                );
+            }
+
+            set_data(
+                storage::pack(
+                    c4::admin, c4::jetton_master, c4::jetton_wallet,
+                    c4::round_seqno, c4::next_round_at, c4::bets_count, c4::bets, c4::bets_queue
+                )
+            );
+        }
+
+        ifnot (is_supported_token?) {
+            messages::tep74::transfer(
+                0, ctx::sender, ctx::jetton_sender,
+                ctx::jetton_amount, begin_cell().end_cell(), CARRY_REMAINING_GAS + IGNORE_ERRORS
+            );
+        }
+
+        return ();
+    }
+
+    throw(error::wrong_op);
+}
+
+() recv_external(slice in_msg) impure {
+    slice ds = get_data().begin_parse();
+    (
+        slice c4::admin, slice c4::jetton_master, slice c4::jetton_wallet, int c4::round_seqno, int c4::next_round_at, int c4::bets_count, cell c4::bets, cell c4::bets_queue
+    ) = (
+        ds~load_msg_addr(), ds~load_msg_addr(), ds~load_msg_addr(), ds~load_uint(64), ds~load_uint(64), ds~load_uint(16), ds~load_dict(), ds~load_dict()
+    );
+
+    slice ctx::signature = in_msg~load_bits(512);
+    throw_unless(error::only_admin + 2, check_signature(in_msg.slice_hash(), ctx::signature, env::backend_public_key));
+    int ctx::valid_until = in_msg~load_uint(64);
+    throw_unless(error::only_admin + 4, now() < ctx::valid_until);
+
+    int ctx::opcode = in_msg~load_uint(32);
+    int ctx::query_id = in_msg~load_uint(64);
+    if (ctx::opcode == opcode::game::force_next) {
+        throw_unless(error::only_admin + 3, ctx::query_id == c4::round_seqno);
+        throw_unless(error::only_admin, now() > c4::next_round_at);
+        throw_unless(error::only_admin + 1, c4::bets_count > 0);
+        accept_message();
+        int ctx::fee_disabled? = in_msg~load_int(1);
+
+        (
+            c4::round_seqno, c4::next_round_at, c4::bets_count, c4::bets, c4::bets_queue
+        ) = make_next_round(
+            c4::admin, c4::jetton_master, c4::jetton_wallet,
+            c4::round_seqno, c4::next_round_at, c4::bets_count, c4::bets, c4::bets_queue, ctx::fee_disabled?
+        );
+        set_data(
+            storage::pack(
+                c4::admin, c4::jetton_master, c4::jetton_wallet,
+                c4::round_seqno, c4::next_round_at, c4::bets_count, c4::bets, c4::bets_queue
+            )
+        );
+        return ();
+    }
+
+    throw(error::wrong_op);
+}
+
+(slice, slice, slice, int, int, int, cell, cell) get_yolo_state() method_id {
+    slice ds = get_data().begin_parse();
+    (
+        slice c4::admin, slice c4::jetton_master, slice c4::jetton_wallet, int c4::round_seqno, int c4::next_round_at, int c4::bets_count, cell c4::bets, cell c4::bets_queue
+    ) = (
+        ds~load_msg_addr(), ds~load_msg_addr(), ds~load_msg_addr(), ds~load_uint(64), ds~load_uint(64), ds~load_uint(16), ds~load_dict(), ds~load_dict()
+    );
+    return (c4::admin, c4::jetton_master, c4::jetton_wallet, c4::round_seqno, c4::next_round_at, c4::bets_count, c4::bets, c4::bets_queue);
+}
