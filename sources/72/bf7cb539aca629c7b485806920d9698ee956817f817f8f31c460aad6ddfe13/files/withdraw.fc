@@ -1,0 +1,106 @@
+#include "imports/stdlib.fc";
+
+;; Storage
+;; storage#_ token_address:MsgAddress admin_address:MsgAddress = Storage;
+
+(slice, slice) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),  ;; token_address
+        ds~load_msg_addr()   ;; admin_address
+    );
+}
+
+() save_data(slice token_address, slice admin_address) impure inline {
+    set_data(begin_cell()
+        .store_slice(token_address)
+        .store_slice(admin_address)
+        .end_cell());
+}
+
+;; Op codes
+const int op::withdraw = 0x7362d09c;
+const int op::transfer = 0x0f8a7ea5;
+
+;; Errors
+const int error::unknown_op = 101;
+const int error::insufficient_fee = 102;
+const int error::already_initialized = 103;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == op::withdraw) {
+        int token_amount = in_msg_body~load_coins();
+        int required_ton = muldiv(token_amount, 40000, 1000000000); ;; 0.00004 TON = 40000 nanoTON per token
+        throw_unless(error::insufficient_fee, msg_value >= required_ton);
+        
+        (slice token_address, slice admin_address) = load_data();
+        
+        ;; Send TON to admin
+        var msg = begin_cell()
+            .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+            .store_slice(admin_address)
+            .store_coins(required_ton)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)  ;; No op needed for simple transfer
+            .end_cell();
+        send_raw_message(msg, 0);  ;; mode 0 to deduct fees from value sent
+        
+        ;; Request token transfer
+        msg = begin_cell()
+            .store_uint(0x10, 6) ;; nobounce
+            .store_slice(token_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::transfer, 32)  ;; transfer operation
+            .store_uint(0, 64)  ;; query id
+            .store_slice(my_address())  ;; from (this contract)
+            .store_slice(sender_address)  ;; to (user requesting withdrawal)
+            .store_coins(token_amount)  ;; amount of tokens
+            .store_uint(0, 1)  ;; no payload
+            .end_cell();
+        
+        send_raw_message(msg, 64);  ;; mode 64 to pay fees separately
+        
+        return ();
+    }
+    
+    throw(error::unknown_op);
+}
+
+;; Get methods
+
+(slice, slice) get_contract_data() method_id {
+    return load_data();
+}
+
+slice get_token_address() method_id {
+    (slice token_address, _) = load_data();
+    return token_address;
+}
+
+slice get_admin_address() method_id {
+    (_, slice admin_address) = load_data();
+    return admin_address;
+}
+
+;; Initialize the contract
+() recv_external(slice in_msg) impure {
+    throw_if(error::already_initialized, ~ cell_null?(get_data()));
+    
+    slice token_address = in_msg~load_msg_addr();
+    slice admin_address = in_msg~load_msg_addr();
+    save_data(token_address, admin_address);
+}
