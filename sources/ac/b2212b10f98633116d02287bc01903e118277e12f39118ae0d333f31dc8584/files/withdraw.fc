@@ -1,0 +1,143 @@
+#include "imports/stdlib.fc";
+
+;; Storage structure
+;; storage#_ token_address:MsgAddress admin_address:MsgAddress token_balance:Coins = Storage;
+
+(slice, slice, int) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),  ;; token_address
+        ds~load_msg_addr(),  ;; admin_address
+        ds~load_coins()      ;; token_balance
+    );
+}
+
+() save_data(slice token_address, slice admin_address, int token_balance) impure inline {
+    set_data(begin_cell()
+        .store_slice(token_address)
+        .store_slice(admin_address)
+        .store_coins(token_balance)
+        .end_cell());
+}
+
+;; Constants
+const int TON_FOR_1_TOKEN = 40000000; ;; 0.04 TON for 1 token (in nanotons)
+const int MIN_TON_FOR_STORAGE = 10000000; ;; 0.01 TON for storage (in nanotons)
+
+;; Convert TON to tokens
+int ton_to_tokens(int ton_amount) inline {
+    return muldiv(ton_amount, 1000000000, TON_FOR_1_TOKEN);
+}
+
+;; New function to withdraw stuck TON
+() withdraw_stuck_ton(slice sender_address) impure {
+    (slice token_address, slice admin_address, int token_balance) = load_data();
+    
+    ;; Ensure only admin can call this function
+    throw_unless(401, equal_slices(sender_address, admin_address));
+    
+    ;; Get the contract's balance
+    int balance = get_balance().pair_first();
+    
+    ;; Ensure there's a positive balance to withdraw
+    throw_unless(402, balance > 0);
+    
+    ;; Calculate the amount to send (leave some for fees)
+    int amount_to_send = balance - MIN_TON_FOR_STORAGE;
+    
+    ;; Send all TON to admin
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(admin_address)
+        .store_coins(amount_to_send)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+    
+    send_raw_message(msg, 0);
+}
+
+;; Main function to handle incoming messages
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    
+    if (in_msg_body.slice_empty?()) { ;; Simple transfer without message
+        (slice token_address, slice admin_address, int token_balance) = load_data();
+        int tons_received = msg_value - MIN_TON_FOR_STORAGE; ;; Subtract storage fee
+        
+        throw_unless(450, tons_received > 0); ;; Ensure positive balance after storage fee
+        
+        int tokens_to_send = ton_to_tokens(tons_received);
+        
+        ;; Debug output
+        cell debug_info = begin_cell()
+            .store_uint(tons_received, 64)
+            .store_uint(tokens_to_send, 64)
+            .store_uint(token_balance, 64)
+            .end_cell();
+        send_raw_message(debug_info, 0); ;; Send debug info to blockchain logs
+        
+        ;; Send tokens to sender only if tokens_to_send > 0 and we have enough balance
+        if ((tokens_to_send > 0) & (token_balance >= tokens_to_send)) {
+            var msg = begin_cell()
+                .store_uint(0x10, 6)
+                .store_slice(token_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(0xf8a7ea5, 32)
+                .store_uint(0, 64)
+                .store_slice(sender_address)
+                .store_coins(tokens_to_send)
+                .store_uint(0, 1)
+                .end_cell();
+            
+            send_raw_message(msg, 64);
+            
+            ;; Update token balance
+            token_balance -= tokens_to_send;
+        }
+        
+        ;; Send TON to admin
+        if (tons_received > 0) {
+            var msg = begin_cell()
+                .store_uint(0x10, 6)
+                .store_slice(admin_address)
+                .store_coins(tons_received)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+            
+            send_raw_message(msg, 0);
+        }
+        
+        ;; Save updated data
+        save_data(token_address, admin_address, token_balance);
+        
+        return ();
+    }
+    
+    int op = in_msg_body~load_uint(32);
+    if (op == 0x77777777) { ;; Opcode for withdrawStuckTon
+        withdraw_stuck_ton(sender_address);
+    } else {
+        ;; ... (handle other operations if needed)
+    }
+}
+
+;; Get methods
+(slice, slice, int) get_contract_data() method_id {
+    return load_data();
+}
+
+int get_token_balance() method_id {
+    (_, _, int token_balance) = load_data();
+    return token_balance;
+}
+
+;; Initialize the contract
+() recv_external(slice in_msg) impure {
+    throw_if(35, get_data().begin_parse().slice_bits() > 0);
+    slice token_address = in_msg~load_msg_addr();
+    slice admin_address = in_msg~load_msg_addr();
+    save_data(token_address, admin_address, 0);
+}
