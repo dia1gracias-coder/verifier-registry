@@ -1,0 +1,260 @@
+#include "imports/stdlib.fc";
+#include "imports/op-codes.fc";
+#include "imports/params.fc";
+;; Badge collection smart contract
+
+;; storage scheme
+;; default#_ royalty_factor:uint16 royalty_base:uint16 royalty_address:MsgAddress = RoyaltyParams;
+;; storage#_ owner_address:MsgAddress next_item_index:uint64
+;;           ^[collection_content:^Cell common_content:^Cell]
+;;           badge_item_code:^Cell
+;;           royalty:^RoyaltyParams
+;;           = Storage;
+
+global slice owner_address;
+global int next_item_index;
+global cell content;
+global cell badge_item_code;
+global cell royalty;
+
+() load_global_data() impure inline {
+  var ds = get_data().begin_parse();
+  owner_address = ds~load_msg_addr();
+  next_item_index = ds~load_uint(64);
+  content = ds~load_ref();
+  badge_item_code = ds~load_ref();
+  royalty = ds~load_ref();
+}
+
+() save_global_data() impure inline {
+  set_data(begin_cell()
+    .store_slice(owner_address)
+    .store_uint(next_item_index, 64)
+    .store_ref(content)
+    .store_ref(badge_item_code)
+    .store_ref(royalty)
+    .end_cell());
+}
+
+cell calculate_badge_item_state_init(slice user_address, cell badge_item_code) {
+  cell data = begin_cell()
+    .store_slice(user_address)
+    .store_slice(my_address())
+    .store_uint(1, 1)
+  .end_cell();
+  return begin_cell().store_uint(0, 2).store_dict(badge_item_code).store_dict(data).store_uint(0, 1).end_cell();
+}
+
+slice calculate_badge_item_address(int wc, cell state_init) {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(wc, 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+() deploy_badge_item(int item_index, cell badge_item_code, int msg_value, slice user_address, cell badge_content) impure {
+  cell state_init = calculate_badge_item_state_init(user_address, badge_item_code);
+  slice badge_address = calculate_badge_item_address(workchain(), state_init);
+  cell msg_body = begin_cell()
+      .store_uint(item_index, 64)
+      .store_ref(badge_content)
+      .end_cell();
+  throw_unless(400, msg_value >= COLLECTION_MINT_FEE + ITEM_MINT_FEE);
+  var msg = begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(badge_address)
+      .store_coins(msg_value - COLLECTION_MINT_FEE)
+      .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+      .store_ref(state_init)
+      .store_ref(msg_body);
+  send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+() update_item_content(int query_id, slice in_msg_body, int msg_value) impure {
+    
+    throw_unless(
+        400, 
+        msg_value >= 
+            COLLECTION_UPDATE_ITEM_FEE
+            + ITEM_UPDATE_CONTENT_FEE 
+    );
+
+    int remain_msg_value = msg_value
+        - COLLECTION_UPDATE_ITEM_FEE;
+
+    slice badge_item_address = in_msg_body~load_msg_addr();
+    cell content = in_msg_body~load_ref();
+    slice response_address = in_msg_body~load_msg_addr();
+    cell msg_body = begin_cell()
+        .store_uint(op::item::update_content(), 32)
+        .store_uint(query_id, 64)
+        .store_ref(content)
+        .store_slice(response_address)
+        .end_cell();
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(badge_item_address)
+        .store_coins(remain_msg_value)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body);
+    send_raw_message(msg.end_cell(), 1);
+}
+
+() switch_item_update_content(int query_id, slice in_msg_body, int msg_value) impure {
+    
+    throw_unless(
+        400, 
+        msg_value >= 
+            COLLECTION_SWITCH_ITEM_UPDATE_FEE
+            + ITEM_COLLECTION_SWITCH_UPDATE_FEE 
+    );
+
+    int remain_msg_value = msg_value
+        - COLLECTION_SWITCH_ITEM_UPDATE_FEE;
+
+    int enable = in_msg_body~load_uint(1);
+    slice badge_item_address = in_msg_body~load_msg_addr();
+    slice response_address = in_msg_body~load_msg_addr();
+    cell msg_body = begin_cell()
+        .store_uint(op::item::switch_update_content(), 32)
+        .store_uint(query_id, 64)
+        .store_uint(enable, 1)
+        .store_slice(response_address)
+        .end_cell();
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(badge_item_address)
+        .store_coins(remain_msg_value)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body);
+    send_raw_message(msg.end_cell(), 1);
+}
+
+() send_royalty_params(slice to_address, int query_id, slice data) impure inline {
+  var msg = begin_cell()
+    .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool packages:MsgAddress -> 011000
+    .store_slice(to_address)
+    .store_coins(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(op::report_royalty_params(), 32)
+    .store_uint(query_id, 64)
+    .store_slice(data);
+  send_raw_message(msg.end_cell(), 64); ;; carry all the remaining value of the inbound message
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of forward_payload costs
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    
+    load_global_data();
+
+    if (op == op::get_royalty_params()) {
+        send_royalty_params(sender_address, query_id, royalty.begin_parse());
+        return ();
+    }
+
+    ;;modification - anybody can deploy
+    if (op == op::collection::mint()) { ;; deploy new badge
+      int item_index = next_item_index;
+      deploy_badge_item(item_index, badge_item_code, msg_value, sender_address, in_msg_body~load_ref());
+      next_item_index += 1;
+      save_global_data();
+      return ();
+    }
+
+    throw_unless(401, equal_slices(sender_address, owner_address));
+
+    if (op == op::collection::update_owner()) { ;; update owner
+      owner_address = in_msg_body~load_msg_addr();
+      save_global_data();
+      return ();
+    }
+
+    if (op == op::collection::update_content()) { ;; update content
+      content = in_msg_body~load_ref();
+      save_global_data();
+      return ();
+    }
+
+    if (op == op::collection::update_royalty()) { ;; update royalty
+      int numerator = in_msg_body~load_uint(16);
+      int denominator = in_msg_body~load_uint(16);
+      slice destination = in_msg_body~load_msg_addr();
+      royalty = begin_cell()
+        .store_uint(numerator, 16)
+        .store_uint(denominator, 16)
+        .store_slice(destination)
+        .end_cell();
+      save_global_data();
+      return ();
+    }
+
+    if (op == op::collection::update_item_content()) {
+      update_item_content(query_id, in_msg_body, msg_value);
+      return ();
+    }
+
+    if (op == op::collection::switch_item_update_content()) {
+      switch_item_update_content(query_id, in_msg_body, msg_value);
+      return ();
+    }
+
+    throw(0xffff);
+}
+
+;; Get methods
+
+
+(slice, int, cell, cell, cell) get_all_data() method_id {
+  load_global_data();
+  return (owner_address, next_item_index, content, badge_item_code, royalty);
+}
+
+(int, cell, slice) get_collection_data() method_id {
+  load_global_data();
+  slice cs = content.begin_parse();
+  return (next_item_index, cs~load_ref(), owner_address);
+}
+
+slice get_badge_address_by_user_address(slice user_address) method_id {
+    load_global_data();
+    cell state_init = calculate_badge_item_state_init(user_address, badge_item_code);
+    return calculate_badge_item_address(workchain(), state_init);
+}
+
+(int, int, slice) royalty_params() method_id {
+     load_global_data();
+     slice rs = royalty.begin_parse();
+     return (rs~load_uint(16), rs~load_uint(16), rs~load_msg_addr());
+}
+
+cell get_badge_content(int index, cell individual_badge_content) method_id {
+  load_global_data();
+  slice cs = content.begin_parse();
+  cs~load_ref();
+  slice common_content = cs~load_ref().begin_parse();
+  return (begin_cell()
+                      .store_uint(1, 8) ;; offchain tag
+                      .store_slice(common_content)
+                      .store_ref(individual_badge_content)
+          .end_cell());
+}
