@@ -1,0 +1,56 @@
+#include "imports/stdlib.fc";
+
+const const::min_tons_for_storage = 10000000; ;; 0.01 TON
+
+(int ,slice ,slice) load_data() inline {
+    slice d = get_data().begin_parse();
+    return (d~load_uint(32),d~load_msg_addr(),d~load_msg_addr());
+}
+
+() save_data(int counter_value,slice recent_sender,slice owner_address) impure inline {
+    set_data(begin_cell().store_uint(counter_value,32).store_slice(recent_sender).store_slice(owner_address).end_cell());
+}
+
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender = cs~load_msg_addr();
+    int op = cs~load_uint(32);
+    var (counter_value,recent_sender,owner_address) = load_data();
+
+    if (op == 1) {
+        save_data(counter_value + 1,recent_sender,owner_address);
+    }
+
+    if (op == 2) {
+        save_data(counter_value - 1,recent_sender,owner_address);
+    }
+    if (op == 3) {
+        throw_unless(103, equal_slice_bits(sender,owner_address));
+        int withdraw_amount = in_msg_body~load_coins();
+        var [balance, _] = get_balance();
+        throw_unless(104,balance >= withdraw_amount);
+        int return_value = min(withdraw_amount,balance - const::min_tons_for_storage);
+        ;; Sending internal message
+
+        cell msg = begin_cell()
+            .store_uint(0x18,6)
+            .store_slice(sender)
+            .store_coins(return_value)
+            .store_uint(0,1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+        send_raw_message(msg,1);
+        return ();
+    }
+    throw(777);
+}
+
+
+(int ,slice, slice) get_contract_storage_data() method_id {
+    slice data = get_data().begin_parse();
+    int counter = data~load_uint(32);
+    slice addr = data~load_msg_addr();
+    slice owner = data~load_msg_addr();
+    return (counter,addr,owner);
+}
