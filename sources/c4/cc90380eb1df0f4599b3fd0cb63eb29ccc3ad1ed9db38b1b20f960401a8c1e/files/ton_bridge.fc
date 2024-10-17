@@ -1,0 +1,131 @@
+#include "imports/stdlib.fc";
+
+int timeout() asm "604800 PUSHINT"; ;; 7 days
+
+int slice_keccak256(slice, int) asm "HASHEXT_KECCAK256";
+(int, int, int, int) ecrecover(int hash, int v, int r, int s) asm "ECRECOVER";
+
+(slice, int, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_bits(160), ;; owner
+        ds~load_uint(256), ;; last_cleanup
+        ds~load_dict(), ;; nonces
+        ds~load_dict() ;; old_nonces
+    );
+}
+
+() save_data(slice owner, int last_cleanup, cell nonces, cell old_nonces) impure inline {
+    set_data(begin_cell()
+        .store_slice(owner)
+        .store_uint(last_cleanup, 256)
+        .store_dict(nonces)
+        .store_dict(old_nonces)
+        .end_cell()
+    );
+}
+
+int cacl_sign_hash(int nonce, slice jetton_wallet, slice to, int amount, int created_at) impure {
+    return cell_hash(begin_cell().store_uint(nonce, 64).store_slice(jetton_wallet).store_slice(to).store_coins(amount).store_uint(created_at, 64).end_cell());
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+    if (flags & 1) {
+        ;; ignore all bounced messages
+        return ();
+    }
+    slice s_addr = cs~load_msg_addr();
+    throw_if(299, in_msg_body.slice_empty?()); ;; inbound message has empty body
+
+    (slice owner, int last_cleanup, cell nonces, cell old_nonces) = load_data();
+
+    if (last_cleanup < (now() - timeout())) {
+        (old_nonces, nonces) = (nonces, null());
+        if (last_cleanup < (now() - (timeout() * 2))) {
+            old_nonces = null();
+        }
+        last_cleanup = now();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == 0x7362d09c) {
+        ;; jetton op::transfer_notification
+        return ();
+    }
+
+    if (op == 1) {
+        ;; todo: check fees
+
+        ;; claim
+        int nonce = in_msg_body~load_uint(64);
+        slice jetton_wallet = in_msg_body~load_msg_addr();
+        slice to = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        int created_at = in_msg_body~load_uint(64);
+        slice sig = in_msg_body~load_ref().begin_parse();
+        int v = sig~load_uint(8);
+        int r = sig~load_uint(256);
+        int s = sig~load_uint(256);
+
+        throw_unless(103, created_at + timeout() > now());
+
+        int hash = cacl_sign_hash(nonce, jetton_wallet, to, amount, created_at);
+
+        (int h_uint8, int x1_uint256, int x2_uint256, int success) = ecrecover(hash, v, r, s);
+        throw_unless(104, success);
+
+        ;; store public key to slice and get keccak256 hash of it
+        slice tmp_public_key = begin_cell().store_uint(x1_uint256, 256).store_uint(x2_uint256, 256).end_cell().begin_parse();
+        int keccak256_hash = slice_keccak256(tmp_public_key, 1);
+
+        ;; store hash to slice and skip first 12 bytes
+        slice slice_address = begin_cell().store_uint(keccak256_hash, 256).end_cell().begin_parse();
+        slice_address~load_uint(96);
+
+        throw_unless(105, equal_slices(slice_address~load_bits(160), owner));
+
+        (_, int found) = old_nonces.udict_get_ref?(256, nonce);
+        throw_if(106, found);
+        (_, int found) = nonces.udict_get_ref?(256, nonce);
+        throw_if(106, found);
+
+        nonces.udict_set(256, nonce, begin_cell().store_int(1, 1).end_cell().begin_parse());
+
+        save_data(owner, last_cleanup, nonces, old_nonces);
+
+        cell body = begin_cell()
+            .store_uint(0xf8a7ea5, 32)
+            .store_uint(0, 64)
+            .store_grams(amount)
+            .store_slice(to)
+            .store_slice(my_address())
+            .store_maybe_ref(null())
+            .store_grams(50000000) ;; 0.05 TON
+            .store_maybe_ref(null())
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(jetton_wallet)
+            .store_grams(500000000) ;; 0.5 TON
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(body);
+
+        send_raw_message(msg.end_cell(), 0);
+    }
+
+    if (op == 2) {
+        throw_unless(107, equal_slices(owner, s_addr));
+        set_code(in_msg_body~load_ref());
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+int get_sign_hash(int nonce, slice jetton_wallet, slice to, int amount, int created_at) method_id {
+    return cacl_sign_hash(nonce, jetton_wallet, to, amount, created_at);
+}
