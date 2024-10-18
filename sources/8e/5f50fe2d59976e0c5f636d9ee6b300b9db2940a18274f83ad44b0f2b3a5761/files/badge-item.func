@@ -1,0 +1,143 @@
+#include "imports/stdlib.fc";
+#include "imports/op-codes.fc";
+#include "imports/params.fc";
+#include "imports/utils.fc";
+;;
+;;  TON Badge Item Smart Contract
+;;
+
+;;
+;;  Storage
+;;
+;;  MsgAddressInt owner_address
+;;  MsgAddressInt collection_address
+;;  uint1 enable_update_content
+;;  uint64 index
+;;  cell content
+;;
+
+(int, int, slice, slice, int, cell) load_data() {
+    slice ds = get_data().begin_parse();
+    var (owner_address, collection_address) = (ds~load_msg_addr(), ds~load_msg_addr());
+    int enable_update_content = ds~load_uint(1);
+    if (ds.slice_bits() > 0) {
+      return (-1, ds~load_uint(64), collection_address, owner_address, enable_update_content, ds~load_ref());
+    } else {
+      return (0, 0, collection_address, owner_address, enable_update_content, null()); ;; badge not initialized yet
+    }
+}
+
+() store_data(slice owner_address, slice collection_address, int enable_update_content, int index, cell content) impure {
+    set_data(
+        begin_cell()
+            .store_slice(owner_address)
+            .store_slice(collection_address)
+            .store_uint(enable_update_content, 1)
+            .store_uint(index, 64)
+            .store_ref(content)
+            .end_cell()
+    );
+}
+
+
+() send_msg(slice to_address, int amount, int op, int query_id, builder payload, int send_mode) impure inline {
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+        .store_slice(to_address)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op, 32)
+        .store_uint(query_id, 64);
+
+    if (~ builder_null?(payload)) {
+        msg = msg.store_builder(payload);
+    }
+
+    send_raw_message(msg.end_cell(), send_mode);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of forward_payload costs
+
+    (int init?, int index, slice collection_address, slice owner_address, int enable_update_content, cell content) = load_data();
+    if (~ init?) {
+        throw_unless(405, equal_slices(collection_address, sender_address));
+        store_data(owner_address, collection_address, enable_update_content, in_msg_body~load_uint(64), in_msg_body~load_ref());
+        
+        int ton_balance_before_msg = my_balance - msg_value;
+        int storage_fee = ITEM_MIN_TON_STORAGE - min(ton_balance_before_msg, ITEM_MIN_TON_STORAGE);
+        int remain_msg_value = msg_value - ITEM_MINT_FEE - storage_fee;
+        refund_fee(0, owner_address, remain_msg_value);
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::item::update_content()) {
+        ;; change content
+        if (equal_slices(sender_address, owner_address)) {
+            throw_unless(402, enable_update_content != 0);
+        } else {
+            throw_unless(405, equal_slices(sender_address, collection_address));
+        }
+        content = in_msg_body~load_ref();
+        store_data(owner_address, collection_address, enable_update_content, index, content);
+
+        slice response_address = in_msg_body~load_msg_addr();
+        int ton_balance_before_msg = my_balance - msg_value;
+        int storage_fee = ITEM_MIN_TON_STORAGE - min(ton_balance_before_msg, ITEM_MIN_TON_STORAGE);
+        int remain_msg_value = msg_value - ITEM_UPDATE_CONTENT_FEE - storage_fee;
+        refund_fee(query_id, response_address, remain_msg_value);
+        return ();
+    }
+
+    if (op == op::item::switch_update_content()) {
+        ;; collection switch update
+        throw_unless(405, equal_slices(sender_address, collection_address));
+
+        enable_update_content = in_msg_body~load_uint(1);
+        slice response_address = in_msg_body~load_msg_addr();
+        store_data(owner_address, collection_address, enable_update_content, index, content);
+
+        int ton_balance_before_msg = my_balance - msg_value;
+        int storage_fee = ITEM_MIN_TON_STORAGE - min(ton_balance_before_msg, ITEM_MIN_TON_STORAGE);
+        int remain_msg_value = msg_value - ITEM_COLLECTION_SWITCH_UPDATE_FEE - storage_fee;
+        refund_fee(query_id, response_address, remain_msg_value);
+        return ();
+    }
+
+    if (op == op::get_static_data()) {
+        throw_unless(400, msg_value >= ITEM_QUERY_FEE);
+        send_msg(sender_address, 0, op::report_static_data(), query_id, begin_cell().store_uint(index, 256).store_slice(collection_address), 64);  ;; carry all the remaining value of the inbound message
+        return ();
+    }
+
+    throw(0xffff);
+
+}
+
+;;
+;;  GET Methods
+;;
+
+(int, int, slice, slice, int, cell) get_badge_data() method_id {
+  (int init?, int index, slice collection_address, slice owner_address, int enable_update_content, cell content) = load_data();
+  return (init?, index, collection_address, owner_address, enable_update_content, content);
+}
