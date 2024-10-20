@@ -1,0 +1,28 @@
+cell pack_order_data(int nonce, slice owner_address, slice bank_address) inline {
+   return  begin_cell()
+            .store_int(nonce, 64)
+            .store_slice(owner_address)
+            .store_slice(bank_address)
+           .end_cell();
+}
+
+cell calculate_order_state_init(slice owner_address, slice bank_address, cell order_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_ref(order_code)
+          .store_ref(pack_order_data(0, owner_address, bank_address))
+          .store_uint(0, 1)
+          .end_cell();
+}
+
+slice calculate_order_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(workchain(), 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+slice calculate_user_order_address(slice owner_address, slice bank_address, cell order_code) inline {
+  return calculate_order_address(calculate_order_state_init(owner_address, bank_address, order_code));
+}
