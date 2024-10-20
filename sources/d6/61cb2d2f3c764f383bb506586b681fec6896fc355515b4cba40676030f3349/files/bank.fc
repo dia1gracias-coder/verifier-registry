@@ -1,0 +1,163 @@
+#include "imports/stdlib.fc";
+#include "imports/params.fc";
+#include "imports/order-utils.fc";
+#include "imports/op-codes.fc";
+
+
+#pragma version >=0.2.0;
+
+
+(int, slice, int, int, int, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+            ds~load_uint(256), ;; signer
+            ds~load_msg_addr(), ;; admin_address
+            ds~load_int(1), ;; pause mode
+            ds~load_coins(), ;; min amount 
+            ds~load_coins(), ;; max amount
+            ds~load_ref() ;; order contract code
+    );
+}
+
+() save_data(int signerPubKey, slice admin_address, int pauseMode, int minAmount, int maxAmount, cell orderContactCode) impure inline {
+    set_data(begin_cell()
+            .store_uint(signerPubKey, 256)
+            .store_slice(admin_address)
+            .store_int(pauseMode, 1)
+            .store_coins(minAmount)
+            .store_coins(maxAmount)
+            .store_ref(orderContactCode)
+            .end_cell()
+    );
+}
+
+
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of provide_wallet_address cost
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64); 
+    (int pubKey, slice admin_address, int pauseMode, int minAmount, int maxAmount, cell orderContactCode) = load_data();
+
+    if (op == op::checkSignatureAndWithdraw()) {
+        slice orderData = in_msg_body~load_ref().begin_parse();
+        int amount = orderData~load_coins();
+        slice userAddress = orderData~load_msg_addr();
+        int nonce = orderData~load_int(64);
+        
+
+        
+        throw_unless(1003, pauseMode == 0);
+        throw_unless(1004, (amount >= minAmount) & (amount <= maxAmount));
+      ;;  throw_unless(1005, equal_slice_bits(sender_address, calculate_user_order_address(userAddress, my_address(), orderContactCode)));
+        slice signatureData = in_msg_body~load_ref().begin_parse();
+        slice signature = signatureData~load_bits(512); 
+       
+        
+        cell data = begin_cell()
+                    .store_uint(query_id, 64)
+                    .store_uint(nonce,64)
+                    .store_coins(amount)
+                    .store_slice(userAddress)
+                    .end_cell();
+        int is_valid = check_signature(cell_hash(data), signature, pubKey);
+        if(is_valid == -1) { 
+            
+             var msg = begin_cell()
+                        .store_uint(0x10,6)
+                        .store_slice(userAddress)
+                        .store_coins(amount)
+                        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                        .store_uint(0xd53276db, 32)
+                        .store_uint(query_id, 64);
+          
+            return send_raw_message(msg.end_cell(), 1); ;; 
+    
+        }
+        else {
+           throw(1005);
+        }
+        return ();
+    }
+
+    if (op == op::setMinMaxAmount()) {
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        int new_min_amount = in_msg_body~load_coins();
+        int new_max_amount = in_msg_body~load_coins();
+        save_data(pubKey, admin_address, pauseMode, new_min_amount, new_max_amount, orderContactCode);
+        return ();
+      
+    }
+
+
+
+    if (op == op::changeAdmin()) { ;; change admin
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        save_data(pubKey, new_admin_address, pauseMode, minAmount, maxAmount, orderContactCode);
+        return ();
+    }
+
+    if (op == op::changeSigner()) { ;; change signer
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        int new_pubKey = in_msg_body~load_uint(256);
+        save_data(new_pubKey, admin_address, pauseMode, minAmount, maxAmount, orderContactCode);
+        return ();
+    }
+
+    if (op == op::setPauseMode()) { ;; set pause mode
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        int newPauseMode = in_msg_body~load_int(1);
+        save_data(pubKey, admin_address, newPauseMode, minAmount, maxAmount, orderContactCode);
+        return ();
+    }
+
+    if (op == op::adminWithdraw()) { ;; withdraw ton from contract
+        int amount = in_msg_body~load_coins();
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        var msg = begin_cell()
+            .store_uint(0x10,6)
+            .store_slice(sender_address)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0xd53276db, 32)
+            .store_uint(query_id, 64);
+          
+        return send_raw_message(msg.end_cell(), 0); 
+    }
+
+    if (op == op::top_up()) {
+        return (); ;; just accept tons
+    }
+
+    throw(0xffff);
+}
+
+(int, slice, int, int, int, cell) get_bank_data() method_id {
+    (int pubKey, slice admin_address, int pauseMode, int minAmount, int maxAmount, cell orderCode) = load_data();
+
+    return (pubKey, admin_address, pauseMode, minAmount, maxAmount, orderCode);
+}
+
+
+
+slice get_order_address(slice owner_address) method_id {
+    (int pubKey, slice admin_address, int pauseMode, int minAmount, int maxAmount, cell orderCode) = load_data();
+    return calculate_user_order_address(owner_address, my_address(), orderCode);
+}
+
