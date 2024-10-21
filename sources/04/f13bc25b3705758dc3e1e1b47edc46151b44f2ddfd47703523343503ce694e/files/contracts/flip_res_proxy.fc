@@ -1,0 +1,89 @@
+#include "../imports/stdlib.fc";
+
+const ADMIN = "UQDO8VPQ7rx3A0tUPdyM80a45yFmbRaWZvX_1o8PmrrdayJv"a;
+
+tuple get_prev_block() asm "PREVKEYBLOCK";
+
+() custom_randomize() impure inline {
+    int prev_root_hash = 0;
+    try {
+        tuple prev_block = get_prev_block(); ;; (int wc, int shard, int seqno, int root_hash, int file_hash)
+        prev_root_hash = prev_block.at(3);
+    } catch (x, n) {
+        prev_root_hash = 1;
+    }
+
+    randomize(cur_lt());
+    randomize(now());
+    randomize(prev_root_hash);
+}
+
+(builder, ()) set_res_side(builder msg_b, int bets_count) impure inline {
+    if bets_count > 1 {
+        repeat(bets_count){
+            int int_side = rand(2);
+            msg_b = msg_b.store_slice(int_side == 0 ? "h" : "t");
+        }
+        return (msg_b, ());
+    }
+    int int_side = rand(2);
+    return (msg_b.store_slice(int_side == 0 ? "h" : "t"), ());
+}
+
+(int, int) int_to_utf8(int num) {
+    int res = 0;
+
+    int bytes = 0;
+    int shift = 0x1;
+    while(num > 0) {
+        (num, int digit) = num.divmod(10);
+        res = res + (digit + 0x30) * shift;
+        shift = shift * 0x0100;
+        bytes = bytes + 1;
+    }
+    return (res, bytes * 8);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    if (flags & 1) { ;; fwd all bounced messages to admin
+        send_raw_message(begin_cell()
+           .store_uint(0x10, 6)
+           .store_slice(ADMIN)
+           .store_coins(0)
+           .store_uint(0, 107)
+        .end_cell(), 64 + 2);
+
+        return ();
+    }
+
+    in_msg_body~load_uint(32); ;; skip op
+
+    int bets_count = in_msg_body~load_uint(4);
+    int bet_id = in_msg_body~load_uint(32);
+
+    slice sender_address = cs~load_msg_addr();
+    builder echo_b = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_uint(0, 107)
+        .store_uint(0, 32)
+        .store_slice("bets:")
+        .store_uint(bets_count + 48, 8)
+        .store_slice(" res:");
+
+    custom_randomize();
+    echo_b~set_res_side(bets_count);
+
+    (int encoded_bet_id, int encoded_bet_id_len) = int_to_utf8(bet_id);
+
+    send_raw_message(echo_b
+        .store_slice(" id:")
+        .store_uint(encoded_bet_id, encoded_bet_id_len)
+    .end_cell(), 64);
+
+    throw(0);
+}
