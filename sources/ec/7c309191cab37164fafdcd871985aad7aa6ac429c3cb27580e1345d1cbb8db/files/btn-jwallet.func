@@ -1,0 +1,259 @@
+;; This code was verified by @gosunov
+;; subscribe to my channel @gosunov_ch
+;; buy $SLOW
+
+;;  _           _ _   
+;; | |         | | |  
+;; | |__   ___ | | |_ 
+;; | '_ \ / _ \| | __|
+;; | |_) | (_) | | |_ 
+;; |_.__/ \___/|_|\__|
+
+;;
+;;  btn-token-smc – smart contracts collection for Biton token
+;;
+;;  Copyright (C) 2022 BITON <https://github.com/BITONdev>
+;;
+;;  This file is part of btn-token-smc.
+;;
+;;  btn-token-smc is free software: you can redistribute it and/or modify
+;;  it under the terms of the GNU General Public License as published by
+;;  the Free Software Foundation, either version 3 of the License, or
+;;  (at your option) any later version.
+;;
+;;  btn-token-smc is distributed in the hope that it will be useful,
+;;  but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;  GNU General Public License for more details.
+;;
+;;  You should have received a copy of the GNU General Public License
+;;  along with btn-token-smc.  If not, see <https://www.gnu.org/licenses/>.
+;;
+
+int min_tons_for_storage() asm "10000000 PUSHINT"; ;; 0.01 TON
+int gas_consumption() asm "10000000 PUSHINT"; ;; 0.01 TON
+
+
+(int, slice, slice, cell) load_data() inline {
+  slice ds = get_data().begin_parse();
+  return (ds~load_grams(), ds~load_msg_addr(), ds~load_msg_addr(), ds~load_ref());
+}
+
+() save_data (int balance, slice owner_addr, slice jmaster_addr, cell jwall_code) impure inline {
+  set_data(pack_jwall_data(balance, owner_addr, jmaster_addr, jwall_code));
+}
+
+{-
+  transfer query_id:uint64 amount:(VarUInteger 16) destination:MsgAddress
+           response_destination:MsgAddress custom_payload:(Maybe ^Cell)
+           forward_ton_amount:(VarUInteger 16) forward_payload:(Either Cell ^Cell)
+           = InternalMsgBody;
+  internal_transfer  query_id:uint64 amount:(VarUInteger 16) from:MsgAddress
+                     response_address:MsgAddress
+                     forward_ton_amount:(VarUInteger 16)
+                     forward_payload:(Either Cell ^Cell) 
+                     = InternalMsgBody;
+-}
+
+() send_tokens (slice in_msg_body, slice sender_addr, int msg_value, int fwd_fee) impure {
+    int query_id = in_msg_body~load_uint(64);
+    int jetton_amount = in_msg_body~load_grams();
+    slice to_owner_addr = in_msg_body~load_msg_addr();
+    force_chain(to_owner_addr);
+    (int balance, slice owner_addr, slice jmaster_addr, cell jwall_code) = load_data();
+    balance -= jetton_amount;
+
+    throw_unless(705, extlib::slice_data_equal?(owner_addr, sender_addr));
+    throw_unless(706, balance >= 0);
+
+    cell state_init = jwall_state_init(to_owner_addr, jmaster_addr, jwall_code);
+    slice to_wallet_address = jwall_state_addr(state_init);
+    slice response_address = in_msg_body~load_msg_addr();
+    cell custom_payload = in_msg_body~load_dict();
+    int forward_ton_amount = in_msg_body~load_grams();
+    slice either_forward_payload = in_msg_body;
+
+    builder msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to_wallet_address)
+        .store_grams(0)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init);
+
+    cell msg_body = begin_cell()
+        .store_uint(op::internal_transfer(), 32)
+        .store_uint(query_id, 64)
+        .store_grams(jetton_amount)
+        .store_slice(owner_addr)
+        .store_slice(response_address)
+        .store_grams(forward_ton_amount)
+        .store_slice(either_forward_payload)
+        .end_cell();
+
+    msg = msg.store_ref(msg_body);
+    throw_unless(709, msg_value >
+        forward_ton_amount +
+        ;; 3 messages: wal1->wal2,  wal2->owner, wal2->response
+        ;; but last one is optional (it is ok if it fails)
+        2 * fwd_fee +
+        (2 * gas_consumption() + min_tons_for_storage()));
+        ;; universal message send fee calculation may be activated here
+        ;; by using this instead of fwd_fee
+        ;; msg_fwd_fee(to_wallet, msg_body, state_init, 15)
+
+    send_raw_message(msg.end_cell(), 64); ;; revert on errors
+    save_data(balance, owner_addr, jmaster_addr, jwall_code);
+}
+
+{-
+  internal_transfer  query_id:uint64 amount:(VarUInteger 16) from:MsgAddress
+                     response_address:MsgAddress
+                     forward_ton_amount:(VarUInteger 16)
+                     forward_payload:(Either Cell ^Cell) 
+                     = InternalMsgBody;
+-}
+
+() receive_tokens (slice in_msg_body, slice sender_addr, int my_ton_balance, int fwd_fee) impure {
+    ;; NOTE we can not allow fails in action phase since in that case there will be
+    ;; no bounce. Thus check and throw in computation phase.
+    (int balance, slice owner_addr, slice jmaster_addr, cell jwall_code) = load_data();
+    int query_id = in_msg_body~load_uint(64);
+    int jetton_amount = in_msg_body~load_grams();
+    balance += jetton_amount;
+    slice from_addr = in_msg_body~load_msg_addr();
+    slice response_address = in_msg_body~load_msg_addr();
+
+    throw_unless(707,
+        extlib::slice_data_equal?(jmaster_addr, sender_addr) |
+        extlib::slice_data_equal?(
+            jwall_addr_by_owner(from_addr, jmaster_addr, jwall_code), sender_addr
+        )
+    );
+
+    int fwd_grams = in_msg_body~load_grams(); ;; forward_ton_amount
+
+    my_ton_balance -= (min_tons_for_storage() + gas_consumption());
+    if(fwd_grams) {
+        my_ton_balance -= (fwd_grams + fwd_fee);
+        slice either_forward_payload = in_msg_body;
+
+        var msg_body = begin_cell()
+            .store_uint(op::transfer_notification(), 32)
+            .store_uint(query_id, 64)
+            .store_grams(jetton_amount)
+            .store_slice(from_addr)
+            .store_slice(either_forward_payload)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(owner_addr)
+            .store_grams(fwd_grams)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body);
+
+        send_raw_message(msg.end_cell(), 1);
+    }
+
+    if ((response_address.preload_uint(2) != 0) & (my_ton_balance > 0)) {
+        raw_reserve(min_tons_for_storage(), 2);
+        var msg = begin_cell()
+            .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+            .store_slice(response_address)
+            .store_grams(my_ton_balance)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::excesses(), 32)
+            .store_uint(query_id, 64);
+        send_raw_message(msg.end_cell(), 2);
+    }
+
+    save_data(balance, owner_addr, jmaster_addr, jwall_code);
+}
+
+() burn_tokens (slice in_msg_body, slice sender_addr, int msg_value, int fwd_fee) impure {
+    ;; NOTE we can not allow fails in action phase since in that case there will be
+    ;; no bounce. Thus check and throw in computation phase.
+    (int balance, slice owner_addr, slice jmaster_addr, cell jwall_code) = load_data();
+    int query_id = in_msg_body~load_uint(64);
+    int jetton_amount = in_msg_body~load_grams();
+    slice response_address = in_msg_body~load_msg_addr();
+    ;; ignore custom payload
+    ;; slice custom_payload = in_msg_body~load_dict();
+    balance -= jetton_amount;
+    throw_unless(705, extlib::slice_data_equal?(owner_addr, sender_addr));
+    throw_unless(706, balance >= 0);
+    throw_unless(707, msg_value > fwd_fee + 2 * gas_consumption());
+
+    var msg_body = begin_cell()
+        .store_uint(op::burn_notification(), 32)
+        .store_uint(query_id, 64)
+        .store_grams(jetton_amount)
+        .store_slice(owner_addr)
+        .store_slice(response_address)
+        .end_cell();
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+        .store_slice(jmaster_addr)
+        .store_grams(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body);
+
+    send_raw_message(msg.end_cell(), 64);
+
+    save_data(balance, owner_addr, jmaster_addr, jwall_code);
+}
+
+() on_bounce (slice in_msg_body) impure {
+    in_msg_body~skip_bits(32); ;; 0xFFFFFFFF
+    (int balance, slice owner_addr, slice jmaster_addr, cell jwall_code) = load_data();
+    int op = in_msg_body~load_uint(32);
+    throw_unless(709, (op == op::internal_transfer()) | (op == op::burn_notification()));
+    int query_id = in_msg_body~load_uint(64);
+    int jetton_amount = in_msg_body~load_grams();
+    balance += jetton_amount;
+    save_data(balance, owner_addr, jmaster_addr, jwall_code);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; istead of if (in_msg_body.slice_empty?()) { return (); }
+    throw_if(0, in_msg_body.slice_empty?());
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        on_bounce(in_msg_body);
+        return ();
+    }
+
+    slice sender_addr = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_grams(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_grams(); ;; skip ihr_fee
+    int fwd_fee = cs~load_grams(); ;; we use message fwd_fee for estimation of forward_payload costs
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::transfer()) { ;; outgoing transfer
+        send_tokens(in_msg_body, sender_addr, msg_value, fwd_fee);
+        return ();
+    }
+
+    if (op == op::internal_transfer()) { ;; incoming transfer
+        receive_tokens(in_msg_body, sender_addr, my_balance, fwd_fee);
+        return ();
+    }
+
+    if (op == op::burn()) { ;; burn
+        burn_tokens(in_msg_body, sender_addr, msg_value, fwd_fee);
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+(int, slice, slice, cell) get_wallet_data() method_id {
+    return load_data();
+}

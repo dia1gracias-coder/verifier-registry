@@ -1,0 +1,69 @@
+;;
+;;  btn-token-smc – smart contracts collection for Biton token
+;;
+;;  Copyright (C) 2022 BITON <https://github.com/BITONdev>
+;;
+;;  This file is part of btn-token-smc.
+;;
+;;  btn-token-smc is free software: you can redistribute it and/or modify
+;;  it under the terms of the GNU General Public License as published by
+;;  the Free Software Foundation, either version 3 of the License, or
+;;  (at your option) any later version.
+;;
+;;  btn-token-smc is distributed in the hope that it will be useful,
+;;  but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;  GNU General Public License for more details.
+;;
+;;  You should have received a copy of the GNU General Public License
+;;  along with btn-token-smc.  If not, see <https://www.gnu.org/licenses/>.
+;;
+
+int workchain() asm "0 PUSHINT";
+
+cell pack_jwall_data(
+    int balance,
+    slice owner_addr,
+    slice jmaster_addr,
+    cell jwallet_code
+) inline {
+    return begin_cell()
+        .store_grams(balance)
+        .store_slice(owner_addr)
+        .store_slice(jmaster_addr)
+        .store_ref(jwallet_code)
+        .end_cell();
+}
+
+cell jwall_state_init(
+    slice owner_addr,
+    slice jmaster_addr,
+    cell jwallet_code
+) inline {
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_dict(jwallet_code)
+        .store_dict(pack_jwall_data(0, owner_addr, jmaster_addr, jwallet_code))
+        .store_uint(0, 1)
+        .end_cell();
+}
+
+slice jwall_state_addr(cell state_init) inline {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(workchain(), 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}
+
+slice jwall_addr_by_owner(slice owner_addr, slice jmaster_addr, cell jwall_code) inline {
+    return jwall_state_addr(jwall_state_init(
+        owner_addr, jmaster_addr, jwall_code
+    ));
+}
+
+() force_chain(slice addr) impure {
+    (int wc, _) = parse_std_addr(addr);
+    throw_unless(333, wc == workchain());
+}
