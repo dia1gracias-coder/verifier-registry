@@ -1,0 +1,156 @@
+#include "imports/stdlib.fc";
+#include "messages.fc";
+#include "op-codes.fc";
+#include "errors.fc";
+
+const int min_tons_for_storage = 10000000;
+
+const int ton_for_fee = 50000000;
+
+(int, slice, slice) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_coins(),
+        ds~load_msg_addr(),
+        ds~load_msg_addr()
+    );
+}
+
+() save_data(int extra_fee, slice admin_address, slice updater_address) impure inline {
+    set_data(begin_cell()
+        .store_coins(extra_fee)
+        .store_slice(admin_address)
+        .store_slice(updater_address)
+    .end_cell());
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {   ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();  
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    (int extra_fee, slice admin_address, slice updater_address) = load_data();
+
+    if (op == op::batch_transfer) {
+        int total = in_msg_body~load_coins();
+        int length = in_msg_body~load_uint(16);
+        cell messages = in_msg_body~load_dict();
+        throw_if(error::insufficient_ton, total > msg_value - extra_fee - ton_for_fee * length);
+
+        (int last_key, slice val, int f?) = messages.udict_get_next?(16, 0);
+        repeat(min(200, length)) {
+            if (f?) {
+                int value = val~load_coins();
+                slice dest = val~load_msg_addr();
+                throw_if(error::malicious_transfer, total < value);
+                send_ton(dest, value);
+                (last_key, val, f?) = messages.udict_get_next?(16, last_key);
+                total = total - value;
+            }
+        }
+
+        int remaining = my_balance - msg_value + extra_fee;
+        raw_reserve(remaining, 0);
+        send_excesses(sender_address);
+
+        return ();
+    }
+    if (op == op::transfer_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(error::insufficient_jetton, jetton_amount > 0);
+        cell forward_payload = in_msg_body~load_maybe_ref();
+        slice forward_payload_cs = forward_payload.begin_parse();
+        int total = forward_payload_cs~load_coins();
+        int length = forward_payload_cs~load_uint(16);
+        cell messages = forward_payload_cs~load_dict();
+        throw_if(error::unmatch_jetton, jetton_amount < total);
+        throw_if(error::insufficient_ton, 0 > msg_value - extra_fee - ton_for_fee * length);
+        
+        (int last_key, slice val, int f?) = messages.udict_get_next?(16, 0);
+        repeat(min(200, length)) {
+            if (f?) {
+                int value = val~load_coins();
+                slice dest = val~load_msg_addr();
+                throw_if(error::malicious_transfer, total < value);
+                send_jetton(query_id, sender_address, dest, value, from_address);
+                (last_key, val, f?) = messages.udict_get_next?(16, last_key);
+                total = total - value;
+            }
+        }
+        
+        int remaining = my_balance - msg_value + extra_fee;
+        raw_reserve(remaining, 0);
+        send_excesses(from_address);
+
+        return ();
+    }
+
+    if (op == op::claim_ton) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, admin_address));
+        int remaining = my_balance - min_tons_for_storage;
+        raw_reserve(min_tons_for_storage, 0);
+        send_excesses(sender_address);
+
+        return ();
+    }
+
+    if (op == op::change_fee) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, admin_address));
+        int new_extra_fee = in_msg_body~load_coins();
+        save_data(new_extra_fee, admin_address, updater_address);
+
+        return ();
+    }
+
+    if (op == op::change_admin) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, admin_address));
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        save_data(extra_fee, new_admin_address, updater_address);
+
+        return ();
+    }
+
+    if (op == op::change_updater) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, admin_address));
+        slice new_updater_address = in_msg_body~load_msg_addr();
+        save_data(extra_fee, admin_address, new_updater_address);
+
+        return ();
+    }
+
+    if (op == op::upgrade_code) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, updater_address));
+        cell code = in_msg_body~load_ref();
+        set_code(code);
+
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+(int, slice, slice) get_contract_data() method_id {
+    var (extra_fee, admin_address, upgrader_address) = load_data();
+
+    return (
+        extra_fee,
+        admin_address,
+        upgrader_address
+    );
+}
+
+int get_extra_fee() method_id {
+    var (extra_fee, admin_address, upgrader_address) = load_data();
+    return extra_fee;
+}
