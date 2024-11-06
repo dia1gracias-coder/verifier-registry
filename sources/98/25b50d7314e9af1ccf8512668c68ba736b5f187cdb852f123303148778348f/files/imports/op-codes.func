@@ -1,0 +1,28 @@
+;; Common
+const int op::excesses = 0xd53276db;
+const int op::notification = 0x00000000;
+
+;; Redeem
+const int op::redeem = 11;
+const int op::internal_redeem_check = 101;
+const int op::internal_redeem_allow = 102;
+const int op::internal_redeem_disallow = 103;
+
+;; Jetton
+const int op::transfer = 0xf8a7ea5;
+const int op::transfer_notification = 0x7362d09c;
+
+;; Admin
+const int op::change_admin = 0x4840664f;
+const int op::change_public_key = 201;
+const int op::upgrade = 0x2508d66a;
+const int op::upgrade_code = 202;
+const int op::withdraw_tons = 203;
+const int op::withdraw_jettons = 204;
+const int op::manual_update_onhand_balance = 205;
+
+(slice, (int)) ~load_op(slice s) inline { return s.load_uint(32); }
+(slice, (int)) ~load_query_id(slice s) inline { return s.load_uint(64); }
+builder store_op(builder b, int op) inline { return b.store_uint(op, 32); }
+builder store_query_id(builder b, int query_id) inline { return b.store_uint(query_id, 64); }
+
