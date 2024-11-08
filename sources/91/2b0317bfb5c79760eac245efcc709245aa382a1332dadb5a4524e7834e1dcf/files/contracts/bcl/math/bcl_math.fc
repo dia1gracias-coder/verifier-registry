@@ -1,0 +1,66 @@
+#include "../../imports/math/math.fc";
+#include "bcl_math_core_2.fc";
+
+;;
+;; High level curve math
+;;
+
+;; Current price
+int calc_coin_price() inline {
+    if (ctx_total_supply == 0) {
+        return 0;
+    }
+
+    return math::calc_coin_price(ctx_total_supply);
+}
+
+;; Sell operation
+var calc_tons_for_coins(int tokens) inline {
+    var tons_to_get = math::calc_tons_for_coins(tokens, ctx_total_supply);
+    ;; Calc fees in TON
+    var fees = muldiv(tons_to_get, ctx_trade_fee_numerator, ctx_trade_fee_denominator);
+
+    ;; Deduct fees
+    tons_to_get -= fees;
+
+    return (fees, tons_to_get);
+}
+
+var calc_tons_for_all_coins() inline {
+    var tons_need = math::calc_tons_for_coins(ctx_bcl_supply, ctx_bcl_supply);
+
+    var full_tons_need = muldivc(tons_need, ctx_trade_fee_denominator, ctx_trade_fee_denominator - ctx_trade_fee_numerator) + 1;
+
+    var fees = muldiv(full_tons_need, ctx_trade_fee_numerator, ctx_trade_fee_denominator);
+
+    return (fees, full_tons_need);
+}
+
+;; Buy operation
+var calc_coins_for_tons(int tons) inline {
+    var incoming_tons = tons;
+    var available_to_buy = ctx_bcl_supply - ctx_total_supply;
+
+    ;; Calc fees in TON
+    var fees = muldiv(tons, ctx_trade_fee_numerator, ctx_trade_fee_denominator);
+    ;; Deduct fees
+    tons = tons - fees;
+
+    var coins_to_get = math::calc_coins_for_tons(tons, ctx_total_supply);
+
+
+    ;; Calculations for rest of available coins
+    if (coins_to_get > available_to_buy) {
+        var tons_no_fees = math::calc_tons_for_coins(available_to_buy, ctx_total_supply + available_to_buy);
+
+        ;; Add fees
+        var tons_need = muldivc(tons_no_fees, ctx_trade_fee_denominator, ctx_trade_fee_denominator - ctx_trade_fee_numerator);
+
+        ;; Calc fees in TON
+        var fees = muldiv(tons_need, ctx_trade_fee_numerator, ctx_trade_fee_denominator);
+
+        return (fees, available_to_buy, tons_need);
+    }
+
+    return (fees, coins_to_get, incoming_tons);
+}
