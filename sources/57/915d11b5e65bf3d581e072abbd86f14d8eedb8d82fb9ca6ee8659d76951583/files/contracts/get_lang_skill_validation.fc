@@ -1,0 +1,233 @@
+#include "imports/stdlib.fc";
+#pragma version >=0.2.0;
+
+;; Хранение данных контракта
+;; storage#_ owner:MsgAddressInt total_pool:Coins current_period:uint32 points_per_ton:uint32 validators:(HashmapE 256 uint32) = Storage;
+
+;; Error codes
+const int error::access_denied = 401;
+const int error::invalid_period = 402;
+const int error::validator_not_found = 403;
+const int error::insufficient_funds = 404;
+const int error::invalid_op = 405;
+const int error::already_initialized = 406;
+
+;; Operation codes
+const int op::update_points = 1;
+const int op::claim_reward = 2;
+const int op::withdraw = 3;
+const int op::change_owner = 4;
+
+;; Структура для хранения данных контракта
+(cell) pack_data(int initialized, slice owner, int total_pool, int current_period, int points_per_ton, cell validators_data) inline {
+    return begin_cell()
+        .store_uint(initialized, 1)  ;; флаг инициализации
+        .store_slice(owner)
+        .store_coins(total_pool)
+        .store_uint(current_period, 32)
+        .store_uint(points_per_ton, 32)
+        .store_dict(validators_data)
+        .end_cell();
+}
+
+;; Распаковка данных
+(int, slice, int, int, int, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_uint(1),    ;; initialized
+        ds~load_msg_addr(), ;; owner
+        ds~load_coins(),    ;; total_pool
+        ds~load_uint(32),   ;; current_period
+        ds~load_uint(32),   ;; points_per_ton
+        ds~load_dict()      ;; validators_data
+    );
+}
+
+;; Инициализация контракта
+() recv_external(slice in_msg) impure {
+    ;; Получаем текущее состояние
+    var (initialized, _, _, _, _, _) = load_data();
+    throw_if(error::already_initialized, initialized == 1);
+
+    ;; Получаем адрес владельца из входящего сообщения
+    slice owner = in_msg~load_msg_addr();
+    
+    ;; Инициализируем контракт
+    set_data(pack_data(
+        1,              ;; initialized = true
+        owner,          ;; owner address
+        0,              ;; initial total_pool
+        0,              ;; initial current_period
+        0,              ;; initial points_per_ton
+        new_dict()      ;; empty validators data
+    ));
+}
+
+;; Проверка владельца
+() ensure_owner(slice sender, slice owner) impure inline {
+    throw_unless(error::access_denied, sender.slice_hash() == owner.slice_hash());
+}
+
+;; Безопасное вычисление награды
+(int) safe_multiply_divide(int amount, int numerator, int denominator) inline {
+    throw_if(0, denominator == 0);
+    return muldiv(amount, numerator, denominator);
+}
+
+;; Отправка TON
+() send_tons(slice address, int amount, int mode) impure inline {
+    var msg = begin_cell()
+        .store_uint(0x18, 6)            ;; nobounce
+        .store_slice(address)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+    send_raw_message(msg, mode);
+}
+
+;; Функция депозита
+() deposit(slice sender, int msg_value) impure {
+    var (init, stored_owner, total_pool, current_period, points_per_ton, validators_data) = load_data();
+    
+    ;; Сохраняем обновленные данные
+    set_data(pack_data(init, stored_owner, total_pool + msg_value, current_period, points_per_ton, validators_data));
+}
+
+;; Обновление баллов валидаторов
+;; Rename _points to update_points to match the call
+() update_points(slice sender, slice in_msg_body) impure {
+    var (init, owner, total_pool, current_period, points_per_ton, validators_data) = load_data();
+    ensure_owner(sender, owner);
+    
+    cell new_validators_data = new_dict();
+    
+    ;; Загружаем новые данные из сообщения
+    int new_period = in_msg_body~load_uint(32);
+    int new_points_per_ton = in_msg_body~load_uint(32);
+    int dict_size = in_msg_body~load_uint(32);
+
+    ;; Загружаем данные для каждого валидатора
+    repeat(dict_size) {
+        slice validator_addr = in_msg_body~load_msg_addr();
+        int points = in_msg_body~load_uint(32);
+        ;; Create a slice from cell for udict_set
+        slice value_slice = begin_cell().store_uint(points, 32).end_cell().begin_parse();
+        new_validators_data~udict_set(256, validator_addr.slice_hash(), value_slice);
+    }
+    
+    ;; Проверяем валидность периода
+    throw_if(error::invalid_period, new_period <= current_period);
+    
+    ;; Сохраняем новые данные
+    set_data(pack_data(init, owner, total_pool, new_period, new_points_per_ton, new_validators_data));
+}
+
+
+;; Функция клейма наград
+() claim_reward(slice sender) impure {
+    var (init, owner, total_pool, current_period, points_per_ton, validators_data) = load_data();
+    
+    ;; Получаем данные валидатора
+    (slice validator_data, int success) = validators_data.udict_get?(256, sender.slice_hash());
+    throw_unless(error::validator_not_found, success);
+    
+    int validator_points = validator_data~load_uint(32);
+    
+    ;; Безопасно вычисляем награду
+    int reward = safe_multiply_divide(validator_points, total_pool, points_per_ton);
+    throw_if(error::insufficient_funds, reward > total_pool);
+    
+    ;; Отправляем награду
+    send_tons(sender, reward, 1);
+    
+    ;; Обновляем пул и удаляем данные валидатора
+    validators_data~udict_delete?(256, sender.slice_hash());
+    
+    set_data(pack_data(init, owner, total_pool - reward, current_period, points_per_ton, validators_data));
+}
+
+;; Функция вывода средств владельцем
+() withdraw(slice sender, int amount) impure {
+    var (init, owner, total_pool, current_period, points_per_ton, validators_data) = load_data();
+    ensure_owner(sender, owner);
+    
+    throw_if(error::insufficient_funds, amount > total_pool);
+    
+    ;; Отправляем запрошенную сумму владельцу
+    send_tons(sender, amount, 1);
+    
+    ;; Обновляем пул
+    set_data(pack_data(init, owner, total_pool - amount, current_period, points_per_ton, validators_data));
+}
+
+;; Смена владельца
+() change_owner(slice sender, slice new_owner) impure {
+    var (init, owner, total_pool, current_period, points_per_ton, validators_data) = load_data();
+    ensure_owner(sender, owner);
+    
+    ;; Обновляем владельца
+    set_data(pack_data(init, new_owner, total_pool, current_period, points_per_ton, validators_data));
+}
+
+;; Get-методы для просмотра состояния
+(int, int) get_pool_info() method_id {
+    var (_, _, total_pool, current_period, points_per_ton, _) = load_data();
+    return (total_pool, current_period);
+}
+
+(int) get_validator_points(slice validator_address) method_id {
+    var (_, _, _, _, _, validators_data) = load_data();
+    (slice validator_data, int success) = validators_data.udict_get?(256, validator_address.slice_hash());
+    if (success) {
+        return validator_data~load_uint(32);
+    }
+    return 0;
+}
+
+(int, slice) get_contract_state() method_id {
+    var (initialized, owner, _, _, _, _) = load_data();
+    return (initialized, owner);
+}
+
+() recv_internal(cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    var sender = cs~load_msg_addr();
+    var amount = cs~load_coins();
+    
+    ;; Проверяем инициализацию
+    var (initialized, _, _, _, _, _) = load_data();
+    throw_unless(error::access_denied, initialized == 1);
+
+    ;; Проверяем, что сообщение не пустое
+    if (in_msg_body.slice_empty?()) {
+        ;; Обрабатываем простой перевод как депозит
+        deposit(sender, amount);
+        return ();
+    }
+    
+    ;; Получаем op-code
+    int op = in_msg_body~load_uint(32);
+    
+    ;; Обрабатываем операции
+    if (op == op::update_points) {
+        update_points(sender, in_msg_body);
+        return ();
+    }
+    if (op == op::claim_reward) {
+        claim_reward(sender);
+        return ();
+    }
+    if (op == op::withdraw) {
+        int withdraw_amount = in_msg_body~load_coins();
+        withdraw(sender, withdraw_amount);
+        return ();
+    }
+    if (op == op::change_owner) {
+        slice new_owner = in_msg_body~load_msg_addr();
+        change_owner(sender, new_owner);
+        return ();
+    }
+    
+    throw(error::invalid_op);
+}
