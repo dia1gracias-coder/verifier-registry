@@ -1,0 +1,20 @@
+int op::transfer() asm "0xf8a7ea5 PUSHINT";
+int op::transfer_notification() asm "0x7362d09c PUSHINT";
+int op::internal_transfer() asm "0x178d4519 PUSHINT";
+int op::excesses() asm "0xd53276db PUSHINT";
+int op::burn() asm "0x595f07bc PUSHINT";
+int op::burn_notification() asm "0x7bdd97de PUSHINT";
+
+;; Minter
+int op::mint() asm "21 PUSHINT";
+int op::change_admin() asm "3 PUSHINT";
+int op::drop_admin() asm "5 PUSHINT";
+
+const error::invalid_op = 72;
+const error::wrong_op = 0xffff;
+const error::not_owner = 73;
+const error::not_valid_wallet = 74;
+const error::discovery_fee_not_matched = 75;
+const error::wrong_workchain = 333;
+const error::not_enough_gas = 48;
+const error::invalid_message = 49;
