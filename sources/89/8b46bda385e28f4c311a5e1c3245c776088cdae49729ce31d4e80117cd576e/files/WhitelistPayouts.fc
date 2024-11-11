@@ -1,0 +1,103 @@
+#include "imports/stdlib.fc";
+
+;; Error codes
+const int error::not_owner = 402;
+const int error::invalid_op = 403;
+
+;; Op codes
+const int op::add_to_whitelist = 1;
+const int op::withdraw = 2;
+
+;; Modes
+const const::mode_ordinary_message = 0;
+const const::flag_pay_fees_separately = 1;
+const const::flag_ignore_errors = 2;
+const const::flag_bounce_transaction = 16;
+const const::flag_destroy_acc_if_balance_0 = 32;
+const const::mode_carry_from_message = 64;
+const const::mode_carry_from_smart_contract = 128;
+
+() save_data(slice owner_address, cell whitelist_dict) impure {
+    set_data(begin_cell()
+        .store_slice(owner_address)
+        .store_dict(whitelist_dict)
+        .end_cell());
+}
+
+(slice, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+
+    return (ds~load_msg_addr(), ds~load_dict());
+}
+
+(int, int) get_whitelist_info(slice address) method_id {
+    (_, cell whitelist_dict) = load_data();
+    (slice value, int found) = whitelist_dict.udict_get?(256, slice_hash(address));
+
+    if (found == -1) {
+        return (found, value~load_coins());
+    }
+
+    return (0, 0);
+}
+
+slice get_owner() method_id {
+    (slice owner_address, _) = load_data();
+    return owner_address;
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+    slice cs = in_msg.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    ;; Load contract data
+    cell data = get_data();
+    slice ds = data.begin_parse();
+
+    ;; Handle initialization
+    if (ds.slice_bits() == 0) {
+        save_data(sender_address, new_dict());
+        return ();
+    }
+
+    ;; Load existing data
+    (slice owner_address, cell whitelist_dict) = load_data();
+
+    ;; Parse op
+    if (in_msg_body.slice_bits() == 0) { return (); }
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::add_to_whitelist) {
+        ;; Check if sender is owner
+        throw_unless(error::not_owner, equal_slice_bits(sender_address, owner_address));
+
+        slice address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        whitelist_dict~udict_set_builder(256, slice_hash(address), begin_cell().store_coins(amount));
+        save_data(owner_address, whitelist_dict);
+        return ();
+    }
+
+    if (op == op::withdraw) {
+        slice address = in_msg_body~load_msg_addr();
+        (int found, int amount) = get_whitelist_info(address);
+        throw_unless(error::invalid_op, found);
+
+        whitelist_dict~udict_delete?(256, slice_hash(address));
+
+        ;; Send coins to the address
+        cell msg = begin_cell()
+            .store_uint(0x18, 6)            ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+            .store_slice(address)           ;; to_address: addr_std$10
+            .store_coins(amount)            ;; value
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; 107 zeroes
+            .end_cell();
+
+        send_raw_message(msg, const::flag_pay_fees_separately);  ;; mode 1 to pay transfer fees separately
+        save_data(owner_address, whitelist_dict);
+        return ();
+    }
+
+    throw(error::invalid_op);
+}
