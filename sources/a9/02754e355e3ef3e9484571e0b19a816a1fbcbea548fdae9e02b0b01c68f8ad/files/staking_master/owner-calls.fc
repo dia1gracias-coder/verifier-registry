@@ -1,0 +1,162 @@
+;; messages from owner
+
+int handle_owner_messages(int op, int query_id, int my_balance, int msg_value, slice in_msg_body) impure inline {
+    if (op == op::init_jetton_wallet_address) {
+        throw_unless(error::invalid_call, storage::jetton_wallet_address.preload_uint(2) == 0);
+        storage::jetton_wallet_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+        save_storage();
+        return -1;
+    }
+    
+    if (op == op::transfer_ownership) {
+        storage::owner = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::update_accounts) {
+        int operation = in_msg_body~load_uint(1);
+        int role = in_msg_body~load_uint(32);
+        slice account = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        throw_if(error::invalid_role, role > SYSTEM_ROLE);
+
+        if (role == ADMIN_ROLE) {
+            if (operation == ADD_ACCOUNT) {
+                storage::admin_accounts = add_account(storage::admin_accounts, account);
+            } else {
+                storage::admin_accounts = remove_account(storage::admin_accounts, account);
+            }
+        }
+
+        if (role == SYSTEM_ROLE) {
+            if (operation == ADD_ACCOUNT) {
+                storage::system_accounts = add_account(storage::system_accounts, account);
+            } else {
+                storage::system_accounts = remove_account(storage::system_accounts, account);
+            }
+        }
+
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::withdraw_jetton) {
+        int amount = in_msg_body~load_coins();
+        int forward_ton_amount = in_msg_body~load_coins();
+        cell either_forward_payload = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        throw_unless(error::invalid_amount, amount > 0);
+        throw_unless(error::insufficient_funds, storage::vault_balance >= amount);
+        storage::vault_balance -= amount;
+
+        var transfer_msg = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(amount)
+            .store_slice(storage::owner)
+            .store_slice(storage::owner)
+            .store_uint(0, 1) ;; store_dict(null())
+            .store_coins(forward_ton_amount)
+            .store_maybe_ref(either_forward_payload)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(storage::jetton_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(transfer_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::withdraw_all_jetton) {
+        int forward_ton_amount = in_msg_body~load_coins();
+        cell either_forward_payload = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        throw_unless(error::insufficient_funds, storage::vault_balance > 0);
+
+        var transfer_msg = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(storage::vault_balance)
+            .store_slice(storage::owner)
+            .store_slice(storage::owner)
+            .store_uint(0, 1) ;; store_dict(null())
+            .store_coins(forward_ton_amount)
+            .store_maybe_ref(either_forward_payload)
+            .end_cell();  
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(storage::jetton_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(transfer_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        storage::vault_balance = 0;
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::withdraw_custom_jetton) {
+        int amount = in_msg_body~load_coins();
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+        int forward_ton_amount = in_msg_body~load_coins();
+        cell either_forward_payload = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        var transfer_msg = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(amount)
+            .store_slice(storage::owner)
+            .store_slice(storage::owner)
+            .store_uint(0, 1) ;; store_dict(null())
+            .store_coins(forward_ton_amount)
+            .store_maybe_ref(either_forward_payload)
+            .end_cell(); 
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(jetton_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(transfer_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        return -1;
+    }
+
+    if (op == op::withdraw_ton) {
+        in_msg_body.end_parse();
+        throw_unless(error::insufficient_funds, my_balance > MIN_TON_FOR_STORAGE);
+        raw_reserve(MIN_TON_FOR_STORAGE, RESERVE_REGULAR);
+
+        cell msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(storage::owner)
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_uint(op::top_up, 32)
+            .store_uint(query_id, 64)
+            .end_cell();
+        send_raw_message(msg, SEND_MODE_CARRY_ALL_BALANCE);
+        return -1;
+    }
+
+    if (op == op::upgrade) {
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_data(new_data);
+        set_code(new_code);
+        return -1;
+    }
+
+    return 0;
+}

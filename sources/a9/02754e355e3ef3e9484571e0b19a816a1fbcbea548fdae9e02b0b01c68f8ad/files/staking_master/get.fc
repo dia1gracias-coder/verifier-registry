@@ -1,0 +1,59 @@
+;; get methods
+
+(int, int, int, int, int, int, int, int, slice, slice, cell, cell, cell, cell) get_staking_master_data() method_id {
+    load_storage();
+    return (
+        storage::paused,
+        storage::pool_id,
+        storage::seqno,
+        storage::request_max_count,
+        storage::unstake_day,
+        storage::one_day_time,
+        storage::public_key,
+        storage::vault_balance,
+        storage::owner,
+        storage::jetton_wallet_address,
+        storage::admin_accounts,
+        storage::system_accounts,
+        storage::percent_per_unlock_days,
+        storage::staking_wallet_code
+    );
+}
+
+slice get_staking_wallet_address(slice staker) method_id {
+    load_storage();
+    return calculate_user_staking_wallet_address(staker, my_address(), storage::staking_wallet_code);
+}
+
+int get_calculate_unlock_amount(int day, int amount) method_id {
+    load_storage();
+    if (storage::pool_id == STAKE_POOL_ID) {
+        return 0;
+    }
+
+    (slice percent_slice, int exists) = storage::percent_per_unlock_days.udict_get?(32, day);
+    ifnot (exists) {
+        return 0;
+    }
+
+    int percent = percent_slice~load_uint(32);
+    return (amount * percent) / ONE_HUNDRED_PERCENT;
+}
+
+int get_has_role(int role, slice account) method_id {
+    load_storage();
+
+    if (role > SYSTEM_ROLE) {
+        return 0;
+    }
+
+    cell accounts = storage::admin_accounts;
+
+    if (role == SYSTEM_ROLE) {
+        accounts = storage::system_accounts;
+    }
+
+    (_, int exists) = account_exists(accounts, account);
+
+    return exists;
+}

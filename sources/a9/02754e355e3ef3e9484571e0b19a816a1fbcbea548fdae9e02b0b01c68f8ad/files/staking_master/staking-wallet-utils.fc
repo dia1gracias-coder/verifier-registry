@@ -1,0 +1,61 @@
+cell pack_staking_wallet_data(int unstake_request_count, int request_id, int timestamp, int balance, slice staker, slice staking_master_address, cell unstake_requests) inline {
+    return begin_cell()
+        .store_uint(unstake_request_count, 32)
+        .store_uint(request_id, 32)
+        .store_uint(timestamp, 32)
+        .store_coins(balance)
+        .store_slice(staker)
+        .store_slice(staking_master_address)
+        .store_dict(unstake_requests)
+        .end_cell();
+}
+
+cell calculate_staking_wallet_state_init(slice staker, slice staking_master_address, cell staking_wallet_code) inline {
+    return begin_cell()
+        .store_uint(0, 2) ;; 0b00 - No split_depth; No special
+        .store_maybe_ref(staking_wallet_code)
+        .store_maybe_ref(
+            pack_staking_wallet_data(
+                0, ;; unstake request count
+                0, ;; request id
+                0, ;; timestamp
+                0, ;; balance
+                staker,
+                staking_master_address,
+                null()
+            )
+        )
+        .store_uint(0, 1) ;; Empty libraries
+        .end_cell();
+}
+
+slice calculate_staking_wallet_address(cell state_init) inline {
+    return begin_cell()
+        .store_uint(4, 3) ;; 0b100 = addr_std$10 tag; No anycast
+        .store_int(WORKCHAIN, 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}
+
+slice calculate_user_staking_wallet_address(slice staker, slice staking_master_address, cell staking_wallet_code) inline {
+    return calculate_staking_wallet_address(calculate_staking_wallet_state_init(staker, staking_master_address, staking_wallet_code));
+}
+
+() send_stake_internal_msg(int query_id, int amount, slice staker) impure inline {
+    cell state_init = calculate_staking_wallet_state_init(staker, my_address(), storage::staking_wallet_code);
+    slice to_wallet_address = calculate_staking_wallet_address(state_init);
+
+    var stake_internal_msg = begin_cell()
+        .store_uint(op::stake_internal, 32)
+        .store_uint(query_id, 64)
+        .store_coins(amount)
+        .end_cell();        
+
+    var msg = begin_cell()
+        .store_msg_flags_and_address_none(BOUNCEABLE)
+        .store_slice(to_wallet_address)
+        .store_coins(0)
+        .store_statinit_ref_and_body_ref(state_init, stake_internal_msg);
+    send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+}

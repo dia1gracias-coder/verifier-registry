@@ -1,0 +1,74 @@
+;; messages from admin accounts
+
+int handle_admin_messages(int op, int query_id, int my_balance, int msg_value, slice in_msg_body) impure inline {
+    if (op == op::pause) {
+        in_msg_body.end_parse();
+        storage::paused = -1;
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::unpause) {
+        in_msg_body.end_parse();
+        storage::paused = 0;
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::update_public_key) {
+        storage::public_key = in_msg_body~load_uint(256);
+        in_msg_body.end_parse();
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::set_request_max_count) {
+        storage::request_max_count = in_msg_body~load_uint(32);
+        in_msg_body.end_parse();
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::set_one_day_time) {
+        storage::one_day_time = in_msg_body~load_uint(32);
+        in_msg_body.end_parse();
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::set_unstake_day) {
+        throw_unless(error::invalid_call, storage::pool_id == STAKE_POOL_ID);
+        storage::unstake_day = in_msg_body~load_uint(32);
+        in_msg_body.end_parse();
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::set_unlock_day) {
+        throw_unless(error::invalid_call, storage::pool_id == LOCK_POOL_ID);
+        int day = in_msg_body~load_uint(32);
+        int percent = in_msg_body~load_uint(32);
+        in_msg_body.end_parse();
+
+        throw_unless(error::invalid_percent, percent <= ONE_HUNDRED_PERCENT);
+
+        slice percent_slice = begin_cell().store_uint(percent, 32).end_cell().begin_parse();
+        storage::percent_per_unlock_days~udict_set(32, day, percent_slice);
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::remove_lock_day) {
+        throw_unless(error::invalid_call, storage::pool_id == LOCK_POOL_ID);
+        int day = in_msg_body~load_uint(32);
+        in_msg_body.end_parse();
+
+        (_, int exists) = storage::percent_per_unlock_days.udict_get?(32, day);
+        throw_unless(error::invalid_unlock_day, exists);
+        storage::percent_per_unlock_days~udict_delete?(32, day);
+        save_storage();
+        return -1;
+    }
+
+    return 0;
+}

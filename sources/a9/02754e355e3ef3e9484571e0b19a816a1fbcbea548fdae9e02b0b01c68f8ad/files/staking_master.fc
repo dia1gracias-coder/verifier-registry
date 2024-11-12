@@ -1,0 +1,290 @@
+#include "imports/stdlib.fc";
+#include "common/workchain.fc";
+#include "staking_master/error.fc";
+#include "common/accounts.fc";
+#include "./helpers.fc";
+#include "staking_master/storage.fc";
+#include "staking_master/op.fc";
+#include "staking_master/params.fc";
+#include "staking_master/staking-wallet-utils.fc";
+#include "staking_master/get.fc";
+#include "staking_master/jetton-utils.fc";
+#include "staking_master/owner-calls.fc";
+#include "staking_master/admin-calls.fc";
+#include "staking_master/system-calls.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    load_storage();
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins();
+
+    force_chain(WORKCHAIN, sender_address, error::wrong_workchain);
+
+    (int op, int query_id) = (in_msg_body~load_uint(32), in_msg_body~load_uint(64));
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }
+
+    if (equal_slices(sender_address, storage::owner)) {
+        if (handle_owner_messages(op, query_id, my_balance, msg_value, in_msg_body)) {
+            return ();
+        }
+    }
+
+    (_, int admin_exists) = account_exists(storage::admin_accounts, sender_address);
+    if (admin_exists) {
+        if (handle_admin_messages(op, query_id, my_balance, msg_value, in_msg_body)) {
+            return ();
+        }
+    }
+
+    throw_if(error::contract_paused, storage::paused);
+
+    (_, int system_exists) = account_exists(storage::system_accounts, sender_address);
+    if (system_exists) {
+        if (handle_system_messages(op, query_id, my_balance, msg_value, in_msg_body)) {
+            return ();
+        }
+    }
+
+    if (op == op::transfer_notification) {
+        (int jetton_amount, slice from_user) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+        cell ref_cs = in_msg_body~load_ref(); 
+        slice ref_ds = ref_cs.begin_parse();
+        
+        throw_unless(error::invalid_amount, jetton_amount > 0);
+
+        ifnot (equal_slices(sender_address, storage::jetton_wallet_address)) {
+            refund_jetton(query_id, jetton_amount, from_user, sender_address);
+            return ();
+        }
+
+        if (storage::pool_id == LOCK_POOL_ID) {
+            (_, int admin_exists) = account_exists(storage::admin_accounts, from_user);
+            ifnot (admin_exists) {
+                refund_jetton(query_id, jetton_amount, from_user, sender_address);
+                return ();
+            }
+
+            from_user = ref_ds~load_msg_addr();
+        }
+
+        ref_ds.end_parse();
+        send_stake_internal_msg(query_id, jetton_amount, from_user);
+        return ();
+    }
+
+    if (op == op::raffle_stake) {
+        throw_unless(error::invalid_call, storage::pool_id == LOCK_POOL_ID);
+        cell ref = in_msg_body~load_ref();
+        slice ref_cs = ref.begin_parse();
+        slice signature = ref_cs~load_bits(512);
+        int msg_seqno = in_msg_body~load_uint(32);
+        int valid_until = in_msg_body~load_uint(32);
+        int amount = in_msg_body~load_coins();
+        slice staker = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        cell cell_to_hash = begin_cell()
+            .store_slice(my_address())
+            .store_slice(sender_address)
+            .store_uint(msg_seqno, 32)
+            .store_uint(valid_until, 32)
+            .store_coins(amount)
+            .store_slice(staker)
+            .end_cell();
+
+        throw_unless(error::deadline_expired, valid_until >= now());
+        throw_unless(error::invalid_seqno, msg_seqno == storage::seqno);
+        throw_unless(error::invalid_signature, check_signature(cell_hash(cell_to_hash), signature, storage::public_key));
+
+        send_stake_internal_msg(query_id, amount, staker);
+        storage::seqno += 1;
+        save_storage();
+        return ();
+    }
+
+    if (op == op::buy_item_response) {
+        int amount = in_msg_body~load_coins();
+        slice staker = in_msg_body~load_msg_addr();
+        slice recipient = in_msg_body~load_msg_addr();
+        int forward_ton_amount = in_msg_body~load_coins();
+        cell either_forward_payload = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        throw_unless(error::invalid_caller,
+            equal_slices(
+                calculate_user_staking_wallet_address(
+                    staker, 
+                    my_address(), 
+                    storage::staking_wallet_code
+                ), sender_address
+            )
+        );
+
+        var transfer_msg = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(amount)
+            .store_slice(recipient)
+            .store_slice(staker)
+            .store_uint(0, 1) ;; store_dict(null())
+            .store_coins(forward_ton_amount)
+            .store_maybe_ref(either_forward_payload)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(storage::jetton_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(transfer_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        return ();
+    }
+
+    if (op == op::request_unstake) {
+        int amount = in_msg_body~load_coins();
+        int day = storage::unstake_day;
+        int percent = ONE_HUNDRED_PERCENT;
+        if (storage::pool_id == LOCK_POOL_ID) {
+            day = in_msg_body~load_uint(32);
+            (slice percent_slice, int exists) = storage::percent_per_unlock_days.udict_get?(32, day);
+            throw_unless(error::invalid_unlock_day, exists);
+            percent = percent_slice~load_uint(32);
+        }
+
+        in_msg_body.end_parse();
+
+        int duration = storage::one_day_time * day;
+        int available_amount = (amount * percent) / ONE_HUNDRED_PERCENT;
+        slice to_wallet_address = calculate_user_staking_wallet_address(sender_address, my_address(), storage::staking_wallet_code);
+
+        var request_unstake_internal_msg = begin_cell()
+            .store_uint(op::request_unstake_internal, 32)
+            .store_uint(query_id, 64)
+            .store_uint(storage::pool_id, 8)
+            .store_uint(storage::request_max_count, 32)
+            .store_uint(duration, 32)
+            .store_coins(amount)
+            .store_coins(available_amount)
+            .end_cell();        
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(to_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(request_unstake_internal_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        return ();
+    }
+
+    if (op == op::cancel_unstake) {
+        int request_id = in_msg_body~load_uint(32);
+        in_msg_body.end_parse();
+
+        slice to_wallet_address = calculate_user_staking_wallet_address(sender_address, my_address(), storage::staking_wallet_code);
+
+        var cancel_unstake_internal_msg = begin_cell()
+            .store_uint(op::cancel_unstake_internal, 32)
+            .store_uint(query_id, 64)
+            .store_uint(request_id, 32)
+            .end_cell();        
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(to_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(cancel_unstake_internal_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        return ();
+    }
+
+    if (op == op::claim_unstake) {
+        int request_id = in_msg_body~load_uint(32);
+        int forward_ton_amount = in_msg_body~load_coins();
+        cell either_forward_payload = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        slice to_wallet_address = calculate_user_staking_wallet_address(sender_address, my_address(), storage::staking_wallet_code);
+
+        var claim_unstake_request_msg = begin_cell()
+            .store_uint(op::claim_unstake_request, 32)
+            .store_uint(query_id, 64)
+            .store_uint(request_id, 32)
+            .store_coins(forward_ton_amount)
+            .store_maybe_ref(either_forward_payload)
+            .end_cell();        
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(to_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(claim_unstake_request_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        return ();
+    }
+
+    if (op == op::claim_unstake_response) {
+        int available_amount = in_msg_body~load_coins();
+        int vault_amount = in_msg_body~load_coins();
+        slice staker = in_msg_body~load_msg_addr();
+        int forward_ton_amount = in_msg_body~load_coins();
+        cell either_forward_payload = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        throw_unless(error::invalid_caller,
+            equal_slices(
+                calculate_user_staking_wallet_address(
+                    staker, 
+                    my_address(), 
+                    storage::staking_wallet_code
+                ), sender_address
+            )
+        );
+
+        storage::vault_balance += vault_amount;
+
+        var transfer_msg = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(available_amount)
+            .store_slice(staker)
+            .store_slice(staker)
+            .store_uint(0, 1) ;; store_dict(null())
+            .store_coins(forward_ton_amount)
+            .store_maybe_ref(either_forward_payload)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(storage::jetton_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(transfer_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        save_storage();
+        return ();
+    }
+
+    throw(error::wrong_op);
+}

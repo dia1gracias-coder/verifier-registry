@@ -1,0 +1,51 @@
+global int storage::paused;
+global int storage::pool_id;
+global int storage::seqno;
+global int storage::request_max_count;
+global int storage::unstake_day;
+global int storage::one_day_time;
+global int storage::public_key;
+global int storage::vault_balance;
+global slice storage::owner;
+global slice storage::jetton_wallet_address;
+global cell storage::admin_accounts;
+global cell storage::system_accounts;
+global cell storage::percent_per_unlock_days;
+global cell storage::staking_wallet_code;
+
+() load_storage() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::paused = ds~load_int(1);
+    storage::pool_id = ds~load_uint(8);
+    storage::seqno = ds~load_uint(32);
+    storage::request_max_count = ds~load_uint(32);
+    storage::unstake_day = ds~load_uint(32);
+    storage::one_day_time = ds~load_uint(32);
+    storage::public_key = ds~load_uint(256);
+    storage::vault_balance = ds~load_coins();
+    storage::owner = ds~load_msg_addr();
+    storage::jetton_wallet_address = ds~load_msg_addr();
+    storage::admin_accounts = ds~load_dict();
+    storage::system_accounts = ds~load_dict();
+    storage::percent_per_unlock_days = ds~load_dict();
+    storage::staking_wallet_code = ds~load_ref();
+}
+
+() save_storage() impure inline {
+    set_data(begin_cell()
+        .store_int(storage::paused, 1)
+        .store_uint(storage::pool_id, 8)
+        .store_uint(storage::seqno, 32)
+        .store_uint(storage::request_max_count, 32)
+        .store_uint(storage::unstake_day, 32)
+        .store_uint(storage::one_day_time, 32)
+        .store_uint(storage::public_key, 256)
+        .store_coins(storage::vault_balance)
+        .store_slice(storage::owner)
+        .store_slice(storage::jetton_wallet_address)
+        .store_dict(storage::admin_accounts)
+        .store_dict(storage::system_accounts)
+        .store_dict(storage::percent_per_unlock_days)
+        .store_ref(storage::staking_wallet_code)
+    .end_cell());
+}

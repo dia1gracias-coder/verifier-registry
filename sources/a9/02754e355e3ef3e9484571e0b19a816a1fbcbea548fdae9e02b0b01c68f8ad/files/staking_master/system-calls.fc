@@ -1,0 +1,36 @@
+;; messages from system accounts
+
+int handle_system_messages(int op, int query_id, int my_balance, int msg_value, slice in_msg_body) impure inline {
+    if (op == op::buy_item) {
+        throw_unless(error::invalid_call, storage::pool_id == STAKE_POOL_ID);
+        int amount = in_msg_body~load_coins();
+        slice staker = in_msg_body~load_msg_addr();
+        slice recipient = in_msg_body~load_msg_addr();
+        int forward_ton_amount = in_msg_body~load_coins();
+        cell either_forward_payload = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        slice to_wallet_address = calculate_user_staking_wallet_address(staker, my_address(), storage::staking_wallet_code);
+        throw_unless(error::invalid_amount, amount > 0);
+
+        var buy_item_request_msg = begin_cell()
+            .store_uint(op::buy_item_request, 32)
+            .store_uint(query_id, 64)
+            .store_coins(amount)
+            .store_slice(recipient)
+            .store_coins(forward_ton_amount)
+            .store_maybe_ref(either_forward_payload)
+            .end_cell();        
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(to_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(buy_item_request_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        return -1;
+    }
+
+    return 0;
+}

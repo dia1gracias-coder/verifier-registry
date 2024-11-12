@@ -1,0 +1,22 @@
+(int, int) account_exists(cell accounts, slice account) inline {
+    (_, int key) = parse_std_addr(account);
+    (slice val, int exists) = accounts.udict_get?(256, key);
+    return (key, exists);
+}
+
+cell add_account(cell accounts, slice account) impure inline {
+    (int key, int exists) = account_exists(accounts, account);
+    throw_if(error::account_exists, exists);
+
+    slice exists_slice = begin_cell().end_cell().begin_parse();
+    accounts~udict_set(256, key, exists_slice);
+    return accounts;
+}
+
+cell remove_account(cell accounts, slice account) impure inline {
+    (int key, int exists) = account_exists(accounts, account);
+    throw_unless(error::account_not_exists, exists);
+
+    accounts~udict_delete?(256, key);
+    return accounts;
+}
