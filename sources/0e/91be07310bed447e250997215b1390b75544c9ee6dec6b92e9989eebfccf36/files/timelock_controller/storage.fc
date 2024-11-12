@@ -1,0 +1,35 @@
+global int storage::min_delay;
+global int storage::timestamp_count;
+global cell storage::admin_accounts;
+global cell storage::proposer_accounts;
+global cell storage::executor_accounts;
+global cell storage::canceller_accounts;
+global cell storage::timestamps;
+
+() load_storage() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::min_delay = ds~load_uint(32);
+    storage::timestamp_count = ds~load_uint(32);
+    cell ref = ds~load_ref();
+    slice ref_ds = ref.begin_parse();
+    storage::admin_accounts = ref_ds~load_dict();
+    storage::proposer_accounts = ref_ds~load_dict();
+    storage::executor_accounts = ref_ds~load_dict();
+    storage::canceller_accounts = ref_ds~load_dict();
+    storage::timestamps = ds~load_dict();
+}
+
+() save_storage() impure inline {
+    set_data(begin_cell()
+        .store_uint(storage::min_delay, 32)
+        .store_uint(storage::timestamp_count, 32)
+        .store_ref(begin_cell()
+            .store_dict(storage::admin_accounts)
+            .store_dict(storage::proposer_accounts)
+            .store_dict(storage::executor_accounts)
+            .store_dict(storage::canceller_accounts)
+            .end_cell()
+        )
+        .store_dict(storage::timestamps)
+    .end_cell());
+}

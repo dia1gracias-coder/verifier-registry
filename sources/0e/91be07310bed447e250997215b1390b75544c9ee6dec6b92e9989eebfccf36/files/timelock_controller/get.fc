@@ -1,0 +1,78 @@
+;; get methods
+
+(int, int, cell, cell, cell, cell, cell) get_timelock_controller_data() method_id {
+    load_storage();
+    return (
+        storage::min_delay,
+        storage::timestamp_count,
+        storage::admin_accounts,
+        storage::proposer_accounts,
+        storage::executor_accounts,
+        storage::canceller_accounts,
+        storage::timestamps
+    );
+}
+
+int get_timestamp(int id) method_id {
+    load_storage();
+
+    (slice timestamp_slice, int exists) = storage::timestamps.udict_get?(256, id);
+    ifnot (exists) {
+        return 0;
+    }
+
+    return timestamp_slice~load_uint(32);
+}
+
+int get_hash_operation(int tonValue, int predecessor, int salt, slice account, cell msg_to_send) method_id {
+    load_storage();
+
+    return hash_operation(tonValue, predecessor, salt, account, msg_to_send);
+}
+
+int get_operation_state(int id) method_id {
+    load_storage();
+
+    (slice timestamp_slice, int exists) = storage::timestamps.udict_get?(256, id);
+    ifnot (exists) {
+        return UNSET_STATE;
+    }
+
+    int timestamp = timestamp_slice~load_uint(32);
+
+    if (timestamp == DONE_TIMESTAMP) {
+        return DONE_STATE;
+    }
+
+    if (timestamp > now()) {
+        return WAITING_STATE;
+    }
+
+    return READY_STATE;
+}
+
+int get_has_role(int role, slice account) method_id {
+    load_storage();
+
+    if (role > EXECUTOR_ROLE) {
+        return 0;
+    }
+
+    cell accounts = storage::admin_accounts;
+
+    if (role == PROPOSER_ROLE) {
+        accounts = storage::proposer_accounts;
+    }
+
+    if (role == CANCELLER_ROLE) {
+        accounts = storage::canceller_accounts;
+    }
+
+    if (role == EXECUTOR_ROLE) {
+        accounts = storage::executor_accounts;
+    }
+
+    (_, int exists) = account_exists(accounts, account);
+
+    return exists;
+}

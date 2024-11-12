@@ -1,0 +1,11 @@
+int hash_operation(int tonValue, int predecessor, int salt, slice account, cell msg_to_send) inline {
+    return cell_hash(
+            begin_cell()
+                .store_coins(tonValue)
+                .store_uint(predecessor, 256)
+                .store_uint(salt, 256)
+                .store_slice(account)
+                .store_ref(msg_to_send)
+                .end_cell()
+    );
+}

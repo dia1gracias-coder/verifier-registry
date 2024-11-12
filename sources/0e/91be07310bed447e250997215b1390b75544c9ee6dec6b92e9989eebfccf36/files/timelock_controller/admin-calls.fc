@@ -1,0 +1,81 @@
+;; messages from admin accounts
+
+int handle_admin_messages(int op, int query_id, int my_balance, int msg_value, slice in_msg_body) impure inline {
+    if (op == op::update_accounts) {
+        int operation = in_msg_body~load_uint(1);
+        int role = in_msg_body~load_uint(32);
+        slice account = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        throw_if(error::invalid_role, role > EXECUTOR_ROLE);
+
+        if (role == ADMIN_ROLE) {
+            if (operation == ADD_ACCOUNT) {
+                storage::admin_accounts = add_account(storage::admin_accounts, account);
+            } else {
+                storage::admin_accounts = remove_account(storage::admin_accounts, account);
+            }
+        }
+
+        if (role == PROPOSER_ROLE) {
+            if (operation == ADD_ACCOUNT) {
+                storage::proposer_accounts = add_account(storage::proposer_accounts, account);
+            } else {
+                storage::proposer_accounts = remove_account(storage::proposer_accounts, account);
+            }
+        }
+
+        if (role == CANCELLER_ROLE) {
+            if (operation == ADD_ACCOUNT) {
+                storage::canceller_accounts = add_account(storage::canceller_accounts, account);
+            } else {
+                storage::canceller_accounts = remove_account(storage::canceller_accounts, account);
+            }
+        }
+
+        if (role == EXECUTOR_ROLE) {
+            if (operation == ADD_ACCOUNT) {
+                storage::executor_accounts = add_account(storage::executor_accounts, account);
+            } else {
+                storage::executor_accounts = remove_account(storage::executor_accounts, account);
+            }
+        }
+
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::update_delay) {
+        int delay = in_msg_body~load_uint(32);
+        in_msg_body.end_parse();
+        storage::min_delay = delay;
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::clear_timestamps) {
+        int length = in_msg_body~load_uint(32);
+        
+        repeat(length) {
+            int id = in_msg_body~load_uint(256);
+            (_, int exists) = storage::timestamps.udict_get?(256, id);
+            if (exists) {
+                storage::timestamps~udict_delete?(256, id);
+                storage::timestamp_count -= 1;
+            }  
+        }
+
+        save_storage();
+        return -1;
+    }
+
+    if (op == op::upgrade) {
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_data(new_data);
+        set_code(new_code);
+        return -1;
+    }
+
+    return 0;
+}

@@ -1,0 +1,132 @@
+#include "imports/stdlib.fc";
+#include "common/workchain.fc";
+#include "timelock_controller/error.fc";
+#include "common/accounts.fc";
+#include "./helpers.fc";
+#include "timelock_controller/storage.fc";
+#include "timelock_controller/op.fc";
+#include "timelock_controller/params.fc";
+#include "timelock_controller/operation-utils.fc";
+#include "timelock_controller/get.fc";
+#include "timelock_controller/admin-calls.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    load_storage();
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins();
+
+    force_chain(WORKCHAIN, sender_address, error::wrong_workchain);
+
+    (int op, int query_id) = (in_msg_body~load_uint(32), in_msg_body~load_uint(64));
+
+    (_, int admin_exists) = account_exists(storage::admin_accounts, sender_address);
+    if (admin_exists) {
+        if (handle_admin_messages(op, query_id, my_balance, msg_value, in_msg_body)) {
+            return ();
+        }
+    }
+
+    (_, int proposer_exists) = account_exists(storage::proposer_accounts, sender_address);
+    if (proposer_exists) {
+        if (op == op::schedule) {
+            int delay = in_msg_body~load_uint(32);
+            int tonValue = in_msg_body~load_coins();
+            int predecessor = in_msg_body~load_uint(256);
+            int salt = in_msg_body~load_uint(256);
+            slice target_account = in_msg_body~load_msg_addr();
+            cell msg_to_send = in_msg_body~load_ref();
+            in_msg_body.end_parse();
+
+            throw_if(error::invalid_delay, delay < storage::min_delay);
+
+            int id = hash_operation(tonValue, predecessor, salt, target_account, msg_to_send);
+
+            (_, int exists) = storage::timestamps.udict_get?(256, id);
+            throw_if(error::operation_exists, exists);
+            slice timestamp_slice = begin_cell().store_uint(now() + delay, 32).end_cell().begin_parse();
+            storage::timestamps~udict_set(256, id, timestamp_slice);
+            storage::timestamp_count += 1;
+            save_storage();
+            return ();
+        }
+    }
+
+    (_, int canceller_exists) = account_exists(storage::canceller_accounts, sender_address);
+    if (canceller_exists) {
+        if (op == op::cancel) {
+            int id = in_msg_body~load_uint(256);
+            in_msg_body.end_parse();
+
+            (slice timestamp_slice, int exists) = storage::timestamps.udict_get?(256, id);
+            throw_unless(error::operation_not_exists, exists);
+            int timestamp = timestamp_slice~load_uint(32);
+            throw_if(error::invalid_operation_state, timestamp == DONE_TIMESTAMP);
+
+            storage::timestamps~udict_delete?(256, id);
+            storage::timestamp_count -= 1;
+            save_storage();
+            return ();
+        }
+    }
+
+    (_, int executor_exists) = account_exists(storage::executor_accounts, sender_address);
+    if (executor_exists) {
+        if (op == op::execute) {
+            int tonValue = in_msg_body~load_coins();
+            int predecessor = in_msg_body~load_uint(256);
+            int salt = in_msg_body~load_uint(256);
+            slice target_account = in_msg_body~load_msg_addr();
+            cell msg_to_send = in_msg_body~load_ref();
+            in_msg_body.end_parse();
+
+            if (predecessor > 0) {
+                (slice timestamp_slice, int exists) = storage::timestamps.udict_get?(256, predecessor);
+                throw_unless(error::predecessor_not_exists, exists);
+                int timestamp = timestamp_slice~load_uint(32);
+                throw_unless(error::invalid_predecessor_state, timestamp == DONE_TIMESTAMP);
+            }
+
+            int id = hash_operation(tonValue, predecessor, salt, target_account, msg_to_send);
+
+            (slice timestamp_slice, int exists) = storage::timestamps.udict_get?(256, id);
+            throw_unless(error::operation_not_exists, exists);
+            int timestamp = timestamp_slice~load_uint(32);
+            throw_unless(error::invalid_operation_state, timestamp <= now());
+
+            raw_reserve(MIN_TON_FOR_STORAGE, RESERVE_REGULAR);
+
+            var msg = begin_cell()
+                .store_msg_flags_and_address_none(BOUNCEABLE)
+                .store_slice(target_account)
+                .store_coins(tonValue)
+                .store_only_body_ref(msg_to_send);
+            send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+            slice timestamp_slice = begin_cell().store_uint(DONE_TIMESTAMP, 32).end_cell().begin_parse();
+            storage::timestamps~udict_set(256, id, timestamp_slice);
+            save_storage();
+            return ();
+        }
+    }
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }
+
+    throw(error::wrong_op);
+}
