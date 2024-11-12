@@ -1,0 +1,45 @@
+slice pack_unstake_request(int request_amount, int available_amount, int claim_time) inline {
+    cell data = begin_cell()
+        .store_coins(request_amount)
+        .store_coins(available_amount)
+        .store_uint(claim_time, 32)
+    .end_cell();
+    return data.begin_parse();
+}
+
+(int, int, int) unpack_unstake_request(slice data) inline {
+    return (data~load_coins(), data~load_coins(), data~load_uint(32));
+}
+
+int available_balance() impure inline {
+    int balance = storage::balance;
+
+    (int key, slice val, int flag) = storage::unstake_requests.udict_get_min?(32);
+    int request_amount = 0;
+
+    while (flag) {
+        (_, request_amount, _) = unpack_unstake_request(val);
+        
+        if (request_amount > balance) {
+            return 0;
+        }
+        balance -= request_amount;
+
+        (key, val, flag) = storage::unstake_requests.udict_get_next?(32, key);
+    }
+    
+    return balance;
+}
+
+(int, int, int) get_unstake_request(int request_id) impure inline {
+    (slice packed_request, int exists) = storage::unstake_requests.udict_get?(32, request_id);
+    throw_unless(error::invalid_request_id, exists);
+    return unpack_unstake_request(packed_request);
+}
+
+() clear_request(int request_id) impure inline {
+    (slice packed_request, int exists) = storage::unstake_requests.udict_get?(32, request_id);
+    throw_unless(error::invalid_request_id, exists);
+    storage::unstake_requests~udict_delete?(32, request_id);
+    storage::unstake_request_count -= 1;
+}

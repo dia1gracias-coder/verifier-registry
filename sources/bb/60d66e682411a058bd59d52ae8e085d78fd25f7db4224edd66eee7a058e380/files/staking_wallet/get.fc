@@ -1,0 +1,39 @@
+;; get methods
+
+(int, int, int, int, slice, slice, cell) get_staking_wallet_data() method_id {
+    load_storage();
+    return (
+        storage::unstake_request_count,
+        storage::last_request_id,
+        storage::timestamp,
+        storage::balance,
+        storage::staker,
+        storage::staking_master_address,
+        storage::unstake_requests
+    );
+}
+
+int get_available_balance() method_id {
+    load_storage();
+    return available_balance();
+}
+
+(int, int, int) get_request_info(int request_id) method_id {
+    load_storage();
+    return get_unstake_request(request_id);
+}
+
+(int, cell) get_request_ids() method_id {
+    load_storage();
+    (int key, _, int flag) = storage::unstake_requests.udict_get_min?(32);
+    int request_count = 0;
+    builder body = begin_cell();
+
+    while (flag) {
+        body~store_uint(key, 32);
+        request_count += 1;
+        (key, _, flag) = storage::unstake_requests.udict_get_next?(32, key);
+    }
+
+    return (request_count, body.end_cell());
+}

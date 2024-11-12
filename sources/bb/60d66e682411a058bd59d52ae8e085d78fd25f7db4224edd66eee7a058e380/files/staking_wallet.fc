@@ -1,0 +1,154 @@
+#include "imports/stdlib.fc";
+#include "common/workchain.fc";
+#include "./helpers.fc";
+#include "staking_wallet/storage.fc";
+#include "staking_wallet/op.fc";
+#include "staking_wallet/error.fc";
+#include "staking_wallet/request-utils.fc";
+#include "staking_wallet/get.fc";
+#include "staking_wallet/params.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    load_storage();
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins();
+
+    force_chain(WORKCHAIN, sender_address, error::wrong_workchain);
+
+    (int op, int query_id) = (in_msg_body~load_uint(32), in_msg_body~load_uint(64));
+
+    if (equal_slices(sender_address, storage::staking_master_address)) {
+        if (op == op::stake_internal) {
+            int amount = in_msg_body~load_coins();
+            in_msg_body.end_parse();
+
+            if (storage::timestamp == 0) {
+                storage::timestamp = now();
+            }
+
+            storage::balance += amount;
+            save_storage();
+            return ();
+        }
+
+        if (op == op::request_unstake_internal) {            
+            int pool_id = in_msg_body~load_uint(8);
+            int request_max_count = in_msg_body~load_uint(32);
+            int duration = in_msg_body~load_uint(32);
+            int amount = in_msg_body~load_coins();
+            int available_amount = in_msg_body~load_coins();
+            in_msg_body.end_parse();
+
+            throw_unless(error::request_count_exceeded, request_max_count > storage::unstake_request_count);
+            throw_unless(error::available_balance_exceeded, available_balance() >= amount);
+            
+            if (pool_id == STAKE_POOL_ID) {
+                storage::timestamp = (available_balance() == amount) ? 0 : now();
+            }
+
+            int claim_time = now() + duration;
+            slice packed_request = pack_unstake_request(amount, available_amount, claim_time);
+            storage::last_request_id += 1;
+            storage::unstake_requests~udict_set(32, storage::last_request_id, packed_request);
+            storage::unstake_request_count += 1;
+            save_storage();
+            return ();
+        }
+
+        if (op == op::cancel_unstake_internal) {            
+            int request_id = in_msg_body~load_uint(32);
+            in_msg_body.end_parse();
+            
+            clear_request(request_id);
+            save_storage();
+            return ();
+        }
+
+        if (op == op::claim_unstake_request) {
+            int request_id = in_msg_body~load_uint(32);
+            int forward_ton_amount = in_msg_body~load_coins();
+            cell either_forward_payload = in_msg_body~load_maybe_ref();
+            in_msg_body.end_parse();
+
+            (int request_amount, int available_amount, int claim_time) = get_unstake_request(request_id);
+            throw_unless(error::claim_time_not_reached, now() >= claim_time);
+            throw_unless(error::invalid_amount, storage::balance >= request_amount);
+            storage::balance -= request_amount;
+            clear_request(request_id);
+            int vault_amount = request_amount - available_amount;
+
+            var claim_unstake_response_msg = begin_cell()
+                .store_uint(op::claim_unstake_response, 32)
+                .store_uint(query_id, 64)
+                .store_coins(available_amount)
+                .store_coins(vault_amount)
+                .store_slice(storage::staker)
+                .store_coins(forward_ton_amount)
+                .store_maybe_ref(either_forward_payload)
+                .end_cell();        
+
+            var msg = begin_cell()
+                .store_msg_flags_and_address_none(BOUNCEABLE)
+                .store_slice(storage::staking_master_address)
+                .store_coins(0)
+                .store_only_body_ref(claim_unstake_response_msg);
+            send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+            save_storage();
+            return ();
+        }
+
+        if (op == op::buy_item_request) {
+            int amount = in_msg_body~load_coins();
+            slice recipient = in_msg_body~load_msg_addr();
+            int forward_ton_amount = in_msg_body~load_coins();
+            cell either_forward_payload = in_msg_body~load_maybe_ref();
+            in_msg_body.end_parse();
+
+            throw_unless(error::available_balance_exceeded, available_balance() >= amount);
+            throw_unless(error::invalid_amount, storage::balance >= amount);
+            storage::balance -= amount;
+
+            var buy_item_response_msg = begin_cell()
+                .store_uint(op::buy_item_response, 32)
+                .store_uint(query_id, 64)
+                .store_coins(amount)
+                .store_slice(storage::staker)
+                .store_slice(recipient)
+                .store_coins(forward_ton_amount)
+                .store_maybe_ref(either_forward_payload)
+                .end_cell();        
+
+            var msg = begin_cell()
+                .store_msg_flags_and_address_none(BOUNCEABLE)
+                .store_slice(storage::staking_master_address)
+                .store_coins(0)
+                .store_only_body_ref(buy_item_response_msg);
+            send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+            save_storage();
+            return ();
+        }
+    }
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }
+
+    throw(error::wrong_op);
+}

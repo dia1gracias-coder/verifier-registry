@@ -1,0 +1,30 @@
+global int storage::unstake_request_count;
+global int storage::last_request_id;
+global int storage::timestamp;
+global int storage::balance;
+global slice storage::staker;
+global slice storage::staking_master_address;
+global cell storage::unstake_requests;
+
+() load_storage() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::unstake_request_count = ds~load_uint(32);
+    storage::last_request_id = ds~load_uint(32);
+    storage::timestamp = ds~load_uint(32);
+    storage::balance = ds~load_coins();
+    storage::staker = ds~load_msg_addr();
+    storage::staking_master_address = ds~load_msg_addr();
+    storage::unstake_requests = ds~load_dict();
+}
+
+() save_storage() impure inline {
+    set_data(begin_cell()
+        .store_uint(storage::unstake_request_count, 32)
+        .store_uint(storage::last_request_id, 32)
+        .store_uint(storage::timestamp, 32)
+        .store_coins(storage::balance)
+        .store_slice(storage::staker)
+        .store_slice(storage::staking_master_address)
+        .store_dict(storage::unstake_requests)
+    .end_cell());
+}
