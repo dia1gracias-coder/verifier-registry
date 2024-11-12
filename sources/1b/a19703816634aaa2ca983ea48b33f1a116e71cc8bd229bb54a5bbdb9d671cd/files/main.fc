@@ -1,0 +1,46 @@
+#include "stdlib.fc";
+
+const BET_AMOUNT = 1000000000;
+const WIN_AMOUNT = 1800000000;
+const COMMISSION = 200000000;
+const organizer = 0x51ca0c72e46da899a15953553546105f5bbab29e3ef0dd394d85c7a7ccaabb;
+
+(int) determine_winner(int player1, int player2) inline {
+    int block_number = now();  ;; Используем текущее время для генерации псевдослучайного значения
+    int last_digit = block_number % 10;
+
+    if (last_digit % 2 == 0) {
+        return player1;
+    } else {
+        return player2;
+    }
+}
+
+() send_prize(int winner) impure {
+    cell prize_msg = begin_cell().end_cell();
+    send_raw_message(prize_msg, WIN_AMOUNT);
+
+    cell commission_msg = begin_cell().end_cell();
+    send_raw_message(commission_msg, COMMISSION);
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    var player1 = 0;
+    var player2 = 0;
+    var betsCount = 0;
+
+    if (msg_value < BET_AMOUNT) {
+        return ();
+    }
+
+    if (betsCount == 0) {
+        player1 = in_msg_body~load_uint(256);
+        betsCount += 1;
+    } else {
+        player2 = in_msg_body~load_uint(256);
+        betsCount += 1;
+
+        int winner = determine_winner(player1, player2);
+        send_prize(winner);
+    }
+}
