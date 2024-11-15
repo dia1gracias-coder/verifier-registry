@@ -1,0 +1,178 @@
+const error::different_wc = 30;
+const error::update_failed = 31;
+const error::invalid_signature = 32;
+const error::insufficient_allownace = 33;
+
+(int) load_public_key() impure inline {
+  slice ds = get_data().begin_parse();
+  return ds~load_uint(256);
+}
+
+(slice) load_jetton_wallet() impure inline {
+  slice ds = get_data().begin_parse();
+  ds~load_uint(256);
+  return ds~load_msg_addr();
+}
+
+(cell) load_allowances() impure inline {
+  slice ds = get_data().begin_parse();
+  ds~load_uint(256);
+  ds~load_msg_addr();
+  return ds~load_dict();
+}
+
+() save_public_key(int new_public_key) impure inline {
+  var old_jetton_wallet = load_jetton_wallet();
+  var old_allowances = load_allowances();
+  set_data(
+    begin_cell()
+      .store_uint(new_public_key, 256)
+      .store_slice(old_jetton_wallet)
+      .store_dict(old_allowances)
+      .end_cell()
+  );
+  commit();
+}
+
+() save_jetton_wallet(slice new_jetton_wallet) impure inline {
+  var old_public_key = load_public_key();
+  var old_allowances = load_allowances();
+  set_data(
+    begin_cell()
+      .store_uint(old_public_key, 256)
+      .store_slice(new_jetton_wallet)
+      .store_dict(old_allowances)
+      .end_cell()
+  );
+  commit();
+}
+
+() save_allowances(cell new_allowances) impure inline {
+  var old_public_key = load_public_key();
+  var old_jetton_wallet = load_jetton_wallet();
+  set_data(
+    begin_cell()
+      .store_uint(old_public_key, 256)
+      .store_slice(old_jetton_wallet)
+      .store_dict(new_allowances)
+      .end_cell()
+  );
+  commit();
+}
+
+(cell) construct_transfer_msg(slice jetton_wallet, int query_id, int jetton_amount, slice destination, slice response_destination, int forward_ton_amount) inline_ref {
+  cell transfer_msg = begin_cell()
+    .store_uint(0xf8a7ea5, 32)
+    .store_query_id(query_id)
+    .store_coins(jetton_amount)
+    .store_slice(destination)          ;; destination:MsgAddress
+    .store_slice(response_destination) ;; response_destination:MsgAddress
+    .store_uint(0, 1)                  ;; custom_payload:(Maybe ^Cell)
+    .store_coins(forward_ton_amount)   ;; forward_ton_amount:(VarUInteger 16)
+    .store_uint(0, 1)                  ;; `left$0` of forward_payload:(Either Cell ^Cell)
+  .end_cell();
+
+  return begin_cell()
+    .store_uint(0x18, 6)
+    .store_slice(jetton_wallet)
+    .store_coins(0)
+    .store_uint(0, 1)                   ;; empty extra currency dictionary
+    .store_uint(0, 4 + 4 + 64 + 32 + 1) ;; empty StateInit
+    .store_uint(1, 1)                   ;; `right$1` of (Either Cell ^Cell)
+    .store_ref(transfer_msg)
+  .end_cell();
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body_raw) impure {
+  if (in_msg_body_raw.slice_empty?()) {
+    return ();
+  }
+
+  slice in_msg_body = in_msg_body_raw.skip_bits(32); ;; Skip 0x00000000
+
+  var approve_string = "approve";
+  var spend_string = "spend";
+  var init_string = "init";
+
+  var maybe_approve = in_msg_body.preload_bits(56);
+  if (equal_slices_bits(approve_string, maybe_approve)) {
+    var in_msg = in_msg_body.skip_bits(56);
+
+    int query_id = in_msg~load_uint(64);
+
+    slice spender = in_msg~load_msg_addr();
+    (_, int spender_ah) = parse_std_addr(spender); ;; Address_Hash
+
+    int value = in_msg~load_coins();
+    slice signature = in_msg~load_bits(512);
+    
+    throw_unless(
+      error::invalid_signature,
+      check_signature(
+        cell_hash(
+          begin_cell().store_uint(query_id, 64).store_slice(spender).store_coins(value).end_cell()
+        ),
+        signature,
+        load_public_key()
+      )
+    );
+
+    cell allowances = load_allowances();
+    (allowances, int is_success) = allowances.udict_add_builder?(256, spender_ah, begin_cell().store_coins(value));
+    throw_unless(error::update_failed, is_success);
+    save_allowances(allowances);
+
+    return ();
+  }
+
+  var maybe_spend = in_msg_body.preload_bits(40);
+  if (equal_slices_bits(spend_string, maybe_spend)) {
+    var in_msg = in_msg_body.skip_bits(40);
+    int query_id = in_msg~load_uint(64);
+    int value = in_msg~load_coins();
+
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    var left_bits = in_msg_full_slice.skip_bits(4);
+    slice sender = left_bits~load_msg_addr();
+    (_, int sender_ah) = parse_std_addr(sender);
+
+    cell allowances = load_allowances();
+    (slice allowance, int found) = allowances.udict_get?(256, sender_ah);
+
+    if (found) {
+      int allow = allowance~load_coins();
+      throw_unless(error::insufficient_allownace, allow - value >= 0);
+      allow -= value;
+
+      allowances = allowances.udict_set_builder(256, sender_ah, begin_cell().store_coins(allow));
+      save_allowances(allowances);
+
+      cell msg = construct_transfer_msg(load_jetton_wallet(), query_id, value, sender, my_address(), 1);
+      send_raw_message(msg, 64 | 16 | 1); ;; Carry all value of in_msg + Bounce if failed + Pay gas separately
+    }
+
+    return ();
+  }
+
+  var maybe_init = in_msg_body.preload_bits(32);
+  if (equal_slices_bits(init_string, maybe_init)) {
+    var in_msg = in_msg_body.skip_bits(32);
+    slice new_jetton_wallet = in_msg~load_msg_addr();
+    save_jetton_wallet(new_jetton_wallet);
+    return ();
+  }
+
+  return ();
+}
+
+(int) get_public_key() method_id {
+  return load_public_key();
+}
+
+(slice) get_jetton_wallet() method_id {
+  return load_jetton_wallet();
+}
+
+(cell) get_allowances() method_id {
+  return load_allowances();
+}
