@@ -1,0 +1,211 @@
+#include "imports/stdlib.fc";
+
+cell load_dic() inline {
+    var ds = get_data();
+    if (slice_empty?(ds.begin_parse())) {
+        ;; Trả về dictionary mới
+        return begin_cell().store_uint(0, 4).store_dict(new_dict()).end_cell();
+    }
+    return ds;
+}
+
+(cell, int) register(int key, cell balances) inline {
+    ;; Biến result đại diện cho trạng thái trả về
+    int result = 0;
+
+    ;; Kiểm tra sự tồn tại của key trong dictionary
+    (slice payload, int found) = balances.udict_get?(256, key);
+
+    if (found == -1) {
+        ;; Key đã tồn tại, không cần đăng ký
+        result = -1;  ;; Key đã tồn tại
+        return (balances, result);
+    } elseif (found == 0) {
+        ;; Key chưa tồn tại, thêm key mới với số dư ban đầu
+        cell newBalanceCell = begin_cell().store_uint(0, 64).end_cell();
+        balances~udict_set(256, key, newBalanceCell.begin_parse());
+
+        result = 1;  ;; Thành công
+        return (balances, result);
+    } else {
+        ;; Trường hợp bất thường, trả về lỗi
+        result = -2;  ;; Lỗi không xác định
+        return (balances, result);
+    }
+}
+
+
+(cell, int) deposit(int key, cell dic, int amount) inline {
+    int result = 0;
+
+    ;; Kiểm tra số tiền hợp lệ
+    if (amount < 0) {
+        result = -3; ;; Lỗi: Số tiền không hợp lệ
+        return (dic, result);
+    }
+
+    ;; Kiểm tra sự tồn tại của key
+    (slice balanceSlice, int f) = dic.udict_get?(256, key);
+    if (f == 0) {
+        result = -2; ;; Lỗi: Key không tồn tại
+        return (dic, result);
+    }
+
+    ;; Lấy và cập nhật số dư
+    int balance = balanceSlice~load_uint(64);
+    int updatedBalance = balance + amount;
+
+    ;; Kiểm tra tràn số nguyên
+    throw_if(36, updatedBalance < balance);
+
+    ;; Tạo cell mới với số dư cập nhật
+    cell updatedBalanceCell = begin_cell().store_uint(updatedBalance, 64).end_cell();
+    
+    ;; Cập nhật vào dictionary
+    (cell updatedDic, int success) = dic.udict_replace?(256, key, updatedBalanceCell.begin_parse());
+    if (success == 0) {
+        result = -1; ;; Lỗi: Không thể cập nhật dictionary
+        return (dic, result);
+    }
+
+    result = 1; ;; Thành công
+    return (updatedDic, result);
+}
+
+(cell, int) transfer(cell dic, int key1, int key2, int amount) inline {
+    int result = 0;
+
+    ;; Kiểm tra sự tồn tại và lấy số dư của key1
+    (slice balance1Slice, int found1) = dic.udict_get?(256, key1);
+    if (found1 == 0) {
+        result = -2; ;; Lỗi: Key1 không tồn tại
+        return (dic, result);
+    }
+    int balance1 = balance1Slice~load_uint(64);
+
+    ;; Kiểm tra số dư key1 có đủ không
+    if (balance1 < amount) {
+        result = -3; ;; Lỗi: Số dư không đủ
+        return (dic, result);
+    }
+
+    ;; Cập nhật số dư của key1
+    int balance1Updated = balance1 - amount;
+    cell balance1UpdatedCell = begin_cell().store_uint(balance1Updated, 64).end_cell();
+    (dic, int success1) = dic.udict_replace?(256, key1, balance1UpdatedCell.begin_parse());
+    if (success1 == 0) {
+        result = -1; ;; Lỗi: Không thể cập nhật số dư key1
+        return (dic, result);
+    }
+
+    ;; Kiểm tra sự tồn tại và lấy số dư của key2
+    (slice balance2Slice, int found2) = dic.udict_get?(256, key2);
+    if (found2 == 0) {
+        result = -4; ;; Lỗi: Key2 không tồn tại
+        return (dic, result);
+    }
+    int balance2 = balance2Slice~load_uint(64);
+
+    ;; Cập nhật số dư của key2
+    int balance2Updated = balance2 + amount;
+
+    ;; Kiểm tra tràn số nguyên
+    throw_if(36, balance2Updated < balance2);
+
+    cell balance2UpdatedCell = begin_cell().store_uint(balance2Updated, 64).end_cell();
+    (dic, int success2) = dic.udict_replace?(256, key2, balance2UpdatedCell.begin_parse());
+    if (success2 == 0) {
+        result = -5; ;; Lỗi: Không thể cập nhật số dư key2
+        return (dic, result);
+    }
+
+    result = 1; ;; Thành công
+    return (dic, result);
+}
+
+
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; Kiểm tra xem body có đủ dữ liệu cho opcode hay không
+    throw_if(35, in_msg_body.slice_bits() < 32);
+    int op = in_msg_body~load_uint(32);
+    ~dump(op);
+
+    ;; Load dữ liệu cũ từ contract state
+    cell balances_result = load_dic();
+    slice balances_result_slice = balances_result.begin_parse();
+
+    int result = balances_result_slice~load_uint(4); ;; Trạng thái
+    cell balances = balances_result_slice~load_dict(); ;; Dictionary số dư
+
+    ;; Xử lý opcode
+    if (op == 0) {
+        ;; Khởi tạo dictionary mới
+        balances = new_dict();
+        result = 0;
+    } elseif (op == 1) {
+        ;; Đăng ký tài khoản
+        throw_if(36, in_msg_body.slice_bits() < 256); ;; Kiểm tra đủ dữ liệu
+        int key = in_msg_body~load_uint(256);
+        ~dump(key);
+
+        ;; Gọi hàm register
+        (balances, result) = register(key, balances);
+
+    } elseif (op == 2) {
+        ;; Gửi tiền vào tài khoản
+        throw_if(37, in_msg_body.slice_bits() < 288); ;; Kiểm tra đủ dữ liệu
+        int key = in_msg_body~load_uint(256);
+        int amount = in_msg_body~load_uint(32);
+
+        ;; Kiểm tra msg_value >= amount
+        throw_if(38, msg_value < amount);
+
+        ;; Gọi hàm deposit
+        (balances, result) = deposit(key, balances, amount);
+
+    } elseif (op == 3) {
+        ;; Chuyển tiền giữa hai tài khoản
+        throw_if(39, in_msg_body.slice_bits() < 544); ;; Kiểm tra đủ dữ liệu
+        int key1 = in_msg_body~load_uint(256);
+        int amount = in_msg_body~load_uint(32);
+        int key2 = in_msg_body~load_uint(256);
+
+        ;; Gọi hàm transfer
+        (balances, result) = transfer(balances, key1, key2, amount);
+
+    } else {
+        ;; Opcode không hợp lệ
+        result = -99; ;; Lỗi: Opcode không hợp lệ
+    }
+
+    ;; Ghi lại state mới
+    ~dump(balances);
+    set_data(begin_cell().store_uint(result, 4).store_dict(balances).end_cell());
+
+    return ();
+}
+
+
+(int) getBalance(int key) method_id {
+    ~dump(key);
+    cell dic_result = load_dic();
+    slice dsSlice = dic_result.begin_parse();
+    int result = dsSlice~load_uint(4);
+    cell dic = dsSlice~load_dict();
+    ~dump(dic);  ;; In dictionary trước khi lấy balance
+
+    (slice payload, int success) = dic.udict_get?(256, key);
+
+    if (success == 0) {
+        return -1;
+    }
+    return payload~load_uint(64);
+}
+
+(int) getResult() method_id {
+    cell ds = load_dic();
+    slice dsSlice = ds.begin_parse();
+    return dsSlice~load_uint(4);
+}
