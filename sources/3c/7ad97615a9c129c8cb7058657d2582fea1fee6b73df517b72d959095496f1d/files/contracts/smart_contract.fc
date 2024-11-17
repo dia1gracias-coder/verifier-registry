@@ -1,0 +1,104 @@
+#include "imports/stdlib.fc";
+
+cell load_dic() inline {
+    var ds = get_data();
+    if (slice_empty?(ds.begin_parse())) {
+        ;; Trả về dictionary mới
+        return begin_cell().store_uint(0, 4).store_dict(new_dict()).end_cell();
+    }
+    return ds;
+}
+
+(cell, int) register(int key, cell balances) inline {
+    int result = -1;
+
+    (slice payload, int found) = balances.udict_get?(256, key);
+    if (found == -1) {
+        result = -1;  ;; Key đã tồn tại
+        return (balances, result);
+    }
+    if (found == 0) {
+        cell newBalanceCell = begin_cell().store_uint(0, 64).end_cell();
+        balances~udict_set(256, key, newBalanceCell.begin_parse());
+        result = 1;  ;; Thành công
+        return (balances, result);
+    }
+    return (balances, result);
+    
+    
+
+}
+
+(cell, int) deposit(int key, cell dic, int amount) inline {
+    int result = 0;
+    if(amount < 0){
+        result = -1;
+        return (dic, result);
+    }
+    (slice balanceSlice, int f) = dic.udict_get?(256, key);
+    if(f == 0 ) {
+        result = -1;
+        return (dic, result);
+    }
+    int balance = balanceSlice~load_uint(64);
+    int updatedBalance = balance + amount;
+    cell updatedBalanceCell = begin_cell().store_uint(updatedBalance, 64).end_cell();
+    dic.udict_replace?(256 ,key, updatedBalanceCell.begin_parse());
+    result = 1;
+    return (dic, result);
+}
+
+
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    throw_if(35, in_msg_body.slice_bits() < 32);
+    int op = in_msg_body~load_uint(32);
+    ~dump(op);
+
+    cell balances_result = load_dic();
+    slice balances_result_slice = balances_result.begin_parse();
+
+    int result = balances_result_slice~load_uint(4);
+    cell balances = balances_result_slice~load_dict();
+
+    if (op == 1) {
+        int key = in_msg_body~load_uint(256);
+        ~dump(key);
+
+        (balances, result) = register(key,balances);
+        
+    }
+    if (op == 2) {
+        int key = in_msg_body~load_uint(256);
+        int amount = in_msg_body~load_uint(32);
+
+        (balances, result) =  deposit(key,balances,amount);
+    }
+
+    ~dump(balances);
+    set_data(begin_cell().store_uint(result, 4).store_dict(balances).end_cell());
+    return ();
+}
+
+(int) getBalance(int key) method_id {
+    ~dump(key);
+    cell dic_result = load_dic();
+    slice dsSlice = dic_result.begin_parse();
+    int result = dsSlice~load_uint(4);
+    cell dic = dsSlice~load_dict();
+    ~dump(dic);  ;; In dictionary trước khi lấy balance
+
+    (slice payload, int success) = dic.udict_get?(256, key);
+
+    if (success == 0) {
+        return -1;
+    }
+    return payload~load_uint(64);
+}
+
+(int) getResult() method_id {
+    cell ds = load_dic();
+    slice dsSlice = ds.begin_parse();
+    return dsSlice~load_uint(4);
+}
