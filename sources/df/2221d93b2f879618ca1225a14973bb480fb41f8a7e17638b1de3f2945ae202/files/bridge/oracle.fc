@@ -1,0 +1,13 @@
+#include "../common/message.fc";
+#include "storage.fc";
+#include "op.fc";
+
+() resend_receipt_info(int message_id,int resend_time_span) impure inline {
+    var payload = begin_cell()
+                    .store_uint(resend,32)
+                    .store_int(message_id,256)
+                    .store_int(0x01,8)
+                    .store_int(resend_time_span,32)
+                  .end_cell();
+    send_message_nobounce(0,storage::oracle_address,payload,SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_IGNORE_ERRORS);
+}

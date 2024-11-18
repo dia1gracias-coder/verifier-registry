@@ -1,0 +1,65 @@
+#include "../common/stdlib.fc";
+;; `bridge_swap_address_dic` is HashMap with `jetton master address` slice key, value is `bridge_swap_address:slice`
+global cell storage::bridge_swap_address_dic;
+;; `bridge_pool_address_dic` is HashMap with `jetton master address` slice key, value is `bridge_pool_address:slice`
+global cell storage::bridge_pool_address_dic;
+;; ·jetton_white_list_dic· is HashMap with `jetton master address,target_chain_id` int key,value is `is_support:int`
+;; 0:not support 1:support
+global cell storage::jetton_whitelist_dic;
+global slice storage::oracle_address;
+global int storage::is_pause;
+global slice storage::pause_controller;
+;; multiSign
+global slice storage::admin;
+global slice storage::owner;
+global cell storage::temp_upgrade;
+global cell storage::bridge_receipt_account_code;
+global cell storage::target_contract_dic;
+
+() load_storage() impure inline {
+    slice ds = get_data().begin_parse();
+    cell ds_0 = ds~load_ref();
+    slice ds_0_slice = ds_0.begin_parse();
+    storage::bridge_swap_address_dic = ds_0_slice~load_dict();
+    storage::bridge_pool_address_dic = ds_0_slice~load_dict();
+    storage::jetton_whitelist_dic = ds_0_slice~load_dict();
+    storage::is_pause = ds~load_int(1);
+    cell ds_1 = ds~load_ref();
+    slice ds_1_slice = ds_1.begin_parse();
+    cell ds_1_0 = ds_1_slice~load_ref();
+    slice ds_1_0_slice = ds_1_0.begin_parse();
+    storage::admin = ds_1_0_slice~load_msg_addr();
+    storage::owner = ds_1_0_slice~load_msg_addr();
+    storage::target_contract_dic = ds_1_0_slice~load_dict();
+    cell ds_1_1 = ds_1_slice~load_ref();
+    slice ds_1_1_slice = ds_1_1.begin_parse();
+    storage::pause_controller = ds_1_1_slice~load_msg_addr();
+    storage::oracle_address = ds_1_1_slice~load_msg_addr();
+    storage::temp_upgrade = ds~load_ref();
+    storage::bridge_receipt_account_code = ds~load_ref();
+}
+
+() save_storage() impure inline {
+    set_data(begin_cell()
+        .store_ref(begin_cell()
+            .store_dict(storage::bridge_swap_address_dic)
+            .store_dict(storage::bridge_pool_address_dic)
+            .store_dict(storage::jetton_whitelist_dic)
+            .end_cell())
+        .store_int(storage::is_pause, 1)
+        .store_ref(begin_cell()
+            .store_ref(begin_cell()
+                .store_slice(storage::admin)
+                .store_slice(storage::owner)
+                .store_dict(storage::target_contract_dic)
+                .end_cell())
+            .store_ref(
+                begin_cell()
+                    .store_slice(storage::pause_controller)
+                    .store_slice(storage::oracle_address)
+                    .end_cell())
+            .end_cell())
+        .store_ref(storage::temp_upgrade)
+        .store_ref(storage::bridge_receipt_account_code)
+        .end_cell());
+}

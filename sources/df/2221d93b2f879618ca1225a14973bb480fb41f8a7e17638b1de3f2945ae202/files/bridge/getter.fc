@@ -1,0 +1,62 @@
+#include "../common/dic.fc";
+#include "../common/utils.fc";
+#include "op.fc";
+#include "storage.fc";
+#include "../common/stdlib.fc";
+
+;; handle onchain 'get' calls
+(int) handle_getter_messages(int op, int query_id, slice sender_address, slice in_msg_body) impure inline {
+    raw_reserve(0, 4);
+
+    if (op == getter_bridge_swap_address) { 
+        slice jetton_address = in_msg_body~load_msg_addr();
+        (var jetton_swap_address,_) = dict_get?(storage::bridge_swap_address_dic,KEY_LENGTH,jetton_address); 
+        var payload = begin_cell()
+            .store_uint(getter_bridge_swap_address, 32)
+            .store_uint(query_id, 64)
+            .store_slice(jetton_address)
+            .store_slice(jetton_swap_address);
+        send_payload(sender_address, payload.end_cell());
+        return (true);
+    }
+    if (op == getter_bridge_pool_address) {
+        slice jetton_address = in_msg_body~load_msg_addr();
+        (var jetton_pool_address,_) = dict_get?(storage::bridge_pool_address_dic,KEY_LENGTH,jetton_address); 
+        var payload = begin_cell()
+            .store_uint(getter_bridge_pool_address, 32)
+            .store_uint(query_id, 64)
+            .store_slice(jetton_address)
+            .store_slice(jetton_pool_address);
+        send_payload(sender_address, payload.end_cell());
+        return (true);
+    }
+    if (op == is_jetton_support) {
+        int target_chain_id = in_msg_body~load_uint(32);
+        slice jetton_address = in_msg_body~load_msg_addr();
+        var token_whitelist = storage::jetton_whitelist_dic;
+        (int wc, int jetton_address_hash) = parse_std_addr(jetton_address);
+        var key_builder = begin_cell()
+            .store_uint(wc,8)
+            .store_uint(target_chain_id,32)
+            .store_uint(jetton_address_hash,256)
+            .end_cell();
+        var key_hash = cell_hash(key_builder);
+        (_,int is_support) = udict_get?(token_whitelist, DEFAULT_KEY_LENGTH, key_hash);
+        var payload = begin_cell()
+            .store_uint(is_jetton_support, 32)
+            .store_uint(query_id, 64)
+            .store_slice(jetton_address)
+            .store_int(is_support,1);
+        send_payload(sender_address, payload.end_cell());
+        return (true);
+    }
+    if (op == getter_oracle_address) {
+        var payload = begin_cell()
+            .store_uint(is_jetton_support, 32)
+            .store_uint(query_id, 64)
+            .store_slice(storage::oracle_address);
+        send_payload(sender_address, payload.end_cell());
+        return (true);
+    }
+    return (false); ;; wrong op
+}

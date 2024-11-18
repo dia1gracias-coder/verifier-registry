@@ -1,0 +1,155 @@
+;; #include "../common/message.fc";
+;; #include "../common/dic.fc";
+;; #include "params.fc";
+;; #include "storage.fc";
+;; #include "op.fc";
+;; #include "errors.fc";
+;; #include "../common/stdlib.fc";
+;; 
+;; () handle_admin_messages(int op, int query_id, int my_balance, int msg_value, slice in_msg_body) impure inline {
+;;     if (op == add_jetton_whitelist) {
+;;         int target_chain_id = in_msg_body~load_uint(32);
+;;         slice ref_cs = in_msg_body;
+;;         int has_refs = 0;
+;;         do {
+;;             slice whitelist_jetton_address = ref_cs~load_msg_addr();
+;;             (int wc, int jetton_address_hash) = parse_std_addr(whitelist_jetton_address);
+;;             var key_builder = begin_cell()
+;;                     .store_uint(wc,8)
+;;                     .store_uint(target_chain_id,32)
+;;                     .store_uint(jetton_address_hash,256)
+;;                     .end_cell();
+;;             var key_hash = cell_hash(key_builder);
+;;             storage::jetton_whitelist_dic~udict_set_builder(DEFAULT_KEY_LENGTH, key_hash, begin_cell().store_int(-1, 1));
+;;             emit_log_simple(JETTON_ADDED,
+;;                 begin_cell()
+;;                     .store_uint(target_chain_id, 32)
+;;                     .store_slice(whitelist_jetton_address)
+;;                     .end_cell(),
+;;                 1
+;;             );
+;;             has_refs = ref_cs.slice_refs() > 0;
+;;             if (has_refs) {
+;;                 cell ref = ref_cs~load_ref();
+;;                 ref_cs = ref.begin_parse();
+;;             }
+;;         } until (~ has_refs);
+;;         save_storage();
+;;         return ();
+;;     }
+;; 
+;;     if (op == remove_jetton) {
+;;         int target_chain_id = in_msg_body~load_uint(32);
+;;         slice ref_cs = in_msg_body;
+;;         int has_refs = 0;
+;;         do {
+;;             slice jetton_address = ref_cs~load_msg_addr();
+;;             (int wc, int jetton_address_hash) = parse_std_addr(jetton_address);
+;;             var key_builder = begin_cell()
+;;                     .store_uint(wc,8)
+;;                     .store_uint(target_chain_id,32)
+;;                     .store_uint(jetton_address_hash,256)
+;;                     .end_cell();
+;;             var key_hash = cell_hash(key_builder);
+;;             (_, int is_support) = idict_get?(storage::jetton_whitelist_dic, DEFAULT_KEY_LENGTH, key_hash);
+;;             if (is_support) {
+;;                 storage::jetton_whitelist_dic~idict_delete?(DEFAULT_KEY_LENGTH, key_hash);
+;;                 emit_log_simple(JETTON_REMOVED,
+;;                     begin_cell()
+;;                         .store_uint(target_chain_id, 32)
+;;                         .store_slice(jetton_address)
+;;                         .end_cell(),
+;;                     1
+;;                 );
+;;             } else {
+;;                 throw(TOKEN_NOT_SUPPORT);
+;;             }
+;;             has_refs = ref_cs.slice_refs() > 0;
+;;             if (has_refs) {
+;;                 cell ref = ref_cs~load_ref();
+;;                 ref_cs = ref.begin_parse();
+;;             }
+;;         } until (~ has_refs);
+;;         save_storage();
+;;         return ();
+;;     }
+;; 
+;;     if (op == set_bridge_pool) {
+;;         slice ref_cs = in_msg_body;
+;;         int has_refs = 0;
+;;         do {
+;;             slice jetton_address = ref_cs~load_msg_addr();
+;;             slice pool_address = in_msg_body~load_msg_addr();
+;;             storage::bridge_pool_address_dic~dict_set(KEY_LENGTH,jetton_address,pool_address);
+;;             has_refs = ref_cs.slice_refs() > 0;
+;;             if (has_refs) {
+;;                 cell ref = ref_cs~load_ref();
+;;                 ref_cs = ref.begin_parse();
+;;             }
+;;         } until (~ has_refs);
+;;         save_storage();
+;;         return ();
+;;     }
+;; 
+;;     if (op == set_bridge_swap) {
+;;         slice ref_cs = in_msg_body;
+;;         int has_refs = 0;
+;;         do {
+;;             slice jetton_address = ref_cs~load_msg_addr();
+;;             slice swap_address = in_msg_body~load_msg_addr();
+;;             storage::bridge_swap_address_dic~dict_set(KEY_LENGTH,jetton_address,swap_address);
+;;             has_refs = ref_cs.slice_refs() > 0;
+;;             if (has_refs) {
+;;                 cell ref = ref_cs~load_ref();
+;;                 ref_cs = ref.begin_parse();
+;;             }
+;;         } until (~ has_refs);
+;;         save_storage();
+;;         return ();
+;;     }
+;; 
+;;     if (op == set_target_contract) {
+;;         slice ref_cs = in_msg_body;
+;;         int has_refs = 0;
+;;         do {
+;;             int target_chain_id = ref_cs~load_uint(64);
+;;             slice target_contract = in_msg_body~load_bits(256);
+;;             storage::target_contract_dic~udict_set(64,target_chain_id,target_contract);
+;;             has_refs = ref_cs.slice_refs() > 0;
+;;             if (has_refs) {
+;;                 cell ref = ref_cs~load_ref();
+;;                 ref_cs = ref.begin_parse();
+;;             }
+;;         } until (~ has_refs);
+;;         save_storage();
+;;         return ();
+;;     }
+;; 
+;;     if (op == change_pause_controller) {
+;;         slice pause_controller = in_msg_body~load_msg_addr();
+;;         storage::pause_controller = pause_controller;
+;;         save_storage();
+;;         return ();
+;;     }
+;; 
+;;     if (op == change_oracle_address) {
+;;         slice oracle_address = in_msg_body~load_msg_addr();
+;;         storage::oracle_address = oracle_address;
+;;         save_storage();
+;;         return ();
+;;     }
+;; 
+;;     if (op == restart) {
+;;         storage::is_pause = false;
+;;         emit_log_simple(RESTARTED,
+;;                     begin_cell()
+;;                         .store_uint(now(), 64)
+;;                         .end_cell(),
+;;                     1
+;;                 );
+;;         save_storage();
+;;         return ();
+;;     }
+;; 
+;;     throw(WRONG_OP);
+;; }
