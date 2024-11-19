@@ -1,0 +1,35 @@
+#pragma version >=0.4.4;
+#include "workchain.fc";
+
+cell pack_vault_wallet_data(slice owner_address, slice vault_address) inline {
+    return  begin_cell()
+                .store_coins(0)
+                .store_bool(0)
+                .store_coins(0)
+                .store_uint32(0)
+                .store_ref(begin_cell().store_coins(0).store_coins(0).store_uint32(0).end_cell())
+                .store_ref(begin_cell().store_coins(0).store_coins(0).store_coins(0).end_cell())
+                .store_slice(owner_address)
+                .store_slice(vault_address)
+                .end_cell();
+}
+
+builder calculate_vault_wallet_state_init(slice owner_address, slice vault_address, cell vault_wallet_code) inline {
+    return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(vault_wallet_code)
+          .store_dict(pack_vault_wallet_data(owner_address, vault_address))
+          .store_uint(0, 1);
+}
+
+slice calculate_address(cell state_init) inline {
+    return begin_cell().store_uint(4, 3)
+                     .store_int(MY_WORKCHAIN, 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+slice calculate_user_vault_wallet_address(slice owner_address, slice vault_address, cell vault_wallet_code) inline {
+    return calculate_address(calculate_vault_wallet_state_init(owner_address, vault_address, vault_wallet_code).end_cell());
+}
