@@ -1,0 +1,516 @@
+#include "imports/stdlib.fc";
+#include "imports/constants.fc";
+#include "imports/address-utils.fc";
+#include "imports/fee-utils.fc";
+#include "imports/message-utils.fc";
+#include "imports/ownable.fc";
+#include "BitcoinHelper.fc";
+
+(cell, cell, cell, cell, cell, cell) load_data() inline_ref {
+    slice ds = get_data().begin_parse();
+    cell numbers = ds~load_ref(); 
+    cell addresses = ds~load_ref();
+    cell content = ds~load_ref();
+    slice refs = ds~load_ref().begin_parse();
+    return(
+        numbers, ;; total_supply, starting_block_number, chain_id, app_id, protocol_percentage_fee
+        addresses, ;; admin_address, teleporter_address, treasury_address
+        content, ;; content
+        refs~load_ref(), ;; bitcoin_relay_address and relay_block_code
+        refs~load_ref(), ;; locker_manager_address and locker_wallet_code
+        refs~load_ref() ;; wrap_request_code and teleBTC_wallet_code
+    );
+}
+
+() save_data(cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) impure inline_ref {
+    set_data(begin_cell()
+            .store_ref(numbers)
+            .store_ref(addresses)
+            .store_ref(content)
+            .store_ref(
+                begin_cell()
+                .store_ref(relay)
+                .store_ref(locker)
+                .store_ref(codes)
+                .end_cell()
+            )
+            .end_cell()
+    );
+}
+
+() change_admin(slice _admin) impure {
+    throw_if(ERROR_ZERO_ADDRESS, is_zero_address?(_admin));
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+    save_data(numbers, pack_addresses_cell(_admin, teleporter_address, treasury_address), content, relay, locker, codes);
+    return ();
+}
+
+() set_starting_block_number(int _starting_block_number) impure {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (int total_supply, int starting_block_number, int chain_id, int app_id, int protocol_percentage_fee) = unpack_numbers(numbers);
+    throw_unless(error::low_starting_block_number, _starting_block_number > starting_block_number);
+    save_data(pack_numbers_cell(total_supply, _starting_block_number, chain_id, app_id, protocol_percentage_fee), addresses, content, relay, locker, codes);
+    return ();
+}
+
+() set_protocol_percentage_fee(int _protocol_percentage_fee) impure {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (int total_supply, int starting_block_number, int chain_id, int app_id, int protocol_percentage_fee) = unpack_numbers(numbers);
+    throw_unless(error::out_of_range_protocol_fee,  MAX_PROTOCOL_FEE >= _protocol_percentage_fee);
+    save_data(pack_numbers_cell(total_supply, starting_block_number, chain_id, app_id, _protocol_percentage_fee), addresses, content, relay, locker, codes);
+    return ();
+}
+
+() set_bitcoin_relay(slice _address) impure {
+    throw_if(ERROR_ZERO_ADDRESS, is_zero_address?(_address));
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (slice bitcoin_relay_address, cell relay_block_code) = unpack_relay(relay);
+    save_data(numbers, addresses, content, pack_relay_cell(_address, relay_block_code), locker, codes);
+    return ();
+}
+
+() set_locker_manager(slice _address) impure {
+    throw_if(ERROR_ZERO_ADDRESS, is_zero_address?(_address));
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (slice locker_manager_address, cell locker_wallet_code) = unpack_locker(locker);
+    save_data(numbers, addresses, content, relay, pack_locker_cell(_address, locker_wallet_code), codes);
+    return ();
+}
+
+() set_treasury(slice _address) impure {
+    throw_if(ERROR_ZERO_ADDRESS, is_zero_address?(_address));
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+    save_data(numbers, pack_addresses_cell(admin_address, teleporter_address, _address), content, relay, locker, codes);
+    return ();
+}
+
+() set_teleporter(slice _address) impure {
+    throw_if(ERROR_ZERO_ADDRESS, is_zero_address?(_address));
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+    save_data(numbers, pack_addresses_cell(admin_address, _address, treasury_address), content, relay, locker, codes);
+    return ();
+}
+
+() set_relay_block_code(cell code) impure {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (slice bitcoin_relay_address, cell relay_block_code) = unpack_relay(relay);
+    save_data(numbers, addresses, content, pack_relay_cell(bitcoin_relay_address, code), locker, codes);
+    return ();
+}
+
+() set_locker_wallet_code(cell code) impure {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (slice locker_manager_address, cell locker_wallet_code) = unpack_locker(locker);
+    save_data(numbers, addresses, content, relay, pack_locker_cell(locker_manager_address, code), codes);
+    return ();
+}
+
+() set_wrap_request_code(cell code) impure {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (cell wrap_request_code, cell teleBTC_wallet_code) = unpack_codes(codes);
+    save_data(numbers, addresses, content, relay, locker, pack_codes(code, teleBTC_wallet_code));
+    return ();
+}
+
+(cell) send_teleBTC(int amount, slice recipient_address, slice from, cell teleBTC_wallet_code, int total_ton_amount, int forward_ton_amount, int query_id, slice payload) inline_ref {
+    cell wallet_state_init = calculate_teleBTC_wallet_state_init(recipient_address, my_address(), teleBTC_wallet_code);
+    slice to_wallet_address = calculate_teleBTC_wallet_address(wallet_state_init);
+    cell wallet_msg = begin_cell()
+                        .store_uint(op::internal_transfer, 32)
+                        .store_uint(query_id, 64)
+                        .store_coins(amount)
+                        .store_slice(my_address())
+                        .store_slice(from)
+                        .store_coins(forward_ton_amount)
+                        .store_slice(payload)
+                        .end_cell();
+    
+    var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(to_wallet_address)
+                .store_coins(total_ton_amount)
+                .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+                .store_ref(wallet_state_init)
+                .store_ref(wallet_msg);
+    return msg.end_cell();
+}
+
+(int, int, int) calculate_and_send_fees(int inpout_amount, int network_fee, int locker_percentage_fee) inline {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (int total_supply, int starting_block_number, int chain_id, int app_id, int protocol_percentage_fee) = unpack_numbers(numbers);
+    int locker_fee = (inpout_amount * locker_percentage_fee) / MAX_LOCKER_FEE;
+    int protocol_fee = (inpout_amount * protocol_percentage_fee) / MAX_PROTOCOL_FEE; 
+    ;; int third_party_fee = 0; ;; to third_party
+    int remained_amount = inpout_amount - locker_fee - protocol_fee - network_fee;
+    return (locker_fee, protocol_fee, remained_amount);
+}
+
+() on_bounce (slice in_msg_body) impure {
+    in_msg_body~skip_bits(32); ;; 0xFFFFFFFF
+
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (int total_supply, int starting_block_number, int chain_id, int app_id, int protocol_percentage_fee) = unpack_numbers(numbers);
+    (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+
+    int op = in_msg_body~load_uint(32);
+    in_msg_body~skip_bits(64);
+
+    throw_unless(ERROR_OP_CODE_NOT_VALID, (op == op::internal_transfer) | (op == op::check_is_used));
+
+    if ( op == op::internal_transfer) {
+        int amount = in_msg_body~load_coins();
+        total_supply -= amount;
+        
+        save_data(pack_numbers_cell(total_supply, starting_block_number, chain_id, app_id, protocol_percentage_fee), addresses, content, relay, locker, codes);
+    }
+    ;; we can not recover "from" address from the bounced message, so send the bounced excess to teleporter
+    send_ton(teleporter_address, 0, 64);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ~strdump("minter");
+    ~dump(my_balance);
+    ~dump(msg_value);
+    int ton_balance_before_msg = my_balance - msg_value;
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages, just receive ton
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        on_bounce(in_msg_body);
+        return();
+    }
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    cs~load_coins(); ;; fwd_fee
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+
+    if (op == op::check_wrap_request) {
+        int total_ton_amount = in_msg_body~load_coins();
+        cell minter_msg = in_msg_body~load_ref();
+        slice minter_msg_cs = minter_msg.begin_parse();
+        int forward_ton_amount = minter_msg_cs~load_coins();
+        int storage_fee = min_tons_for_storage - min(ton_balance_before_msg, min_tons_for_storage);
+        int txn_fee = storage_fee + min_msg_fwd_fee + 2 * gas_consumption;
+        throw_unless(ERROR_NOT_ENOUGH_COINS, total_ton_amount >= 
+                    forward_ton_amount + txn_fee);
+        forward_ton_amount = 15 * gas_consumption + 18 * min_msg_fwd_fee + 14 * min_tons_for_storage;
+        slice from = minter_msg_cs~load_msg_addr();
+        
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(teleporter_address, sender_address);
+
+        (int tx_id, slice vout) = calculate_tx_id(minter_msg_cs~load_ref().begin_parse());
+        ;; slice hash_cs = begin_cell().store_uint(tx_id, 256).end_cell().begin_parse();
+        ;; ~dump(hash_cs.preload_bits(hash_cs.slice_bits()));
+
+        
+        slice relay_cs = minter_msg_cs~load_ref().begin_parse();
+        int block_number = relay_cs~load_uint(256);
+
+        (int total_supply, int starting_block_number, int chain_id, int app_id, int protocol_percentage_fee) = unpack_numbers(numbers);
+        throw_unless(error::request_is_old, block_number >= starting_block_number);
+
+        (slice bitcoin_relay_address, cell relay_block_code) = unpack_relay(relay);
+        cell relay_block_state_init = calculate_block_state_init(bitcoin_relay_address, block_number, relay_block_code);
+        slice relay_block_address = calculate_block_address(relay_block_state_init);
+
+        relay_cs = relay_cs~load_ref().begin_parse();
+        int index = relay_cs~load_uint(256);
+        cell intermediate_nodes = relay_cs~load_ref();
+        
+        throw_if(ERROR_EMPTY_VALUE, vout.slice_empty?());
+        
+        cell locker_locking_script_c = minter_msg_cs~load_ref();
+        (slice locker_manager_address, cell locker_wallet_code) = unpack_locker(locker);
+        cell locker_wallet_state_init = calculate_locker_wallet_state_init(locker_manager_address, locker_locking_script_c, locker_wallet_code);
+        slice locker_wallet_address = calculate_locker_wallet_address(locker_wallet_state_init);
+
+        slice locker_cs =  locker_locking_script_c.begin_parse();
+        int locker_locking_script_size = locker_cs~load_uint(8);
+        int locker_locking_script = locker_cs~load_uint(locker_locking_script_size);
+
+        (int input_amount, slice ad) = parse_value_and_data(locker_locking_script_size, locker_locking_script, vout);
+        throw_unless(ERROR_ZERO_VALUE, input_amount > 0);
+
+        (int _chain_id, int _app_id, slice recipient_address, int network_fee, int speed, int third_party_id) = parse_arbitrary_data(ad);
+        force_chain(recipient_address);
+        throw_unless(error::wrong_chain_id, _chain_id == chain_id);
+        throw_unless(error::wrong_app_id, _app_id == app_id);
+        throw_unless(error::wrong_fee, network_fee <= input_amount);
+        throw_unless(error::speed_out_of_range, speed == 0);
+
+        (cell wrap_request_code, cell teleBTC_wallet_code) = unpack_codes(codes);
+        cell state_init = calculate_wrap_request_state_init(my_address(), tx_id, wrap_request_code);
+        slice to_wrap_request_address = calculate_wrap_request_address(state_init);
+
+        cell numbers = begin_cell()
+                        .store_coins(input_amount)
+                        .store_uint(network_fee, 24)
+                        .store_uint(speed, 8)
+                        .end_cell();
+        cell relay = begin_cell() 
+                    .store_slice(relay_block_address)
+                    .store_uint(index, 256)
+                    .store_ref(intermediate_nodes)
+                    .end_cell();
+        cell wrap_req_msg = begin_cell() 
+                            .store_ref(numbers)
+                            .store_ref(relay)
+                            .store_slice(locker_wallet_address)
+                            .store_slice(recipient_address)
+                            .end_cell();
+        cell wrap_msg = begin_cell()
+                        .store_uint(op::check_is_used, 32)
+                        .store_uint(query_id, 64)
+                        .store_coins(forward_ton_amount)
+                        .store_slice(from)
+                        .store_ref(wrap_req_msg)
+                        .end_cell();
+        var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(to_wrap_request_address)
+                .store_coins(0)
+                .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+                .store_ref(state_init)
+                .store_ref(wrap_msg);
+        send_raw_message(msg.end_cell(), 64);
+    
+        return();
+    }
+
+    if (op == op::mint) {
+        try {
+            int forward_ton_amount = in_msg_body~load_coins();
+            slice from = in_msg_body~load_msg_addr();
+            int total_ton_amount = msg_value;
+        
+            int storage_fee = min_tons_for_storage - min(ton_balance_before_msg, min_tons_for_storage);
+            int txn_fee = storage_fee + 4 * min_msg_fwd_fee + 2 * gas_consumption;
+            throw_unless(ERROR_NOT_ENOUGH_COINS, total_ton_amount >= 
+                        forward_ton_amount + txn_fee);
+            total_ton_amount -= txn_fee;
+            forward_ton_amount = 8 * gas_consumption + 8 * min_msg_fwd_fee + 8 * min_tons_for_storage;
+
+            int tx_id = in_msg_body~load_uint(256);
+            int inpout_amount = in_msg_body~load_coins();
+            int network_fee = in_msg_body~load_coins();
+            slice locker_info_cs = in_msg_body~load_ref().begin_parse();
+            int locker_percentage_fee = locker_info_cs~load_uint(32);
+            slice locker_wallet_admin_address = locker_info_cs~load_msg_addr();
+            cell locker_locking_script = locker_info_cs~load_ref();
+            slice recipient_address = in_msg_body~load_msg_addr();
+            
+            (cell wrap_request_code, cell teleBTC_wallet_code) = unpack_codes(codes);
+            cell state_init = calculate_wrap_request_state_init(my_address(), tx_id, wrap_request_code);
+            slice wrap_request_address = calculate_wrap_request_address(state_init);
+
+            throw_unless(error::sender_is_not_wrap_request, equal_slice_bits(wrap_request_address, sender_address));
+
+            cell wallet_state_init = calculate_teleBTC_wallet_state_init(recipient_address, my_address(), teleBTC_wallet_code);
+            slice to_wallet_address = calculate_teleBTC_wallet_address(wallet_state_init);
+            (int locker_fee, int protocol_fee, int remained_amount) = calculate_and_send_fees(inpout_amount, network_fee, locker_percentage_fee);
+            (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+
+            cell to_treasury_cell = send_teleBTC(protocol_fee, treasury_address, from, teleBTC_wallet_code, total_ton_amount / 4, forward_ton_amount / 4, query_id, "wrapping TeleBTC");
+            cell to_teleporter_cell = send_teleBTC(network_fee, teleporter_address, from, teleBTC_wallet_code, total_ton_amount / 4, forward_ton_amount / 4, query_id, "wrapping TeleBTC");
+            cell to_locker_cell = send_teleBTC(locker_fee, locker_wallet_admin_address, from, teleBTC_wallet_code, total_ton_amount / 4, forward_ton_amount / 4, query_id, "wrapping TeleBTC");
+            cell for_event = begin_cell()
+                            .store_slice("Event:")
+                            .store_uint(tx_id, 256)
+                            .store_ref(locker_locking_script)
+                            .end_cell();
+            cell to_recipient_cell = send_teleBTC(remained_amount, recipient_address, from, teleBTC_wallet_code, total_ton_amount / 4, forward_ton_amount / 4, query_id, for_event.begin_parse());
+
+            send_raw_message(to_treasury_cell, 1);
+            send_raw_message(to_teleporter_cell, 1);
+            send_raw_message(to_locker_cell, 1);
+            send_raw_message(to_recipient_cell, 1);
+            
+            (int total_supply, int starting_block_number, int chain_id, int app_id, int protocol_percentage_fee) = unpack_numbers(numbers);
+
+            save_data(pack_numbers_cell(total_supply + inpout_amount, starting_block_number, chain_id, app_id, protocol_percentage_fee), addresses, content, relay, locker, codes);
+            ;; throw(0x1); ;; for fall-back test
+        } catch(x, n) {
+            ;; send message to wrap request to set is_used as 0 and send message to locker wallet, if there is enough gas left, if not, we can recognize this situation from the fact that the last message was sent from from wrap request to minter and back-end can adjust locker's capacity and unset is_used in other transactions
+            int txn_fee = 2 * min_msg_fwd_fee + 4 * gas_consumption;
+            throw_unless(ERROR_NOT_ENOUGH_COINS, msg_value >= txn_fee);
+
+            in_msg_body~load_coins();
+            in_msg_body~load_msg_addr();
+            int tx_id = in_msg_body~load_uint(256);
+            int input_amount = in_msg_body~load_coins();
+
+            var msg_body = begin_cell()
+                        .store_uint(op::unset_is_used, 32)
+                        .store_uint(query_id, 64)
+                        .end_cell();
+            var msg = begin_cell()
+                    .store_uint(0x18, 6)
+                    .store_slice(sender_address)
+                    .store_coins(0)
+                    .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                    .store_ref(msg_body);
+            send_raw_message(msg.end_cell(), 64);
+        }
+        return ();
+    }
+
+    if (op == op::wrap_notification) {
+        int total_ton_amount = msg_value;
+        int storage_fee = min_tons_for_storage - min(ton_balance_before_msg, min_tons_for_storage);
+        int txn_fee = storage_fee + min_msg_fwd_fee + gas_consumption;
+        throw_unless(ERROR_NOT_ENOUGH_COINS, total_ton_amount >= txn_fee);
+        slice from = in_msg_body~load_msg_addr();
+        if ((is_zero_address?(from) == 0) & (msg_value >= min_msg_fwd_fee)) {
+            var msg = begin_cell()
+                .store_uint(0x10, 6) ;; nobounce 
+                .store_slice(from)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::excesses, 32)
+                .store_uint(query_id, 64);
+            send_raw_message(msg.end_cell(), 64);
+        }
+        return ();
+    }
+
+    if (op == op::mint_without_wrap) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        int forward_ton_amount = in_msg_body~load_coins();
+        slice from = in_msg_body~load_msg_addr();
+        int total_ton_amount = msg_value;
+    
+        int storage_fee = min_tons_for_storage - min(ton_balance_before_msg, min_tons_for_storage);
+        int txn_fee = storage_fee + min_msg_fwd_fee + gas_consumption;
+        throw_unless(ERROR_NOT_ENOUGH_COINS, total_ton_amount >= 
+                    forward_ton_amount + txn_fee);
+        total_ton_amount -= txn_fee;
+        forward_ton_amount = 2 * gas_consumption + 2 * min_msg_fwd_fee + 2 * min_tons_for_storage;
+        slice recipient_address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        (cell wrap_request_code, cell teleBTC_wallet_code) = unpack_codes(codes);
+        cell msg = send_teleBTC(amount, recipient_address, from, teleBTC_wallet_code, total_ton_amount, forward_ton_amount, query_id, "minting TeleBTC");
+        send_raw_message(msg, 64);
+
+        (int total_supply, int starting_block_number, int chain_id, int app_id, int protocol_percentage_fee) = unpack_numbers(numbers);
+        save_data(pack_numbers_cell(total_supply + amount, starting_block_number, chain_id, app_id, protocol_percentage_fee), addresses, content, relay, locker, codes);
+        return ();
+    }
+
+    if (op == op::set_starting_block_number) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        set_starting_block_number(in_msg_body~load_uint(32));
+    }
+
+    if(op == op::set_protocol_percentage_fee) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        set_protocol_percentage_fee(in_msg_body~load_uint(32));
+    }
+
+    if (op == op::set_bitcoin_relay) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        set_bitcoin_relay(in_msg_body~load_msg_addr());
+    }
+
+    if (op == op::set_locker_manager) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        set_locker_manager(in_msg_body~load_msg_addr());
+    }
+
+    if (op == op::set_treasury) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        set_treasury(in_msg_body~load_msg_addr());
+    }
+
+    if (op == op::set_teleporter) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        set_teleporter(in_msg_body~load_msg_addr());
+    }
+
+    if ( op == op::change_content) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        save_data(numbers, addresses, in_msg_body~load_ref(), relay, locker, codes);
+        return ();
+    }
+
+    if ( op == op::change_admin) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        change_admin(in_msg_body~load_msg_addr());
+    }
+
+    if ( op == op::set_relay_block_code) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        set_relay_block_code(in_msg_body~load_ref());
+    }
+
+    if ( op == op::set_locker_wallet_code) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        set_locker_wallet_code(in_msg_body~load_ref());
+    }
+
+    if ( op == op::set_wrap_request_code) {
+        (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+        is_owner(admin_address, sender_address);
+        set_wrap_request_code(in_msg_body~load_ref());
+    }
+}
+
+(cell, cell, cell, cell, cell) get_storage_data() method_id {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    return (numbers, addresses, relay, locker, codes);
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (int total_supply, int starting_block_number, int chain_id, int app_id, int protocol_percentage_fee) = unpack_numbers(numbers);
+    (cell wrap_request_code, cell teleBTC_wallet_code) = unpack_codes(codes);
+    (slice admin_address, slice teleporter_address, slice treasury_address) = unpack_addresses(addresses);
+    return (total_supply, -1, admin_address, content, teleBTC_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (cell wrap_request_code, cell teleBTC_wallet_code) = unpack_codes(codes);
+    return calculate_user_teleBTC_wallet_address(owner_address, my_address(), teleBTC_wallet_code);
+}
+
+slice get_wrap_request_address(slice tx_id) method_id {
+    (cell numbers, cell addresses, cell content, cell relay, cell locker, cell codes) = load_data();
+    (cell wrap_request_code, cell teleBTC_wallet_code) = unpack_codes(codes);
+    cell state_init = calculate_wrap_request_state_init(my_address(), tx_id~load_uint(256), wrap_request_code);
+    return calculate_wrap_request_address(state_init);
+}
+
+(int) get_contract_storage_fee(int max_viewed_cells, int workchain, int seconds, cell contract_code) method_id {
+    (int cells, int bits, _) = compute_data_size(contract_code, max_viewed_cells);      
+    return get_storage_fee(workchain, seconds, bits, cells); 
+}
+
+(int) get_contract_balance() method_id {
+    [int b, _] = get_balance();
+    return b;
+}

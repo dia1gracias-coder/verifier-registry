@@ -1,0 +1,146 @@
+#include "imports/stdlib.fc";
+#include "imports/constants.fc";
+
+int tuple_length (tuple t) asm "TLEN";
+forall X -> (tuple, X) ~tpop ( tuple t) asm "TPOP";
+
+int slice_hash_1(builder b1, int n) asm "HASHEXT_SHA256";
+int slice_hash_2(builder b1, builder b2, int n) asm "HASHEXT_SHA256";
+int keccak256(builder b, int n) asm "HASHEXT_KECCAK256";
+;; int slice_hash_5(slice s1, slice s2, slice s3, slice s4, slice s5, int n) asm "HASHEXT_SHA256";
+
+;;;;;;;; hash functions for different number of vin and vout sizes ;;;;;;;;;;;
+int slice_hash_R_7(builder b1, builder b2, builder b3, builder b4, builder b5, builder b6, builder b7, int n) asm "HASHEXTR_SHA256";
+int slice_hash_R_8(builder b1, builder b2, builder b3, builder b4, builder b5, builder b6, builder b7, builder b8, int n) asm "HASHEXTR_SHA256";
+int slice_hash_R_9(builder b1, builder b2, builder b3, builder b4, builder b5, builder b6, builder b7, builder b8, builder b9, int n) asm "HASHEXTR_SHA256";
+int slice_hash_R_10(builder b1, builder b2, builder b3, builder b4, builder b5, builder b6, builder b7, builder b8, builder b9, builder b10, int n) asm "HASHEXTR_SHA256";
+int slice_hash_R_11(builder b1, builder b2, builder b3, builder b4, builder b5, builder b6, builder b7, builder b8, builder b9, builder b10, builder b11, int n) asm "HASHEXTR_SHA256";
+int slice_hash_R_12(builder b1, builder b2, builder b3, builder b4, builder b5, builder b6, builder b7, builder b8, builder b9, builder b10, builder b11, builder b12, int n) asm "HASHEXTR_SHA256";
+int slice_hash_R_13(builder b1, builder b2, builder b3, builder b4, builder b5, builder b6, builder b7, builder b8, builder b9, builder b10, builder b11, builder b12, builder b13, int n) asm "HASHEXTR_SHA256";
+int slice_hash_R_14(builder b1, builder b2, builder b3, builder b4, builder b5, builder b6, builder b7, builder b8, builder b9, builder b10, builder b11, builder b12, builder b13, builder b14, int n) asm "HASHEXTR_SHA256";
+int slice_hash_R_15(builder b1, builder b2, builder b3, builder b4, builder b5, builder b6, builder b7, builder b8, builder b9, builder b10, builder b11, builder b12, builder b13, builder b14, builder b15, int n) asm "HASHEXTR_SHA256";
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(int, slice) calculate_tx_id(slice s) inline {
+    tuple ins = empty_tuple();
+    int vin_num_256 = s~load_uint(8);
+    int vin_last_cell_length = s~load_uint(8);
+    int vout_num_256 = s~load_uint(8);
+    int vout_last_cell_length = s~load_uint(8);
+    s = s~load_ref().begin_parse();
+    ins~tpush(begin_cell().store_uint( s~load_uint(32), 32)); ;; version
+    repeat (vin_num_256) {
+      s = s~load_ref().begin_parse();
+      ins~tpush(begin_cell().store_uint(s~load_uint(256), 256));
+    }
+    s = s~load_ref().begin_parse();
+    ins~tpush(begin_cell().store_uint(s~load_uint(vin_last_cell_length), vin_last_cell_length));
+    builder vout = begin_cell();
+    repeat (vout_num_256) {
+      s = s~load_ref().begin_parse();
+      int vo = s~load_uint(256);
+      ins~tpush(begin_cell().store_uint(vo, 256));
+      vout = vout.store_uint(vo, 256);
+    }
+    s = s~load_ref().begin_parse();
+    int vo = s~load_uint(vout_last_cell_length);
+    ins~tpush(begin_cell().store_uint(vo, vout_last_cell_length));
+    vout = vout.store_uint(vo, vout_last_cell_length);
+    s = s~load_ref().begin_parse();
+    int locktime = s~load_uint(32);
+    throw_unless(error::locktime_is_non_zero, locktime == 0);
+    ins~tpush(begin_cell().store_uint(locktime, 32));
+
+    int hash_ins = vin_num_256 + vout_num_256 + 4;
+
+    int hash = 0;
+    if (hash_ins == 7) {
+      hash = slice_hash_R_7(ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(), 7);
+    };
+    if (hash_ins == 8) {
+      hash = slice_hash_R_8(ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(), 8);
+    };
+    if (hash_ins == 9) {
+      hash = slice_hash_R_9(ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(), 9);
+    }
+    if (hash_ins == 10) {
+      hash = slice_hash_R_10(ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(), 10);
+    };
+    if (hash_ins == 11) {
+      hash = slice_hash_R_11(ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(), 11);
+    };
+    if (hash_ins == 12) {
+      hash = slice_hash_R_12(ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(), 12);
+    }
+    if (hash_ins == 13) {
+      hash = slice_hash_R_13(ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(),ins~tpop(), 13);
+    }
+    if (hash_ins == 14) {
+      hash = slice_hash_R_14(ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(),ins~tpop(), ins~tpop(), 14);
+    }
+    if (hash_ins == 15) {
+      hash = slice_hash_R_15(ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(), ins~tpop(),ins~tpop(),ins~tpop(), ins~tpop(),ins~tpop(), ins~tpop(), ins~tpop(), 15);
+    }
+
+    return (slice_hash_1(begin_cell().store_uint(hash, 256), 1), vout.end_cell().begin_parse());
+}
+
+(int, int, slice, int, int, int) parse_arbitrary_data(slice ad) inline {
+    int chain_id = ad~load_uint(16); ;; chain_id
+    int app_id = ad~load_uint(8); ;; app_id
+    ad~skip_bits(5); ;; was added to make it a valid byte length
+    builder recipient_address_b = begin_cell().store_uint(ad~load_uint(11), 11);
+    slice recipient_address = recipient_address_b.store_uint(ad~load_uint(256), 256).end_cell().begin_parse();
+    recipient_address = recipient_address~load_msg_addr(); ;; recipient_address, 32 byte: TVM account
+    int network_fee = ad~load_uint(24); ;; network_fee, 3 byte
+    int speed = ad~load_uint(8); ;; speed, 1 byte: {0,1}
+    int third_party_id = ad~load_uint(8); ;; third_party_id, 1 byte: max 256 third parties, default is 0 for no third party
+    return (chain_id, app_id, recipient_address~load_msg_addr(), network_fee, speed, third_party_id);
+}
+
+(int) to_little_endian(int number) inline {
+  slice number_cs = begin_cell().store_uint(number, 64).end_cell().begin_parse();
+  tuple number_stack = empty_tuple();
+  builder little_endian_number = begin_cell();
+  repeat(8) {
+    number_stack~tpush(number_cs~load_uint(8));
+  }
+  repeat(8) {
+    little_endian_number = little_endian_number.store_uint(number_stack~tpop(), 8);
+  }
+  slice little_endian_number_cs = little_endian_number.end_cell().begin_parse();
+  return little_endian_number_cs~load_uint(64);
+}
+
+(int, slice) parse_value_and_data(int locker_locking_script_size, int locker_locking_script, slice vout) inline {
+  int bitcoin_amount = 0;
+  builder ad = begin_cell();
+  int output_num = vout~load_uint(8);
+  int script_pub_key = 0;
+  int arbitrary_data = 0;
+  repeat(output_num) {
+    int amount = to_little_endian(vout~load_uint(64));
+    int script_size = vout~load_uint(8) * 8;
+    if (script_size < 256) { ;; not an op_return
+      script_pub_key = vout~load_uint(script_size);
+      if(
+        keccak256(begin_cell().store_uint(script_pub_key, script_size), 1) == keccak256(begin_cell().store_uint(locker_locking_script, locker_locking_script_size), 1)) 
+      {
+        bitcoin_amount = amount;
+      }
+      } else {
+          int maybe_arbitrary_data = vout~load_uint(8);
+          throw_unless(error::invalid_op_return_code, maybe_arbitrary_data == 106); ;; 0x6a
+        
+          int arbitrary_data_size = vout~load_uint(8) * 8;
+          throw_unless(error::invalid_ad_length, arbitrary_data_size == 336); ;; 42 bytes
+          ad = ad.store_uint(vout~load_uint(256), 256);
+          ad = ad.store_uint(vout~load_uint(80), 80);
+      }
+  }
+  slice bitcoin_amount_cs = begin_cell().store_coins(bitcoin_amount).end_cell().begin_parse();
+  return (bitcoin_amount_cs~load_coins(), ad.end_cell().begin_parse());
+}
+  
+
+

@@ -1,0 +1,18 @@
+#include "constants.fc";
+
+int is_owner(slice owner_address, slice msg_sender) impure {
+    throw_unless(ERROR_ACCESS_DENIED, equal_slice_bits(owner_address, msg_sender));
+    return 1;
+}
+
+() send_coins (slice owner_address, slice msg_sender, int amount) impure {
+    is_owner(owner_address, msg_sender);
+    
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(owner_address)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+
+    send_raw_message(msg.end_cell(), 64);
+}

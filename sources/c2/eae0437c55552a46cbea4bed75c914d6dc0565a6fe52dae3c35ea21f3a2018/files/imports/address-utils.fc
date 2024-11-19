@@ -1,0 +1,278 @@
+slice get_zero_address() inline_ref {
+  return begin_cell().store_uint(1, 1).store_uint(0, 255).store_uint(0, 11).end_cell().begin_parse();
+}
+
+int is_zero_address?(slice addr) inline_ref {
+  return equal_slice_bits(get_zero_address(), addr);
+}
+
+(int, int, int, int, int) unpack_numbers(cell numbers) inline {
+    slice numbers_cs = numbers.begin_parse();
+    return (
+        numbers_cs~load_coins(), ;; total_supply
+        numbers_cs~load_uint(32), ;; starting_block_number
+        numbers_cs~load_uint(16), ;; chain_id, 2 byte: max 65535 chains
+        numbers_cs~load_uint(8), ;; app_id, 1 byte: max 256 apps
+        numbers_cs~load_uint(32) ;; protocol_percentage_fee: A number between 0 to 1000
+    );
+}
+
+(cell) pack_numbers_cell(int total_supply, int starting_block_number, int chain_id, int app_id, int protocol_percentage_fee) inline {
+    return (
+        begin_cell()
+        .store_coins(total_supply)
+        .store_uint(starting_block_number, 32)
+        .store_uint(chain_id, 16)
+        .store_uint(app_id, 8)
+        .store_uint(protocol_percentage_fee, 32)
+        .end_cell()
+    );
+}
+
+(slice, slice, slice) unpack_addresses(cell addresses) inline {
+    slice addresses_cs = addresses.begin_parse();
+    return (
+        addresses_cs~load_msg_addr(), ;; admin_address
+        addresses_cs~load_msg_addr(), ;; teleporter_address
+        addresses_cs~load_msg_addr() ;; treasury_address
+    );
+}
+
+(cell) pack_addresses_cell(slice admin_address, slice teleporter_address, slice treasury_address) inline {
+    return(
+        begin_cell()
+        .store_slice(admin_address)
+        .store_slice(teleporter_address)
+        .store_slice(treasury_address)
+        .end_cell()
+    );
+}
+
+(slice, cell) unpack_relay(cell relay) inline {
+    slice relay_cs = relay.begin_parse();
+    return (
+        relay_cs~load_msg_addr(), ;; bitcoin_relay_address
+        relay_cs~load_ref()  ;; relay_block_code
+    );
+}
+
+(cell) pack_relay_cell(slice bitcoin_relay_address, cell relay_block_code) inline {
+    return (
+        begin_cell()
+        .store_slice(bitcoin_relay_address)
+        .store_ref(relay_block_code)
+        .end_cell()
+    );
+}
+
+(slice, cell) unpack_locker(cell locker) inline {
+    slice locker_cs = locker.begin_parse();
+    return (
+        locker_cs~load_msg_addr(), ;; locker_manager_address
+        locker_cs~load_ref()  ;; locker_wallet_code
+    );
+}
+
+(cell) pack_locker_cell(slice locker_manager_address, cell locker_wallet_code) inline {
+    return (
+        begin_cell()
+        .store_slice(locker_manager_address)
+        .store_ref(locker_wallet_code)
+        .end_cell()
+    );
+}
+
+(cell, cell) unpack_codes(cell codes) inline {
+    slice codes_cs = codes.begin_parse();
+    return (
+        codes_cs~load_ref(), ;; wrap_request_code
+        codes_cs~load_ref() ;; teleBTC_wallet_code
+    );
+}
+
+(cell) pack_codes(cell wrap_request_code, cell teleBTC_wallet_code) inline {
+  return (
+      begin_cell()
+      .store_ref(wrap_request_code)
+      .store_ref(teleBTC_wallet_code)
+      .end_cell()
+  );
+}
+
+cell pack_wrap_request_data(int tx_id, int is_used, slice teleBTC_minter_address, int input_amount, int fee, int speed, slice relay_block_address, int index, cell intermediate_nodes, slice locker_wallet_address, slice recipient_address) inline {
+  cell main_data = begin_cell()
+                  .store_uint(tx_id, 256)
+                  .store_uint(is_used, 1)
+                  .store_slice(teleBTC_minter_address)
+                  .end_cell();
+  cell numbers = begin_cell()
+                  .store_coins(input_amount)
+                  .store_uint(fee, 24)
+                  .store_uint(speed, 8)
+                  .end_cell();
+  cell relay = begin_cell() 
+              .store_slice(relay_block_address)
+              .store_uint(index, 256)
+              .store_ref(intermediate_nodes)
+              .end_cell();
+
+  return(
+    begin_cell()
+    .store_ref(main_data)
+    .store_ref(numbers)
+    .store_ref(relay)
+    .store_slice(locker_wallet_address)
+    .store_slice(recipient_address)
+    .end_cell()
+    );
+}
+
+cell calculate_wrap_request_state_init(slice teleBTC_minter_address, int tx_id, cell wrap_request_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(wrap_request_code)
+          .store_dict(
+            pack_wrap_request_data(
+              tx_id,
+              0,
+              teleBTC_minter_address, 
+              0,
+              0,
+              0,
+              get_zero_address(),
+              0,
+              begin_cell().end_cell(),
+              get_zero_address(),
+              get_zero_address()
+            )
+          )
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_wrap_request_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(0, 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+cell pack_teleBTC_wallet_data(int balance, slice owner_address, slice teleBTC_minter_address, cell teleBTC_wallet_code) inline {
+   return  begin_cell()
+            .store_coins(balance)
+            .store_slice(owner_address)
+            .store_slice(teleBTC_minter_address)
+            .store_ref(teleBTC_wallet_code)
+           .end_cell();
+}
+
+cell calculate_teleBTC_wallet_state_init(slice owner_address, slice teleBTC_minter_address, cell teleBTC_wallet_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(teleBTC_wallet_code)
+          .store_dict(pack_teleBTC_wallet_data(0, owner_address, teleBTC_minter_address, teleBTC_wallet_code))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_teleBTC_wallet_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(0, 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+slice calculate_user_teleBTC_wallet_address(slice owner_address, slice teleBTC_minter_address, cell teleBTC_wallet_code) inline {
+  return calculate_teleBTC_wallet_address(calculate_teleBTC_wallet_state_init(owner_address, teleBTC_minter_address, teleBTC_wallet_code));
+}
+
+cell pack_block_data(slice bitcoin_relay_address , int block_height) inline {
+  cell empty_cell = begin_cell().end_cell();
+  return  begin_cell()
+          .store_slice(bitcoin_relay_address)
+          .store_uint(block_height, 32)
+          .store_ref(empty_cell)
+          .store_uint(0, 1) ;; is_actived
+          .store_uint(0, 32) ;; require_fee
+          .store_uint(0, 1) ;; is_paused
+          .end_cell();
+}
+          
+cell calculate_block_state_init(slice bitcoin_relay_address , int block_height, cell block_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(block_code)
+          .store_dict(pack_block_data(bitcoin_relay_address, block_height))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_block_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(0, 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+cell pack_locker_data(slice locker_manager_address, cell locker_locking_script) inline {
+  cell empty_cell = begin_cell().end_cell();
+  return  begin_cell()
+          .store_slice(locker_manager_address)
+          .store_ref(locker_locking_script)
+          .store_slice(get_zero_address()) ;;admin_address
+          .store_slice(get_zero_address())  ;;telebtc_minter
+          .store_ref(empty_cell) ;; wrap_request_code
+          .store_uint(0, 1) ;; is_active
+          .store_uint(0, 64) ;; total wrapped amount
+          .store_uint(0, 1) ;; is_paused
+          .end_cell();
+}
+
+cell calculate_locker_wallet_state_init(slice locker_manager_address, cell locker_locking_script, cell locker_wallet_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(locker_wallet_code)
+          .store_dict(pack_locker_data(locker_manager_address, locker_locking_script))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_locker_wallet_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_uint(0, 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+cell pack_unwrap_data(slice teleBTC_minter_address, int query_id) inline {
+  cell empty_cell = begin_cell().end_cell();
+  return  begin_cell()
+          .store_slice(teleBTC_minter_address)
+          .store_uint(query_id, 64)
+          .store_slice(teleBTC_minter_address) ;; locker_wallet_address
+          .store_uint(0, 64) ;; total unwrapped amount
+          .store_uint(0, 1) ;; is_complete
+          .store_uint(0, 1) ;; is_paused
+          .end_cell();
+}
+
+cell calculate_unwrap_request_state_init(slice teleBTC_minter_address, int query_id, cell unwrap_request_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(unwrap_request_code)
+          .store_dict(pack_unwrap_data(teleBTC_minter_address, query_id))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_unwrap_request_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_uint(0, 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
