@@ -1,0 +1,56 @@
+#include "imports/stdlib.fc";
+
+const slice admin_address = "UQD2YViLALU8R-HdyCd84xxviQ8j7hnau7S8Guxp22vgWglJ"a;
+const op::checkin = "op::checkin"c;
+const op::withdraw = "op::withdraw"c;
+
+const int admin_fee = 30;
+int equal_slices(slice a, slice b) asm "SDEQ";
+
+global int ctx_id;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+
+    ;; Ignore bounced messages
+    int flags = cs~load_uint(4);
+    if (flags & 1) { 
+        return ();
+    }
+
+    ;; Load sender address
+    slice sender = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+    if (op == op::checkin) {
+        int fee = msg_value / 100 * admin_fee;
+        send_raw_message(
+            begin_cell()
+                .store_uint(0x10, 6) 
+                .store_slice(sender) 
+                .store_coins(msg_value - fee) 
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) 
+                .end_cell(),
+            0);
+        return ();
+    }
+
+    if (op == op::withdraw) {
+        if (equal_slices(sender, admin_address) == 0) {
+            return ();
+        }
+
+        int amount = in_msg_body~load_coins();
+        send_raw_message(
+            begin_cell()
+                .store_uint(0x10, 6) 
+                .store_slice(sender) 
+                .store_coins(0) 
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) 
+                .end_cell(),
+            128);
+        return ();
+    }
+
+    return ();
+}
