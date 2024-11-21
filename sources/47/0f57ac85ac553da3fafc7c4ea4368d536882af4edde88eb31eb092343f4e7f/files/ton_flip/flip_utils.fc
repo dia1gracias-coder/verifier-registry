@@ -1,0 +1,114 @@
+#include "../shared/utils.fc";
+
+const WIN_FEE_SHARE = 5000;
+const BET_FEE_SHARE = 10000;
+const MIN_TON_BET = 500000000;
+const FLIP_GAS_FEE = 47000000;
+const INVALID_MSG = "Send h or t";
+
+const FEE_POOL = "UQCu8lL3X0vfTNRwgdi7IjUi0UHRWmkZdRXDDOIGYUW3yHBS"a;
+
+() check_side(msg) impure inline_ref {
+    int isHeads = equal_slices(msg, "h");
+    int isTails = equal_slices(msg, "t");
+
+    ifnot isHeads | isTails {
+        refund_bet(INVALID_MSG);
+        throw(0);
+    }
+}
+
+() check_set_bet_side(slice msg) impure inline {
+    int bytes = slice_bits(msg) / 8;
+    if bytes > 1 {
+        throw_unless(4017, bytes < 3);
+
+        bet_x = 1;
+
+        repeat(bytes){
+            slice letter = msg~load_bits(8);
+            check_side(letter);
+            bet_x = bet_x * 2;
+        }
+        return ();
+    }
+    bet_x = 2;
+    check_side(msg);
+}
+
+(int, int) proceed_bet(cell msg_dict, int max_bet_id) impure inline {
+    int pure_winning = bet_amount * bet_x;
+    int winning = equal_slices(bet_side, res_side) ? 
+    pure_winning - pure_winning * WIN_FEE_SHARE / DENOMINATOR 
+    : 0;
+    
+    int bet_fee = bet_amount * BET_FEE_SHARE / DENOMINATOR;
+
+    if winning > 0 {
+        slice win_msg = get_win_msg(msg_dict);
+            
+        send_winning(winning, win_msg);
+        return (winning, bet_fee);
+    }
+
+    send_raw_message(begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(player)
+        .store_coins(4000000)
+        .store_uint(0, 107)
+        .store_uint(0, 32)
+        .store_slice(max_bet_id % 2 ? "Next time!" : "Try again!")
+    .end_cell(), 0);
+
+    return (0, bet_fee);
+}
+
+(cell, ()) set_last_bets_dict(cell dict, int new_bet_id, cell data) impure inline {
+    dict~udict_set_ref(32, new_bet_id, data);
+    
+    (int min_bet_id, _, int is_min_bet_id) = dict.udict_get_min?(32);
+
+    if (is_min_bet_id & (new_bet_id - min_bet_id) > 18) {
+        dict~udict_delete?(32, min_bet_id);
+    }
+
+    return (dict, ());
+}
+
+(slice, int, slice, slice) get_bet(cell dict, int bet_id) impure inline {
+    (slice data, int success) = dict.udict_get?(32, bet_id);
+    throw_unless(4039, success);
+    
+    slice dict_player = data~load_msg_addr();
+    int dict_bet_amount = data~load_coins();
+    slice dict_bet_side = data~load_bits(bets_count * 8);
+    data~load_bits(8); ;; skip "_"
+    slice dict_res_side = data;
+
+    return (dict_player, dict_bet_amount, dict_bet_side, dict_res_side);
+}
+
+() check_bet_amount(
+    int amount,
+    int pool_balance, 
+    int max_win
+) impure inline {
+    int max_bet = get_max_bet(pool_balance, max_win, bet_x);
+
+    if(pool_balance < MIN_TON_BET){
+        refund_bet("Pool is empty");
+        throw(0);
+    }
+    if(amount < MIN_TON_BET){
+        refund_bet(
+            response_w_coins("Min bet is ", MIN_TON_BET, "TON")
+        );
+        throw(0);
+    }
+    if(amount > max_bet){
+        refund_bet(
+            response_w_coins("Max bet is ", max_bet, "TON")
+        );
+        throw(0);
+    }
+}

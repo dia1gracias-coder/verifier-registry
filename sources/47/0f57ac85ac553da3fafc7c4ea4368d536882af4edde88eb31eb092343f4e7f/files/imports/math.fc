@@ -1,0 +1,24 @@
+{-
+    math.func   
+
+    Extends FunC's arithmetic operations.
+-}
+
+(int) math::pow(int n, int e) {
+  if (e == 0) {
+    return 1;
+  }
+
+  if (e == 1) {
+    return n;
+  }
+
+  int p = math::pow(n, (e / 2));
+  p = p * p;
+    
+  if ((e % 2) == 1) {
+    p = p * n;
+  }
+    
+  return p;
+}
