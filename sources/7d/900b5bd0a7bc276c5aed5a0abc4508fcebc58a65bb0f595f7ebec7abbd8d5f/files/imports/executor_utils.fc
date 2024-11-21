@@ -1,0 +1,27 @@
+#include "params.fc";
+
+cell pack_executor_proxy_data(int executor_address, int data_hash, int status) inline {
+    return begin_cell()
+        .store_uint(executor_address, 256)
+        .store_uint(data_hash, 256)
+        .store_uint(status, 8)
+        .end_cell();
+}
+
+cell calculate_executor_proxy_state_init(cell executor_proxy_code, int executor_address, int data_hash) inline {
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_dict(executor_proxy_code)
+        .store_dict(pack_executor_proxy_data(executor_address, data_hash, 0))
+        .store_uint(0, 1)
+        .end_cell();
+}
+
+slice calculate_executor_proxy_address(cell state_init) inline {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(BASECHAIN, 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}

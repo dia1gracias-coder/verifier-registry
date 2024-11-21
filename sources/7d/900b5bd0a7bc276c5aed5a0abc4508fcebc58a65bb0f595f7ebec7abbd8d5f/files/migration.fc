@@ -1,0 +1,88 @@
+#include "imports/stdlib.fc";
+#include "imports/errors.fc";
+#include "imports/opcodes.fc";
+#include "imports/params.fc";
+
+(int, int, int) load_data() inline {
+    slice ds = get_data().begin_parse();
+
+    return (
+        ds~load_uint(16),   ;; version
+        ds~load_uint(256),  ;; admin
+        ds~load_uint(16)    ;; completed
+    );
+}
+
+() save_data(int version, int admin, int completed) impure inline {
+    cell ds = begin_cell()
+        .store_uint(version, 16)    ;; version
+        .store_uint(admin, 256)     ;; admin
+        .store_uint(completed, 16)  ;; completed
+    .end_cell();
+
+    set_data(ds);
+}
+
+() set_completed(slice sender_address, int new_completed) impure inline {
+    throw_unless(errors::not_inited, ~ get_data().begin_parse().slice_empty?());
+    var (version, admin, completed) = load_data();
+
+    var (sender_address_wc, sender_address_int) = sender_address.parse_std_addr();
+    throw_unless(errors::invalid_address, sender_address_wc == BASECHAIN);
+    throw_unless(errors::unauthorized, sender_address_int == admin);
+
+    return save_data(version, admin, new_completed);
+}
+
+() update_code(slice sender_address, cell code) impure inline {
+    throw_unless(errors::not_inited, ~ get_data().begin_parse().slice_empty?());
+    var (version, admin, completed) = load_data();
+
+    var (sender_address_wc, sender_address_int) = sender_address.parse_std_addr();
+    throw_unless(errors::invalid_address, sender_address_wc == BASECHAIN);
+    throw_unless(errors::unauthorized, sender_address_int == admin);
+
+    set_code(code);
+
+    return save_data(version + 1, admin, completed);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    if flags & 1 {
+        ;; ignore all bounced messages
+        return ();
+    }
+
+    if in_msg_body.slice_empty?() {
+        ;; accept empty incoming messages
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    if op == op::set_completed {
+        int new_completed = in_msg_body~load_uint(16);
+        in_msg_body.end_parse();
+
+        return set_completed(sender_address, new_completed);
+    }
+
+    if op == op::update_code {
+        cell code = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        return update_code(sender_address, code);
+    }
+
+    throw(0xffff);
+}
+
+(int, int, int) get_migration_data() method_id {
+    var (version, admin, completed) = load_data();
+
+    return (version, admin, completed);
+}

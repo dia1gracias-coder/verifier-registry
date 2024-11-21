@@ -1,0 +1,10 @@
+#include "params.fc";
+
+slice serialize_address(int address) inline {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_uint(BASECHAIN, 8)
+        .store_uint(address, 256)
+        .end_cell()
+        .begin_parse();
+}
