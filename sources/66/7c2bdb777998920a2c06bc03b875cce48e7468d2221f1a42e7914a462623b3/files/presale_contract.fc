@@ -1,0 +1,181 @@
+#include "imports/stdlib.fc";
+#include "imports/jetton-utils.fc";
+
+global slice owner_address; ;; 267
+global slice jetton_master_address; ;; 267
+global cell jetton_wallet_code; ;; ref
+global int price_rate; ;; 124
+global int min_ton; ;; 124
+global int max_ton; ;; 124
+global int amount_total; ;; 124
+global int amount_sold; ;; 124
+
+;; const 
+const int forward_ton_fee = 11000000;
+const int commission_send_jetton = 50000000;
+
+;; errors
+const int error::incorrect_amount = 555;
+const int error::no_jetton_left_amount = 666;
+const int error::not_owner = 777;
+
+;; op-codes
+int op::transfer() asm "0xf8a7ea5 PUSHINT";
+int op::excesses() asm "0xd53276db PUSHINT";
+
+() load_data() impure inline {
+    var ds = get_data().begin_parse();
+    owner_address = ds~load_msg_addr(); ;; Bits = 534, Refs = 2
+    jetton_master_address = ds~load_msg_addr();
+    jetton_wallet_code = ds~load_ref();
+
+    var ds2 = ds~load_ref().begin_parse(); ;; Bits = 620, Refs = 0
+    price_rate = ds2~load_coins();
+    min_ton = ds2~load_coins();
+    max_ton = ds2~load_coins();
+    amount_total = ds2~load_coins();
+    amount_sold = ds2~load_coins();
+}
+
+() save_data() impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(owner_address)
+            .store_slice(jetton_master_address)
+            .store_ref(jetton_wallet_code)
+            .store_ref(
+                begin_cell()
+                    .store_coins(price_rate)
+                    .store_coins(min_ton)
+                    .store_coins(max_ton)
+                    .store_coins(amount_total)
+                    .store_coins(amount_sold)
+                    .end_cell()
+            )
+            .end_cell()
+    );
+}
+
+() send_jetton(slice send_to, int jetton_amount, slice comment, int mode) impure inline {
+    cell state_init = calculate_jetton_wallet_state_init(my_address(), jetton_master_address, jetton_wallet_code);
+    slice jetton_wallet_address = calculate_jetton_wallet_address(state_init);
+
+    var msg = begin_cell()
+        .store_uint(0x18, 6) ;; bounceable - 0x18
+        .store_slice(jetton_wallet_address) ;; wallet address
+        .store_coins(commission_send_jetton) ;; value
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(
+            begin_cell()
+                .store_uint(op::transfer(), 32) ;; op code
+                .store_uint(0, 64) ;; query_id
+                .store_coins(jetton_amount) ;; amount
+                .store_slice(send_to) ;; destination
+                .store_slice(my_address()) ;; response_destination
+                .store_uint(0, 1) ;; custom_payload
+                .store_coins(forward_ton_fee) ;; forward_ton_amount
+                .store_uint(1, 1)
+                .store_ref(
+                    begin_cell()
+                        .store_uint(0, 32)
+                        .store_slice(comment)
+                        .end_cell()
+                )
+                .end_cell()
+        );
+
+    send_raw_message(msg.end_cell(), mode);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == 1) {
+        ;;; buy jetton
+        throw_if(error::incorrect_amount, (msg_value < min_ton) | (msg_value > max_ton));
+
+        int jetton_amount = (msg_value / price_rate) * 1000000000;
+        int left_amount = amount_total - amount_sold;
+        throw_unless(error::no_jetton_left_amount, jetton_amount <= left_amount);
+        amount_sold = amount_sold + jetton_amount;
+        slice comment = "Welcome to Crypto Billions!";
+        send_jetton(sender_address, jetton_amount, comment, 1);
+        save_data();
+        return ();
+    }
+
+    if (op == op::excesses()) {
+        ;; Excess
+        return ();
+    }
+
+    throw_unless(error::not_owner, equal_slices_bits(sender_address, owner_address));
+
+    if (op == 2) {
+        ;; send jetton to someone
+        slice send_to = in_msg_body~load_msg_addr();
+        int jetton_amount = in_msg_body~load_coins();
+        int left_amount = amount_total - amount_sold;
+        throw_unless(error::no_jetton_left_amount, jetton_amount <= left_amount);
+        amount_sold = amount_sold + jetton_amount;
+        slice comment = "Welcome to Crypto Billions!";
+        send_jetton(send_to, jetton_amount, comment, 1);
+        save_data();
+        return ();
+    }
+
+    if (op == 3) {
+        ;; withdraw ton
+        cell msg = begin_cell()
+            .store_uint(0x18, 6) ;; bounceable - 0x18
+            .store_slice(owner_address) ;; wallet address
+            .store_coins(0) ;; value
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+
+        raw_reserve(100000000, 0);
+        send_raw_message(msg, 128);
+        return ();
+    }
+
+    if (op == 4) {
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        set_data(new_data);
+        set_code(new_code);
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+;; Get methods
+
+(slice, slice, int, int, int, int, int) get_all_data() method_id {
+    load_data();
+    return (
+        owner_address,
+        jetton_master_address,
+        price_rate,
+        min_ton,
+        max_ton,
+        amount_total,
+        amount_sold
+    );
+}
