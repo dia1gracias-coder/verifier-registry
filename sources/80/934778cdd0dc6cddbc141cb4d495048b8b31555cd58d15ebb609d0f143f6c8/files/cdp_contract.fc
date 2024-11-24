@@ -1,0 +1,178 @@
+#include "imports/stdlib.fc";
+
+;; Constants
+const int MIN_COLLATERAL_RATIO = 150;  ;; 150% minimum collateral ratio
+const int ERROR_INVALID_AMOUNT = 101;
+const int ERROR_BELOW_MIN_COLLATERAL = 102;
+const int ERROR_UNAUTHORIZED = 103;
+
+;; Asset Types
+const int TON = 1;
+const int DOGS = 2;
+const int BTC = 3;
+const int ETH = 4;
+const int SOL = 5;
+
+;; Storage
+global cell users;        ;; Dictionary<addr_std, UserPosition>
+global cell price_feeds;  ;; Dictionary<int, int>
+global int total_pusd_supply;
+
+;; Storage TL-B
+;; UserPosition: (collateral_value:int, pusd_borrowed:int, collaterals:dict)
+
+
+;; Function Declarations
+() load_data() impure;
+() save_data() impure;
+() deposit_collateral(slice sender_address, int asset_type, int amount) impure;
+() borrow_pusd(slice sender_address, int amount) impure;
+
+;; Helper Functions
+(int, int, cell) unpack_position(slice cs) inline {
+    return (cs~load_uint(128),  ;; collateral_value
+            cs~load_uint(128),  ;; pusd_borrowed
+            cs~load_dict());    ;; collaterals
+}
+
+cell pack_position(int collateral_value, int pusd_borrowed, cell collaterals) inline {
+    return begin_cell()
+        .store_uint(collateral_value, 128)
+        .store_uint(pusd_borrowed, 128)
+        .store_dict(collaterals)
+        .end_cell();
+}
+
+(int, int, int) unpack_collateral(slice cs) inline {
+    return (cs~load_uint(8),   ;; asset_type
+            cs~load_uint(128), ;; amount
+            cs~load_uint(64)); ;; price
+}
+
+cell pack_collateral(int asset_type, int amount, int price) inline {
+    return begin_cell()
+        .store_uint(asset_type, 8)
+        .store_uint(amount, 128)
+        .store_uint(price, 64)
+        .end_cell();
+}
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    users = ds~load_ref();
+    price_feeds = ds~load_ref();
+    total_pusd_supply = ds~load_uint(128);
+}
+
+() save_data() impure {
+    set_data(begin_cell()
+        .store_ref(users)
+        .store_ref(price_feeds)
+        .store_uint(total_pusd_supply, 128)
+        .end_cell());
+}
+
+() deposit_collateral(slice sender_address, int asset_type, int amount) impure {
+    throw_if(ERROR_INVALID_AMOUNT, amount <= 0);
+
+    ;; Convert sender address to key
+    int sender_key = slice_hash(sender_address);
+
+    ;; Fetch the price of the asset
+    (slice price_slice, int price_found) = price_feeds.udict_get?(8, asset_type);
+    throw_unless(ERROR_INVALID_AMOUNT, price_found);
+    int price = price_slice~load_uint(64);
+
+    ;; Calculate the collateral value
+    int new_collateral_value = muldiv(amount, price, 1000000000);  ;; Assume price has 9 decimals
+
+    ;; Load or initialize user's position
+    (slice position_slice, int found) = users.udict_get?(267, sender_key);
+    int collateral_value = 0;
+    int pusd_borrowed = 0;
+    cell collaterals = new_dict();  ;; Properly initialize collaterals as an empty dictionary
+
+if (found) {
+        (collateral_value, pusd_borrowed, collaterals) = unpack_position(position_slice);
+    }
+
+    ;; Update collateral value
+    collateral_value += new_collateral_value;
+
+    ;; Update or add the asset to the collateral dictionary
+    (slice collateral_slice, int collateral_found) = collaterals.udict_get?(8, asset_type);
+    int current_amount = 0;
+    if (collateral_found) {
+        (_, current_amount, _) = unpack_collateral(collateral_slice);
+    }
+    int updated_amount = current_amount + amount;
+
+    cell updated_collateral = pack_collateral(asset_type, updated_amount, price);
+    collaterals~udict_set(8, asset_type, updated_collateral.begin_parse());
+
+;; Save the updated position
+    users~udict_set(267, sender_key, pack_position(collateral_value, pusd_borrowed, collaterals).begin_parse());
+}
+
+() borrow_pusd(slice sender_address, int amount) impure {
+throw_if(ERROR_INVALID_AMOUNT, amount <= 0);
+
+    ;; Convert sender address to key
+    int sender_key = slice_hash(sender_address);
+
+    ;; Load user's position
+    (slice position_slice, int found) = users.udict_get?(267, sender_key);
+    throw_unless(ERROR_UNAUTHORIZED, found);
+
+    int collateral_value = 0;
+    int pusd_borrowed = 0;
+    cell collaterals = new_dict();  ;; Initialize collaterals as an empty dictionary
+
+    (collateral_value, pusd_borrowed, collaterals) = unpack_position(position_slice);
+
+    ;; Check if the user has enough collateral to mint pUSD
+    int new_borrowed = pusd_borrowed + amount;
+    int collateral_ratio = muldiv(collateral_value, 100, new_borrowed);
+    throw_if(ERROR_BELOW_MIN_COLLATERAL, collateral_ratio < MIN_COLLATERAL_RATIO);
+
+    ;; Update the user's position
+    pusd_borrowed = new_borrowed;
+    users~udict_set(267, sender_key, pack_position(collateral_value, pusd_borrowed, collaterals).begin_parse());
+
+    ;; Mint the pUSD
+    total_pusd_supply += amount;
+
+    ;; Send the minted pUSD to the user
+    var msg = begin_cell()
+        .store_uint(0x10, 6)  ;; Operation type: Transfer
+        .store_slice(sender_address)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+    send_raw_message(msg, 1);  ;; Pay transfer fees separately
+}
+
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {  ;; Ignore bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == 1) {  ;; Deposit Collateral
+        int asset_type = in_msg_body~load_uint(8);
+        int amount = in_msg_body~load_uint(128);
+        deposit_collateral(sender_address, asset_type, amount);
+    } elseif (op == 2) {  ;; Borrow pUSD
+        int amount = in_msg_body~load_uint(128);
+        borrow_pusd(sender_address, amount);
+    }
+
+    save_data();
+}
