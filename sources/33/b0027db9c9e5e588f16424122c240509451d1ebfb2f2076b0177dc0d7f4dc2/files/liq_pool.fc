@@ -1,0 +1,60 @@
+#include "imports/stdlib.fc";
+
+const const::min_tons_for_storage = 10000000;
+
+int equal_slices (slice a, slice b) asm "SDEQ";
+
+slice load_data() inline {
+    slice ds = get_data().begin_parse();
+    slice owner_addr = ds~load_msg_addr();
+    return owner_addr;
+}
+
+() save_data(slice owner_address) impure {
+    set_data(begin_cell()
+             .store_slice(owner_address)
+            .end_cell()
+        );
+}
+
+;; Функция обработки входящего сообщения
+() recv_internal(int msg_value, cell in_msg, slice in_body) impure {
+    slice cs = in_msg.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr(); 
+
+    slice owner_address = load_data();
+
+    int op_code = in_body~load_uint(32);
+    
+    if (op_code == 1) {
+        return();
+    }
+    if (op_code == 2) {
+        throw_unless(101, equal_slices_bits(sender_address, owner_address));
+        int withdraw_amount = in_body~load_coins();
+        var [balance, _] = get_balance();
+        throw_unless(102, balance >= withdraw_amount);
+
+        int return_value = min(withdraw_amount, balance - const::min_tons_for_storage);
+
+        var msg = begin_cell()
+                    .store_uint(0x18,6)
+                    .store_slice(sender_address)
+                    .store_coins(return_value)
+                    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+        send_raw_message(msg, 1);
+        return();
+    }
+    throw(201); ;; Неподдерживаемая операция
+}
+
+slice getOwner() method_id {
+    slice owner_addr = load_data();
+    return owner_addr;
+}
+int balance() method_id {
+    var [balance, _] = get_balance();
+    return balance;
+}
