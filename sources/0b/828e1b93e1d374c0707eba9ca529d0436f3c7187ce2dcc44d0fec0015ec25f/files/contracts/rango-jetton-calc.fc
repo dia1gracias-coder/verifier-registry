@@ -1,0 +1,62 @@
+int workchain() asm "0 PUSHINT";
+
+cell get_pack_jetton_wallet_data(int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) method_id {
+   return begin_cell()
+            .store_coins(balance)
+            .store_slice(owner_address)
+            .store_slice(jetton_master_address)
+            .store_ref(jetton_wallet_code)
+           .end_cell();
+}
+
+cell get_calculate_jetton_wallet_state_init(int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) method_id {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(jetton_wallet_code)
+          .store_dict(get_pack_jetton_wallet_data(balance, owner_address, jetton_master_address, jetton_wallet_code))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice get_calculate_jetton_wallet_address(cell state_init) method_id {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(workchain(), 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+slice get_calculate_user_jetton_wallet_address(int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) method_id {
+  return get_calculate_jetton_wallet_address(
+    get_calculate_jetton_wallet_state_init(balance, owner_address, jetton_master_address, jetton_wallet_code)
+  );
+}
+
+const int op::create_jetton_wallet = 0x1234;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    if (flags & 1) { return (); }
+
+    slice sender_address = cs~load_msg_addr();
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::create_jetton_wallet) {
+        int balance = in_msg_body~load_coins();
+        slice owner_address = in_msg_body~load_msg_addr();
+        slice jetton_master_address = in_msg_body~load_msg_addr();
+        cell jetton_wallet_code = in_msg_body~load_ref();
+        
+        cell state_init = get_calculate_jetton_wallet_state_init(balance, owner_address, jetton_master_address, jetton_wallet_code);
+        slice jetton_wallet_address = get_calculate_jetton_wallet_address(state_init);
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(jetton_wallet_address)
+            .store_coins(0)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(state_init);
+        send_raw_message(msg.end_cell(), 0);
+    }
+}
