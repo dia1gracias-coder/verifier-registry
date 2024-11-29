@@ -1,0 +1,16 @@
+const op::jetton_notify = 0x7362d09c;
+const op::jetton_transfer = 0xf8a7ea5;
+const op::jetton_excesses = 0xd53276db;
+
+cell pack_jetton_transfer(int amount, slice to, int fwd_value, slice fwd_payload) inline {
+    return begin_cell()
+        .store_uint(op::jetton_transfer, 32)
+        .store_uint(0, 64)
+        .store_coins(amount)
+        .store_slice(to)
+        .store_slice(my_address())
+        .store_dict(new_dict())
+        .store_coins(fwd_value)
+        .store_slice(fwd_payload)
+    .end_cell();
+}
