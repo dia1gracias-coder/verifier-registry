@@ -1,0 +1,72 @@
+#include "imports/stdlib.fc";
+
+(int, slice, slice) get_contract_data() method_id {
+    slice ds = get_data().begin_parse();
+
+    return (
+        ds~load_uint(32),
+        ds~load_msg_addr(),
+        ds~load_msg_addr()
+    );
+}
+
+() save_data(int counter, slice sender, slice owner) impure inline {
+    set_data(
+      begin_cell()
+        .store_uint(counter, 32)
+        .store_slice(sender)
+        .store_slice(owner)
+        .end_cell()
+    );
+}
+
+(int) get_contract_balance() method_id {
+    [int balance, _] = get_balance();
+    return balance;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice ms = in_msg_full.begin_parse();
+
+    int flags = ms~load_uint(4);
+
+    slice sender_address = ms~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+
+    (int counter, slice sender, slice owner) = get_contract_data();
+
+    if (op == 1) {
+        save_data(counter + 1, sender_address, owner);
+        return();
+    }
+
+    if (op == 2) {
+        throw_unless(101, equal_slices_bits(sender_address, owner));
+
+        int withdraw_amount = in_msg_body~load_coins();
+        [int balance, _] = get_balance();
+
+        throw_unless(102, balance >= withdraw_amount);
+
+        int return_value = min(withdraw_amount, balance - 10000000);
+
+        int mode = 1;
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(return_value)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+
+        send_raw_message(msg.end_cell(), mode);
+
+        return();
+    }
+
+    if (op == 3) {
+        return();
+    }
+
+    throw(777);
+}
