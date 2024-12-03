@@ -1,0 +1,99 @@
+#include "stdlib.fc";
+
+;; f(J) = 0.0005T +  0.000000003 * J * 1T ;; T == 1 TON; J == 1 Jetton
+;; At 1 Million Jettons, Total is 2000 TON.
+;; Starting pirce is 0.0005T/Jetton, 1 Million Jetton price is 0.0035T/Jetton
+;; V(J) = 0.0005J * 1T + 0.5J * [f(J) - 0.0005]
+;; V stands for ton amount bought from 0 to J including.
+
+int one_ton() asm "1000000000 PUSHINT";
+int one_jetton() asm "1000000000 PUSHINT";
+
+int math::sqrt(int x) {
+    if (x == 0) {
+        return 0;
+    }
+    int z = (x + 1) / 2;
+    int y = x;
+    while (z < y) {
+        y = z;
+        z = (x / z + z) / 2;
+    }
+    return y;
+}
+
+
+int bc::calculate_price_in_grams_for_jetton(int jettons_nano) {
+    int ton = one_ton();
+    return ton / 2000 + jettons_nano * one_jetton() / 333333333333333333;
+}
+
+;; V(J) = 0.0005J * 1T + 0.5J * [f(J) - 0.0005]
+int bc::calculate_volume_in_grams(int jettons_nano) {
+    int ton = one_ton();
+    return jettons_nano / 2000 + jettons_nano * (bc::calculate_price_in_grams_for_jetton(jettons_nano) - ton / 2000) / 2 / one_jetton();
+}
+
+int bc::calculate_jetton_amount_from_zero(int ton_amount_nano) {
+    int jetton = one_jetton();
+
+    int a = 3;
+    int b = 1000000;
+    int c = -2 * ton_amount_nano;
+
+    ;; Calculate discriminant
+    int discriminant = b * b - 4 * a * c;
+
+    ;; Calculate square root of discriminant
+    int sqrt_disc = math::sqrt(discriminant);
+
+    ;; Calculate final result: (-b + sqrt(discriminant)) / (2a)
+    ;; We multiply by 10^9 before division to maintain precision
+    int result = ((-1 * b + sqrt_disc) * jetton) / (2 * a);
+
+    return result;
+}
+
+
+int bc::calculate_bought_jetton_amount_for_ton(int total_jettons_sold_nano, int ton_amount_nano) {
+    int total_grams_sold = bc::calculate_volume_in_grams(total_jettons_sold_nano);
+    int jettons_to_end = bc::calculate_jetton_amount_from_zero(total_grams_sold + ton_amount_nano);
+    return jettons_to_end - total_jettons_sold_nano;
+}
+
+int bc::calculate_ton_amount_for_sold_jetton(int total_jettons_sold_nano, int jettons_amount_nano) {
+    int current_volume = bc::calculate_volume_in_grams(total_jettons_sold_nano);
+    int volume_after_sell = bc::calculate_volume_in_grams(total_jettons_sold_nano - jettons_amount_nano);
+    return current_volume - volume_after_sell;
+}
+
+int math::cbrt(int x) {
+    if (x == 0) {
+        return 0;
+    }
+
+    ;; Handle negative numbers
+    int sign = 1;
+    if (x < 0) {
+        x = -1 * x;
+        sign = -1;
+    }
+
+    ;; Minimum of [cubicRoot(MAX_INT) - 1] and x
+    int low = min(x, 0);
+    int high = min(x, 48740834812604276470692693);
+
+    while (low < high) {
+        int mid = (low + high + 1) / 2;
+
+        int mid_cubed = mid * mid * mid;
+
+        if (mid_cubed <= x) {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    }
+
+    return low * sign;
+}
