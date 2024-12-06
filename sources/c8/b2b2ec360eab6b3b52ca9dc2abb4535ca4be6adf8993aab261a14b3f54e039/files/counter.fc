@@ -1,0 +1,55 @@
+#include "imports/stdlib.fc";
+
+(int, int) load_data() {
+    slice ds = get_data().begin_parse(); ;; start parsing the cell
+
+
+    int counter = ds~load_uint(32); ;; read the counter value from the slice as 32-bit integer
+    int id = ds~load_uint(32); ;; read the id value from the slice as 32-bit integer
+
+
+    ds.end_parse(); ;; finish parsing the slice and check that it's empty
+
+
+    return (counter, id); ;; return the resulting values as tuple
+}
+
+() save_data(int counter, int id) impure {
+    set_data( ;; sets the given cell as persistent contract data
+        begin_cell() ;; start building the cell
+            .store_uint(counter, 32) ;; store counter value as 32-bit integer
+            .store_uint(id, 32) ;; store id value as 32-bit integer
+            .end_cell() ;; finish building the cell
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+
+    int op = in_msg_body~load_uint(32); ;; load the opcode from the message body
+
+
+    if (op == 1) { ;; '1' stands for 'increment' operation
+        (int counter, int id) = load_data(); ;; load the current storage data
+        save_data(counter + 1, id); ;; save the new storage data
+        return ();
+    }
+
+
+    throw(0xffff); ;; throw the error if the opcode is unknown
+
+}
+
+int get_counter() method_id {
+    (int counter, _) = load_data();
+    return counter;
+}
+
+
+int get_id() method_id {
+    (_, int id) = load_data();
+    return id;
+}
