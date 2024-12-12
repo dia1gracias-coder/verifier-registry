@@ -1,0 +1,174 @@
+#include "imports/stdlib.fc";
+
+;; Storage schema
+;; bit_0: admin address
+;; bit_1: jetton master address
+;; bit_2: total jettons to distribute
+;; bit_3: claimed addresses dictionary
+
+global slice storage::admin;
+global slice storage::jetton_master;
+global int storage::total_jettons;
+global cell storage::claimed_addresses;
+global slice storage::my_jetton_wallet;  
+
+;; Opcodes
+const op::claim = 0x47d54391;  ;; Unique opcode for claiming
+const op::transfer = 0xf8a7ea5;  ;; Jetton transfer opcode
+const op::deploy = "op:deploy"c;  ;; Deploy opcode
+const op::set_wallet = "op:set_wallet"c;  ;; Set wallet opcode
+
+() save_data(slice admin, slice jetton_master, int total_jettons, cell claimed_addresses, slice my_jetton_wallet) impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(admin)
+            .store_slice(jetton_master)
+            .store_coins(total_jettons)
+            .store_dict(claimed_addresses)
+            .store_slice(my_jetton_wallet)
+        .end_cell()
+    );
+}
+
+(slice, slice, int, cell, slice) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),   ;; admin
+        ds~load_msg_addr(),   ;; jetton master
+        ds~load_coins(),      ;; total jettons
+        ds~load_dict(),        ;; claimed addresses
+        ds~load_msg_addr()    ;; my jetton wallet
+    );
+}
+
+() send_jettons(slice to_address, int jetton_amount, slice jetton_wallet, int value) impure inline {
+
+    ;; ~strdump("Sending jettons to ");
+   int required_amount = 80000000;  ;; 0.08 TON
+   throw_unless(77, value >= required_amount); ;; Require minimum TON amount
+
+     ;; Create transfer body cell (all params except headers)
+    cell transfer_body = begin_cell()
+        .store_uint(op::transfer, 32)    ;; transfer op
+        .store_uint(0, 64)            ;; query id
+        .store_coins(jetton_amount)    
+        .store_slice(to_address)       ;; to
+        .store_slice(to_address)     ;; response
+        .store_uint(0, 1)             ;; no custom payload
+        .store_coins(20000000)         ;; 0.02 TON forward amount
+        .store_uint(0, 1)             ;; no forward payload
+    .end_cell();
+
+    ;; Create main message with body as ref
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(jetton_wallet)
+        .store_coins(required_amount - 10000000)  ;; 0.09 TON
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)  ;; we have body in ref
+        .store_ref(transfer_body)
+    .end_cell();
+    
+    send_raw_message(msg, 1);
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    
+    ;; Ignore bounced messages
+    if (flags & 1) {
+        return ();
+    }
+
+    int operation = in_msg_body~load_uint(32);
+
+    ;; Load contract data
+    var (admin, jetton_master, total_jettons, claimed_addresses,my_jetton_wallet) = load_data();
+    
+    slice sender_addr = cs~load_msg_addr();
+
+
+    if (operation == op::set_wallet) {
+        
+        ;; Just from jetton master
+        if (equal_slices(admin,sender_addr)){
+            slice new_wallet = in_msg_body~load_msg_addr();
+            save_data(admin , jetton_master ,total_jettons , claimed_addresses, new_wallet);
+        }
+        return ();
+
+    }
+
+    if (operation == op::deploy) {
+        throw_unless(0, my_balance == 0);  ;; Contract can only be deployed once
+        return ();
+    }
+            
+    ;; Claim operation
+    
+    if (operation == op::claim) {
+
+        ;; Check if already claimed
+        (cell addr_slice, int found) = claimed_addresses.udict_get_ref?(256, sender_addr.slice_hash());
+        throw_if(400, found);  ;; Throw if already claimed
+        
+        ;; Check sufficient total jettons
+        throw_unless(401, total_jettons >= 100000000000);
+        
+
+        ;; Mark as claimed
+        var new_claimed = claimed_addresses.udict_set_ref(256, sender_addr.slice_hash(), begin_cell().end_cell());
+        
+ 
+
+        ;; Send 100 jettons
+        send_jettons(sender_addr, 100000000000, my_jetton_wallet, msg_value);
+        
+        ;; Update total jettons and storage
+        save_data(admin, jetton_master, total_jettons - 100, new_claimed, my_jetton_wallet);
+        
+        return ();
+    }
+    
+    
+    ;; Admin can top up total jettons
+    if (equal_slices(sender_addr, admin)) {
+        int added_amount = in_msg_body~load_coins();
+        save_data(admin, jetton_master, total_jettons + added_amount, claimed_addresses,my_jetton_wallet);
+        return ();
+    }
+
+    if (msg_value > 0) {
+        return ();
+    }
+    
+    throw(0xffff);  ;; Unknown operation
+}
+
+;; Get methods to query contract state
+int get_total_jettons() method_id {
+    var (_, _, total_jettons, _,_) = load_data();
+    return total_jettons;
+}
+
+int is_address_claimed(slice addr) method_id {
+    var (_, _, _, claimed_addresses,_) = load_data();
+    (cell addr_slice, int found) = claimed_addresses.udict_get_ref?(256, addr.slice_hash());
+    return found;
+}
+
+slice get_admin() method_id {
+    var (admin, _, _, _,_) = load_data();
+    return admin;
+}
+
+slice get_jetton_master() method_id {
+    var (_, jetton_master, _, _,_) = load_data();
+    return jetton_master;
+}
+
+slice get_jetton_wallet() method_id {
+    var (_, _, _, _, my_jetton_wallet) = load_data();
+    return my_jetton_wallet;
+}
