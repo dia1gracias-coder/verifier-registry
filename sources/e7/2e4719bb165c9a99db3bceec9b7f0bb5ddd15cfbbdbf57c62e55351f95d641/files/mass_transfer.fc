@@ -1,0 +1,40 @@
+#include "imports/stdlib.fc";
+
+const op::mass_send = 0x7362d09d;
+const op::transfer = 0xf8a7ea5;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == op::mass_send) {
+        int query_id = in_msg_body~load_uint(64);
+        slice jetton_wallet = in_msg_body~load_msg_addr();
+        cell recipients = in_msg_body~load_ref();
+        
+        slice cs = recipients.begin_parse();
+        while (cs.slice_data_empty?() == 0) {
+            slice to_address = cs~load_msg_addr();
+            int amount = cs~load_coins();
+            
+            var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(jetton_wallet)
+                .store_coins(msg_value)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::transfer, 32)
+                .store_uint(query_id, 64)
+                .store_coins(amount)
+                .store_slice(to_address)
+                .store_slice(sender_address)
+                .store_uint(0, 1)
+                .store_coins(0)
+                .store_uint(0, 1);
+                
+            send_raw_message(msg.end_cell(), 64);
+        }
+    }
+}
