@@ -1,0 +1,18 @@
+;; jetton/wallet/get.fc
+
+#include "../../common/stdlib.fc";
+#include "../../common/jetton-utils.fc";
+#include "storage.fc";
+
+(int, slice, slice, cell) get_wallet_data() method_id {
+    ;; load_storage();
+    (_, int balance, slice owner_address, slice jetton_master_address) = load_data();
+    return (balance, owner_address, jetton_master_address, my_code());
+}
+
+int get_status() method_id {
+    ;; load_storage();
+    (int status, int balance, slice owner_address, slice jetton_master_address) = load_data();
+    return status;
+}
+
