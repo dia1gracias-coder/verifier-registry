@@ -1,0 +1,36 @@
+;; jetton/master/get.fc
+
+#include "../../common/stdlib.fc";
+#include "../../common/jetton-utils.fc";
+#include "storage.fc";
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    load_storage();
+    return (storage::total_supply, TRUE, storage::admin_address, build_content_cell(storage::metadata_uri.begin_parse()), storage::jetton_wallet_code);
+}
+
+int get_total_supply() method_id {
+    load_storage();
+    return storage::total_supply;
+}
+
+slice get_admin_address() method_id {
+    load_storage();
+    return storage::admin_address;
+}
+
+(slice) get_wallet_address(slice owner_address) method_id {
+    load_storage();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), storage::jetton_wallet_code);
+}
+
+(slice) get_next_admin_address() method_id {
+    load_storage();
+    return storage::next_admin_address;
+}
+
+(slice) get_exchange_address() method_id {
+    load_storage();
+    return storage::exchange_address;
+}
+

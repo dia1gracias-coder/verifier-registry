@@ -1,0 +1,42 @@
+;; jetton/master/admin.fc
+
+#include "storage.fc";
+
+;; TODO: check upgrades, change_metadata_uri, 
+;; add claim_admin, blacklist(?), 
+
+() handle_admin_messages(int op, int query_id, int msg_value, slice in_msg_body) impure inline {
+    if (op == op::set_exchange) {
+        storage::exchange_address = in_msg_body~load_msg_addr();
+        save_storage();
+        return ();
+    }
+
+    if (op == op::change_admin) {
+        storage::next_admin_address = in_msg_body~load_msg_addr();
+        save_storage();
+        return ();
+    }
+
+    ;; if (op == op::set_status) {
+    ;;     storage::status = in_msg_body~load_uint(STATUS_SIZE); ;; add STATUS_SIZE import
+    ;;     save_storage();
+    ;;     return ();
+    ;; }
+
+    if (op == op::change_metadata_uri) {
+        storage::metadata_uri = begin_cell().store_slice(in_msg_body).end_cell();
+        save_storage();
+        return ();
+    }
+
+    if (op == op::upgrade) {
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_data(new_data);
+        set_code(new_code);
+        return ();
+    }
+
+    throw(error::invalid_op);
+}

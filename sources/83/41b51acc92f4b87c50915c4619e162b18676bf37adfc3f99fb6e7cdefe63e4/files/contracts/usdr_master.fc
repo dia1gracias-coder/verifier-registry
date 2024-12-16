@@ -1,0 +1,129 @@
+;; usdr_master.fc
+
+#pragma version >=0.4.3;
+
+#include "common/stdlib.fc";
+#include "common/jetton-utils.fc";
+#include "common/gas.fc";
+#include "common/roles.fc";
+
+#include "jetton/master/storage.fc";
+#include "jetton/master/get.fc";
+#include "jetton/master/admin.fc";
+#include "jetton/master/exchange-calls.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    int msg_flags = in_msg_full_slice~load_msg_flags();
+
+    load_storage();
+
+    if (is_bounced(msg_flags)) {
+        in_msg_body~skip_bounced_prefix();
+        ;; process only mint bounces
+        ifnot (in_msg_body~load_op() == op::internal_transfer) {
+            return ();
+        }
+        in_msg_body~skip_query_id();
+        int jetton_amount = in_msg_body~load_coins();
+
+        storage::total_supply = storage::total_supply - jetton_amount;
+        save_storage();
+        return ();
+    }
+    slice sender_address = in_msg_full_slice~load_msg_addr();
+    
+    in_msg_full_slice~load_msg_addr(); ;; skip dst
+    in_msg_full_slice~load_coins(); ;; skip value
+    in_msg_full_slice~skip_bits(1); ;; skip extracurrency collection
+    in_msg_full_slice~load_coins(); ;; skip ihr_fee
+    int fwd_fee = in_msg_full_slice~load_coins();
+
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+
+    if (op == op::burn_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+
+        throw_unless(error::not_valid_wallet,
+            equal_slice_bits(calculate_user_jetton_wallet_address(from_address, my_address(), storage::jetton_wallet_code), sender_address)
+        );
+
+        storage::total_supply = storage::total_supply - jetton_amount;
+        save_storage();
+
+        slice response_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        if (~ is_address_none(response_address)) {
+            ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+            var msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(response_address) ;; dest
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_op(op::excesses)
+            .store_query_id(query_id);
+            send_raw_message(msg.end_cell(), SEND_MODE_IGNORE_ERRORS | SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        }
+        return ();
+    }
+
+    if (op == op::provide_wallet_address) {
+        ;; see provide_wallet_address TL-B layout in jetton.tlb
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_bool();
+        in_msg_body.end_parse();
+
+        cell included_address = include_address?
+        ? begin_cell().store_slice(owner_address).end_cell()
+        : null();
+
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_op(op::take_wallet_address)
+            .store_query_id(query_id);
+
+        if (is_same_workchain(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), storage::jetton_wallet_code));
+        } else {
+            msg = msg.store_address_none();
+        }
+
+        cell msg_cell = msg.store_maybe_ref(included_address).end_cell();
+
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        return ();
+    }
+
+    if (op == op::claim_admin) {
+        in_msg_body.end_parse();
+        ensure_admin(sender_address); ;; TODO: change it to next_admin_address
+        storage::admin_address = storage::next_admin_address;
+        storage::next_admin_address = address_none();
+        save_storage();
+        return ();
+    }
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }    
+
+    if (equal_slices(sender_address, storage::exchange_address)) {
+        handle_exchange_calls(op, query_id, msg_value, in_msg_body, fwd_fee);
+        return ();
+    }
+
+    ;; handle admin messages
+    if (equal_slices(sender_address, storage::admin_address)) {
+        handle_admin_messages(op, query_id, msg_value, in_msg_body);
+        return ();
+    }
+    
+    throw(error::wrong_op);
+}
