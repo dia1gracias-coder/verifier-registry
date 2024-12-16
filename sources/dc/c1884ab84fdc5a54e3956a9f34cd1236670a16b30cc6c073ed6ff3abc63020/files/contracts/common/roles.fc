@@ -1,0 +1,10 @@
+#include "errors.fc";
+#include "../jetton/master/storage.fc";
+
+() ensure_admin(slice sender_address) inline { ;; TODO: add role manager
+    throw_unless(error::not_admin, equal_slice_bits(sender_address, storage::admin_address));
+}
+
+() ensure_exchange(slice sender_address) inline { ;; TODO: add role manager
+    throw_unless(error::not_exchange, equal_slice_bits(sender_address, storage::exchange_address));
+}
