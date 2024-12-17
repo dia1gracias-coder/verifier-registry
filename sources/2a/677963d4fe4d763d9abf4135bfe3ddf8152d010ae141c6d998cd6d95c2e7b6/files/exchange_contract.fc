@@ -1,0 +1,133 @@
+#pragma version 0.4.4;
+#include "imports/stdlib.fc";
+
+global slice storage::owner_address;
+global int storage::exchange_rate;
+global int storage::min_exchange_amount;
+
+() save_data() impure inline_ref {
+    slice data = get_data().begin_parse();
+    (slice msg_sender, slice remainder) = load_msg_addr(data);
+    storage::exchange_rate = 100;
+    storage::min_exchange_amount = 100000000;
+    set_data(begin_cell()
+        .store_slice(msg_sender)
+        .end_cell());
+}
+
+() load_data() impure inline_ref {
+    slice data = get_data().begin_parse();
+    (slice owner_address, cell extra) = data.load_ref();
+    storage::owner_address = owner_address;
+}
+
+(slice) get_owner() impure inline {
+    load_data();
+    return storage::owner_address;
+}
+
+() check_owner(slice sender_address) impure inline {
+    throw_unless(100, equal_slices_bits(sender_address, get_owner()));
+}
+
+() deposit() impure inline {
+    slice data = get_data().begin_parse();
+    (slice sender_address, slice remainder) = load_msg_addr(data);
+    check_owner(sender_address);
+    accept_message();
+}
+
+() withdraw(int amount) impure inline {
+    load_data();
+    slice data = get_data().begin_parse();
+    (slice sender_address, slice remainder) = load_msg_addr(data);
+    check_owner(sender_address);
+    [int balance, _] = get_balance();
+    throw_unless(400, amount <= balance);
+    accept_message();
+    cell msg = begin_cell()
+        .store_slice(sender_address)
+        .store_coins(amount)
+        .end_cell();
+    send_raw_message(msg, 0);
+}
+
+() ton_to_maze(int amount) impure inline {
+    load_data();
+    throw_unless(200, amount > 0);
+    throw_unless(201, amount >= storage::min_exchange_amount);
+    int maze_amount = amount / storage::exchange_rate;
+    throw_unless(202, maze_amount > 0);
+    accept_message();
+
+    slice data = get_data().begin_parse();
+    (slice sender_address, slice remainder) = load_msg_addr(data);
+
+    cell msg = begin_cell()
+        .store_slice(sender_address)
+        .store_coins(maze_amount)
+        .end_cell();
+    send_raw_message(msg, 0);
+}
+
+() maze_to_ton(int maze_amount) impure inline {
+    load_data();
+    throw_unless(300, maze_amount > 0);
+    int ton_amount = maze_amount * storage::exchange_rate;
+    [int balance, _] = get_balance();
+    throw_unless(301, ton_amount <= balance);
+    accept_message();
+
+    slice data = get_data().begin_parse();
+    (slice sender_address, slice remainder) = load_msg_addr(data);
+
+    cell msg = begin_cell()
+        .store_slice(sender_address)
+        .store_coins(ton_amount)
+        .end_cell();
+    send_raw_message(msg, 0);
+}
+
+int getBalance() impure inline {
+    [int balance, _] = get_balance();
+    return balance;
+}
+
+int get_exchange_rate() impure inline {
+    load_data();
+    return storage::exchange_rate;
+}
+
+int get_min_exchange_amount() impure inline {
+    load_data();
+    return storage::min_exchange_amount;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    int op_code = in_msg_body~load_uint(32);
+
+    ;; Условные проверки
+    if (op_code == 0) {
+        save_data();
+    }
+    if (op_code == 1) {
+        deposit();
+    }
+    if (op_code == 2) {
+        withdraw(100000000);
+    }
+    if (op_code == 3) {
+        ton_to_maze(100000000);
+    }
+    if (op_code == 4) {
+        maze_to_ton(100);
+    }
+    if (op_code == 5) {
+        getBalance();
+    }
+
+    throw_unless(999, op_code >= 0);
+    throw_unless(999, op_code <= 5);
+}
+
+
