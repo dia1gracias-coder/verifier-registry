@@ -1,0 +1,114 @@
+#include "imports/stdlib.fc";
+#include "common/constant.fc";
+#include "common/utils.fc";
+
+global slice factory::admin;
+global cell factory::base_code;
+global cell factory::lp_account_code;
+
+() factory::handle_deposit(
+    int ctx::value,
+    int ctx::fwd_fee,
+    slice provider,
+    int provide_amount
+) impure inline {
+    ;; Calculate Gas
+    int gas_consume = DEPOSIT_INTERNAL + ctx::fwd_fee;
+    int remaining_ton = ctx::value - gas_consume;
+
+    ;; Get lp account init and proof to calculate lp account address
+    cell lp_account_init = begin_cell()
+        .store_slice(factory::admin)
+        .store_slice(provider)
+        .store_coins(provide_amount)
+        .store_ref(factory::base_code)
+        .store_slice(my_address())
+        .end_cell();
+    int lp_account_proof = begin_cell()
+        .store_uint(1, 5)   ;; contract_type
+        .store_slice(provider)
+        .end_cell().cell_hash();
+    
+    ;; Get base init and lp account address
+    (cell base_contract_init, slice lp_account_address) = get_base_init_and_address(my_address(), lp_account_proof, factory::base_code);
+
+    ;; Pack deposit internal message to lp account
+    cell deposit_internal_msg = begin_cell()
+        .store_op(op::deposit_internal)
+        .store_slice(provider)
+        .store_coins(provide_amount)
+        .end_cell();
+    
+    ;; Pack top_up body and send deploy msg
+    cell top_up_body = begin_cell()
+        .store_op(op::top_up)
+        .store_ref(factory::lp_account_code)
+        .store_ref(lp_account_init)
+        .store_slice(address_none())
+        .store_maybe_ref(deposit_internal_msg)
+    .end_cell();
+
+    send_deploy_msg(BOUNCEABLE, lp_account_address, remaining_ton, top_up_body, base_contract_init, SEND_MODE_REGULAR);
+    return ();
+}
+
+() route_internal(slice ctx::sender, int ctx::value, int ctx::fwd_fee, slice ctx::body) impure inline {
+    ;; Load op
+    int op = ctx::body~load_op();
+
+    if op == op::deposit_internal {
+        slice provider = ctx::body~load_msg_addr();
+        int provide_amount = ctx::body~load_coins();
+        ctx::body.end_parse();
+
+        return factory::handle_deposit(
+            ctx::value,
+            ctx::fwd_fee,
+            provider,
+            provide_amount
+        );
+    }
+
+    throw(777);
+}
+
+() factory::load_data() impure inline_ref {
+	slice ds = get_data().begin_parse();
+    factory::admin = ds~load_msg_addr();
+    factory::base_code = ds~load_ref();
+    factory::lp_account_code = ds~load_ref();
+	ds.end_parse();
+}
+
+() main(int ctx::value, cell in_msg_full, slice ctx::body) impure {
+    slice s = in_msg_full.begin_parse();
+    int flags = s~load_msg_flags();
+
+    if (is_bounced(flags)) { ;; skip all bounced messages
+        return ();
+    }
+    
+    ;; get context
+    (slice ctx::sender, int ctx::fwd_fee) = s~retrieve_ctx(0);
+
+    ;; Load data from storage
+    factory::load_data();
+
+    ;; route function to handle internal message
+    route_internal(ctx::sender, ctx::value, ctx::fwd_fee, ctx::body);
+}
+
+{- Getters -}
+
+slice get_address(int proof) method_id {
+    factory::load_data();
+    (_, slice contract_address) = get_base_init_and_address(my_address(), proof, factory::base_code);
+    return contract_address;
+}
+
+int get_lp_account_proof(slice provider) method_id {
+    return begin_cell()
+        .store_uint(1, 5)
+        .store_slice(provider)
+        .end_cell().cell_hash();
+}

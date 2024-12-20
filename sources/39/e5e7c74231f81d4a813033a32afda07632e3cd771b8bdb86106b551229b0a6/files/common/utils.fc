@@ -1,0 +1,46 @@
+cell get_base_init(slice deployer, int proof, cell base_code) inline_ref {
+    return begin_cell()
+    .store_uint(0, 2) ;; 0b00 - No split_depth; No special
+    .store_maybe_ref(base_code)
+    .store_maybe_ref(
+        begin_cell()
+            .store_slice(deployer)
+            .store_uint(proof, PROOF_SIZE)
+        .end_cell()
+    )
+    .store_uint(0, 1) ;; Empty libraries
+    .end_cell();
+}
+
+slice get_contract_addr(cell state_init) inline_ref {
+    return begin_cell()
+    .store_uint(2, 2) ;; addr_std$10
+    .store_uint(0, 1) ;; anycast nothing
+    .store_int(0, 8)
+    .store_uint(cell_hash(state_init), 256)
+    .end_cell()
+    .begin_parse();
+}
+
+(cell, slice) get_base_init_and_address(slice factory ,int proof, cell base_code) inline_ref {
+    cell base_contract_init = get_base_init(factory, proof, base_code);
+    slice base_contract_address = get_contract_addr(base_contract_init);
+    return (base_contract_init, base_contract_address);
+}
+
+() send_deploy_msg(
+    int bounce_flag,
+    slice to,
+    int value,
+    cell body,
+    cell state_init,
+    int mode
+) impure inline_ref {
+    var msg = begin_cell()
+        .store_msg_flags_and_address_none(bounce_flag)
+        .store_slice(to)
+        .store_coins(value)
+        .store_statinit_ref_and_body_ref(state_init, body)
+        .end_cell();
+    send_raw_message(msg, mode);
+}
