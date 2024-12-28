@@ -1,0 +1,205 @@
+#include "imports/stdlib.fc";
+#include "imports/messages.fc";
+#include "shared/global_vars.fc";
+#include "shared/jetton_utils.fc";
+#include "ton_flip/flip_utils.fc";
+#include "shared/admin_ops.fc";
+#include "shared/rand_utils.fc";
+
+const op::bet = "op::bet"c;
+const op::set_config = "op::set_config"c;
+
+(slice, int, slice, cell, int, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(), ;; admin_address
+        ds~load_coins(),    ;; max_win
+        ds~load_msg_addr(), ;; echo_address
+        ds~load_dict(),     ;; msg_dict
+        ds~load_uint(8),    ;; slast_used_msg_idx
+        ds~load_dict()      ;; last_bets_dict
+    );
+}
+
+() save_data(
+    slice admin_address, 
+    int max_win, 
+    slice echo_address,
+    cell msg_dict,
+    int slast_used_msg_idx,
+    cell last_bets_dict
+) impure inline_ref {
+    set_data(begin_cell()
+       .store_slice(admin_address)
+       .store_coins(max_win)
+       .store_slice(echo_address)
+       .store_dict(msg_dict)
+       .store_uint(slast_used_msg_idx, 8)
+       .store_dict(last_bets_dict)
+     .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    (
+        slice admin_address, 
+        int max_win, 
+        slice echo_address,
+        cell msg_dict, 
+        int slast_used_msg_idx,
+        cell last_bets_dict
+    ) = load_data();
+
+    slice sender_address = cs~load_msg_addr();
+
+    if equal_slices(admin_address, sender_address) {
+        int op = in_msg_body~load_uint(32);
+
+        if op == op::set_config {
+            int new_max_win = in_msg_body~load_coins();
+            save_data(
+                admin_address, 
+                new_max_win, 
+                echo_address,
+                msg_dict, 
+                slast_used_msg_idx,
+                last_bets_dict
+            );
+            return ();
+        }
+
+        proceed_admin_ops(op, in_msg_body, admin_address);
+        return ();
+    }
+
+    int is_echo = equal_slices(sender_address, echo_address);
+    int flip_gas_fee = FLIP_GAS_FEE;
+    if ~ is_echo {
+        throw_unless(411, msg_value < 11000000000);
+        if msg_value < 1000000000 {
+            flip_gas_fee = FLIP_GAS_FEE - 15000000;
+        }
+    }
+    slice player = is_echo ? in_msg_body~load_msg_addr() : sender_address;
+    int bet_amount = (is_echo ? in_msg_body~load_coins() : msg_value) - flip_gas_fee;
+
+    int op = in_msg_body~load_uint(32);
+    int is_ton_bet_custom = op == op::bet;
+
+    int ref_state = 0;
+    slice referrer_acc = null();
+
+    if is_ton_bet_custom {
+        ref_state = in_msg_body~load_int(1); ;; 0 - no referrer
+        referrer_acc = in_msg_body~load_msg_addr();
+    } elseif op {
+        throw(0xffff);
+    }
+
+    ;; check_bet_side
+    int bets_count = slice_bits(in_msg_body) / 8;
+    if bets_count > 1 {
+        throw_unless(407, bets_count < 3);
+
+        bet_x = 1;
+
+        slice msg = preload_bits(in_msg_body, bets_count * 8);
+        repeat(bets_count){
+            slice letter = msg~load_bits(8);
+            check_side(letter);
+            bet_x = bet_x * 2;
+        }
+    } else {
+        bet_x = 2;
+        check_side(in_msg_body);
+    }
+
+    check_bet_amount(bet_amount + flip_gas_fee, my_balance, max_win);
+
+    last_used_msg_idx = slast_used_msg_idx;
+
+    (int max_bet_id, _, int is_max_bet_id) = last_bets_dict.udict_get_max?(32);
+    int new_bet_id = is_max_bet_id ? max_bet_id + 1 : 1;
+
+    custom_randomize();
+    randomize_lt();
+
+    set_res_side(bets_count);
+
+    int pure_winning = bet_amount * bet_x;
+    int win_fee = pure_winning * WIN_FEE_SHARE / DENOMINATOR;
+    int winning = equal_slices(in_msg_body, res_side) ? pure_winning - win_fee : 0;
+    
+    if is_ton_bet_custom & ref_state & winning {
+        send_raw_message(begin_cell()
+           .store_uint(0x10, 6)
+           .store_slice(referrer_acc)
+           .store_coins(win_fee / 2)
+           .store_uint(0, 107)
+        .end_cell(), 0 + 2);
+
+        win_fee = win_fee / 2;
+    }
+
+    cell fee_msg = begin_cell()
+       .store_uint(0x10, 6)
+       .store_slice(FEE_POOL)
+       .store_coins(win_fee)
+       .store_uint(0, 107)
+       .store_slice(player)
+       .store_coins(bet_amount)
+       .store_slice(in_msg_body)
+       .store_slice(res_side)
+    .end_cell();
+        
+    if winning {
+        send_raw_message(fee_msg, 1 + 2);
+    }
+
+    ;; set_last_bets_dict
+    last_bets_dict~udict_set_ref(32, new_bet_id, fee_msg);
+    (int min_bet_id, _, int is_min_bet_id) = last_bets_dict.udict_get_min?(32);
+        
+    if (is_min_bet_id & (new_bet_id - min_bet_id) > 18) {
+        last_bets_dict~udict_delete?(32, min_bet_id);
+    }
+
+    if winning > 0 {
+        send_raw_message(begin_cell()
+           .store_uint(0x18, 6)
+           .store_slice(player)
+           .store_coins(winning)
+           .store_uint(0, 107)
+           .store_uint(0, 32)
+           .store_slice(get_win_msg(msg_dict))
+        .end_cell(), 1);
+    } else {
+        send_raw_message(begin_cell()
+           .store_uint(0x18, 6)
+           .store_slice(player)
+           .store_coins(4000000)
+           .store_uint(0, 107)
+           .store_uint(0, 32)
+           .store_slice("Try again!")
+        .end_cell(), 0);
+    }
+
+    save_data(
+        admin_address, 
+        max_win, 
+        echo_address,
+        msg_dict, 
+        last_used_msg_idx,
+        last_bets_dict
+    );
+    return ();
+}
+
+(slice, int, slice, cell, int, cell) %get_data() method_id(78985) {
+    return load_data();
+}
