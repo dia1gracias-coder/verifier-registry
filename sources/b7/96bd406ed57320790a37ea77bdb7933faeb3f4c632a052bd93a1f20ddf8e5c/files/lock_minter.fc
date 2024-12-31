@@ -1,0 +1,180 @@
+#include "import/stdlib.fc";
+#include "import/params.fc";
+#include "op-codes.fc";
+
+;;
+;; Price Lock NFT minter
+;;
+
+const err::not_owner = 401;
+const err::not_enough_value = 402;
+const err::unknown_op = 0xffff;
+
+const const::min_tons_for_storage = 50000000; ;; 0.05 TON
+const const::gas_fee = 15000000; ;; 0.015 TON
+
+;; storage scheme
+;; lp_config#_ lp_address:MsgAddress
+;;             is_usdt_first:uint32
+;;             = LPConfig;
+;; storage#_ owner_address:MsgAddress
+;;           collection_address:MsgAddress
+;;           royalty_param:Grams
+;;           lp_config:^LPConfig
+;;           content:^Cell
+;;           = Storage;
+
+(slice, slice, int, cell, cell) load_data() inline {
+  var ds = get_data().begin_parse();
+  return (
+    ds~load_msg_addr(), ;; owner_address
+    ds~load_msg_addr(), ;; collection_address
+    ds~load_coins(),    ;; royalty_param
+    ds~load_ref(),      ;; lp_config
+    ds~load_ref()       ;; content
+  );
+}
+
+() save_data(slice owner_address, slice collection_address, int royalty_param, cell lp_config, cell content) impure inline {
+  set_data(begin_cell()
+    .store_slice(owner_address)
+    .store_slice(collection_address)
+    .store_coins(royalty_param)
+    .store_ref(lp_config)
+    .store_ref(content)
+    .end_cell()
+  );
+}
+
+(cell) to_lp_config(slice lp_address, int is_usdt_first) inline {
+  return begin_cell()
+    .store_slice(lp_address)
+    .store_uint(is_usdt_first, 32)
+    .end_cell();
+}
+
+(slice, int) from_lp_config(cell mint_config) inline {
+  var ds = mint_config.begin_parse();
+  return (
+    ds~load_msg_addr(), ;; lp_address
+    ds~load_uint(32)   ;; is_usdt_first
+  );
+}
+
+;; deploy new nft with autoincremented index
+;; mint_next#50932698 query_id:uint64 value:Grams nft_init_message:^NftInitMessage = MintNextPayload;
+;; nft_init_message#_ owner_addr:MsgAddress target_price:uint32 lp_config:^Cell content:^Cell = NftInitMessage;
+() send_mint_message(int query_id, slice sender_address, slice collection_address, int fwd_value, int nft_value, int target_price, cell lp_config, cell content) impure inline {
+  var nft_init_message = begin_cell()
+    .store_slice(sender_address)
+    .store_uint(target_price, 32)
+    .store_ref(lp_config)
+    .store_ref(content)
+    .end_cell();
+  var msg = begin_cell()
+    .store_uint(0x18, 6)
+    .store_slice(collection_address)
+    .store_coins(fwd_value)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(op::mint_next(), 32)
+    .store_uint(query_id, 64)
+    .store_coins(nft_value)
+    .store_ref(nft_init_message);
+  send_raw_message(msg.end_cell(), SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+(int) calc_royalty(int value) inline {
+  ;; TODO: implement royalty calculation
+  (_, _, int royalty_param, _, _) = load_data();
+  return royalty_param;
+}
+
+() mint_with_config(int msg_value, int target_price, int nft_value, int royalty_value, cell lp_config, int query_id, slice sender_address, slice collection_address, cell content) impure inline {
+  int min_value = nft_value + royalty_value + const::gas_fee;
+  throw_unless(err::not_enough_value, msg_value >= min_value);
+
+  int fwd_value = msg_value - royalty_value;
+
+  send_mint_message(query_id, sender_address, collection_address, fwd_value, nft_value, target_price, lp_config, content);
+}
+
+;;
+;; Public methods
+;;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+      return ();
+  }
+  slice cs = in_msg_full.begin_parse();
+  int flags = cs~load_uint(4);
+
+  if (flags & 1) { ;; ignore all bounced messages
+      return ();
+  }
+  slice sender_address = cs~load_msg_addr();
+
+  int op = in_msg_body~load_op();
+  int query_id = in_msg_body~load_query_id();
+
+  (slice owner_address, slice collection_address, int royalty_param, cell lp_config, cell content) = load_data();
+
+  ;; everyone can mint if provide enough money
+  ;; mint#0318f361 query_id:uint64 target_price:uint32 value:Grams = MintPayload;
+  if (op == op::mint()) {
+    int target_price = in_msg_body~load_uint(32);
+    int nft_value = in_msg_body~load_coins();
+    int royalty_value = calc_royalty(nft_value);
+    mint_with_config(msg_value, target_price, nft_value, royalty_value, lp_config, query_id, sender_address, collection_address, content);
+    return();
+  }
+
+  if (op == op::change_lp_config()) {
+    throw_unless(err::not_owner, equal_slice_bits(sender_address, owner_address));
+    cell new_lp_config = in_msg_body~load_ref();
+    save_data(owner_address, collection_address, royalty_param, new_lp_config, content);
+    return();
+  }
+
+  if (op == op::change_content()) {
+    throw_unless(err::not_owner, equal_slice_bits(sender_address, owner_address));
+    cell new_content = in_msg_body~load_ref();
+    save_data(owner_address, collection_address, royalty_param, lp_config, new_content);
+    return();
+  }
+
+  if (op == op::change_royalty_param()) {
+    throw_unless(err::not_owner, equal_slice_bits(sender_address, owner_address));
+    int new_royalty_param = in_msg_body~load_coins();
+    save_data(owner_address, collection_address, new_royalty_param, lp_config, content);
+    return();
+  }
+  
+  ;; only owner can collect profits, but need to leave some value for storage
+  if (op == op::collect_profits()) {
+    throw_unless(err::not_owner, equal_slice_bits(sender_address, owner_address));
+    throw_unless(err::not_enough_value, my_balance >= const::min_tons_for_storage);
+    send_raw_message(begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(owner_address)
+      .store_coins(my_balance + msg_value - const::min_tons_for_storage)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_uint(0, 32)
+      .store_uint(query_id, 32)
+      .end_cell(), SEND_MODE_PAY_FEES_SEPARATELY);
+    return();
+  }
+
+  throw(err::unknown_op);
+}
+
+(int) get_txvalue_for_nftvalue(int nft_value) method_id {
+  int royalty_value = calc_royalty(nft_value);
+  return nft_value + royalty_value + const::gas_fee;
+}
+
+(int, slice, int, cell) get_contract_data() method_id {
+  (_, _, int royalty_param, cell lp_config, cell content) = load_data();
+  (slice lp_address, int is_usdt_first) = from_lp_config(lp_config);
+  return (royalty_param, lp_address, is_usdt_first, content);
+}
