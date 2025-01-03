@@ -1,0 +1,322 @@
+#include "imports/stdlib.fc";
+#include "constants.fc";
+
+global slice storage::jetton_wallet_address;
+global int storage::cliff_end_date;
+global int storage::cliff_numerator;
+global int storage::cliff_denominator;
+global int storage::vesting_period;
+global int storage::vesting_numerator;
+global int storage::vesting_denominator;
+global int storage::cliff_unlock_amount;
+global int storage::vesting_unlock_amount;
+global int storage::unlocks_count;
+global int storage::tge_amount;
+global int storage::tge_time;
+
+global int storage::init?;
+global slice storage::admin_address;
+global slice storage::claimer_address;
+global int storage::token_balance;
+global int storage::token_claimed;
+global int storage::last_claimed;
+global cell storage::vesting_data;
+
+global int storage::is_paused;
+
+global slice message::sender;
+
+() load_data() impure inline_ref {
+    slice ds = get_data().begin_parse();
+
+    storage::admin_address = ds~load_msg_addr();
+    storage::claimer_address = ds~load_msg_addr();
+
+    if (slice_empty?(ds)) {
+        storage::init? = false;
+        return ();
+    }
+    storage::init? = true;
+
+    storage::token_balance = ds~load_coins();
+    storage::token_claimed = ds~load_coins();
+    storage::last_claimed = ds~load_uint(32);
+    storage::vesting_data = ds~load_ref();
+
+    slice vesting_data = storage::vesting_data.begin_parse();
+    storage::jetton_wallet_address = vesting_data~load_msg_addr();
+    storage::cliff_end_date = vesting_data~load_uint(32);
+    storage::cliff_numerator = vesting_data~load_uint(16);
+    storage::cliff_denominator = vesting_data~load_uint(16);
+    storage::vesting_period = vesting_data~load_uint(32);
+    storage::vesting_numerator = vesting_data~load_uint(16);
+    storage::vesting_denominator = vesting_data~load_uint(16);
+    storage::cliff_unlock_amount = vesting_data~load_coins();
+    storage::vesting_unlock_amount = vesting_data~load_coins();
+    storage::unlocks_count = vesting_data~load_uint(16);
+    storage::tge_amount = vesting_data~load_coins();
+    storage::tge_time = vesting_data~load_uint(32);
+
+    storage::is_paused = ds~load_uint(1);
+
+    ds.end_parse();
+    vesting_data.end_parse();
+}
+
+() save_data() impure inline_ref {
+    cell data = begin_cell()
+        .store_slice(storage::admin_address)
+        .store_slice(storage::claimer_address)
+        .store_coins(storage::token_balance)
+        .store_coins(storage::token_claimed)
+        .store_uint(storage::last_claimed, 32)
+        .store_ref(storage::vesting_data)
+        .store_uint(storage::is_paused, 1)
+        .end_cell();
+
+    set_data(data);
+}
+
+int claimable_tokens() inline {
+    if (now() < storage::tge_time) {
+        return 0;
+    }
+
+    ;; If claimed all tokens
+    if (storage::token_claimed >= storage::token_balance) {
+        return 0;
+    }
+
+    ;; TGE unlock
+    int unlocked_tokens = storage::tge_amount;
+    
+    ;; Vesting unlock after cliff
+    if (now() >= storage::cliff_end_date) {
+        ;; Add cliff unlock amount
+        unlocked_tokens += storage::cliff_unlock_amount;
+        
+        ;; Calculate vesting periods
+        int time_since_cliff = now() - storage::cliff_end_date;
+        int passed_periods = time_since_cliff / storage::vesting_period;
+        
+        if (passed_periods >= storage::unlocks_count) {
+            ;; If all periods passed, unlock all remaining tokens
+            return storage::token_balance - storage::token_claimed;
+        } else {
+            ;; Calculate linear vesting based on passed periods
+            if (passed_periods > 0) {
+                ;; Add vesting unlock amount for each passed period
+                unlocked_tokens += storage::vesting_unlock_amount * passed_periods;
+            }
+        }
+    }
+
+    ;; Ensure not exceeding total balance
+    if (unlocked_tokens > storage::token_balance) {
+        unlocked_tokens = storage::token_balance;
+    }
+
+    ;; Calculate claimable amount
+    int claimable = unlocked_tokens - storage::token_claimed;
+    return max(claimable, 0);
+}
+
+int min_fee() inline {
+    return
+        get_compute_fee(WORKCHAIN, LOCKUP_CONTRACT_GAS_USAGE) +
+        ;; lockup -> lockup_wallet -> user_wallet -> user_wallet -> user (notification)
+        get_forward_fee(WORKCHAIN, TRANSFER_PAYLOAD_MAX_BITS, TRANSFER_PAYLOAD_MAX_CELLS) * 3 +
+        ;; lockup_wallet -> user_wallet (with state init)
+        get_simple_forward_fee(WORKCHAIN, JETTON_WALLET_INIT_BITS, JETTON_WALLET_INIT_CELLS) +
+        ;; lockup_wallet + user_wallet
+        max(get_compute_fee(WORKCHAIN, JETTON_WALLET_GAS_USAGE), JETTON_WALLET_COMPUTE_FEE) * 2 +
+        ;; user_wallet
+        max(get_storage_fee(WORKCHAIN, ONE_YEAR, JETTON_WALLET_STATE_MAX_BITS, JETTON_WALLET_INIT_MAX_CELLS), JETTON_WALLET_STORAGE);
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_int(4);
+    message::sender = cs~load_msg_addr();
+
+    load_data();
+    if (flags & 1) {
+        in_msg_body~skip_bits(32); ;; skip bounce flag
+        int op = in_msg_body~load_uint(32);
+        ;; this should not happen, however, processing of this bounce is implemented just in case
+        if (op == op::jetton_transfer) {
+            if (equal_slices(message::sender, storage::jetton_wallet_address)) {
+                int amount = in_msg_body~load_coins();
+                storage::token_claimed -= amount; ;; Revert claimed amount
+                save_data();
+            }
+        }
+        return ();
+    }
+
+    ifnot (storage::init?) {
+        throw_unless(error::unauthorized, equal_slices(message::sender , storage::admin_address));
+        storage::token_balance = in_msg_body~load_coins();
+        storage::token_claimed = 0;
+        storage::last_claimed = 0;
+
+        storage::jetton_wallet_address = in_msg_body~load_msg_addr();
+        storage::cliff_end_date = in_msg_body~load_uint(32);
+        storage::cliff_numerator = in_msg_body~load_uint(16);
+        storage::cliff_denominator = in_msg_body~load_uint(16);
+        storage::vesting_period = in_msg_body~load_uint(32);
+        storage::vesting_numerator = in_msg_body~load_uint(16);
+        storage::vesting_denominator = in_msg_body~load_uint(16);
+        storage::unlocks_count = in_msg_body~load_uint(16);
+        storage::tge_amount = in_msg_body~load_coins();
+        storage::tge_time = in_msg_body~load_uint(32);
+        storage::is_paused = in_msg_body~load_uint(1);
+        in_msg_body.end_parse();
+
+        throw_unless(error::invalid_vesting_period, storage::vesting_period > 0);
+
+        ;; validate chronological order
+        throw_unless(error::invalid_dates, storage::cliff_end_date > storage::tge_time);
+
+        ;; validate fractions
+        throw_unless(error::invalid_fraction, storage::cliff_numerator < storage::cliff_denominator);
+        throw_unless(error::invalid_fraction, storage::vesting_numerator < storage::vesting_denominator);
+        throw_unless(error::invalid_fraction, storage::cliff_denominator > 0);
+        throw_unless(error::invalid_fraction, storage::vesting_denominator > 0);
+
+        ;; calculate unlock amounts
+        storage::cliff_unlock_amount = muldiv(storage::token_balance, storage::cliff_numerator, storage::cliff_denominator);
+        storage::vesting_unlock_amount = muldiv(storage::token_balance, storage::vesting_numerator, storage::vesting_denominator);
+
+        ;; validate total distribution
+        int total_vesting = storage::tge_amount + storage::cliff_unlock_amount + (storage::vesting_unlock_amount * storage::unlocks_count);
+        throw_unless(error::invalid_distribution, total_vesting <= storage::token_balance);
+        
+        ;; validate non-negative values
+        throw_unless(error::invalid_amount, storage::tge_amount >= 0);
+        throw_unless(error::invalid_amount, storage::cliff_unlock_amount >= 0);
+        throw_unless(error::invalid_amount, storage::vesting_unlock_amount >= 0);
+        throw_unless(error::invalid_amount, storage::unlocks_count > 0);
+
+        storage::vesting_data = begin_cell()
+            .store_slice(storage::jetton_wallet_address)
+            .store_uint(storage::cliff_end_date, 32)
+            .store_uint(storage::cliff_numerator, 16)
+            .store_uint(storage::cliff_denominator, 16)
+            .store_uint(storage::vesting_period, 32)
+            .store_uint(storage::vesting_numerator, 16)
+            .store_uint(storage::vesting_denominator, 16)
+            .store_coins(storage::cliff_unlock_amount)
+            .store_coins(storage::vesting_unlock_amount)
+            .store_uint(storage::unlocks_count, 16)
+            .store_coins(storage::tge_amount)
+            .store_uint(storage::tge_time, 32)
+            .end_cell();
+
+        raw_reserve(get_storage_fee(WORKCHAIN, ELEVEN_YEARS, LOCKUP_CONTRACT_STATE_MAX_BITS, LOCKUP_CONTRACT_STATE_MAX_CELLS), 0);
+        send_raw_message(begin_cell()
+            .store_uint(flag::non_bounceable, 6)
+            .store_slice(message::sender)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell(), mode::available_balance + flag::ignore_errors);
+        save_data();
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    if (op == op::claim_tokens) {
+        throw_unless(error::paused, storage::is_paused == 0);
+        in_msg_body.end_parse();
+        throw_unless(error::unauthorized, equal_slices(message::sender, storage::claimer_address));
+        throw_unless(error::not_enough_ton, msg_value >= min_fee());
+        int claimable_tokens = claimable_tokens();
+        throw_unless(error::nothing_to_claim, claimable_tokens > 0);
+
+        cell transfer_payload = begin_cell()
+            .store_uint(op::jetton_transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(claimable_tokens)
+            .store_slice(message::sender)
+            .store_slice(message::sender)
+            .store_uint(0, 1)
+            .store_coins(1)
+            .store_uint(0, 1)
+            .end_cell();
+        cell msg = begin_cell()
+            .store_uint(flag::bounceable, 6)
+            .store_slice(storage::jetton_wallet_address)
+            .store_coins(0)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(transfer_payload)
+            .end_cell();
+        send_raw_message(msg, mode::remaining_amount + flag::bounce_on_fail);
+
+        storage::token_claimed += claimable_tokens;
+        storage::last_claimed = now();
+        save_data();
+        return ();
+    }
+
+    if (op == op::set_admin) {
+        throw_unless(error::unauthorized, equal_slices(message::sender, storage::admin_address));
+        storage::admin_address = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+
+    if (op == op::set_paused) {
+        throw_unless(error::unauthorized, equal_slices(message::sender, storage::admin_address));
+        storage::is_paused = in_msg_body~load_uint(1);
+        save_data();
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+(int, slice, slice, int, int, int, int) get_lockup_data() method_id {
+    load_data();
+    return (
+        storage::init?,
+        storage::admin_address,
+        storage::claimer_address,
+        storage::token_balance,
+        storage::token_claimed,
+        storage::last_claimed,
+        storage::is_paused
+    );
+}
+
+
+(slice, int, int, int, int, int, int, int, int, int, int, int) get_vesting_data() method_id {
+    load_data();
+    return (
+        storage::jetton_wallet_address,
+        storage::cliff_end_date,
+        storage::cliff_numerator,
+        storage::cliff_denominator,
+        storage::vesting_period,
+        storage::vesting_numerator,
+        storage::vesting_denominator,
+        storage::cliff_unlock_amount,
+        storage::vesting_unlock_amount,
+        storage::unlocks_count,
+        storage::tge_amount,
+        storage::tge_time
+    );
+}
+
+int get_claimable_tokens() method_id {
+    load_data();
+    return claimable_tokens();
+}
+
+int get_min_fee() method_id {
+    return min_fee();
+}
+
+int get_init_storage_fee() method_id {
+    return get_storage_fee(WORKCHAIN, ELEVEN_YEARS, LOCKUP_CONTRACT_STATE_MAX_BITS, LOCKUP_CONTRACT_STATE_MAX_CELLS);
+}
