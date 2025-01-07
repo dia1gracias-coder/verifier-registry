@@ -1,0 +1,124 @@
+#include "imports/stdlib.fc";
+
+const int op::create = 0x7362d09c; ;; "op::create"
+const int op::complete = 0x7362d09d; ;; "op::complete"
+const int op::cancel = 0x2ccf498b; ;; "op::cancel"
+const int op::dispute = 0x42e7b1b4; ;; "op::dispute"
+
+;; Error Codes
+const int error::not_platform = 100;
+const int error::not_buyer = 101;
+const int error::not_seller = 102;
+const int error::invalid_state = 103;
+const int error::insufficient_funds = 104;
+const int error::too_early = 105;
+const int error::too_late = 106;
+
+;; Transaction Status
+const int status::pending = 0;
+const int status::completed = 1;
+const int status::disputed = 2;
+const int status::refunded = 3; 
+
+;; id is required to be able to create different instances of counters
+;; since addresses in TON depend on the initial state of the contract
+;;global int ctx_id;
+
+;; Constants
+const int MIN_AMOUNT = 1000000000; ;; 1 TON
+
+;; load_data populates storage variables using stored data
+(slice, slice, cell) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),
+        ds~load_msg_addr(),
+        ds~load_dict()
+    );
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data(slice owner, slice platform, cell transactions) impure inline {
+    set_data(begin_cell()
+        .store_slice(owner)
+        .store_slice(platform)
+        .store_dict(transactions)
+        .end_cell());
+}
+
+;; Create new transaction
+() create_transaction(int query_id, slice buyer, slice seller, int amount, int fee) impure {
+    ;; Load storage
+    var (owner, platform, transactions) = load_data();
+
+    ;; Check minimum amount
+    throw_unless(error::insufficient_funds, amount >= MIN_AMOUNT);
+    
+    ;; Create transaction record
+    var transaction_data = begin_cell()
+        .store_uint(query_id, 64)
+        .store_slice(buyer) ;; buyer_address
+        .store_slice(seller) ;; seller_address
+        .store_coins(amount)
+        .store_uint(fee, 8)
+        .store_uint(status::pending, 8)
+        .store_uint(now(), 64) ;; created_at
+        .end_cell();
+
+    ;; Add transaction to the list
+    ;;transactions.store_dict_entry(query_id, transaction_data);
+    transactions~udict_set_ref(64, query_id, transaction_data);
+
+    save_data(owner, platform, transactions);
+}
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+    int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
+
+    if(op == op::create) {
+        slice buyer = in_msg_body~load_msg_addr();
+        slice seller = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_uint(64);
+        int fee = in_msg_body~load_uint(8);
+        create_transaction(query_id, buyer, seller, amount, fee);
+        return ();
+    }
+
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+;; get methods are a means to conveniently read contract data using, for example, HTTP APIs
+;; they are marked with method_id
+;; note that unlike in many other smart contract VMs, get methods cannot be called by other contracts
+
+cell get_transactions() method_id {
+    var (owner, platform, transactions) = load_data();
+    return transactions;
+}
+
+;;get_transaction_info
+;; int get_transaction_info(int query_id) method_id {
+;;     var (transactions) = load_data();
+;;    var (transaction, found?) = transactions.udict_get?(64, query_id);
+;;     throw_unless(error::invalid_state, found?);
+;;     var ds = transaction.begin_parse();
+;;     ds~load_msg_addr();  ;; skip buyer
+;;     ds~load_msg_addr();  ;; skip seller
+;;     var amount = ds~load_coins();
+;;     var created_at = ds~load_uint(64);
+;;     var status = ds~load_uint(8);
+    
+;;     return (amount, created_at, status);
+;; }
