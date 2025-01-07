@@ -1,0 +1,88 @@
+;; Contract for burning JVT
+;; © JVault.xyz
+
+
+#include "imports/stdlib.fc";
+#include "imports/constants.fc";
+#include "imports/messages.fc";
+
+
+global slice storage::admin_address;
+global slice storage::jetton_wallet_address;
+global slice storage::jetton_minter_address;
+
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse(); 
+    
+    storage::admin_address          = ds~load_msg_addr();
+    storage::jetton_wallet_address = ds~load_msg_addr();
+    storage::jetton_minter_address = ds~load_msg_addr();
+    
+    ds.end_parse();
+    return ();
+}
+
+
+() save_data() impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(storage::admin_address)
+            .store_slice(storage::jetton_wallet_address)
+            .store_slice(storage::jetton_minter_address)
+        .end_cell()
+    );
+    return ();
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    if ((flags & 1)) {;; | slice_empty?(in_msg_body)) {  ;; bounced messages
+        return ();
+    }
+
+    int op = 0;
+    int query_id = 0;
+    if (in_msg_body.slice_bits()) {
+        op = in_msg_body~load_uint(32);
+    }
+    if (op != 0) {
+        query_id = in_msg_body~load_uint(64);
+    }
+
+    load_data();
+
+    if (op == op::TRANSFER_NOTIFICATION) {
+        raw_reserve(storage_fees(), 4);
+
+        int   transferred_jettons = in_msg_body~load_coins();
+        slice from_address        = in_msg_body~load_msg_addr();
+
+        ifnot(equal_slices(storage::jetton_wallet_address, sender_address)) {
+            send_jettons(query_id, transferred_jettons, from_address, my_address(), 
+                         storage::jetton_wallet_address, 0, mode::CARRY_REMAINING_BALANCE, 0, null());
+            return ();
+        }
+        
+        send_excess(from_address, query_id, 0, mode::CARRY_REMAINING_BALANCE);
+        return ();
+    }
+
+    if (op == op::BURN_JETTON) {
+        throw_unless(exc::INCORRECT_SENDER, equal_slices(sender_address, storage::admin_address));
+        int jetton_amount = in_msg_body~load_coins();
+        burn_jettons(query_id, jetton_amount, storage::jetton_wallet_address, storage::admin_address, 0, mode::CARRY_REMAINING_BALANCE);
+        return ();
+    }
+    
+    throw(exc::UNSUPPORTED_OP);
+}
+
+
+(slice, slice, slice) get_storage_data() method_id {
+    load_data();
+    return (storage::admin_address, storage::jetton_wallet_address, storage::jetton_minter_address);
+}

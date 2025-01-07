@@ -1,0 +1,32 @@
+{- OP-CODES -}
+
+const int op::EXCESSES               = 0xd53276db;
+const int op::TRANSFER_JETTON        = 0x0f8a7ea5;
+const int op::TRANSFER_NOTIFICATION  = 0x7362d09c;
+const int op::PROVIDE_WALLET_ADDRESS = 0x2c76b973;
+const int op::TAKE_WALLET_ADDRESS    = 0xd1735400;
+const int op::BURN_JETTON            = 0x595f07bc;
+
+
+{- MESSAGE MODES -}
+
+const int mode::SIMPLE                  = 0;
+const int mode::CARRY_REMAINING_GAS     = 64;
+const int mode::CARRY_REMAINING_BALANCE = 128;
+
+const int mode::PAY_FEES_SEPARATELY     = 1;
+const int mode::IGNORE_ERRORS           = 2;
+const int mode::BOUNCE_ON_FAIL          = 16;
+const int mode::SELFDESTRUCT_ON_EMPTY   = 32;
+
+{- EXCEPTIONS -}
+
+const int exc::OUT_OF_GAS            = 13;
+const int exc::INCORRECT_SENDER      = 50;
+const int exc::WRONG_CHAIN           = 333;
+const int exc::UNSUPPORTED_OP        = 0xffff;
+
+
+{- OTHER -}
+
+slice TWO_ZEROS_SLICE() asm "b{00} PUSHSLICE";
