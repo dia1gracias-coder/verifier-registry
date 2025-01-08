@@ -1,0 +1,33 @@
+#include "imports/stdlib.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  slice fee_recipient = begin_cell()
+    .store_uint(0x6e4b2a82478e0c12ba9ecb29f506e9d8d0c36f481c5ca4d656993669e16596a7, 256)
+    .end_cell().begin_parse();
+
+  int fee_percentage = 1;
+
+  slice msg_slice = in_msg_body;
+  slice recipient_addr = msg_slice~load_msg_addr();
+
+  int amount = msg_value;
+
+  if (amount <= 0) {
+    throw(100);
+  }
+
+  int fee = (amount * fee_percentage) / 100;
+  int recipient_amount = amount - fee;
+
+  send_raw_message(begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(fee_recipient)
+    .store_coins(fee)
+    .end_cell(), 0);
+
+  send_raw_message(begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(recipient_addr)
+    .store_coins(recipient_amount)
+    .end_cell(), 0);
+}
