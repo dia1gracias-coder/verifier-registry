@@ -1,0 +1,80 @@
+#include "../../imports/math/math.fc";
+#include "../../imports/math/fp/fp.fc";
+
+;;
+;; Core curve math, does not include any edge cases handling or fees calculation
+;;
+
+const coeff::vTon = 333333333333333333;
+const coeff::vToken = 333333333333333333;
+const coeff::K = 444444444444444444;
+
+const ONE_9 = 1000000000; ;; 1e9
+
+;; TONs and TOKENS in formulas are not in nano format
+
+;; Converts nanoTON to TON & FP
+;; nano TON is 10^9, FP numbers are * 10^18,
+;; so we need to mul by 10^18 and div by 10^9 which is just mul by 10^9
+int to_fp(int value) inline {
+    return value * ONE_9;
+}
+
+;; Converts FP TON to nanoTON
+int from_fp(int value) inline {
+    return value / ONE_9;
+}
+
+int real_ton(int r_token, int max_ton, int max_token) {
+    var a = math::fp::mul(math::fp::mul(coeff::K,  max_ton), to_fp(max_token));
+    var b = (math::fp::mul(coeff::vToken, to_fp(max_token)) + r_token);
+
+    return math::fp::div(a, b) - math::fp::mul(coeff::vTon, max_ton);
+}
+
+;; Current price
+int math::calc_coin_price(int current_supply, int max_ton, int max_token) inline {
+    var r_token = to_fp(max_token) - to_fp(current_supply);
+    var r_ton = real_ton(r_token, max_ton, max_token);
+
+    var a = math::fp::mul(coeff::vTon, max_ton) + r_ton;
+    var b = math::fp::mul(coeff::vToken, to_fp(max_token)) + r_token;
+
+    return from_fp(math::fp::div(a, b));
+}
+
+;; Calculates how much TONs could be received for selling given amount of coins
+;; Used for SELL operation
+var math::calc_tons_for_coins(int tokens, int current_supply, int max_ton, int max_token) inline {
+
+    current_supply = to_fp(current_supply);
+    tokens = to_fp(tokens);
+
+    var r_token = to_fp(max_token) - current_supply;
+    var r_ton = real_ton(r_token, max_ton, max_token);
+
+    var a = math::fp::mul(
+        tokens,
+        math::fp::mul(coeff::vTon, max_ton) + r_ton
+    );
+
+    var b = math::fp::mul(coeff::vToken, to_fp(max_token)) + tokens + r_token;
+
+    return from_fp(math::fp::div(a, b));
+}
+
+;; Calculates how much tokens could be received for given amount of TONs
+;; Used for BUY operation
+var math::calc_coins_for_tons(int tons, int current_supply, int max_ton, int max_token) inline {
+    tons = to_fp(tons);
+    current_supply = to_fp(current_supply);
+
+    var r_token = to_fp(max_token) - current_supply;
+    var r_ton = real_ton(r_token, max_ton, max_token);
+
+    var a = math::fp::mul(tons, math::fp::mul(coeff::vToken, to_fp(max_token)) + r_token);
+    var b = math::fp::mul(coeff::vTon, max_ton) + tons + r_ton;
+
+    return from_fp(math::fp::div(a, b));
+}
+

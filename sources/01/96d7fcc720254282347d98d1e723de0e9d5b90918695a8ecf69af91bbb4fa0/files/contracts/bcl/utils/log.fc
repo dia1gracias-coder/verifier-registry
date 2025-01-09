@@ -1,0 +1,28 @@
+#include "../../imports/stdlib_modern.fc";
+
+() emit_log(builder data) impure inline {
+    ;; 1023 - (4+2+9+256+64+32+2) = 654 bit free
+
+    ;;    var msg = begin_cell()
+    ;;    .store_uint (12, 4)         ;; ext_out_msg_info$11 src:MsgAddressInt ()
+    ;;    .store_uint (1, 2)          ;; addr_extern$01
+    ;;    .store_uint (256, 9)        ;; len:(## 9)
+    ;;    .store_uint(event_id, 256); ;; external_address:(bits len)
+    ;;
+    ;;    if (need_separate_cell) {
+    ;;        msg = msg.store_uint(1, 64 + 32 + 2) ;; created_lt, created_at, init:Maybe, body:Either
+    ;;        .store_ref(data);
+    ;;    } else {
+    ;;        msg = msg.store_uint(0, 64 + 32 + 2) ;; created_lt, created_at, init:Maybe, body:Either
+    ;;        .store_slice(data.begin_parse());
+    ;;    }
+
+    send_raw_message(
+        begin_cell()
+        .store_uint (12, 4)
+        .store_uint(0, 100)
+        .store_builder(data)
+        .end_cell(),
+        SEND_MODE_BOUNCE_ON_ACTION_FAIL
+    );
+}

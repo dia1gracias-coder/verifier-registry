@@ -1,0 +1,95 @@
+#include "../imports/stdlib_modern.fc";
+
+;;
+;; Jetton Minter data
+;;
+
+global int ctx_total_supply;
+global slice ctx_admin;
+global cell ctx_content;
+global cell ctx_wallet_code;
+global int ctx_last_trade_date;
+global int ctx_ton_liq_collected;
+global int ctx_max_ton;
+global slice ctx_lp_receiver;
+
+
+;; BCL data
+global int ctx_bcl_supply;
+global int ctx_liq_supply;
+global slice ctx_author_address;
+global slice ctx_fee_address;
+global int ctx_trade_fee_numerator;
+global int ctx_trade_fee_denominator;
+global int ctx_trading_enabled;
+global cell ctx_referral;
+global int ctx_seed;
+global int ctx_trading_close_fee;
+
+global slice ctx_router_address;
+global slice ctx_router_pton_wallet_address;
+
+() load_base_data() impure {
+    var ds = get_data().begin_parse();
+
+    ctx_total_supply = ds~load_coins();
+    ctx_admin = ds~load_msg_addr();
+    ctx_content = ds~load_ref();
+    ctx_wallet_code = ds~load_ref();
+    ctx_last_trade_date = ds~load_uint(32);
+    ctx_ton_liq_collected = ds~load_coins();
+    ctx_max_ton = ds~load_coins();
+    ctx_lp_receiver = ds~load_msg_addr();
+
+
+    var bcl_ds = ds~load_ref().begin_parse();
+    ctx_bcl_supply = bcl_ds~load_coins();
+    ctx_liq_supply = bcl_ds~load_coins();
+    ctx_author_address = bcl_ds~load_msg_addr();
+    ctx_fee_address = bcl_ds~load_msg_addr();
+    ctx_trade_fee_numerator = bcl_ds~load_uint(16);
+    ctx_trade_fee_denominator = bcl_ds~load_uint(16);
+    ctx_trading_enabled = bcl_ds~load_uint(1);
+    ctx_referral = bcl_ds~load_ref();
+    ctx_seed = bcl_ds~load_uint(64);
+    ctx_trading_close_fee = bcl_ds~load_coins();
+
+    slice router_info = bcl_ds~load_ref().begin_parse();
+    ctx_router_address = router_info~load_msg_addr();
+    ctx_router_pton_wallet_address = router_info~load_msg_addr();
+
+    router_info.end_parse();
+    bcl_ds.end_parse();
+    ds.end_parse();
+}
+
+() store_base_data() impure {
+    set_data(begin_cell()
+    .store_coins(ctx_total_supply)
+    .store_slice(ctx_admin)
+    .store_ref(ctx_content)
+    .store_ref(ctx_wallet_code)
+    .store_uint(ctx_last_trade_date, 32)
+    .store_coins(ctx_ton_liq_collected)
+    .store_coins(ctx_max_ton)
+    .store_slice(ctx_lp_receiver)
+    .store_ref(begin_cell()
+        .store_coins(ctx_bcl_supply)
+        .store_coins(ctx_liq_supply)
+        .store_slice(ctx_author_address)
+        .store_slice(ctx_fee_address)
+        .store_uint(ctx_trade_fee_numerator, 16)
+        .store_uint(ctx_trade_fee_denominator, 16)
+        .store_uint(ctx_trading_enabled, 1)
+        .store_ref(ctx_referral)
+        .store_uint(ctx_seed, 64)
+        .store_coins(ctx_trading_close_fee)
+        .store_ref(
+            begin_cell()
+                .store_slice(ctx_router_address)
+                .store_slice(ctx_router_pton_wallet_address)
+            .end_cell())
+        .end_cell())
+    .end_cell()
+    );
+}

@@ -1,0 +1,62 @@
+#include "../../imports/math/math.fc";
+#include "core.fc";
+
+;;
+;; High level curve math
+;;
+
+;; Current price
+int calc_coin_price(int current_supply, int max_ton, int max_tokens) inline {
+    return math::calc_coin_price(current_supply, max_ton, max_tokens);
+}
+
+;; Sell operation
+var calc_tons_for_coins(int tokens, int current_supply, int max_ton, int max_tokens, int trade_fee_numerator, int trade_fee_denominator) inline {
+    var tons_to_get = math::calc_tons_for_coins(tokens, current_supply, max_ton, max_tokens);
+    ;; Calc fees in TON
+    var fees = muldiv(tons_to_get, trade_fee_numerator, trade_fee_denominator);
+
+    ;; Deduct fees
+    tons_to_get -= fees;
+
+    return (fees, tons_to_get);
+}
+
+var calc_tons_for_all_coins(int max_tokens, int max_ton, int trade_fee_denominator, int trade_fee_numerator) inline {
+    var tons_need = math::calc_tons_for_coins(max_tokens, max_tokens, max_ton, max_tokens);
+
+    var full_tons_need = muldivc(tons_need, trade_fee_denominator, trade_fee_denominator - trade_fee_numerator) + 1;
+
+    var fees = muldiv(full_tons_need, trade_fee_numerator, trade_fee_denominator);
+
+    return (fees, full_tons_need);
+}
+
+;; Buy operation
+var calc_coins_for_tons(int tons, int max_tokens, int current_supply, int trade_fee_numerator, int trade_fee_denominator, int max_ton) inline {
+    var incoming_tons = tons;
+    var available_to_buy = max_tokens - current_supply;
+
+    ;; Calc fees in TON
+    var fees = muldiv(tons, trade_fee_numerator, trade_fee_denominator);
+    ;; Deduct fees
+    tons = tons - fees;
+
+    var coins_to_get = math::calc_coins_for_tons(tons, current_supply, max_ton, max_tokens);
+
+
+    ;; Calculations for rest of available coins
+    if (coins_to_get > available_to_buy) {
+        var tons_no_fees = math::calc_tons_for_coins(available_to_buy, current_supply + available_to_buy, max_ton, max_tokens);
+
+        ;; Add fees
+        var tons_need = muldivc(tons_no_fees, trade_fee_denominator, trade_fee_denominator - trade_fee_numerator);
+
+        ;; Calc fees in TON
+        var fees = muldiv(tons_need, trade_fee_numerator, trade_fee_denominator);
+
+        return (fees, available_to_buy, tons_need);
+    }
+
+    return (fees, coins_to_get, incoming_tons);
+}

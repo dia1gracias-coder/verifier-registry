@@ -1,0 +1,20 @@
+#include "../../imports/stdlib_modern.fc";
+
+const addr_none = "2_"s;
+
+const const::ok = 0xf09f918d;
+
+() send_ok(slice to_addr, int value, int mode) impure {
+    var msg = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(to_addr)
+    .store_grams(value)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(0, 32)
+    .store_uint(const::ok, 32)
+    .end_cell();
+
+    send_raw_message(msg, mode);
+}
+
+int storage_fees() asm "STORAGEFEES";

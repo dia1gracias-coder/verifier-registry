@@ -1,0 +1,574 @@
+#include "../imports/stdlib_modern.fc";
+#include "utils/jetton_utils.fc";
+#include "./op_codes.fc";
+#include "./storage.fc";
+#include "./errors.fc";
+#include "../lib/bcl_math/math.fc";
+#include "utils/log.fc";
+#include "utils/utils.fc";
+#include "dex/stonfi.fc";
+#include "../imports/math/math.fc";
+
+const gas::buy_op_cost = 50000000;      ;; 0.05 TON
+const gas::sell_op_cost = 50000000;      ;; 0.05 TON
+const gas::auxiliary_costs = 100000000;   ;; 0.1 TON
+
+() send_fees(int amount, cell referal) impure inline {
+    ;; Send fees
+    send_raw_message(begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(ctx_fee_address)
+        .store_grams(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::fee_payout, 32)
+        .store_dict(referal)
+        .end_cell(), SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+}
+
+() send_mint_token(slice to_address, int amount, slice response_addr, int query_id, int msg_value, int send_mode) impure inline {
+    var master_msg = begin_cell()
+        .store_uint(0x178d4519, 32)
+        .store_uint(query_id, 64)
+        .store_coins(amount)
+        .store_uint(0, 2) ;; addr_none
+        .store_slice(response_addr) ;; resonse dest
+        .store_coins(0)     ;; forward ton amount
+        .store_uint(0, 1) ;; forward payload
+        .end_cell();
+
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), ctx_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to_wallet_address)
+        .store_coins(msg_value)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(master_msg);
+    send_raw_message(msg.end_cell(), send_mode);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    load_base_data();
+
+    ;; User wants to buy some coins
+    if (op == op::buy) {
+        int init_msg_value = msg_value;
+
+        ;; By default sender is the buyer
+        var buyer_address = sender_address;
+
+        ;; Throw if trading is disabled
+        throw_if(err::trading_disabled, ctx_trading_enabled == 0);
+
+        ;; Throw if not enough TONs
+        throw_if(err::no_funds_for_gas, msg_value < gas::buy_op_cost);
+
+        ;; Deduct gas fee
+        msg_value -= gas::buy_op_cost;
+
+        var min_receive_amount = in_msg_body~load_coins();
+        var referral = in_msg_body~load_maybe_ref();
+
+        ;; Change buyer if its specified
+        if (~ slice_empty?(in_msg_body)) {
+            buyer_address = in_msg_body~load_msg_addr();
+        }
+
+        ;; Calculate amount of tokens to buy
+        var (ton_fees, coins_to_buy, tons_consumed) = calc_coins_for_tons(
+            msg_value,
+            ctx_bcl_supply,
+            ctx_total_supply,
+            ctx_trade_fee_numerator,
+            ctx_trade_fee_denominator,
+            ctx_max_ton
+        );
+
+        throw_if(err::too_few_coins_to_buy, coins_to_buy <= 0);
+
+        ;; Check slippage
+        throw_if(err::slippage_error, coins_to_buy < min_receive_amount);
+
+        var to_return = msg_value - tons_consumed;
+
+        ;; Update supply
+        ctx_total_supply += coins_to_buy;
+
+        ;; Update collected TON liq
+        ctx_ton_liq_collected += tons_consumed - ton_fees;
+
+        ;; Update last trade date
+        ctx_last_trade_date = now();
+
+        ;; Send fees
+        send_fees(ton_fees, referral);
+
+        ;; Send log message
+        emit_log(
+            begin_cell()
+                .store_uint("buy_log"c, 32)
+                ;; Buyer
+                .store_slice(buyer_address)
+                ;; TON value
+                .store_coins(tons_consumed)
+                ;; Supply delta
+                .store_coins(coins_to_buy)
+                ;; New supply
+                .store_coins(ctx_total_supply)
+                ;; Collected TON liq
+                .store_coins(ctx_ton_liq_collected)
+                ;; Referal
+                .store_maybe_ref(referral)
+        );
+
+        var should_close_trading = ctx_total_supply >= ctx_bcl_supply;
+
+        ifnot (should_close_trading) {
+            ;; Regular buy
+
+            ;; This way we can return unused tons for gas to the user
+            raw_reserve(my_balance - init_msg_value + tons_consumed - ton_fees + storage_fees(), SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+
+            ;; Send tokens
+            send_mint_token(
+                buyer_address,
+                coins_to_buy,
+                buyer_address,
+                query_id,
+                0,
+                SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_BOUNCE_ON_ACTION_FAIL
+            );
+
+            ;; Save storage
+            store_base_data();
+
+            return ();
+        } else {
+            ;; All coins are sold, we can send liq to STON.fi
+
+            ;; free gas for last trader
+            to_return += gas::buy_op_cost;
+
+            ;; Send tokens
+            send_mint_token(
+                buyer_address,
+                coins_to_buy,
+                buyer_address,
+                query_id,
+                to_return,
+                SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL
+            );
+
+            ;; Disable trading
+            ctx_trading_enabled = 0;
+
+            var ton_liq = ctx_ton_liq_collected - gas::total_lp_provide_gas - gas::auxiliary_costs - gas::buy_op_cost - ctx_trading_close_fee;
+
+            ;; Send Jetton part of liq
+            provide_jetton_lp(ctx_liq_supply);
+            ;; Send TON part of liq
+            provide_ton_lp(ton_liq);
+
+            ;; Increase total supply
+            ctx_total_supply += ctx_liq_supply;
+
+            ;; Send close fee
+            if (ctx_trading_close_fee > 0) {
+                send_fees(ctx_trading_close_fee, ctx_referral);
+            }
+
+            ;; Send log message
+            emit_log(
+                begin_cell()
+                    .store_uint("send_liq_log"c, 32)
+                    ;; Liq in TON
+                    .store_coins(ton_liq)
+                    ;; Liq in coins
+                    .store_coins(ctx_liq_supply)
+            );
+
+            ;; Revoke admin rights
+            ctx_admin = address_none();
+
+            ;; Save storage
+            store_base_data();
+
+            return ();
+        }
+    }
+
+    ;; BCL wallet wants to sell some tokens
+    if (op == op::sell_coins_notification) {
+        ;; Throw if trading is disabled
+        throw_if(err::trading_disabled, ctx_trading_enabled == 0);
+
+        int jetton_amount = in_msg_body~load_coins();
+        int min_receive_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        cell referral = in_msg_body~load_maybe_ref();
+
+
+        ;; Accept sell messages only from wallets
+        throw_unless(err::not_valid_wallet, equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), ctx_wallet_code), sender_address));
+
+        ;; Throw if not enough TONs
+        throw_if(err::no_funds_for_gas, msg_value < gas::sell_op_cost);
+
+        ;; This case should never appear
+        throw_if(err::too_many_coins_to_sell, jetton_amount > ctx_bcl_supply);
+
+        ;; Calculate amount TONs to return
+        var (ton_fees, tons_to_return) = calc_tons_for_coins(
+            jetton_amount,
+            ctx_total_supply,
+            ctx_max_ton,
+            ctx_bcl_supply,
+            ctx_trade_fee_numerator,
+            ctx_trade_fee_denominator
+        );
+
+        throw_if(err::too_few_coins_to_sell, tons_to_return <= 0);
+
+        ;; Check slippage
+        throw_if(err::slippage_error, tons_to_return < min_receive_amount);
+
+        ;; Update supply
+        ctx_total_supply -= jetton_amount;
+
+        ;; Update collected TON liq
+        ctx_ton_liq_collected -= (tons_to_return + ton_fees);
+
+        ;; Update last trade date
+        ctx_last_trade_date = now();
+
+        ;; Reserve contract balance BEFORE the message minus tons to return minus fees
+        raw_reserve(my_balance - msg_value - tons_to_return - ton_fees + storage_fees(), SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+
+        ;; Send fees
+        send_fees(ton_fees, referral);
+
+        ;; Send log message
+        emit_log(
+            begin_cell()
+                .store_uint("sell_log"c, 32)
+                ;; Seller
+                .store_slice(from_address)
+                ;; TON value
+                .store_coins(tons_to_return)
+                ;; Supply delta
+                .store_coins(jetton_amount)
+                ;; New supply
+                .store_coins(ctx_total_supply)
+                ;; Collected TON liq
+                .store_coins(ctx_ton_liq_collected)
+                ;; Referal
+                .store_dict(referral)
+        );
+
+        ;; Send TONs
+        send_ok(from_address, 0, SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+
+        ;; Save storage
+        store_base_data();
+
+
+        return ();
+    }
+
+    ;; Wallet wants to unlock
+    if (op == op::unlock_wallet_callback) {
+        var from_address = in_msg_body~load_msg_addr();
+
+        ;; Accept unlock request only from wallets
+        throw_unless(err::not_valid_wallet, equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), ctx_wallet_code), sender_address));
+
+        ;; Wallets could be unlocked only after trading phase is over
+        throw_if(err::trading_enabled, ctx_trading_enabled == 1);
+
+        ;; Send excess to wallet
+        send_raw_message(
+            begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(sender_address)
+            .store_grams(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::unlock_wallet_excess, 32)
+            .store_uint(query_id, 64)
+            .end_cell(), 64
+        );
+
+        return ();
+    }
+
+    if (op == op::burn_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(74,
+            equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), ctx_wallet_code), sender_address)
+        );
+        ctx_total_supply -= jetton_amount;
+        slice response_address = in_msg_body~load_msg_addr();
+        if (response_address.preload_uint(2) != 0) {
+            var msg = begin_cell()
+                .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+                .store_slice(response_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::excesses, 32)
+                .store_uint(query_id, 64);
+            send_raw_message(msg.end_cell(), 2 + 64);
+        }
+        store_base_data();
+        return ();
+    }
+
+    if (op == op::provide_wallet_address) {
+        ;; see provide_wallet_address TL-B layout in jetton.tlb
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_bool();
+        in_msg_body.end_parse();
+
+        cell included_address = include_address? ? begin_cell().store_slice(owner_address).end_cell() : null();
+
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_op(op::take_wallet_address)
+            .store_query_id(query_id);
+
+        if (is_same_workchain(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), ctx_wallet_code));
+        } else {
+            msg = msg.store_address_none();
+        }
+
+        cell msg_cell = msg.store_maybe_ref(included_address).end_cell();
+
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        return ();
+    }
+
+    if (op == op::set_admin) {
+        ;; change admin
+        throw_unless(err::not_admin, equal_slices_bits(sender_address, ctx_admin));
+        ctx_admin = in_msg_body~load_msg_addr();
+        store_base_data();
+
+        send_ok(sender_address, 0, 64);
+        return ();
+    }
+
+    if (op == op::set_content) {
+        ;; change content, delete this for immutable tokens
+        throw_unless(err::not_admin, equal_slices_bits(sender_address, ctx_admin));
+        ctx_content = in_msg_body~load_ref();
+        store_base_data();
+        return ();
+    }
+
+    if (op == op::set_fees) {
+        throw_unless(err::not_admin, equal_slices_bits(sender_address, ctx_admin));
+        ;; Fees address
+        ctx_fee_address = in_msg_body~load_msg_addr();
+        ;; Numerator
+        ctx_trade_fee_numerator = in_msg_body~load_uint(16);
+        ;; Denominator
+        ctx_trade_fee_denominator = in_msg_body~load_uint(16);
+
+        in_msg_body.end_parse();
+        send_ok(sender_address, 0, 64);
+        store_base_data();
+        return ();
+    }
+
+    if (op == op::set_code) {
+        throw_unless(err::not_admin, equal_slices_bits(sender_address, ctx_admin));
+        var code = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+        set_code(code);
+
+        send_ok(sender_address, 0, 64);
+        return ();
+    }
+
+    if (op == op::set_data) {
+        throw_unless(err::not_admin, equal_slices_bits(sender_address, ctx_admin));
+        var data = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+        set_data(data);
+
+        send_ok(sender_address, 0, 64);
+        return ();
+    }
+
+    if (op == op::set_code_data) {
+        throw_unless(err::not_admin, equal_slices_bits(sender_address, ctx_admin));
+        var code = in_msg_body~load_ref();
+        var data = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        set_code(code);
+        set_data(data);
+
+        send_ok(sender_address, 0, 64);
+        return ();
+    }
+
+    if (op == op::transfer_notification) {
+        if (equal_slices_bits(ctx_lp_receiver, addr_none)) {
+            return ();
+        }
+
+        int amount = in_msg_body~load_coins();
+
+        send_raw_message(begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(begin_cell()
+                .store_uint(op::transfer, 32)
+                .store_uint(query_id, 64)
+                .store_coins(amount)
+                .store_slice(ctx_lp_receiver)
+                .store_slice(my_address())
+                .store_maybe_ref(null())
+                .store_coins(0)
+                .store_maybe_ref(null())
+                .end_cell()
+            )
+            .end_cell(), 64);
+
+        return ();
+    }
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }
+
+    if (op == op::excesses) {
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+var get_jetton_data() method_id {
+    load_base_data();
+    return (
+        ctx_total_supply,
+        ctx_trading_enabled == 1,
+        ctx_admin,
+        ctx_content,
+        ctx_wallet_code
+    );
+}
+
+var get_wallet_address(slice owner_address) method_id {
+    load_base_data();
+    return calculate_user_jetton_wallet_address(
+        owner_address,
+        my_address(),
+        ctx_wallet_code
+    );
+}
+
+;;
+;; BCL specific methods
+;;
+var coin_price() method_id {
+    load_base_data();
+    return calc_coin_price(ctx_total_supply, ctx_max_ton, ctx_bcl_supply);
+}
+
+var coins_for_tons(int tons) method_id {
+    load_base_data();
+
+    var (fees, coins, tons_consumed) = calc_coins_for_tons(
+        tons,
+        ctx_bcl_supply,
+        ctx_total_supply,
+        ctx_trade_fee_numerator,
+        ctx_trade_fee_denominator,
+        ctx_max_ton
+    );
+
+    if (coins <= 0) {
+        return (0, 0);
+    }
+
+    return (fees, coins);
+}
+
+var tons_for_coins(int coins) method_id {
+    load_base_data();
+
+    var (fees, tons) = calc_tons_for_coins(
+        coins,
+        ctx_total_supply,
+        ctx_max_ton,
+        ctx_bcl_supply,
+        ctx_trade_fee_numerator,
+        ctx_trade_fee_denominator
+    );
+
+    if (tons <= 0) {
+        return (0, 0);
+    }
+    return (fees, tons);
+}
+
+var get_bcl_data() method_id {
+    load_base_data();
+
+    var (full_price_ton_fees, full_price_ton_need) = calc_tons_for_all_coins(
+        ctx_bcl_supply,
+        ctx_max_ton,
+        ctx_trade_fee_denominator,
+        ctx_trade_fee_numerator
+    );
+
+    return (
+        ctx_total_supply,
+        ctx_bcl_supply,
+        ctx_liq_supply,
+        ctx_admin,
+        ctx_author_address,
+        ctx_content,
+        ctx_fee_address,
+        ctx_trade_fee_numerator,
+        ctx_trade_fee_denominator,
+        0, ;; depricated field
+        ctx_last_trade_date,
+        ctx_trading_enabled,
+        ctx_ton_liq_collected,
+        ctx_referral,
+        ctx_trading_close_fee,
+        full_price_ton_need,
+        full_price_ton_fees,
+        ctx_router_address,
+        ctx_router_pton_wallet_address
+    );
+}
