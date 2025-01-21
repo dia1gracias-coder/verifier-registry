@@ -1,0 +1,12 @@
+;; moved to the separate file to keep hex of the previous codes unchanged
+
+int is_resolvable?(slice addr) inline {
+    (int wc, _) = parse_std_addr(addr);
+
+    return wc == 0;
+}
+
+() force_chain(slice addr) impure {
+  (int wc, _) = parse_std_addr(addr);
+  throw_unless(333, wc == 0);
+}

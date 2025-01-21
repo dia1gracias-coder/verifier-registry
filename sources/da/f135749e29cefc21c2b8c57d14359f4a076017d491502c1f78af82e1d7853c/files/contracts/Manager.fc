@@ -1,0 +1,585 @@
+#include "imports/stdlib.fc";
+#include "imports/utils.fc";
+#include "imports/constants.fc";
+;; ---------------------------------------------------------------------
+;; OP CODES
+;; ---------------------------------------------------------------------
+const op::setTokens = "op::setTokens"c; ;; 
+const op::deposit   = "op::deposit"c;
+const op::withdraw  = "op::withdraw"c;
+const op::setTreasury = "op::setTreasury"c;
+const op::setAsset = "op::setAsset"c;
+const op::set_admin_role     = "op::set_admin_role"c;    ;; set admin role (0 or 1)
+const op::transfer_ownership = "op::transfer_ownership"c;
+const op::accept_ownership = "op::accept_ownership"c;
+const op::set_rfq_pubkey = "op::set_rfq_pubkey"c;
+const op::set_paused = "op::set_paused"c;
+const op::upgrade = "op::upgrade"c;
+const op::top_up = "op::top_up"c;
+;; ---------------------------------------------------------------------
+;; GLOBAL STORAGE
+;; - g_rfqPubKey: 256 bits
+;; - g_sToken: 256 bits (Address)
+;; - g_yToken: 256 bits (Address)
+;; - g_treasury: 256 bits (Address)
+;; ---------------------------------------------------------------------
+global int g_rfqPubKey;
+global slice g_owner;
+global slice g_sToken;
+global slice g_yToken;
+global slice g_treasury;
+global cell g_assets;  
+global cell g_usedSignature;
+global cell g_adminRoleDict; ;; 10s of adming ->  anyone in this admin role can also other admins
+global slice g_pendingOwner;
+global int g_isPaused;
+const int ADDRESS_SIZE = 257; ;; 256 address + 1 bit
+
+
+
+
+;; ---------------------------------------------------------------------
+;; LOAD & SAVE DATA
+;; ---------------------------------------------------------------------
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    g_rfqPubKey = ds~load_uint(256);
+    g_sToken = ds~load_msg_addr();
+    g_yToken = ds~load_msg_addr();
+    g_isPaused = ds~load_uint(1);
+    ;; Load first reference cell (ref1) containing addresses
+    slice ref1 = ds~load_ref().begin_parse();
+    g_treasury = ref1~load_msg_addr();
+    g_owner = ref1~load_msg_addr();
+    g_pendingOwner = ref1~load_msg_addr();
+    
+    ;; Load second reference cell (ref2) containing dictionaries
+    slice ref2 = ref1~load_ref().begin_parse();
+    g_assets = ref2~load_dict();
+    g_usedSignature = ref2~load_dict();
+    g_adminRoleDict = ref2~load_dict();
+    
+    ds.end_parse();
+}
+
+
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            ;; Main data (core fields)
+            .store_uint(g_rfqPubKey, 256)
+            .store_slice(g_sToken)
+            .store_slice(g_yToken)
+            .store_uint(g_isPaused, 1)
+            .store_ref(                      ;; Reference 1: Addresses
+                begin_cell()
+                    .store_slice(g_treasury)  ;; 256 bits for treasury (Address)
+                    .store_slice(g_owner)      ;; 256 bits for owner (Address)
+                    .store_slice(g_pendingOwner)
+                    .store_ref(              ;; Reference 2: Dictionaries
+                        begin_cell()
+                            .store_dict(g_assets)
+                            .store_dict(g_usedSignature)
+                            .store_dict(g_adminRoleDict)
+                        .end_cell()
+                    )
+                .end_cell()
+            )
+        .end_cell()
+    );
+}
+
+;; TODO : go through exact upgradeablity in terms of data variables (compare with ETH UUPS proxy)
+
+;; ---------------------------------------------------------------------
+;; SIGNATURE VALIDATION USING CHKSIGNU
+;; ---------------------------------------------------------------------
+(int, int) _check_signature_replay(slice signature_slice) inline {
+    int signature_index = slice_hash(signature_slice);
+    (slice valSlice, int found) = g_usedSignature.udict_get?(256, signature_index);
+    if (found == -1) {
+        return (signature_index, 0); ;; signature already used
+    }
+    return (signature_index, 1); ;; signature is valid
+}
+
+(int, slice, int) _validateSignature(slice in_msg_body) inline {
+    ;; Ensure enough bits for a signature (512 bits for the signature)
+    if (slice_bits(in_msg_body) < 512) {
+        cell payload = in_msg_body~load_ref();
+        slice payload_slice = payload.begin_parse();
+        return (0, payload_slice, 0); ;; Return failure
+    }
+
+    ;; Extract the signature (512 bits)
+    slice root_signature = in_msg_body~load_bits(512);
+    
+    ;; Check signature replay
+    (int signature_index, int valid) = _check_signature_replay(root_signature);
+    if (valid == 0) {
+        cell payload = in_msg_body~load_ref();
+        slice payload_slice = payload.begin_parse();
+        return (0, payload_slice, 0); ;; Return success = 0 if signature used
+    }
+
+    ;; Compute the hash of the remaining message body
+    cell payload = in_msg_body~load_ref();
+    slice payload_slice = payload.begin_parse();
+    int root_hash = slice_hash(payload_slice);
+
+    ;; Validate the signature using the stored public key
+    if (check_signature(root_hash, root_signature, g_rfqPubKey) == 0) {
+        return (0, payload_slice, 0); ;; Return success = 0 if invalid signature
+    }
+
+     ;; if contract paused, set success to 0
+    if (g_isPaused == 1) {
+        return (0, payload_slice, 0); ;; Return success = 0 if contract paused
+    }
+    return (signature_index, payload_slice, 1); ;; Return success with original signature_index
+}
+
+(int) _validateAsset(slice token) inline {
+    (slice status_slice, int found) = g_assets.dict_get?(ADDRESS_SIZE, token);
+    if (found == -1) {
+        ;; Asset found, extract status
+        int status = status_slice~load_uint(1);
+        return status;
+    } else {
+        ;; Asset not found, default to 0 (false)
+        return 0;
+    }
+}
+
+
+(int) has_admin_role(slice address) inline {
+    (slice valSlice, int found) = g_adminRoleDict.dict_get?(ADDRESS_SIZE, address);
+    if (found == -1) {
+        int b = valSlice~load_uint(1);
+        return b;
+    }
+    return 0;
+}
+
+
+(int) calc_fee(int shareAmount, int fee) inline {
+    int hundred_percent = 100000000000; ;; 100e9
+    return (shareAmount * fee) / hundred_percent;
+}
+
+;; ---------------------------------------------------------------------
+;; HANDLERS
+;; ---------------------------------------------------------------------
+() handle_setTokens(slice in_msg_body) impure {
+    g_sToken = in_msg_body~load_msg_addr();
+    g_yToken = in_msg_body~load_msg_addr();    
+}
+
+
+() handle_deposit(slice in_msg_body, slice sender_address) impure {
+    ;; Validate signature if needed    
+    ;; Try to validate signature, catch any errors
+    (int signature_index, slice payload_ref_slice, int success) = _validateSignature(in_msg_body);
+    ;; Rest of the original deposit logic...
+    cell payload_cell = payload_ref_slice~load_ref();
+    slice payload_slice = payload_cell.begin_parse();
+
+    (slice token, slice receiver, 
+    int amount, int sharePrice, 
+    int shareAmount, int fee, 
+    int deadline, int trxnType, int managerGas, int tokenGas) = extract_payload(payload_slice);
+
+    ;; Validate asset
+    if(_validateAsset(token) == 0) {
+       success = 0;
+    }
+
+    ;; if sender is not sToken, set success to 0
+    if (equal_slices(sender_address, g_sToken) != -1) {
+        success = 0;
+    }
+    
+    if (success == 0) {
+        ;; If validation failed, send refund message to STokenMinter
+        cell refund_msg = begin_cell()
+            .store_uint("op::refund_if_deposit_failed"c, 32)
+            .store_uint(0, 64) ;; query_id
+            .store_ref(payload_cell) ;; Store the original payload reference
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(g_sToken)
+            .store_coins(0)
+            .store_uint(1, 107)
+            .store_ref(refund_msg);
+
+        send_raw_message(msg.end_cell(), 64);
+        return ();
+    }
+
+
+    ;; Handle deposit logic
+    int feeAmount = calc_fee(shareAmount, fee);
+    int balanceAmount = shareAmount - feeAmount;
+
+    ;; call mint on yToken (yTokenMinter), first create master message with balanceAmount
+    cell master_msg = create_mint_master_message(0, balanceAmount, g_yToken);
+
+    ;; call mint on yToken (yTokenMinter) to mint tokens to receiver
+    cell mint_msg = create_mint_message(0, tokenGas, receiver, master_msg);
+
+    var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(g_yToken) 
+            .store_coins(managerGas)
+            .store_uint(1, 107)
+            .store_ref(mint_msg);
+
+    send_raw_message(msg.end_cell(), 1); 
+
+    ;; mint fee amount of yToken to treasury
+    cell fee_master_msg = create_mint_master_message(0, feeAmount, g_yToken);
+    cell fee_mint_msg = create_mint_message(0, tokenGas, g_treasury, fee_master_msg);
+
+    var fee_msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(g_yToken) 
+            .store_coins(managerGas)
+            .store_uint(1, 107)
+            .store_ref(fee_mint_msg);
+
+    send_raw_message(fee_msg.end_cell(), 1); 
+
+    ;; after deposit, set the signature as used
+    g_usedSignature~udict_set(256, signature_index, begin_cell().store_uint(1, 1).end_cell().begin_parse());
+}
+
+() handle_withdraw(slice in_msg_body, slice sender_address) impure {
+    ;; Validate signature
+    (int signature_index, slice payload_ref_slice, int success) = _validateSignature(in_msg_body);
+    if (success == 0) {
+        throw(0xfffe); ;; invalid signature
+    }
+
+    cell payload = payload_ref_slice~load_ref();
+
+    (slice assetAddress, slice receiver, 
+    int yTokenAmount, int sharePrice, 
+    int assetAmount, int fee, 
+    int deadline, int trxnType, int txnGas, int tokenGas) = extract_payload(payload.begin_parse());
+    throw_unless(1234, trxnType == "txn::withdraw"c); 
+
+    ;; Validate asset
+    if(_validateAsset(assetAddress) == 0) {
+       throw(0xfffd); ;; asset is not enabled
+    }
+
+    ;; Handle withdraw logic
+    ;; INSTEAD of transfering FEE from withdrawer to treasury and burning remaining yToken of withdrawer,
+    ;; we mint fee amount of yToken to treasury and burn assetAmount of yToken of withdrawer
+
+    ;;------------------------------------------------------------------------------------------------
+    ;; example: fee is 1%, YToken is 100
+    ;; according to EVM logic -> transfer 1 to treasury and burn 99 from withdrawer 
+    ;; withdrawer balance = 0 , totalSupply -= 99 (99 burn), treasury balance += 1
+    ;; BUT HERE:
+    ;; burn 100 from withdrawer and mint 1 to treasury, THUS
+    ;; withdrawer balance = 0 , totalSupply -= 99 (100 burn, 1 mint), treasury balance += 1
+    ;;------------------------------------------------------------------------------------------------  
+
+    ;; calculate feeAmount
+    int feeAmount = calc_fee(yTokenAmount, fee);
+
+    ;; mint fee amount of yToken to treasury
+    cell fee_master_msg = create_mint_master_message(0, feeAmount, g_yToken);
+    cell fee_mint_msg = create_mint_message(0, tokenGas, g_treasury, fee_master_msg);
+    var fee_msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(g_yToken) 
+            .store_coins(txnGas)
+            .store_uint(1, 107)
+            .store_ref(fee_mint_msg);
+
+    send_raw_message(fee_msg.end_cell(), 1); 
+
+
+    ;; call burn on yToken (yTokenMinter) to burn assetAmount of yToken of withdrawer
+    cell burn_msg = create_burn_message(0, tokenGas, receiver, yTokenAmount);
+    var burn_msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(g_yToken) 
+            .store_coins(txnGas)
+            .store_uint(1, 107)
+            .store_ref(burn_msg);
+
+    send_raw_message(burn_msg.end_cell(), 1); 
+
+    ;; call withdrawRequest on stoken (stokenMinter) to withdraw assetAmount of asset to receiver
+    cell withdraw_request_msg = create_withdraw_request_message(0, assetAddress, assetAmount, receiver);
+    var withdraw_request_msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(g_sToken) 
+            .store_coins(txnGas)
+            .store_uint(1, 107)
+            .store_ref(withdraw_request_msg);
+
+    send_raw_message(withdraw_request_msg.end_cell(), 1);
+
+    ;; after withdraw, set the signature as used
+    g_usedSignature~udict_set(256, signature_index, begin_cell().store_uint(1, 1).end_cell().begin_parse());
+}
+
+() handle_setTreasury(slice in_msg_body) impure {
+    ;; Load the reference cell containing the new addresses
+    g_treasury = in_msg_body~load_msg_addr();
+}
+
+() handle_set_paused(slice in_msg_body, slice sender_address) impure {
+    throw_unless(73, equal_slices(sender_address, g_owner) | has_admin_role(sender_address));
+    g_isPaused = in_msg_body~load_uint(1);
+}
+
+;; ---------------------------------------------------------------------
+;; ASSET MANAGEMENT
+;; ---------------------------------------------------------------------
+
+() handle_setAsset(slice in_msg_body) impure {
+    ;; Load asset address and status
+    slice asset_address = in_msg_body~load_msg_addr();
+    slice sToken_asset_wallet_address = in_msg_body~load_msg_addr();
+    int status = in_msg_body~load_uint(1);
+    int gasAmount = in_msg_body~load_coins();
+
+    ;; Update asset status in dictionary with addr as key and status as slice
+    g_assets~dict_set(ADDRESS_SIZE, asset_address, begin_cell().store_uint(status, 1).end_cell().begin_parse());
+
+    cell set_asset_to_asset_wallet_msg = begin_cell()
+        .store_uint("op::set_asset_to_asset_wallet"c, 32)
+        .store_uint(0, 64) ;; query_id 0
+        .store_slice(asset_address)
+        .store_slice(sToken_asset_wallet_address)
+        .store_uint(status, 1)
+        .end_cell();
+
+    var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(g_sToken)
+            .store_coins(gasAmount)
+            .store_uint(1, 107)
+            .store_ref(set_asset_to_asset_wallet_msg);
+
+    send_raw_message(msg.end_cell(), 1);
+}
+
+;; ---------------------------------------------------------------------
+;; ROLE MANAGEMENT
+;; ---------------------------------------------------------------------
+
+() handle_set_admin_role(slice address, int flag) impure inline {
+    cell val_cell = begin_cell().store_uint(flag, 1).end_cell();
+    g_adminRoleDict~dict_set(ADDRESS_SIZE, address, val_cell.begin_parse());
+}
+
+;; Add new handlers
+() handle_transfer_ownership(slice in_msg_body, slice sender_address) impure {
+    ;; Only current owner can transfer ownership
+    throw_unless(73, equal_slices(sender_address, g_owner));
+    
+    ;; Set pending owner
+    g_pendingOwner = in_msg_body~load_msg_addr();
+}
+
+() handle_accept_ownership(slice sender_address) impure {
+    ;; Only pending owner can accept ownership
+    throw_unless(73, equal_slices(sender_address, g_pendingOwner));
+    
+    ;; Transfer ownership
+    g_owner = g_pendingOwner;
+    g_pendingOwner = begin_cell().store_uint(0, 2).end_cell().begin_parse(); ;; Reset pending owner
+}
+
+() handle_set_rfq_pubkey(slice in_msg_body, slice sender_address) impure {
+    ;; Can be called by owner or admin
+    throw_unless(73, equal_slices(sender_address, g_owner) | has_admin_role(sender_address));
+    
+    ;; Set new RFQ public key
+    g_rfqPubKey = in_msg_body~load_uint(256);
+}
+
+
+;; ---------------------------------------------------------------------
+;; MAIN ENTRY POINT
+;; ---------------------------------------------------------------------
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        ;; Bounced message, ignore
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins();
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64); ;; Not used but read for convention
+
+    if (op == op::setTokens) {
+        throw_unless(73, equal_slices(sender_address, g_owner) | has_admin_role(sender_address));
+        handle_setTokens(in_msg_body);
+        save_data();
+        return ();
+    }
+    elseif (op == op::deposit) {
+        handle_deposit(in_msg_body, sender_address);
+        save_data();
+        return ();
+    }
+    elseif (op == op::withdraw) {
+        handle_withdraw(in_msg_body, sender_address);
+        save_data();
+        return ();
+    }
+    elseif (op == op::setTreasury) {
+        throw_unless(73, equal_slices(sender_address, g_owner) | has_admin_role(sender_address));
+        handle_setTreasury(in_msg_body);
+        save_data();
+        return ();
+    }
+    elseif (op == op::setAsset) {
+        throw_unless(73, equal_slices(sender_address, g_owner) | has_admin_role(sender_address));
+        handle_setAsset(in_msg_body);
+        save_data();
+        return ();
+    }
+    elseif (op == op::set_admin_role) {
+        throw_unless(73, equal_slices(sender_address, g_owner) | has_admin_role(sender_address));
+        slice address = in_msg_body~load_msg_addr();
+        int flag = in_msg_body~load_uint(1);
+        handle_set_admin_role(address, flag);
+        save_data();
+        return ();
+    }
+    elseif(op == op::set_rfq_pubkey) {
+        throw_unless(73, equal_slices(sender_address, g_owner) | has_admin_role(sender_address));
+        handle_set_rfq_pubkey(in_msg_body, sender_address);
+        save_data();
+        return ();
+    }
+    elseif(op == op::transfer_ownership) {
+        handle_transfer_ownership(in_msg_body, sender_address);
+        save_data();
+        return ();
+    }
+    elseif(op == op::accept_ownership) {
+        handle_accept_ownership(sender_address);
+        save_data();
+        return ();
+    }
+    elseif(op == op::set_paused) {
+        handle_set_paused(in_msg_body, sender_address);
+        save_data();
+        return ();
+    }
+    elseif(op == op::upgrade) {
+        throw_unless(73, equal_slices(sender_address, g_owner)); ;; only owner can upgrade
+        throw_unless(74, g_isPaused == 1); ;; contract must be paused
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_data(new_data);
+        set_code(new_code);
+        return ();
+    }
+    elseif(op == op::top_up){
+        ;; just accept incoming ton
+        return ();
+    }
+
+    throw(0xffff); ;; Unknown operation
+}
+
+;; ---------------------------------------------------------------------
+;; GET METHODS
+;; ---------------------------------------------------------------------
+(slice) get_stoken() method_id {
+    load_data();
+    return g_sToken;
+}
+
+(slice) get_ytoken() method_id {
+    load_data();
+    return g_yToken;
+}
+
+(slice) get_treasury() method_id {
+    load_data();
+    return g_treasury;
+}
+
+
+int get_rfq_pubkey() method_id {
+    load_data();
+    return g_rfqPubKey;
+}
+
+(int) get_has_admin_role(slice address) method_id {
+    load_data();
+    return has_admin_role(address);
+}
+
+;; Get method to check if asset is enabled
+(int) is_asset_enabled(slice asset_address) method_id {
+    load_data();
+    (slice status_slice, int found) = g_assets.dict_get?(ADDRESS_SIZE, asset_address);
+    if (found == -1) {
+        ;; Asset found, extract status
+        int status = status_slice~load_uint(1);
+        return status;
+    } else {
+        ;; Asset not found, default to 0 (false)
+        return 0;
+    }
+}
+
+(int) get_used_signature(slice signature_slice) method_id {
+    load_data();
+    int signature_index = slice_hash(signature_slice);
+    (slice valSlice, int found) = g_usedSignature.udict_get?(256, signature_index);
+    if (found == -1) {
+        ;; signature index found so signature is used
+        return 1;
+    }
+    return 0;
+}
+
+
+;; Add new getter methods
+(slice) get_pending_owner() method_id {
+    load_data();
+    return g_pendingOwner;
+}
+
+(slice) get_owner() method_id {
+    load_data();
+    return g_owner;
+}
+
+(int) get_is_paused() method_id {
+    load_data();
+    return g_isPaused;
+}
+
+(cell) get_contract_data() method_id {
+    return get_data();
+}

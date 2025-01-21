@@ -1,0 +1,114 @@
+() send_grams(slice address, int amount) impure {
+  cell msg = begin_cell()
+    .store_uint (0x18, 6) ;; bounce
+    .store_slice(address) ;; 267 bit address
+    .store_grams(amount)
+    .store_uint(0, 107) ;; 106 zeroes +  0 as an indicator that there is no cell with the data
+    .end_cell(); 
+  send_raw_message(msg, 3); ;; mode, 2 for ignoring errors, 1 for sender pays fees, 64 for returning inbound message value
+}
+
+(cell) create_simple_transfer_body(int query_id, int fwd_amount, int jetton_amount, slice to) inline {
+    cell msg = begin_cell()
+        .store_uint("op::transfer"c, 32)
+        .store_uint(query_id, 64)
+        .store_coins(jetton_amount)
+        .store_slice(to) ;; to_owner_address
+        .store_slice(to)
+        .store_uint(0, 1)
+        .store_coins(fwd_amount) ;; forward_ton_amount
+        .store_uint(0, 1)
+        .end_cell();
+    return msg;
+}
+
+() send_message_with_ref_but_not_init(slice to_address, cell reference_message, int gas_amount) inline {
+     var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to_address)
+            .store_coins(gas_amount)
+            .store_uint(1, 107)
+            .store_ref(reference_message);
+
+        send_raw_message(msg.end_cell(), 1);
+}
+
+
+;; Returns (token, receiver, amount, sharePrice, sAmount, fee, deadline, trxnType, managerGas, tokenGas)
+(slice, slice, int, int, int, int, int, int, int, int) extract_payload(slice payload) inline {
+    ;; First cell contains:
+    ;; - token address (267 bits)
+    ;; - receiver address (267 bits)
+    ;; - amount (120 bits)
+    slice token = payload~load_msg_addr();      ;; 267 bits
+    slice receiver = payload~load_msg_addr();   ;; 267 bits
+    int amount = payload~load_coins();          ;; 120 bits
+    
+    ;; Load reference cell for remaining data
+    slice ref_slice = payload~load_ref().begin_parse();
+    
+    ;; Second cell contains:
+    ;; - sharePrice (256 bits)
+    ;; - sAmount (120 bits)
+    ;; - fee (64 bits is enough for percentage  of order of 10^9)
+    ;; - deadline (32 bits for unix timestamp)
+    ;; - trxnType (32 bits for crc32)
+    int sharePrice = ref_slice~load_coins();  ;; 120 bits
+    int sAmount = ref_slice~load_coins();       ;; 120 bits
+    int fee = ref_slice~load_coins();          ;; 120 bits
+    int deadline = ref_slice~load_uint(32);     ;; 32 bits
+    int trxnType = ref_slice~load_uint(32);     ;; 32 bits
+    int managerGas = ref_slice~load_coins();    ;; 120 bits
+    int tokenGas = ref_slice~load_coins();      ;; 120 bits
+    
+    return (token, receiver, amount, sharePrice, sAmount, fee, deadline, trxnType, managerGas, tokenGas);
+}
+const op::internal_transfer = "op::internal_transfer"c;
+const op::mint = "op::mint"c;
+
+(cell) create_mint_master_message(int query_id, int token_amount, slice jetton_master_address) {
+  cell master_msg = begin_cell()
+            .store_uint(op::internal_transfer, 32) ;; JettonWallet internal_transfer opcode
+            .store_uint(query_id, 64)                     ;; query_id
+            .store_coins(token_amount)                   ;; amount of tokens minted
+            .store_uint(0, 2)                     ;; from_address (addr_none)
+            .store_uint(0, 2)             ;; jetton master address (sender is the minter)
+            .store_coins(0)                        ;; forward_ton_amount (can be zero)
+            .end_cell();
+  return master_msg;
+}
+
+(cell) create_mint_message(int query_id, int gasAmount, slice receiver, cell master_msg) {
+  cell msg = begin_cell()
+        .store_uint(op::mint, 32)
+        .store_uint(query_id, 64)
+        .store_slice(receiver)
+        .store_coins(gasAmount)
+        .store_ref(master_msg)
+        .end_cell();
+
+  return msg;
+}
+
+(cell) create_burn_message(int query_id, int gasAmount, slice ownerAddress, int burnAmount) {
+  cell msg = begin_cell()
+        .store_uint("op::burn"c, 32)
+        .store_uint(query_id, 64)
+        .store_slice(ownerAddress)
+        .store_coins(burnAmount)
+        .store_coins(gasAmount)
+        .store_uint(0, 2) ;; no response address
+        .end_cell();
+  return msg;
+}
+
+(cell) create_withdraw_request_message(int query_id, slice assetAddress, int assetAmount, slice receiver) {
+  cell msg = begin_cell()
+        .store_uint("op::withdraw_request"c, 32)
+        .store_uint(query_id, 64)
+        .store_slice(assetAddress)
+        .store_coins(assetAmount)
+        .store_slice(receiver)
+        .end_cell();
+  return msg;
+}
