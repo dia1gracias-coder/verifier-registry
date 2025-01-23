@@ -1,0 +1,60 @@
+#include "imports/stdlib.fc";
+
+;; Storage structure
+(slice, int) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),  ;; owner_address
+        ds~load_coins()      ;; pack_price
+    );
+}
+
+() save_data(slice owner_address, int pack_price) impure inline {
+    set_data(begin_cell()
+        .store_slice(owner_address)
+        .store_coins(pack_price)
+        .end_cell());
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    var sender_address = cs~load_msg_addr();
+    
+    var (owner_address, pack_price) = load_data();
+    
+    ;; Process purchase if enough TON sent
+    if (msg_value >= pack_price) {
+        ;; Send payment to owner
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(owner_address)
+            .store_coins(pack_price)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+        send_raw_message(msg, 1);
+        
+        ;; Return excess if any
+        if (msg_value > pack_price) {
+            var excess = msg_value - pack_price;
+            var refund = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(sender_address)
+                .store_coins(excess)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+            send_raw_message(refund, 1);
+        }
+    }
+}
+
+;; Get methods
+int get_pack_price() method_id {
+    var (_, price) = load_data();
+    return price;
+}
+
+slice get_owner_address() method_id {
+    var (owner, _) = load_data();
+    return owner;
+}
