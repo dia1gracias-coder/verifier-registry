@@ -1,0 +1,191 @@
+#include "imports/stdlib.fc";
+#include "./helpers.fc";
+const op::transfer_notification = 0x7362d09c;
+const op::transfer = 0xf8a7ea5;
+
+const op::set_item_price = "op::set_item_price"c; 
+const op::buy_item_ton = "op::buy_item_ton"c; 
+const op::top_up = "op::top_up"c; 
+const op::withdraw_ton = "op::withdraw_ton"c; 
+const op::withdraw_jetton = "op::withdraw_jetton"c; 
+
+;; storage variables
+global int ctx_id;
+global slice owner_address;
+global cell itemPrices;
+
+;; load_data populates storage variables using stored data
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    ctx_id = ds~load_uint(32);
+    owner_address = ds~load_msg_addr();
+    itemPrices = slice_empty?(ds) ? new_dict() : ds~load_dict();
+
+    ds.end_parse();
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(ctx_id, 32)
+            .store_slice(owner_address)
+            .store_dict(itemPrices)
+            .end_cell()
+    );
+}
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    load_data(); ;; here we populate the storage variables
+
+    slice sender_address = cs~load_msg_addr();
+    int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+    int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }
+
+    if (op == op::set_item_price) {
+        throw_unless(401, equal_slices(sender_address, owner_address));
+        int item_id = in_msg_body~load_uint(64);
+        int item_price = in_msg_body~load_coins();
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+
+        cell message = begin_cell().store_coins(item_price).store_slice(jetton_wallet_address).end_cell();
+        itemPrices~udict_set(64, item_id, message.begin_parse());
+
+        save_data();
+        return ();
+    }
+
+    if (op == op::buy_item_ton) {
+        int item_id = in_msg_body~load_uint(64);
+        int quantity = in_msg_body~load_uint(64);
+        int item_price = 0;
+
+        (slice data, int found?) = itemPrices.udict_get?(64, item_id);
+
+        if (found?){
+            item_price = data~load_coins();
+            throw_unless(501, msg_value >= item_price * quantity);
+        } else {
+            throw(502);
+        }
+
+        return ();
+    }
+
+    if (op == op::transfer_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+           
+        throw_unless(87, jetton_amount > 0);
+
+        cell ref = in_msg_body~load_ref();
+        slice ref_cs = ref.begin_parse();
+        int item_id = ref_cs~load_uint(64);
+        int quantity = ref_cs~load_uint(64);
+        int item_price = 0;
+
+        (slice data, int found?) = itemPrices.udict_get?(64, item_id);
+
+        if (found?){
+            item_price = data~load_coins();
+            throw_unless(501, jetton_amount >= item_price * quantity);
+        } else {
+            throw(502);
+        }
+
+        return ();
+    }
+
+    if (op == op::withdraw_ton) { ;; withdraw ton
+        throw_unless(401, equal_slices(sender_address, owner_address));
+
+        int MIN_TON_FOR_STORAGE = 50000000; 
+
+        in_msg_body.end_parse();
+        throw_unless(92, my_balance > MIN_TON_FOR_STORAGE);
+        raw_reserve(MIN_TON_FOR_STORAGE, RESERVE_REGULAR);
+
+        cell msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(owner_address)
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_uint(op::top_up, 32)
+            .store_uint(query_id, 64)
+            .end_cell();
+        send_raw_message(msg, SEND_MODE_CARRY_ALL_BALANCE);
+        return ();
+    }
+
+    if (op == op::withdraw_jetton) { ;; withdraw jetton
+        throw_unless(401, equal_slices(sender_address, owner_address));
+        int available_amount = in_msg_body~load_coins();
+        int forward_ton_amount = in_msg_body~load_coins();
+        cell either_forward_payload = in_msg_body~load_maybe_ref();
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+        slice receiver_address = in_msg_body~load_msg_addr();
+
+        var transfer_msg = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(available_amount)
+            .store_slice(receiver_address)
+            .store_slice(receiver_address)
+            .store_uint(0, 1) ;; store_dict(null())
+            .store_coins(forward_ton_amount)
+            .store_maybe_ref(either_forward_payload)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(BOUNCEABLE)
+            .store_slice(jetton_wallet_address)
+            .store_coins(0)
+            .store_only_body_ref(transfer_msg);
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        return ();
+    }
+
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+;; get methods are a means to conveniently read contract data using, for example, HTTP APIs
+;; they are marked with method_id
+;; note that unlike in many other smart contract VMs, get methods cannot be called by other contracts
+
+int get_id() method_id {
+    load_data();
+    return ctx_id;
+}
+
+(int, slice) get_item_data(int item_id) method_id {
+  load_data();
+  (slice data, int found?) = itemPrices.udict_get?(64, item_id);
+
+  if (found?){
+      return (
+        data~load_coins(), 
+        data~load_msg_addr()
+      );
+  } else {
+    return (0,"");
+  }
+}
+
+
+
