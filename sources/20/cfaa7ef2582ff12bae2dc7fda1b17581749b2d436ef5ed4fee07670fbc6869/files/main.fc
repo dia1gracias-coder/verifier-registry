@@ -1,0 +1,143 @@
+#include "stdlib.fc";
+
+;; Storage variables
+;; storage#_ owner_address:MsgAddress total_deposited:uint128 total_tickets:uint32 users:(HashmapE 256 uint32) = Storage;
+
+(slice, int, int, cell) load_data() inline {
+    var ds = get_data().begin_parse();
+    if (ds.slice_empty?()) {
+        cell empty_dict = null(); ;; Use null() for an empty dictionary
+        return (my_address(), 0, 0, empty_dict); ;; default owner is deployer
+    }
+    return (ds~load_msg_addr(), ds~load_uint(128), ds~load_uint(32), ds~load_dict());
+}
+
+() save_data(slice owner_address, int total_deposited, int total_tickets, cell users) impure inline {
+    set_data(begin_cell()
+        .store_slice(owner_address)
+        .store_uint(total_deposited, 128)
+        .store_uint(total_tickets, 32)
+        .store_dict(users)
+        .end_cell());
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; simple transfer
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    ;; Load storage
+    var (owner_address, total_deposited, total_tickets, users) = load_data();
+
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == 1) { ;; deposit operation
+        int amount = msg_value - 10000000; ;; subtract gas fee
+        throw_if(708, amount < 1000000000); ;; minimum 1 TON
+        int chances = amount / 1000000000; ;; 1 TON = 1 chance
+        
+        ;; Hash the sender address to use as a dictionary key
+        int sender_key = slice_hash(sender_address);
+        
+        ;; Check if user exists
+        int user_chances = 0;
+        (slice value, int found?) = users.udict_get?(256, sender_key);
+        if (found?) {
+            user_chances = value~load_uint(32); ;; value is already a slice
+            chances += user_chances;
+        }
+        
+        ;; Update user chances
+        cell chance_cell = begin_cell().store_uint(chances, 32).end_cell();
+        users~udict_set(256, sender_key, chance_cell.begin_parse()); ;; Store as slice
+        
+        ;; Update totals
+        total_deposited += amount;
+        total_tickets += chances - user_chances;
+        
+        save_data(owner_address, total_deposited, total_tickets, users);
+        return ();
+    }
+    
+    if (op == 2) { ;; distribute prize operation
+        throw_unless(710, equal_slice_bits(sender_address, owner_address)); ;; only owner
+        int winner_ticket = in_msg_body~load_uint(32);
+        throw_if(711, winner_ticket >= total_tickets); ;; check valid ticket number
+        
+        ;; Find winner
+        int current_ticket = 0;
+        int winner_found = 0;
+        slice winner_address = null();
+        
+        (int key, slice value, int found?) = users.udict_get_min?(256);
+        while (found?) {
+            int chances = value~load_uint(32); ;; value is already a slice
+            current_ticket += chances;
+            
+            if ((current_ticket > winner_ticket) & (winner_found == 0)) {
+                winner_found = 1;
+                winner_address = begin_cell().store_uint(key, 256).end_cell().begin_parse();
+            }
+            
+            (key, value, found?) = users.udict_get_next?(256, key);
+        }
+        
+        throw_unless(712, winner_found);
+        
+        ;; Send prize
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(winner_address)
+            .store_uint(total_deposited, 128)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+            
+        send_raw_message(msg, 0);
+        
+        ;; Reset contract state
+        save_data(owner_address, 0, 0, null());
+        return ();
+    }
+    
+    if (op == 3) { ;; transfer ownership
+        throw_unless(710, equal_slice_bits(sender_address, owner_address));
+        slice new_owner = in_msg_body~load_msg_addr();
+        save_data(new_owner, total_deposited, total_tickets, users);
+        return ();
+    }
+    
+    throw(0xffff); ;; unknown operation
+}
+
+;; Get methods
+(slice) get_owner() method_id {
+    var (owner_address, _, _, _) = load_data();
+    return owner_address;
+}
+
+(int) get_total_deposited() method_id {
+    var (_, total_deposited, _, _) = load_data();
+    return total_deposited;
+}
+
+(int) get_total_tickets() method_id {
+    var (_, _, total_tickets, _) = load_data();
+    return total_tickets;
+}
+
+(int) get_user_chances(slice address) method_id {
+    var (_, _, _, users) = load_data();
+    int address_key = slice_hash(address);
+    (slice value, int found?) = users.udict_get?(256, address_key);
+    if (found?) {
+        return value~load_uint(32); ;; value is already a slice
+    }
+    return 0;
+}
