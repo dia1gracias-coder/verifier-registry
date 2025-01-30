@@ -1,0 +1,170 @@
+#pragma version >=0.2.0;
+
+#include "./common/stdlib.fc";
+
+;; Global storage
+global slice storage::owner_address;         ;; Owner's address
+global slice storage::jetton_wallet_address; ;; Pool's jetton wallet address
+global int storage::reserve0;                ;; Reserve of token0
+global int storage::reserve1;                ;; Reserve of token1
+
+;; opcodes
+const op:provide_liquidity = 0x1;
+const op:deploy = 0x2;
+const op:remove_liquidity = 0x3;
+const op:set_jetton_wallet_address = 0x4;
+
+;; jetton wallet operations
+const jwop::transfer = 0xf8a7ea5;
+
+;; errors
+const err:must_be_owner = 100;
+const err:unknown_operation = 101;
+const err:insufficent_storage = 102;
+const err:insufficent_liquidity = 103;
+
+;; Load persistent storage
+() load_storage() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::owner_address = ds~load_msg_addr();
+    storage::jetton_wallet_address = ds~load_msg_addr();
+    storage::reserve0 = ds~load_coins();
+    storage::reserve1 = ds~load_coins();
+}
+
+;; Save persistent storage
+() save_storage() impure inline {
+    set_data(begin_cell()
+        .store_slice(storage::owner_address)
+        .store_slice(storage::jetton_wallet_address)
+        .store_coins(storage::reserve0)
+        .store_coins(storage::reserve1)
+    .end_cell());
+}
+
+;; Ensure the sender is the owner
+() ensure_owner(slice sender) impure inline {
+    throw_unless(err:must_be_owner, equal_slice_bits(sender, storage::owner_address));
+}
+
+;; Provide liquidity (owner only)
+() provide_liquidity(slice in_msg_body) impure inline {
+    (int amount0, int amount1) = (in_msg_body~load_coins(), in_msg_body~load_coins());
+    storage::reserve0 += amount0;
+    storage::reserve1 += amount1;
+
+    save_storage();
+}
+
+;; Remove liquidity (owner only)
+() remove_liquidity(slice in_msg_body) impure inline {
+    (int amount0, int amount1) = (in_msg_body~load_coins(), in_msg_body~load_coins());
+    throw_unless(err:insufficent_liquidity, (amount0 <= storage::reserve0) & (amount1 <= storage::reserve1));
+    storage::reserve0 -= amount0;
+    storage::reserve1 -= amount1;
+    save_storage();
+
+    ;; should send removed tokens back to owner
+    
+    var jetton_transfer_body = begin_cell()
+        .store_uint(jwop::transfer, 32)
+        .store_uint(0, 64) 
+        .store_coins(amount1)
+        .store_slice(storage::owner_address)
+        .store_uint(0, 2)
+        .store_uint(0, 1)
+        .store_coins(0)
+        .store_uint(0, 1)
+        .end_cell();
+
+    var message_to_wallet = begin_cell()
+        .store_uint(0, 6)
+        .store_slice(storage::jetton_wallet_address)
+        .store_coins(35000000)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+        .store_uint(1, 1)
+        .store_ref(jetton_transfer_body)
+        .end_cell();
+
+    send_raw_message(message_to_wallet, 1 + 2);
+
+    var ton_transfer_body = begin_cell().end_cell();
+
+    var message_back = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(storage::owner_address)
+        .store_coins(amount0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+        .store_uint(1, 1)
+        .store_ref(ton_transfer_body)
+        .end_cell();
+
+    send_raw_message(message_back, 1);
+}
+
+() set_jetton_wallet_address(slice wallet_address) impure inline {
+    storage::jetton_wallet_address = wallet_address;
+    save_storage();
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (slice_empty?(in_msg_body)) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    if (flags & 1) {
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op:deploy) {
+        return ();
+    }
+
+    if (op == op:provide_liquidity) {
+        load_storage();
+        ensure_owner(sender_address);
+        provide_liquidity(in_msg_body);
+        return ();
+    }
+
+    if (op == op:remove_liquidity) {
+        load_storage();
+        ensure_owner(sender_address);
+        remove_liquidity(in_msg_body);
+        return ();
+    }
+
+    if (op == op:set_jetton_wallet_address) {
+        load_storage();
+        ensure_owner(sender_address);
+        slice new_address = in_msg_body~load_msg_addr();
+        set_jetton_wallet_address(new_address);
+        return ();
+    }
+
+    throw(err:unknown_operation);
+}
+
+;; Getter: Get current reserves
+(int, int) get_reserves() method_id {
+    load_storage();
+    return (storage::reserve0, storage::reserve1);
+}
+
+;; Getter: Get current price of token0 in terms of token1
+(int) get_price() method_id {
+    load_storage();
+    throw_unless(err:insufficent_storage, (storage::reserve0 > 0) & (storage::reserve1 > 0));
+    return (storage::reserve1 / storage::reserve0); ;; Scaled price
+}
+
+(slice) get_jetton_wallet() method_id {
+    load_storage();
+    return (storage::jetton_wallet_address);
+}
