@@ -1,0 +1,43 @@
+#include "../shared/utils.fc";
+
+const WIN_FEE_SHARE = 5000;
+const MIN_TON_BET = 250000000;
+const FLIP_GAS_FEE = 45000000;
+const INVALID_MSG = "Send h or t";
+
+const FEE_POOL = "UQCu8lL3X0vfTNRwgdi7IjUi0UHRWmkZdRXDDOIGYUW3yHBS"a;
+
+() check_side(msg) impure inline_ref {
+    int isHeads = equal_slices(msg, "h");
+    int isTails = equal_slices(msg, "t");
+
+    ifnot isHeads | isTails {
+        refund_bet(INVALID_MSG);
+        throw(0);
+    }
+}
+
+() check_bet_amount(
+    int amount,
+    int pool_balance, 
+    int max_win
+) impure inline {
+    int max_bet = get_max_bet(pool_balance, max_win, bet_x);
+
+    if(pool_balance < MIN_TON_BET){
+        refund_bet("Pool is empty");
+        throw(0);
+    }
+    if(amount < MIN_TON_BET){
+        refund_bet(
+            response_w_coins("Min bet is ", MIN_TON_BET, "TON")
+        );
+        throw(0);
+    }
+    if(amount > max_bet){
+        refund_bet(
+            response_w_coins("Max bet is ", max_bet, "TON")
+        );
+        throw(0);
+    }
+}
