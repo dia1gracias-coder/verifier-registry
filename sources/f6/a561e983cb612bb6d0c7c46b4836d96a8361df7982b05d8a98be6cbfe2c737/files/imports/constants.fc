@@ -1,0 +1,52 @@
+;;
+;; Operational codes
+;;
+
+const int OP::UPDATE                   = 0x11bf5a9c;
+const int OP::TRANSFER                 = 0x5fcc3d14;
+const int OP::OWNERSHIP_ASSIGNED       = 0x05138d91;
+
+;;
+;; Constants
+;;
+
+const int INTEREST_RATE_BASE           = 10000;
+const int SECONDS_PER_DAY              = 84000;
+
+;;
+;; Exit codes
+;;
+
+const int EXIT::ACCESS_DENIED          = 403;
+const int EXIT::LOAN_EXPIRED           = 408;
+const int EXIT::INVALID_STATE          = 409;
+const int EXIT::ALREADY_ENDED          = 410;
+const int EXIT::NOT_EXPIRED            = 412;
+const int EXIT::LOW_AMOUNT             = 422;
+const int EXIT::NO_TRANSFER            = 424;
+
+;;
+;; States
+;;
+
+const int STATE::INITED                = 0;
+const int STATE::PENDING               = 1;
+const int STATE::ACTIVE                = 2;
+const int STATE::CANCELED              = 3;
+const int STATE::REFUSED               = 4;
+const int STATE::CLAIMED               = 5;
+const int STATE::REDEEMED              = 6;
+
+;;
+;; Messages
+;;
+
+const slice MSG::INSUFF_FUNDS          = "⚠️ Insufficient funds";
+const slice MSG::LOAN_CANCELED         = "⚠️ Loan canceled";
+const slice MSG::LOAN_REFUSED          = "⚠️ Loan payment refuse";
+const slice MSG::LOMBARD_FEE           = "🐾 Lombard fee";
+const slice MSG::ISSUE_LOAN_AMOUNT     = "💸 Loan amount disbursed";
+const slice MSG::LENDER_PROFIT         = "🐾 Loan profit";
+const slice MSG::RETURN_LOAN_AMOUNT    = "💰 Loan amount repaid";
+const slice MSG::NFT_REDEEMED          = "🏆 Deposit paid";
+const slice MSG::NFT_CLAIMED           = "🎁 Deposit claimed";
