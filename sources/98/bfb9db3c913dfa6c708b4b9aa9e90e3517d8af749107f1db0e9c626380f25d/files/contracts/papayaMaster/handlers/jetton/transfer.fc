@@ -1,0 +1,38 @@
+#include "../../../common/common.fc";
+#include "../../storage.fc";
+
+() handlers::transfer(
+    int query_id,
+    int amount,
+    slice to_address,
+    slice response_address,
+    int forward_ton_amount,
+    slice either_forward_payload,
+    cell papaya_client_state_init
+) impure inline_ref {
+    storage::load();
+
+    storage::total_supply += amount;
+
+    storage::save();
+
+    cell msg_body = begin_cell()
+        .store_uint(op::deposit, 32)
+        .store_uint(query_id, 64)
+        .store_coins(amount)
+        .store_slice(to_address)
+        .store_slice(response_address)
+        ;; .store_bits(0) ;;no custom payload
+        .store_coins(forward_ton_amount)
+        .store_slice(either_forward_payload)
+        .end_cell();
+
+    msgs::send_with_stateinit(
+        amount,
+        to_address,
+        papaya_client_state_init,
+        msg_body,
+        64
+    );
+
+}

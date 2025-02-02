@@ -1,0 +1,24 @@
+#include "../../../common/common.fc";
+#include "../../storage.fc";
+
+() handlers::withdraw(
+    int query_id,
+    int amount,
+    slice to_address,
+    slice response_address,
+    int forward_ton_amount,
+    slice either_forward_payload
+) impure inline_ref {
+    storage::load();
+
+    storage::total_supply -= amount;
+
+    storage::save();
+
+    msgs::send_simple(
+        amount,
+        storage::jetton_wallet, 
+        jetton_wallet::simple_transfer(storage::jetton_wallet, amount, to_address, 0),
+        64 
+    );
+}

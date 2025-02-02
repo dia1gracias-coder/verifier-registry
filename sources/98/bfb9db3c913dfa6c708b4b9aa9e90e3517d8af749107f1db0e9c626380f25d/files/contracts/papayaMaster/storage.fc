@@ -1,0 +1,52 @@
+global slice storage::admin;
+global int storage::salt;
+global slice storage::jetton_minter;
+global int storage::total_supply;
+global slice storage::jetton_wallet;
+;; global cell storage::content;
+global cell storage::papaya_client_code;
+
+() storage::load() impure inline_ref {
+    var ds = get_data().begin_parse();
+
+    ;;Total size of cell is 1023 bits
+
+    storage::admin = ds~load_msg_addr(); ;;257 bits - 766 remaining
+    storage::salt = ds~load_int(32); ;;32 bits - 734 remaining
+    storage::jetton_minter = ds~load_msg_addr(); ;;257 bits - 477 remaining
+    storage::total_supply  = ds~load_int(192); ;;192 bits - 285 remaining
+    storage::jetton_wallet = ds~load_msg_addr(); ;; 257 bits - 28 remaining
+    ;; storage::content = ds~load_ref();
+    storage::papaya_client_code = ds~load_ref();
+}
+
+() storage::save() impure inline_ref {
+    set_data(begin_cell()
+        .store_slice(storage::admin)
+        .store_int(storage::salt, 32)
+        .store_slice(storage::jetton_minter)
+        .store_int(storage::total_supply, 192)
+        .store_slice(storage::jetton_wallet)
+        ;; .store_ref(storage::content)
+        .store_ref(storage::papaya_client_code)
+        .end_cell()
+        );
+}
+
+() storage::init(
+    slice jetton_wallet
+    ;; cell content
+) impure inline_ref {
+    storage::load();
+
+    set_data(begin_cell()
+        .store_slice(storage::admin)
+        .store_int(storage::salt, 32)
+        .store_slice(storage::jetton_minter)
+        .store_int(storage::total_supply, 192)
+        .store_slice(jetton_wallet)
+        ;; .store_ref(content)
+        .store_ref(storage::papaya_client_code)
+        .end_cell()
+    );
+}

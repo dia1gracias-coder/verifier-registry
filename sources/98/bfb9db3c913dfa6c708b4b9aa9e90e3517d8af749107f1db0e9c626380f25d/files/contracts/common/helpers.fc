@@ -1,0 +1,32 @@
+cell helpers::build_stateinit(cell init_code, cell init_data) {
+  cell state_init = begin_cell()
+    .store_uint(0, 1) ;; split_depth:(Maybe (## 5))
+    .store_uint(0, 1) ;; special:(Maybe TickTock)
+    .store_uint(1, 1) ;; (Maybe ^Cell)
+    .store_uint(1, 1) ;; (Maybe ^Cell)
+    .store_uint(0, 1) ;; (HashmapE 256 SimpleLib)
+    .store_ref(init_code)
+    .store_ref(init_data)
+    .end_cell();
+
+    return state_init;
+}
+
+cell helpers::calculate_papaya_client_state_init(slice papayaMaster, slice owner, cell papaya_client_code) {
+    cell data = begin_cell().store_slice(papayaMaster).store_slice(owner).end_cell();
+
+    return helpers::build_stateinit(papaya_client_code, data);
+}
+
+slice helpers::calc_address(cell state_init) {
+  cell future_address = begin_cell()
+    .store_uint(2, 2) ;; addr_std$10
+    .store_uint(0, 1) ;; anycast:(Maybe Anycast)
+    .store_uint(0, 8) ;; workchain_id:int8
+    .store_uint(cell_hash(state_init), 256) ;; address:bits256
+    .end_cell();
+
+    var ds = future_address.begin_parse();
+    
+    return ds~load_msg_addr();
+}

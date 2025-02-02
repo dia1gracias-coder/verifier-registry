@@ -1,0 +1,39 @@
+#include "../common/common.fc";
+
+slice my_address() asm "MYADDR";
+
+_ get_jetton_data() method_id {
+    storage::load();
+    
+    return (
+        storage::total_supply, ;;int total_supply
+        -1, ;;int mintable
+        storage::admin, ;;slice admin_address
+        ;; storage::content, ;;cell jetton_content
+        storage::papaya_client_code ;;cell jetton_wallet_code
+    );
+}
+
+_ get_full_data() method_id {
+    storage::load();
+
+    return (
+        storage::admin,
+        storage::salt,
+        storage::jetton_minter,
+        storage::total_supply,
+        storage::jetton_wallet,
+        ;; storage::content,
+        storage::papaya_client_code
+    );
+}
+
+_ get_wallet_address(slice owner) method_id {
+    storage::load();
+;;Here we can use `contract` pattern
+    cell client_init_state = helpers::calculate_papaya_client_state_init(my_address(), owner, storage::papaya_client_code);
+    slice client_addr = helpers::calc_address(client_init_state);
+
+    return (client_addr);
+}
+

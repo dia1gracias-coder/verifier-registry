@@ -1,0 +1,84 @@
+#pragma version >=0.4.0;
+#include "papayaMaster/papayaMaster.fc";
+
+slice my_address() asm "MYADDR";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    ctx::init(my_balance, msg_value, in_msg_full, in_msg_body);
+
+    storage::load();
+
+    if (ctx.at(OPCODE) == op::init) {
+        if(equal_slices(ctx.at(SENDER), storage::admin)) {
+            ;; cell update_data = in_msg_body~load_ref();
+
+            ;; var ds_update_data = update_data.begin_parse();
+            ;; ;;jettonWallet, content
+            ;; handlers::init(ds_update_data~load_ref());
+
+            msgs::send_simple(
+                msg_value,
+                storage::jetton_minter,
+                any::custom_call(op::ft::provide_wallet_address),
+                64
+            );
+
+            return();
+        }
+    }
+
+    throw_if(ex::illegal, slice_data_empty?(storage::jetton_wallet));
+
+    in_msg_body~skip_bits(32 + 32 + 64 + 120); ;;skip fwd_fee, op, query_id, coins
+
+    slice to_address = in_msg_body~load_msg_addr();
+    slice response_address = in_msg_body~load_msg_addr();
+    int forward_ton_amount = in_msg_body~load_coins();
+
+    if (ctx.at(OPCODE) == op::transfer_notification) {
+        ;;here we can use `contract` pattern
+        cell client_init_state = helpers::calculate_papaya_client_state_init(my_address(), to_address, storage::papaya_client_code);
+        slice client_addr = helpers::calc_address(client_init_state);
+
+        handlers::transfer(
+            ctx.at(QUERY_ID), 
+            ctx.at(MSG_VALUE), 
+            client_addr, 
+            response_address, 
+            forward_ton_amount, 
+            ctx.at(BODY), 
+            client_init_state
+        );
+
+        return();
+    }
+
+    if (ctx.at(OPCODE) == op::withdraw) {
+        ;;TODO Add address_from check, because only papayaClient have access to this handler
+        handlers::withdraw(
+            ctx.at(QUERY_ID), 
+            ctx.at(MSG_VALUE), 
+            to_address, 
+            response_address, 
+            forward_ton_amount, 
+            ctx.at(BODY)
+        );
+
+        return();
+    }
+
+    if (ctx.at(OPCODE) == op::ft::take_wallet_address) {
+        slice _in_msg_body = ctx.at(BODY);
+        ;; cell EMPTY_CELL = begin_cell().store_uint(0, 2).end_cell();
+
+        _in_msg_body~skip_bits(32 + 64); ;;Skip op and queryId
+
+        handlers::init(_in_msg_body~load_msg_addr());
+
+        return();
+    }
+}
