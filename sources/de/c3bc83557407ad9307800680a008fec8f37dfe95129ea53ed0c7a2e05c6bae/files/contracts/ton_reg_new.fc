@@ -1,0 +1,152 @@
+#include "imports/stdlib.fc";
+
+;; Operation IDs
+const int OP_REGISTER_USER = 1;
+const int OP_DEPOSIT = 2;
+
+;; Global variables
+global int next_user_id;
+global int referral_bonus_percentage;
+global cell users;  ;; Declare users as a global cell to store the dictionary
+
+;; Constructor
+() constructor() {
+    next_user_id = 0;
+    referral_bonus_percentage = 10;
+    users = begin_cell().end_cell();  ;; Initialize users as an empty cell
+}
+
+;; Load data from persistent storage
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    if (ds.slice_bits() > 0) {
+        next_user_id = ds~load_uint(32);
+        users = ds~load_ref();  ;; Changed load_cell to load_ref
+    }
+}
+
+;; Save data to persistent storage
+() save_data() impure {
+    set_data(begin_cell()
+        .store_uint(next_user_id, 32)
+        .store_ref(users)  ;; Changed store_cell to store_ref
+        .end_cell());
+}
+
+;; Helper function to deserialize the users dictionary from the cell
+(cell) load_users_dict() impure {  ;; Changed return type from dict to cell
+    return users;  ;; Simplified since we're working with cells directly
+}
+
+;; Helper function to serialize the users dictionary back into the cell
+() save_users_dict(cell users_dict) impure {  ;; Changed parameter type from dict to cell
+    users = users_dict;  ;; Store the dictionary cell directly
+}
+
+;; Register a new user
+() register_user(slice in_msg_body) impure {
+    var referrer_id = in_msg_body~load_int(32);
+
+    ;; Create user data cell
+    var user_cell = begin_cell()
+        .store_uint(next_user_id, 32)
+        .store_uint(0, 64)
+        .store_int(referrer_id, 32)
+        .end_cell();
+
+    ;; Load existing users dictionary
+    cell users_dict = load_users_dict();
+    
+    ;; Create or get the dictionary builder
+    cell dict = new_dict();
+    
+    ;; Add new user to dictionary
+    dict~udict_set(32, next_user_id, user_cell.begin_parse());
+    
+    ;; Save updated users dictionary
+    save_users_dict(dict);
+
+    next_user_id += 1;
+    save_data();
+}
+
+;; Deposit funds into a user's account
+() deposit(slice in_msg_body) impure {
+    var user_id = in_msg_body~load_int(32);
+    var amount = in_msg_body~load_uint(64);
+
+    cell users_dict = load_users_dict();
+
+    (slice value, int success) = udict_get?(users_dict, 32, user_id);
+    throw_unless(100, success); ;; User does not exist
+
+    var id = value~load_uint(32);
+    var balance = value~load_uint(64);
+    var referrer_id = value~load_int(32);
+
+    balance += amount;
+    users_dict = udict_set(users_dict, 32, user_id, begin_cell()
+        .store_uint(id, 32)
+        .store_uint(balance, 64)
+        .store_int(referrer_id, 32)
+        .end_cell().begin_parse());
+
+    ;; Process referral bonus (10% of the deposit)
+    if (referrer_id >= 0) {
+        (slice referrer_value, int referrer_exists) = udict_get?(users_dict, 32, referrer_id);
+        if (referrer_exists) {
+            var referrer_id_ = referrer_value~load_uint(32);
+            var referrer_balance = referrer_value~load_uint(64);
+            var referrer_referrer_id = referrer_value~load_int(32);
+
+            var bonus = amount * referral_bonus_percentage / 100;
+            referrer_balance += bonus;
+
+            users_dict = udict_set(users_dict, 32, referrer_id, begin_cell()
+                .store_uint(referrer_id_, 32)
+                .store_uint(referrer_balance, 64)
+                .store_int(referrer_referrer_id, 32)
+                .end_cell().begin_parse());
+        }
+    }
+
+    save_users_dict(users_dict);
+    save_data();
+}
+
+;; Main function to handle internal messages
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return();
+    }
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == OP_REGISTER_USER) {
+        register_user(in_msg_body);
+    } elseif (op == OP_DEPOSIT) {
+        deposit(in_msg_body);
+    } else {
+        throw(101); ;; Unknown operation
+    }
+}
+
+;; Get method to retrieve user balance
+(int, cell) get_user_balance(int user_id) method_id(85143) {  ;; Changed return type and added parameter
+    cell users_dict = load_users_dict();
+
+    (slice value, int success) = udict_get?(users_dict, 32, user_id);
+    if (~ success) {
+        return (0, users_dict);
+    }
+
+    value~load_uint(32); ;; Skip id
+    return (value~load_uint(64), users_dict); ;; Return balance and users dictionary
+}
+
+;; Get total registered users
+int get_total_users() method_id(86143) {  ;; Simplified return type
+    return next_user_id;
+}
