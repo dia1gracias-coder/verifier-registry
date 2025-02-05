@@ -1,0 +1,87 @@
+#include "stdlib.fc";
+#include "extlib.func";
+
+#include "op.func";
+#include "err.func";
+
+#include "storage.func";
+#include "index.func";
+
+(slice, slice, int, int, int, int, int, int) load_data() inline {
+    slice ds = get_data().begin_parse();
+    var data = (
+        ds~load_msg_addr(), ;; total_supply
+        ds~load_msg_addr(), ;; admin_address
+        ds~load_uint(128), ;; next_admin_address
+        ds~load_uint(256),  ;; jetton_wallet_code
+        ds~load_uint(64),  ;; metadata url (contains snake slice without 0x0 prefix)
+        ds~load_uint(16),  ;; jetton_wallet_code
+        ds~load_uint(8),  ;; metadata url (contains snake slice without 0x0 prefix)
+        ds~load_uint(8)  ;; metadata url (contains snake slice without 0x0 prefix)
+    );
+    ds.end_parse();
+    return data;
+}
+
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+
+    slice sender_address = in_msg_full_slice~load_msg_addr();
+
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+
+    if (op == op::transfer_notification()) { 
+        handle_int::transfer_notification(sender_address); 
+    }
+
+    if (op == op::change_settings()) { 
+        handle_int::change_settings(in_msg_body, sender_address); 
+    }
+    
+    if (op == op::upgrade) {
+        (slice owner_addr, slice jwall_addr, int seed, int pow_complexity, int last_success, int target_delta, int min_cpl, int max_cpl) = load_data();
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, owner_addr));
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_data(new_data);
+        set_code(new_code);
+        return ();
+    }
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }
+
+    throw(err::not_found());
+}
+
+() recv_external(slice in_msg) impure {
+    if (in_msg.preload_uint(32) == op::mine()) { 
+        handle_ext::mine(in_msg); 
+    }
+
+    throw(err::not_found());
+}
+
+;; Get methods
+
+int seqno() method_id {
+  return get_data().begin_parse().preload_uint(32);
+}
+
+;; gets (seed, pow_complexity, amount, interval)
+(int, int, int, int) get_pow_params() method_id {
+
+    var ds = get_data().begin_parse();
+    var (owner_addr, jwall_addr, seed, pow_complexity) = (ds~load_msg_addr(), ds~load_msg_addr(), ds~load_uint(128), ds~load_uint(256));
+
+    ds.end_parse();
+    return (seed, pow_complexity, 0x174876e800, 0x64);
+}
+
+(slice, slice, int, int, int, int, int, int) get_settings() method_id {
+    (slice owner_addr, slice jwall_addr, int seed, int pow_complexity, int last_success, int target_delta, int min_cpl, int max_cpl) = load_data();
+
+    return (owner_addr, jwall_addr, seed, pow_complexity, last_success, target_delta, min_cpl, max_cpl);
+}
