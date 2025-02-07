@@ -1,0 +1,62 @@
+#include "./imports/stdlib.fc";
+
+(slice, int, int) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),  ;; owner_address
+        ds~load_uint(16),    ;; streak
+        ds~load_uint(32)     ;; last_checkin
+    );
+}
+
+() save_data(slice owner_address, int streak, int last_checkin) impure inline {
+    set_data(begin_cell()
+        .store_slice(owner_address)
+        .store_uint(streak, 16)
+        .store_uint(last_checkin, 32)
+        .end_cell());
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    (slice owner_address, int streak, int last_checkin) = load_data();
+
+    ;; Only owner can check in
+    throw_unless(401, equal_slices_bits(sender_address, owner_address));
+
+    int op = in_msg_body~load_uint(32);
+    
+    ;; Check-in operation
+    if (op == 0x01) {  ;; op == 1 for check-in
+        int current_time = now();
+        int time_diff = current_time - last_checkin;
+        
+        ;; Check if it's a new day (> 24 hours)
+        if (time_diff >= 86400) {  ;; 24 hours in seconds
+            ;; If more than 48 hours passed, reset streak
+            if (time_diff >= 172800) {  ;; 48 hours in seconds
+                streak = 1;
+            } else {
+                streak += 1;
+            }
+            save_data(owner_address, streak, current_time);
+            return ();
+        }
+        throw(402);  ;; Too early for check-in
+    }
+
+    throw(0xffff);  ;; Unknown operation
+}
+
+;; Get methods
+(int, int) get_streak_info() method_id {
+    (slice owner_address, int streak, int last_checkin) = load_data();
+    return (streak, last_checkin);
+}
