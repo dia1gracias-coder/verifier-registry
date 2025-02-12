@@ -1,0 +1,32 @@
+;; Constants
+;;
+
+const int interest_rate_base           = 10000;
+const int seconds_per_day              = 84000;
+const int min_tons_for_storage         = 200000000;
+
+;;
+;; Contract states
+;;
+
+const int state::inited                = 0;
+const int state::pending               = 1;
+const int state::active                = 2;
+const int state::canceled              = 3;
+const int state::refused               = 4;
+const int state::redeemed              = 5;
+const int state::claimed               = 6;
+
+;;
+;; Transfer messages
+;;
+
+const slice msg::loan_canceled         = "loan canceled";
+const slice msg::loan_refused          = "payment refused";
+const slice msg::service_fee           = "service fee";
+const slice msg::issue_loan_amount     = "loan issued";
+const slice msg::remaining_amount      = "remaining amount";
+const slice msg::lender_profit         = "lender profit";
+const slice msg::return_loan_amount    = "loan repaid";
+const slice msg::nft_redeemed          = "deposit returned";
+const slice msg::nft_claimed           = "deposit claimed";

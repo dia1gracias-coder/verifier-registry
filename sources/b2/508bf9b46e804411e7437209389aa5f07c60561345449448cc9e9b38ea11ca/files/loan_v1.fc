@@ -1,0 +1,295 @@
+#include "./imports/constants.fc";
+#include "./imports/exit-codes.fc";
+#include "./imports/op-codes.fc";
+#include "./imports/params.fc";
+#include "./imports/stdlib.fc";
+
+;;
+;; Global variables
+;;
+
+global int       ended?;
+global int       state;
+global slice     borrower_addr;
+global slice     lender_addr;
+global slice     nft_addr;
+global cell      loan_terms_cell;
+global cell      service_terms_cell;
+global int       started_at;
+global int       ended_at;
+
+global int       full_price;
+global int       interest_rate;
+global int       duration_seconds;
+
+global slice     service_addr;
+global int       service_rate;
+
+;;
+;; Functions
+;;
+
+() pack_data() impure inline_ref {
+    set_data(
+        begin_cell()
+            .store_int(ended?, 1)
+            .store_uint(state, 8)
+            .store_slice(borrower_addr)
+            .store_slice(lender_addr)
+            .store_slice(nft_addr)
+            .store_ref(loan_terms_cell)
+            .store_ref(service_terms_cell)
+            .store_uint(started_at, 32)
+            .store_uint(ended_at, 32)
+            .end_cell()
+    );
+}
+
+() init_data() impure inline_ref {
+    ifnot (null?(state)) {
+        return ();
+    }
+
+    slice ds = get_data().begin_parse();
+    ended? = ds~load_int(1);
+    state = ds~load_int(8);
+    borrower_addr = ds~load_msg_addr();
+    lender_addr = ds~load_msg_addr();
+    nft_addr = ds~load_msg_addr();
+    loan_terms_cell = ds~load_ref();
+    service_terms_cell = ds~load_ref();
+    started_at = ds~load_uint(32);
+    ended_at = ds~load_uint(32);
+
+    slice loan_terms = loan_terms_cell.begin_parse();
+    full_price = loan_terms~load_coins();
+    interest_rate = loan_terms~load_uint(16);
+    duration_seconds = loan_terms~load_uint(32);
+
+    slice service_terms = service_terms_cell.begin_parse();
+    service_addr = service_terms~load_msg_addr();
+    service_rate = service_terms~load_uint(16);
+}
+
+int calc_earned() {
+    int cur_time = now();
+    int elapsed_seconds = (cur_time < ended_at) ? (cur_time - started_at) : (ended_at - started_at);
+    return (full_price * elapsed_seconds * interest_rate) / (seconds_per_day * interest_rate_base);
+}
+
+() transfer_nft(slice nft_addr, slice new_owner, slice response_addr, slice msg) impure inline {
+    builder msg_body = begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(cur_lt(), 64)
+        .store_slice(new_owner)
+        .store_slice(response_addr)
+        .store_uint(0, 1)
+        .store_coins(1)
+        .store_uint(0, 33)
+        .store_slice(msg);
+
+    var transfer_msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(nft_addr)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body.end_cell());
+
+    send_raw_message(transfer_msg.end_cell(), 128 + 2);
+}
+
+() transfer_coins(slice to_addr, int amount, slice msg, int mode) impure inline {
+    builder transfer_msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(to_addr)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(0, 32)
+        .store_slice(msg);
+
+    send_raw_message(transfer_msg.end_cell(), mode);
+}
+
+int get_cmd_code(slice s) inline_ref {
+    if (slice_empty?(s) == true) {
+        return 0;
+    }
+    int op = s~load_uint(32);
+
+    if (equal_slices("deploy", s)) {
+        return 1;
+    } elseif (equal_slices("cancel", s)) {
+        return 2;
+    } elseif (equal_slices("issue", s)) {
+        return 3;
+    } elseif (equal_slices("refuse", s)) {
+        return 4;
+    } elseif (equal_slices("redeem", s)) {
+        return 5;
+    } elseif (equal_slices("claim", s)) {
+        return 6;
+    } else {
+        return op;
+    }
+}
+
+;;
+;; Handlers
+;;
+
+() handle::init_loan(slice in_msg_body) impure inline_ref {
+    throw_unless(exit::no_transfer, in_msg_body~load_uint(32) == op::ownership_assigned);
+    throw_unless(exit::invalid_state, state == state::inited);
+    in_msg_body~skip_bits(64); ;; skip query id
+    borrower_addr = in_msg_body~load_msg_addr();
+    state = state::pending;
+    started_at = 0;
+    pack_data();
+}
+
+() handle::update_loan(slice sender_addr, slice in_msg_body) impure inline_ref {
+    throw_unless(exit::invalid_state, state == state::inited);
+    throw_unless(exit::invalid_state, state == state::pending);
+    throw_unless(exit::access_denied, equal_slices(sender_addr, borrower_addr));
+    in_msg_body~skip_bits(64); ;; skip query id
+    loan_terms_cell = in_msg_body~load_ref();
+    pack_data();
+}
+
+() handle::cancel_loan(slice sender_addr) impure inline_ref {
+    throw_unless(exit::invalid_state, state == state::pending);
+    throw_unless(exit::access_denied, equal_slices(sender_addr, borrower_addr));
+    transfer_nft(nft_addr, borrower_addr, borrower_addr, msg::loan_canceled);
+    ended? = true;
+    state = state::canceled;
+    ended_at = now();
+    pack_data();
+}
+
+() handle::issue_loan(int msg_value, slice sender_addr) impure inline_ref {
+    throw_unless(exit::invalid_state, state == state::pending);
+    throw_if(exit::low_amount, full_price > msg_value);
+    int service_fee = muldiv(full_price, service_rate, interest_rate_base);
+    transfer_coins(service_addr, service_fee, msg::service_fee, 3);
+    transfer_coins(borrower_addr, full_price - service_fee, msg::issue_loan_amount, 3);
+    int remaining_amount = msg_value - full_price;
+    if (remaining_amount > min_tons_for_storage) {
+        transfer_coins(sender_addr, remaining_amount, msg::remaining_amount, 3);
+    }
+    state = state::active;
+    started_at = now();
+    ended_at = started_at + duration_seconds;
+    lender_addr = sender_addr;
+    pack_data();
+}
+
+() handle::refuse_nft(slice sender_addr) impure inline_ref {
+    throw_unless(exit::invalid_state, state == state::active);
+    throw_unless(exit::access_denied, equal_slices(sender_addr, borrower_addr));
+    transfer_nft(nft_addr, lender_addr, lender_addr, msg::loan_refused);
+    ended? = true;
+    state = state::refused;
+    ended_at = now();
+    pack_data();
+}
+
+() handle::redeem_nft(int msg_value, slice sender_addr) impure inline_ref {
+    throw_if(exit::loan_expired, now() >= ended_at);
+    throw_unless(exit::invalid_state, state == state::active);
+    throw_unless(exit::access_denied, equal_slices(sender_addr, borrower_addr));
+    int borrower_debt = full_price + calc_earned();
+    int lender_profit = borrower_debt - full_price;
+    throw_if(exit::low_amount, borrower_debt > msg_value);
+    if (lender_profit > 0) {
+        transfer_coins(lender_addr, lender_profit, msg::lender_profit, 3);
+    }
+    transfer_coins(lender_addr, full_price, msg::return_loan_amount, 3);
+    transfer_nft(nft_addr, borrower_addr, borrower_addr, msg::nft_redeemed);
+    ended? = true;
+    state = state::redeemed;
+    ended_at = now();
+    pack_data();
+}
+
+() handle::claim_nft(slice sender_addr) impure inline_ref {
+    throw_if(exit::not_expired, now() < ended_at);
+    throw_unless(exit::invalid_state, state == state::active);
+    throw_unless(exit::access_denied, equal_slices(sender_addr, lender_addr));
+    transfer_nft(nft_addr, lender_addr, lender_addr, msg::nft_claimed);
+    ended? = true;
+    state = state::claimed;
+    ended_at = now();
+    pack_data();
+}
+
+;;
+;; Entry point
+;;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_cell, slice in_msg_body) impure {
+    slice cs = in_msg_cell.begin_parse();
+    throw_if(0, cs~load_uint(4) & 1);
+
+    slice sender_addr = cs~load_msg_addr();
+    force_chain(sender_addr);
+    init_data();
+
+    ;; init loan
+    if (equal_slices(sender_addr, nft_addr) & (ended? == false)) {
+        handle::init_loan(in_msg_body);
+        return ();
+    }
+
+    int cmd = get_cmd_code(in_msg_body);
+
+    ;; update load terms
+    if (cmd == op::update) {
+        handle::update_loan(sender_addr, in_msg_body);
+        return ();
+    }
+    ;; command deploy
+    if (cmd == 1) {
+        ;; just accept coins
+        return ();
+    }
+    ;; command cancel
+    if (cmd == 2) {
+        handle::cancel_loan(sender_addr);
+        return ();
+    }
+    ;; command issue
+    if (cmd == 3) {
+        handle::issue_loan(msg_value, sender_addr);
+        return ();
+    }
+    ;; command refuse
+    if (cmd == 4) {
+        handle::refuse_nft(sender_addr);
+        return ();
+    }
+    ;; command redeem
+    if (cmd == 5) {
+        handle::redeem_nft(msg_value, sender_addr);
+        return ();
+    }
+    ;; command claim
+    if (cmd == 6) {
+        handle::claim_nft(sender_addr);
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+;;
+;; Get methods
+;;
+
+cell get_loan_data() method_id {
+    return get_data();
+}
+
+int get_earned() method_id {
+    init_data();
+    return calc_earned();
+}
