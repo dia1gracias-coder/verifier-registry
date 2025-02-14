@@ -1,0 +1,1161 @@
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/classes/msgdata/MessagingReceipt.fc";
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/classes/msgdata/OptionsV1.fc";
+
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/actions/sendJettons.fc";
+
+#include "../../structs/Amount.fc";
+#include "../../structs/GasAsserts.fc";
+#include "../../structs/CostAsserts.fc";
+#include "../../structs/MdError.fc";
+#include "../../structs/MdGuid.fc";
+#include "../../structs/TokenTransfer.fc";
+#include "../../structs/OFTCredits.fc";
+#include "../../structs/OFTSend.fc";
+#include "../../structs/Fee.fc";
+#include "../../structs/RecoverUsdt.fc";
+
+#include "../oApp/handlerOApp.fc";
+
+#include "interface.fc";
+#include "storage.fc";
+#include "consts.fc";
+
+;;; ================STORAGE FUNCTIONS=====================
+
+cell getOAppStorage() impure inline method_id {
+    return getContractStorage().cl::get<objRef>(UsdtOFT::oAppStorage);
+}
+
+cell setOAppStorage(cell $storage, cell $NewOAppStorage) impure inline {
+    return $storage.cl::set(UsdtOFT::oAppStorage, $NewOAppStorage);
+}
+
+(int, int, int, int, int) getAllCredits() method_id {
+    cell $storage = getContractStorage();
+    return (
+        $storage.cl::get<coins>(UsdtOFT::creditsArbitrum),
+        $storage.cl::get<coins>(UsdtOFT::creditsCelo),
+        $storage.cl::get<coins>(UsdtOFT::creditsEth),
+        $storage.cl::get<coins>(UsdtOFT::creditsTon),
+        $storage.cl::get<coins>(UsdtOFT::creditsTron)
+    );
+}
+
+int getContractUsdtBalance() method_id {
+    return getContractStorage().cl::get<coins>(UsdtOFT::contractBalance);
+}
+
+cell getGasAsserts() impure inline {
+    return getContractStorage().cl::get<objRef>(UsdtOFT::gasAsserts);
+}
+
+;;; ================INTERFACE FUNCTIONS=====================
+
+(cell, tuple) _initialize(cell $Address) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    ;; Note that there is no validation done on this address, but it must
+    ;; be the USDT wallet owned by this contract.
+    ;; If this is not the case, the contract is permanently bricked.
+    $storage = $storage.cl::set(
+        UsdtOFT::contractWalletAddress,
+        $Address.Address::getAddress()
+    );
+
+    return ($storage, actions);
+}
+
+() assertPlanner() impure inline {
+    throw_unless(
+        ERROR::OnlyPlanner,
+        getCaller() == getContractStorage().cl::get<address>(UsdtOFT::plannerAddress)
+    );
+}
+
+() assertPlannerOrOwner() impure inline {
+    throw_unless(
+        ERROR::OnlyPlannerOrOwner,
+        (getCaller() == getContractStorage().cl::get<address>(UsdtOFT::plannerAddress)) 
+        | (getCaller() == getOAppStorage().cl::get<address>(OApp::owner))
+    );
+}
+
+() assertLpAdminOrOwner() impure inline {
+    throw_unless(
+        ERROR::OnlyLpAdminOrOwner,
+        (getCaller() == getContractStorage().cl::get<address>(UsdtOFT::lpAdminAddress)) 
+        | (getCaller() == getOAppStorage().cl::get<address>(OApp::owner))
+    );
+}
+
+
+() assertContractWalletAddress() impure inline {
+    throw_unless(
+        ERROR::OnlyContractWalletAddress,
+        getCaller() == getContractStorage().cl::get<address>(UsdtOFT::contractWalletAddress)
+    );
+}
+
+int _getEventSink() impure inline {
+    return getContractAddress();
+}
+
+;;; ========================== HELPER FUNCTIONS =====================================
+
+;; View function so this can be queried off chain easily,
+;; returns the amount of tokens locked in this contract, less the fees
+int tvl() impure method_id {
+    return getContractStorage().cl::get<coins>(UsdtOFT::contractBalance);
+}
+
+;; The rounding on the fee and amount calculation favors the sender,
+;; In theory small enough transfers will not incurr any fees
+(int, int) _getAmountAndFee(cell $storage, int totalAmount) impure inline {
+    int feeBps = $storage.UsdtOFT::getFeeBps();
+    ;; totalAmount is always at most 128-bits, feeBps is at most 10000 == 13 bits
+    ;; so this multiplication can never overflow signed 257-bit
+    int fee = ((totalAmount * feeBps) / BPS_DENOMINATOR);
+    int amount = totalAmount - fee;
+    return (amount, fee);
+}
+
+;; View function so this can be queried off chain easily
+(int, int) getAmountAndFee(int totalAmount) impure method_id {
+    return _getAmountAndFee(
+        getContractStorage(),
+        totalAmount
+    );
+}
+
+;; This is to be used for triggering sending tokens to a user ON this chain.
+;; e.g. when a withdrawLiquidityLocal is made, or a lzReceive is processed
+tuple _sendUsdt(cell $storage, tuple actions, int to, int amount) impure inline {
+    actions~pushAction<sendJettons>(
+        $storage.UsdtOFT::getContractWalletAddress(),
+        to,
+        amount,
+        getOrigin()
+    );
+
+    return actions;
+}
+
+int _getTransferAmount() impure inline {
+    int amount = getDonationNanos();
+
+    ;; The following assertion cannot fail, because the txnContext loads amount as coins which
+    ;; by the definition of LDGRAMS is a VarUInteger16.
+    ;; throw_if(ERROR::InvalidAmount, amount < 0);
+
+    setDonationNanos(0);
+
+    return (amount);
+}
+
+int _getCreditsField(int eid) impure inline {
+    if (eid == ARBITRUM_EID) {
+        return UsdtOFT::creditsArbitrum;
+    } elseif (eid == CELO_EID) {
+        return UsdtOFT::creditsCelo;
+    } elseif (eid == ETH_EID) {
+        return UsdtOFT::creditsEth;
+    } elseif (eid == TON_EID) {
+        return UsdtOFT::creditsTon;
+    } elseif (eid == TRON_EID) {
+        return UsdtOFT::creditsTron;
+    } else {
+        throw(ERROR::InvalidEid);
+    }
+
+    ;; This will never be reached, but compiler needs it
+    return 0;
+}
+
+;; Very important to note this can only be applied to fields of type 'coin'
+cell _incrementCoins(cell $storage, int field, int amount) impure inline {
+    if (field == UsdtOFT::contractBalance) {
+        $storage = $storage.UsdtOFT::setContractBalance($storage.UsdtOFT::getContractBalance() + amount);
+    } elseif (field == UsdtOFT::feeBalance) {
+        $storage = $storage.UsdtOFT::setFeeBalance($storage.UsdtOFT::getFeeBalance() + amount);
+    } elseif (field == UsdtOFT::creditsArbitrum) {
+        $storage = $storage.UsdtOFT::setCreditsArbitrum($storage.UsdtOFT::getCreditsArbitrum() + amount);
+    } elseif (field == UsdtOFT::creditsCelo) {
+        $storage = $storage.UsdtOFT::setCreditsCelo($storage.UsdtOFT::getCreditsCelo() + amount);
+    } elseif (field == UsdtOFT::creditsEth) {
+        $storage = $storage.UsdtOFT::setCreditsEth($storage.UsdtOFT::getCreditsEth() + amount);
+    } elseif (field == UsdtOFT::creditsTon) {
+        $storage = $storage.UsdtOFT::setCreditsTon($storage.UsdtOFT::getCreditsTon() + amount);
+    } elseif (field == UsdtOFT::creditsTron) {
+        $storage = $storage.UsdtOFT::setCreditsTron($storage.UsdtOFT::getCreditsTron() + amount);
+    } else {
+        throw(ERROR::InvalidField);
+    }
+    return $storage;
+}
+
+;; Very important to note this can only be applied to fields of type 'coin'
+cell _decrementCoins(cell $storage, int field, int amount) impure inline {
+    if (field == UsdtOFT::contractBalance) {
+        int currentAmount = $storage.UsdtOFT::getContractBalance();
+        if (currentAmount < amount) {
+            throw(ERROR::InsufficientContractBalance);
+        }
+        $storage = $storage.UsdtOFT::setContractBalance(currentAmount - amount);
+    } elseif (field == UsdtOFT::feeBalance) {
+        int currentAmount = $storage.UsdtOFT::getFeeBalance();
+        if (currentAmount < amount) {
+            throw(ERROR::InsufficientFeeBalance);
+        }
+        $storage = $storage.UsdtOFT::setFeeBalance(currentAmount - amount);
+    } elseif (field == UsdtOFT::creditsArbitrum) {
+        int currentAmount = $storage.UsdtOFT::getCreditsArbitrum();
+        if (currentAmount < amount) {
+            throw(ERROR::InsufficientCreditsArbitrum);
+        }
+        $storage = $storage.UsdtOFT::setCreditsArbitrum(currentAmount - amount);
+    } elseif (field == UsdtOFT::creditsCelo) {
+        int currentAmount = $storage.UsdtOFT::getCreditsCelo();
+        if (currentAmount < amount) {
+            throw(ERROR::InsufficientCreditsCelo);
+        }
+        $storage = $storage.UsdtOFT::setCreditsCelo(currentAmount - amount);
+    } elseif (field == UsdtOFT::creditsEth) {
+        int currentAmount = $storage.UsdtOFT::getCreditsEth();
+        if (currentAmount < amount) {
+            throw(ERROR::InsufficientCreditsEth);
+        }
+        $storage = $storage.UsdtOFT::setCreditsEth(currentAmount - amount);
+    } elseif (field == UsdtOFT::creditsTon) {
+        int currentAmount = $storage.UsdtOFT::getCreditsTon();
+        if (currentAmount < amount) {
+            throw(ERROR::InsufficientCreditsTon);
+        }
+        $storage = $storage.UsdtOFT::setCreditsTon(currentAmount - amount);
+    } elseif (field == UsdtOFT::creditsTron) {
+        int currentAmount = $storage.UsdtOFT::getCreditsTron();
+        if (currentAmount < amount) {
+            throw(ERROR::InsufficientCreditsTron);
+        }
+        $storage = $storage.UsdtOFT::setCreditsTron(currentAmount - amount);
+    } else {
+        throw(ERROR::InvalidField);
+    }
+    return $storage;
+}
+
+cell _addCredits(cell $storage, int eid, int amount) impure inline {
+    return _incrementCoins($storage, _getCreditsField(eid), amount);
+}
+
+cell _removeCredits(cell $storage, int eid, int amount) impure inline {
+    return _decrementCoins($storage, _getCreditsField(eid), amount);
+}
+
+cell _encodeSendOFT(int msgType, int to, int amount) impure inline {
+    return begin_cell()
+        .store_uint16(msgType)
+        .store_uint256(to)
+        .store_uint64(amount)
+        .end_cell();
+}
+
+cell _encodeSendOFTCallback(int msgType, int dstEid, int from, int amount, int fee) impure inline {
+    return begin_cell()
+        .store_uint16(msgType)
+        .store_uint32(dstEid)
+        .store_uint256(from)
+        .store_uint64(amount)
+        .store_uint64(fee)
+        .end_cell();
+}
+
+(int, int, int) _decodeSendOFT(cell sendOftEncoded) impure inline {
+    slice sendOftSlice = sendOftEncoded.begin_parse();
+
+    ;; Because this does it in place, it pops the length off and so you dont need to do offsets
+    int msgType = sendOftSlice~load_uint(16);
+    int to = sendOftSlice~load_uint(256);
+    int amount = sendOftSlice~load_uint(64);
+
+    ;; Assert there are no bits left
+    sendOftSlice.end_parse();
+
+    return (msgType, to, amount);
+}
+
+(int, int, int, int, int) _decodeSendOFTCallback(cell sendOftEncoded) impure inline {
+    slice sendOftSlice = sendOftEncoded.begin_parse();
+
+    ;; Because this does it in place, it pops the length off and so you dont need to do offsets
+    int msgType = sendOftSlice~load_uint(16);
+    int dstEid = sendOftSlice~load_uint(32);
+    int from = sendOftSlice~load_uint(256);
+    int amount = sendOftSlice~load_uint(64);
+    int fee = sendOftSlice~load_uint(64);
+
+    ;; Assert there are no bits left
+    sendOftSlice.end_parse();
+
+    return (msgType, dstEid, from, amount, fee);
+}
+
+cell _encodeSendCredits(
+    int creditsArbitrum,
+    int creditsCelo,
+    int creditsEth,
+    int creditsTon,
+    int creditsTron
+) impure inline {
+    return begin_cell()
+        .store_uint16(SEND_CREDITS)
+        .store_uint64(creditsArbitrum)
+        .store_uint64(creditsCelo)
+        .store_uint64(creditsEth)
+        .store_uint64(creditsTon)
+        .store_uint64(creditsTron)
+        .end_cell();
+}
+
+cell _encodeSendCreditsCallback(
+    int dstEid,
+    int creditsArbitrum,
+    int creditsCelo,
+    int creditsEth,
+    int creditsTon,
+    int creditsTron
+) impure inline {
+    return begin_cell()
+        .store_uint16(SEND_CREDITS)
+        .store_uint32(dstEid)
+        .store_uint64(creditsArbitrum)
+        .store_uint64(creditsCelo)
+        .store_uint64(creditsEth)
+        .store_uint64(creditsTon)
+        .store_uint64(creditsTron)
+        .end_cell();
+}
+
+(int, int, int, int, int) _decodeSendCredits(cell oftCreditsEncoded) impure inline {
+    ;; msgtype is not used here, because its only used in the fail case on the sendCallback
+    ;; pop the msgType off of the slice
+    slice oftCreditsSlice = oftCreditsEncoded.begin_parse().skip_bits(16);
+
+    int creditsArbitrum = oftCreditsSlice~load_uint(64);
+    int creditsCelo = oftCreditsSlice~load_uint(64);
+    int creditsEth = oftCreditsSlice~load_uint(64);
+    int creditsTon = oftCreditsSlice~load_uint(64);
+    int creditsTron = oftCreditsSlice~load_uint(64);
+
+    ;; Assert there are no bits left
+    oftCreditsSlice.end_parse();
+
+    return (creditsArbitrum, creditsCelo, creditsEth, creditsTon, creditsTron);
+}
+
+(int, int, int, int, int, int) _decodeSendCreditsCallback(cell oftCreditsEncoded) impure inline {
+    ;; msgtype is not used here, because its only used in the fail case on the sendCallback
+    ;; pop the msgType off of the slice
+    slice oftCreditsSlice = oftCreditsEncoded.begin_parse().skip_bits(16);
+
+    int dstEid = oftCreditsSlice~load_uint(32);
+    int creditsArbitrum = oftCreditsSlice~load_uint(64);
+    int creditsCelo = oftCreditsSlice~load_uint(64);
+    int creditsEth = oftCreditsSlice~load_uint(64);
+    int creditsTon = oftCreditsSlice~load_uint(64);
+    int creditsTron = oftCreditsSlice~load_uint(64);
+
+    ;; Assert there are no bits left
+    oftCreditsSlice.end_parse();
+
+    return (dstEid, creditsArbitrum, creditsCelo, creditsEth, creditsTon, creditsTron);
+}
+
+int _getMsgType(cell encodedMsg) impure inline {
+    (_, int msgType) = encodedMsg.begin_parse().load_uint(16);
+    return msgType;
+}
+
+int getSendAssertGas(cell $md) impure inline method_id {
+    int packetType = cl::typeof($md);
+
+    if (packetType == OFTSend::NAME) {
+        ;; 'withdrawRemote' and 'sendOFT' have the same receive handler
+        return getGasAsserts().GasAsserts::getSendOFTGas();
+    } elseif (packetType == OFTCredits::NAME) {
+        return getGasAsserts().GasAsserts::getSendCreditsGas();
+    } else {
+        throw(ERROR::InvalidMsgType);
+    }
+
+    ;; Wont hit, here so compiler doesnt complain
+    return 0;
+}
+
+int getReceiveAssertGas(cell $Packet) impure inline method_id {
+    cell $Message = $Packet.lz::Packet::getMessage();
+    int msgType = _getMsgType($Message);
+
+    if (msgType == WITHDRAW_REMOTE) {
+        ;; 'withdrawRemote' and 'sendOFT' have the same receive handler
+        return getGasAsserts().GasAsserts::getSendOFTGasReceiveGas();
+    } elseif (msgType == SEND_OFT){
+        return getGasAsserts().GasAsserts::getSendOFTGasReceiveGas();
+    } elseif (msgType == SEND_CREDITS) {
+        return getGasAsserts().GasAsserts::getSendCreditsGasReceiveGas();
+    } else {
+        throw(ERROR::InvalidMsgType);
+    }
+
+    ;; Wont hit, here so compiler doesnt complain
+    return 0;
+}
+
+;; This function simply returns the formatted lzSend md that is used for quoting.
+;; It does NOT apply checks for things like 'enough credits' or 'enough balance'.
+;;
+;; This is contrary to typically how OFT/OApps in EVM behave, as in those functions they
+;; run state validation checks before calling the lzSend.
+cell getLzSendMd(cell $md, int msgType) impure method_id {
+    int dstEid = 0;
+    cell $ExtraOptions = null();
+    cell lzMessage = null();
+
+    int to = 0;
+    int minAmount = 0;
+
+    int creditsArbitrum = 0;
+    int creditsCelo = 0;
+    int creditsEth = 0;
+    int creditsTon = 0;
+    int creditsTron = 0;
+
+    if (
+        (cl::typeof($md) == OFTSend::NAME) &
+        ((msgType == SEND_OFT) | (msgType == WITHDRAW_REMOTE))
+    ) {
+
+        (
+            dstEid,
+            to,
+            minAmount,
+            _,
+            _,
+            $ExtraOptions
+        ) = $md.OFTSend::getLzSendInfo();
+
+        lzMessage = _encodeSendOFT(msgType, to, minAmount);
+
+    } elseif (
+        (cl::typeof($md) == OFTCredits::NAME) & (msgType == SEND_CREDITS)
+    ) {
+        (
+            dstEid,
+            creditsArbitrum,
+            creditsCelo,
+            creditsEth,
+            creditsTon,
+            creditsTron,
+            _,
+            _,
+            $ExtraOptions
+        ) = $md.OFTCredits::deserialize();
+
+        lzMessage = _encodeSendCredits(
+            creditsArbitrum,
+            creditsCelo,
+            creditsEth,
+            creditsTon,
+            creditsTron
+        );
+
+    } else {
+        throw(ERROR::InvalidMsgTypeOrMd);
+    }
+
+    ;; Mock the lzSend call to get actions
+    tuple actions = _lzSend(
+        emptyActions(),
+        dstEid,
+        msgType,
+        0,
+        0,
+        $ExtraOptions,
+        lzMessage,
+        empty_cell() ;; We can safely cast this as empty, because the endpoint does not use this value for quoting
+    );
+
+    ;; There is only one action returns from _lzSend, and from that action we want the md,
+    ;; on "empty actions" it is initialized with a empty value for the 0th index,
+    ;; thus we query the 1st index for an actions list which contains 1 element
+    return actions.tuple_at(1).cell_at(action::call::md);
+}
+
+tuple _sendOFT(
+    tuple actions,
+    cell $OFTSend,
+    int msgType,
+    int amountSent,
+    int fee
+) impure inline {
+    (
+        int dstEid,
+        int to,
+        int minAmount,
+        int nativeFee,
+        int zroFee,
+        cell $ExtraOptions
+    ) = $OFTSend.OFTSend::getLzSendInfo();
+
+    throw_if(
+        ERROR::SlippageExceeded,
+        amountSent < minAmount
+    );
+
+    return _lzSend(
+        actions,
+        dstEid,
+        msgType,
+        nativeFee,
+        zroFee,
+        $ExtraOptions,
+        _encodeSendOFT(msgType, to, amountSent),
+        _encodeSendOFTCallback(
+            msgType,
+            dstEid,
+            getOrigin(),
+            amountSent,
+            fee
+        )
+    );
+}
+
+() _assertOptionsCost(cell $enforcedOptions, cell $extraOptions, int dstEid, int layerZeroFee) impure inline {
+    cell $CostAsserts = getContractStorage().UsdtOFT::getCostAsserts();
+
+    ;; If invalid EID, ensure an error will be thrown by integer overflow
+    int maxPriceRatio = MAX_U256;
+    int maxGasPrice = MAX_U256;
+
+    if (dstEid == ARBITRUM_EID) {
+        (maxPriceRatio, maxGasPrice) = $CostAsserts.CostAsserts::getMaxPriceRatioArbitrumAndMaxGasPriceArbitrum();
+    } elseif (dstEid == CELO_EID) {
+        (maxPriceRatio, maxGasPrice) = $CostAsserts.CostAsserts::getMaxPriceRatioCeloAndMaxGasPriceCelo();
+    } elseif (dstEid == ETH_EID) {
+        (maxPriceRatio, maxGasPrice) = $CostAsserts.CostAsserts::getMaxPriceRatioEthAndMaxGasPriceEth();
+    } elseif (dstEid == TRON_EID) {
+        (maxPriceRatio, maxGasPrice) = $CostAsserts.CostAsserts::getMaxPriceRatioTronAndMaxGasPriceTron();
+    }
+
+    ;; We do not need to assert the enforced lzReceive value and the enforced nativeDropAmount
+    ;; because they will always be zero and the worst thing that can happen if they are accidentally
+    ;; or maliciously set to nonzero is the USDT OFT will have a minor DoS surface
+
+    int enforcedLzReceiveGas = 0;
+    int extraLzReceiveGas = 0;
+    int extraLzReceiveValue = 0;
+    int extraNativeDropAmount = 0;
+
+    ifnot ($enforcedOptions.cl::isNullObject()) {
+        enforcedLzReceiveGas = $enforcedOptions.md::OptionsV1::getLzReceiveGas();
+    }
+
+    ifnot ($extraOptions.cl::isNullObject()) {
+        (
+            extraLzReceiveGas,
+            extraLzReceiveValue,
+            extraNativeDropAmount
+        ) = $extraOptions.md::OptionsV1::decodeCoins();
+    }
+
+    int totalRemoteGas = enforcedLzReceiveGas + extraLzReceiveGas;
+    int totalRemoteValue = extraLzReceiveValue + extraNativeDropAmount;
+
+    ;; totalRemoteGasAndValue is the total number of native coins on the remote chain
+    ;; that will be requested from the executor
+    int totalRemoteGasAndValue = ((totalRemoteGas * maxGasPrice) + totalRemoteValue);
+
+    throw_if(
+        ERROR::InsufficientLayerZeroFee,
+        ;; this converts remote coins to nanotons
+        ((totalRemoteGasAndValue * maxPriceRatio) / PRICE_RATIO_DENOMINATOR) > layerZeroFee
+    );
+}
+
+;;; ========================== OFT FUNCTIONS =====================================
+
+(cell, tuple) receiveOFT(cell $storage, tuple actions, cell sendOftEncoded) impure {
+    (_, int to, int amount) = _decodeSendOFT(sendOftEncoded);
+
+    $storage = _decrementCoins($storage, UsdtOFT::contractBalance, amount);
+    actions = _sendUsdt($storage, actions, to, amount);
+
+    return ($storage, actions);
+}
+
+tuple sendOFT(cell $OFTSend) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    ;; Check point the initial state and storage from before attempting to execute
+    ;; In the event that the send fails or throws for any reason,
+    ;; this allows us to rollback the state, and send the tokens back
+    cell $initialStorage = $storage;
+    tuple initialActions = actions;
+
+    ;; Determine the amount to transfer and the fee
+    int totalAmount = _getTransferAmount();
+
+    int errorCode = ERROR::NoError;
+    try {
+        (int amountSent, int fee) = _getAmountAndFee($storage, totalAmount);
+
+        (
+            int dstEid,
+            int nativeFee,
+            cell $ExtraOptions
+        ) = $OFTSend.OFTSend::getDstEidAndNativeFeeAndExtraOptions();
+
+        ;; deduct the corresponding credits
+        $storage = _removeCredits($storage, dstEid, amountSent);
+
+        actions~pushAction<event>(EVENT::OFTSentInit, $OFTSend);
+
+        ;; Contains a terminal action thus must be last in the actions list before returning
+        ;; Send the tokens to the remote chain
+        actions = _sendOFT(actions, $OFTSend, SEND_OFT, amountSent, fee);
+
+        ;; is this affected by the try/catch bug in funC compiler?
+        ifnot (cl::isNullObject($storage.UsdtOFT::getCostAsserts())) {
+            ;; It is unlikely anyone will care enough to lock up capital and waste gas abusing this
+            ;; particular DoS surface considering all composed contracts will be unshardable.
+
+            ;; convert extra and enforced options to TON
+            _assertOptionsCost(
+                getEnforcedOptions(dstEid, SEND_OFT),
+                $ExtraOptions,
+                dstEid,
+                nativeFee
+            );
+        }
+
+        _assertGasWithFee(
+            getGasAsserts().GasAsserts::getSendOFTGas(),
+            nativeFee
+        );
+
+    } catch(x, n) {
+        errorCode = n;
+    }
+
+    ifnot (errorCode == ERROR::NoError) {
+        ;; Revert the state changes from the handler which 'failed'
+        $storage = $initialStorage;
+        actions = initialActions;
+
+        actions~pushAction<event>(
+            EVENT::OFTSentFailed,
+            MdError::Build(
+                $OFTSend,
+                errorCode
+            )
+        );
+        ;; We need to refund the transfered usdt that was sent and triggered this event
+        actions = _sendUsdt($storage, actions, getOrigin(), totalAmount);
+    }
+
+    setContractStorage($storage);
+
+    return actions;
+}
+
+(cell, tuple) sendOFTCallback(
+    cell $storage,
+    tuple actions,
+    int errorCode,
+    int guid,
+    cell oftSendEncoded
+) impure inline {
+    (_, int dstEid, int to, int amount, int fee) = _decodeSendOFTCallback(oftSendEncoded);
+
+    if (errorCode == Channel::NO_ERROR) {
+        ;; Success
+        int localEid = getOAppStorage().OApp::getEid();
+
+        $storage = $storage
+            ._incrementCoins(UsdtOFT::contractBalance, amount)
+            ._incrementCoins(UsdtOFT::feeBalance, fee)
+            ._addCredits(localEid, amount);
+
+        actions~pushAction<event>(
+            EVENT::OFTSentSucceed,
+            MdGuid::Build(oftSendEncoded, guid)
+        );
+    } else {
+        ;; Failure
+        $storage = _addCredits($storage, dstEid, amount);
+
+        actions~pushAction<event>(
+            EVENT::OFTSentFailed,
+            MdError::Build(
+                MdGuid::Build(oftSendEncoded, guid),
+                errorCode
+            )
+        );
+
+        actions = _sendUsdt($storage, actions, to, (amount + fee));
+    }
+
+    return ($storage, actions);
+}
+
+;;; ========================== LIQUIDITY FUNCTIONS =====================================
+
+;; There is no assertion on WHO can deposit liquidity, because ALL liquidity is owned by the 'owner'
+;; Thus tracking the depositer is not necessary
+;; NOTE: md is not used in this function
+tuple depositLocal(cell $Empty) impure inline {
+    (cell $storage, tuple actions) = preamble();
+    int amount = _getTransferAmount();
+    int localEid = getOAppStorage().OApp::getEid();
+
+    $storage = $storage
+        ._incrementCoins(UsdtOFT::contractBalance, amount)
+        ._addCredits(localEid, amount);
+
+    setContractStorage($storage);
+
+    actions~pushAction<event>(EVENT::LocalDeposited, Amount::Build(amount));
+
+    return actions;
+}
+
+tuple withdrawLocal(cell $TokenTransfer) impure inline {
+    (cell $storage, tuple actions) = preamble();
+    int localEid = getOAppStorage().OApp::getEid();
+
+    (int to, int amount) = $TokenTransfer.TokenTransfer::getToAndAmount();
+
+    $storage = $storage
+        ._decrementCoins(UsdtOFT::contractBalance, amount)
+        ._removeCredits(localEid, amount);
+
+    ;; non terminal action so must be called before _sendUsdt
+    actions~pushAction<event>(EVENT::LocalWithdrawn, $TokenTransfer);
+
+    actions = _sendUsdt($storage, actions, to, amount);
+
+    setContractStorage($storage);
+
+    return actions;
+}
+
+tuple withdrawRemote(cell $OFTSend) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    (
+        int dstEid, 
+        int minAmount, 
+        int nativeFee
+    ) = $OFTSend.OFTSend::getDstEidAndMinAmountAndNativeFee();
+
+    ;; Use the minAmount field to represent he amount of liquidity to remove
+    int amount = minAmount;
+
+    ;; deduct the corresponding credits
+    $storage = _removeCredits($storage, dstEid, amount);
+
+    ;; non terminal action so must be called before _sendOFT
+    actions~pushAction<event>(EVENT::RemoteWithdrawInit, $OFTSend);
+
+    ;; Send the tokens to the remote chain
+    actions = _sendOFT(
+        actions,
+        $OFTSend,
+        WITHDRAW_REMOTE,
+        amount,
+        0 ;; no fees on withdrawing liquidity
+    );
+
+    setContractStorage($storage);
+
+    ;; The gas assertion for withdrawing remote is the same as the sendOFT,
+    ;; because inside of the protocol they are the same action
+    _assertGasWithFee(getGasAsserts().GasAsserts::getSendOFTGas(), nativeFee);
+
+    return actions;
+}
+
+(cell, tuple) withdrawRemoteCallback(
+    cell $storage,
+    tuple actions,
+    int errorCode,
+    int guid,
+    cell oftSendEncoded
+) impure inline {
+    if (errorCode == Channel::NO_ERROR) {
+        ;; Success
+        actions~pushAction<event>(EVENT::RemoteWithdrawSucceed, MdGuid::Build(oftSendEncoded, guid));
+    } else {
+        ;; Failure
+        ;; fee is unused but left to avoid false-positive linter error
+        (_, int dstEid, _, int amount, int fee) = _decodeSendOFTCallback(oftSendEncoded);
+
+        $storage = _addCredits($storage, dstEid, amount);
+
+        actions~pushAction<event>(
+            EVENT::RemoteWithdrawFailed,
+            MdError::Build(MdGuid::Build(oftSendEncoded, guid), errorCode)
+        );
+    }
+
+    return ($storage, actions);
+}
+
+;;; ========================== CREDIT FUNCTIONS =====================================
+
+cell receiveCredits(cell $storage, cell oftCreditsEncoded) impure inline {
+    (
+        int creditsArbitrum,
+        int creditsCelo,
+        int creditsEth,
+        int creditsTon,
+        int creditsTron
+    ) = _decodeSendCredits(oftCreditsEncoded);
+
+    $storage = $storage
+        ._addCredits(ARBITRUM_EID, creditsArbitrum)
+        ._addCredits(CELO_EID, creditsCelo)
+        ._addCredits(ETH_EID, creditsEth)
+        ._addCredits(TON_EID, creditsTon)
+        ._addCredits(TRON_EID, creditsTron);
+
+    return $storage;
+}
+
+tuple sendCredits(cell $OFTCredits) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    (
+        int dstEid,
+        int creditsArbitrum,
+        int creditsCelo,
+        int creditsEth,
+        int creditsTon,
+        int creditsTron,
+        int nativeFee,
+        int zroFee,
+        cell $ExtraOptions
+    ) = $OFTCredits.OFTCredits::deserialize();
+
+    actions~pushAction<event>(EVENT::CreditsSentInit, $OFTCredits);
+
+    ;; Assert and deduct the credits
+    $storage = $storage
+        ._removeCredits(ARBITRUM_EID, creditsArbitrum)
+        ._removeCredits(CELO_EID, creditsCelo)
+        ._removeCredits(ETH_EID, creditsEth)
+        ._removeCredits(TON_EID, creditsTon)
+        ._removeCredits(TRON_EID, creditsTron);
+
+    ;; Contains a terminal action, thus must be at the end of the actions list
+    actions = _lzSend(
+        actions,
+        dstEid,
+        SEND_CREDITS,
+        nativeFee,
+        zroFee,
+        $ExtraOptions,
+        _encodeSendCredits(
+            creditsArbitrum,
+            creditsCelo,
+            creditsEth,
+            creditsTon,
+            creditsTron
+        ),
+        _encodeSendCreditsCallback(
+            dstEid,
+            creditsArbitrum,
+            creditsCelo,
+            creditsEth,
+            creditsTon,
+            creditsTron
+        )
+    );
+
+    setContractStorage($storage);
+
+    ;; Do this as late as possible so the estimation uses less variance from the previous instructions
+    _assertGasWithFee(getGasAsserts().GasAsserts::getSendCreditsGas(), nativeFee);
+
+    return actions;
+}
+
+(cell, tuple) sendCreditsCallback(
+    cell $storage,
+    tuple actions,
+    int errorCode,
+    int guid,
+    cell oftCreditsEncoded
+) impure inline {
+    if (errorCode == Channel::NO_ERROR) {
+        ;; Success
+        actions~pushAction<event>(EVENT::CreditsSentSucceed, MdGuid::Build(oftCreditsEncoded, guid));
+
+    } else {
+        ;; Failure
+        (
+            int dstEid,
+            int creditsArbitrum,
+            int creditsCelo,
+            int creditsEth,
+            int creditsTon,
+            int creditsTron
+        ) = _decodeSendCreditsCallback(oftCreditsEncoded);
+
+        $storage = $storage
+            ._addCredits(ARBITRUM_EID, creditsArbitrum)
+            ._addCredits(CELO_EID, creditsCelo)
+            ._addCredits(ETH_EID, creditsEth)
+            ._addCredits(TON_EID, creditsTon)
+            ._addCredits(TRON_EID, creditsTron);
+
+        actions~pushAction<event>(
+            EVENT::CreditsSentFailed,
+            MdError::Build(MdGuid::Build(oftCreditsEncoded, guid), errorCode)
+        );
+    }
+
+    return ($storage, actions);
+}
+
+;;; ============== INTERNAL FUNCTIONS ====================
+
+(cell, tuple) _sendCallback(cell $storage, tuple actions, cell $MessagingReceipt) impure inline {
+    (int errorCode, cell $LzSend) = $MessagingReceipt.md::MessagingReceipt::getErrorCodeAndLzSend();
+
+    (
+        cell $Packet,
+        cell $CallbackData
+    ) = $LzSend.md::LzSend::getPacketAndCallbackData();
+
+    int msgType = _getMsgType($CallbackData);
+
+    int guid = $Packet.lz::Packet::getGuid();
+
+    if (msgType == SEND_OFT) {
+        return sendOFTCallback($storage, actions, errorCode, guid, $CallbackData);
+    } elseif (msgType == WITHDRAW_REMOTE) {
+        return withdrawRemoteCallback($storage, actions, errorCode, guid, $CallbackData);
+    } elseif (msgType == SEND_CREDITS) {
+        return sendCreditsCallback($storage, actions, errorCode, guid, $CallbackData);
+    } else {
+        throw(ERROR::InvalidMsgType);
+    }
+
+    ;; This will never hit, but compiler complains if we dont include it
+    return ($storage, actions);
+}
+
+;; Best practice is to fail here, and NOT inside of the _lzReceiveExecute
+;; e.g. you ONLY check the valid remote peer on the prepare, NOT execute
+;; The endpoint will NOT pass a packet through execute, that has NOT been passed here
+tuple _lzReceivePrepare(cell $storage, tuple actions, cell $Packet) impure inline method_id {
+    cell $Message = $Packet.lz::Packet::getMessage();
+    int msgType = _getMsgType($Message);
+
+    if (msgType == WITHDRAW_REMOTE) {
+        ;; 'withdrawRemote' and 'sendOFT' have the same receive handler
+        _assertGas(getGasAsserts().GasAsserts::getSendOFTGasReceiveGas());
+    } elseif (msgType == SEND_OFT){
+        _assertGas(getGasAsserts().GasAsserts::getSendOFTGasReceiveGas());
+    } elseif (msgType == SEND_CREDITS) {
+        _assertGas(getGasAsserts().GasAsserts::getSendCreditsGasReceiveGas());
+    } else {
+        throw(ERROR::InvalidMsgType);
+    }
+
+    return actions;
+}
+
+(cell, tuple) _lzReceiveExecute(cell $storage, tuple actions, cell $Packet) impure inline {
+    cell message = $Packet.lz::Packet::getMessage();
+    int msgType = _getMsgType(message);
+
+    if ((msgType == WITHDRAW_REMOTE) | (msgType == SEND_OFT)) {
+        ;; 'withdrawRemote' and 'sendOFT' have the same receive handler
+        int eventTopic = (msgType == WITHDRAW_REMOTE) ? EVENT::RemoteWithdrawn : EVENT::OFTReceived;
+
+        actions~pushAction<event>(eventTopic, $Packet);
+        actions~pushAction<dispatch>(
+            getCaller(),
+            Channel::OP::LZ_RECEIVE_EXECUTE_CALLBACK,
+            md::LzReceiveStatus::build(
+                true,
+                $Packet.lz::Packet::getNonce()
+            ),
+            _gasToNanoton(getOAppStorage().OApp::getLzReceiveExecuteCallbackGas())
+        );
+
+        ;; This produces a terminal action, thus it must be the last action pushed
+        ($storage, actions) = receiveOFT($storage, actions, message);
+
+    } elseif (msgType == SEND_CREDITS) {
+        actions~pushAction<event>(EVENT::CreditsReceived, $Packet);
+        actions~pushAction<call>(
+            getCaller(),
+            Channel::OP::LZ_RECEIVE_EXECUTE_CALLBACK,
+            md::LzReceiveStatus::build(
+                true,
+                $Packet.lz::Packet::getNonce()
+            )
+        );
+
+        $storage = receiveCredits($storage, message);
+
+    } else {
+        ;; This should never happen because the lzReceivePrepare should catch a malformed msgType
+        ;; We put it here reduntantly to be safe
+        actions~pushAction<event>(
+            EVENT::LzReceiveExecuteFailed,
+            MdError::Build($Packet, ERROR::InvalidMsgType)
+        );
+        actions~pushAction<call>(
+            getCaller(),
+            Channel::OP::LZ_RECEIVE_EXECUTE_CALLBACK,
+            md::LzReceiveStatus::build(
+                false,
+                $Packet.lz::Packet::getNonce()
+            )
+        );
+    }
+
+    return ($storage, actions);
+}
+
+;;; ========================== OWNER FUNCTIONS =====================================
+
+tuple setPlanner(cell $Address) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    setContractStorage(
+        $storage.cl::set(
+            UsdtOFT::plannerAddress,
+            $Address.Address::getAddress()
+        )
+    );
+    actions~pushAction<event>(EVENT::PlannerSet, $Address);
+
+    return actions;
+}
+
+
+tuple setLpAdmin(cell $Address) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    setContractStorage(
+        $storage.cl::set(
+            UsdtOFT::lpAdminAddress,
+            $Address.Address::getAddress()
+        )
+    );
+    actions~pushAction<event>(EVENT::LpAdminSet, $Address);
+
+    return actions;
+}
+
+tuple setGasAsserts(cell $GasAsserts) impure inline {
+    (cell $storage, tuple actions) = preamble();
+    $GasAsserts = GasAsserts::sanitize($GasAsserts);
+
+    setContractStorage(
+        $storage
+            .cl::set(UsdtOFT::gasAsserts, $GasAsserts)
+            .setOAppStorage(
+                getOAppStorage().cl::set(
+                    OApp::lzReceiveExecuteCallbackGas,
+                    $GasAsserts.GasAsserts::getLzReceiveExecuteCallbackGas()
+                )
+            )
+    );
+    actions~pushAction<event>(EVENT::GasAssertsSet, $GasAsserts);
+
+    return actions;
+}
+
+tuple setCostAsserts(cell $CostAsserts) impure inline {
+    (cell $storage, tuple actions) = preamble();
+    $CostAsserts = CostAsserts::sanitize($CostAsserts);
+    
+    setContractStorage(
+        $storage.cl::set(UsdtOFT::costAsserts, $CostAsserts)
+    );
+    actions~pushAction<event>(EVENT::CostAssertsSet, $CostAsserts);
+
+    return actions;
+}
+
+tuple setFee(cell $Fee) impure inline {
+    (cell $storage, tuple actions) = preamble();
+    int bps = $Fee.Fee::getBps();
+
+    ;; fees cant be 100%
+    throw_unless(ERROR::InvalidFee, bps < BPS_DENOMINATOR);
+
+    setContractStorage($storage.cl::set(UsdtOFT::feeBps, bps));
+    actions~pushAction<event>(EVENT::FeeSet, $Fee);
+
+    return actions;
+}
+
+;;; ========================== MANAGEMENT FUNCTIONS =====================================
+
+tuple withdrawFees(cell $TokenTransfer) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    (int to, int amount) = $TokenTransfer.TokenTransfer::getToAndAmount();
+
+    $storage = _decrementCoins($storage, UsdtOFT::feeBalance, amount);
+
+    ;; non terminal action so must be called before _sendUsdt
+    actions~pushAction<event>(EVENT::FeesWithdrawn, $TokenTransfer);
+
+    actions = _sendUsdt($storage, actions, to, amount);
+
+    setContractStorage($storage);
+
+    return actions;
+}
+
+tuple recoverUsdtInit(cell $RecoverUsdt) impure inline {
+    (cell $storage, tuple actions) = preamble();
+    $RecoverUsdt = RecoverUsdt::sanitize($RecoverUsdt);
+
+    $RecoverUsdt = $RecoverUsdt.cl::set(RecoverUsdt::recoveryTimeout, now());
+    setContractStorage($storage.cl::set(UsdtOFT::recoverRequest, $RecoverUsdt));
+
+    actions~pushAction<event>(EVENT::UsdtRecoverInit, $RecoverUsdt);
+
+    return actions;
+}
+
+tuple recoverUsdt(cell $Empty) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    cell $RecoverRequest = $storage.cl::get<objRef>(UsdtOFT::recoverRequest);
+    throw_if(ERROR::NoRecoverInit, cl::isNullObject($RecoverRequest));
+
+    (int to, int amount, int recoveryTimeout) = $RecoverRequest.RecoverUsdt::getToAndAmountAndRecoveryTimeout();
+
+    ;; elapsedSeconds is guaranteed to be non-negative
+    int elapsedSeconds = now() - recoveryTimeout;
+
+    if ((elapsedSeconds >= WITHDRAW_REQUEST_TIMEOUT_SECONDS) & (elapsedSeconds <= WITHDRAW_REQUEST_TTL_SECONDS)) {
+        actions~pushAction<event>(EVENT::UsdtRecovered, $RecoverRequest);
+
+        actions = _sendUsdt($storage, actions, to, amount);
+    } else {
+        throw(ERROR::InvalidRecoverWindow);
+    }
+
+    setContractStorage($storage.cl::set(UsdtOFT::recoverRequest, cl::nullObject()));
+    return actions;
+}

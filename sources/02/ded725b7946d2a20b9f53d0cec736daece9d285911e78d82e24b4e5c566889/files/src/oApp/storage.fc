@@ -1,0 +1,283 @@
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/constants.fc";
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/txnContext.fc";
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/actions/utils.fc";
+
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/protocol/endpoint/storage.fc";
+
+#include "./interface.fc";
+
+
+;; !!! If you put this storage anywhere other than index 0 of your custom contract storage,
+;; you are gunna have a bad time
+const int BASE_OAPP_STORAGE_INDEX = 0;
+
+;; required object name
+const int OApp::NAME = "oAppStore"u;
+
+;; field names
+const int OApp::owner = 0;
+const int OApp::tentativeOwner = 1;
+const int OApp::authenticated = 2;
+const int OApp::initialized = 3;
+const int OApp::controllerAddress = 4;
+const int OApp::eid = 5;
+const int OApp::maxReceivedNonce = 6;
+const int OApp::peers = 7;
+const int OApp::enforcedOptions = 8;
+const int OApp::endpointCode = 9;
+const int OApp::channelCode = 10;
+const int OApp::endpointInitStorage = 11;
+const int OApp::lzReceiveExecuteCallbackGas = 12;
+
+;; @owner oApp owner EOA
+cell OApp::New(
+    int owner,
+    int controllerAddress,
+    int eid,
+    cell endpointCode,
+    cell channelCode
+) method_id {
+    return cl::declare(
+        OApp::NAME,
+        unsafeTuple([
+            [cl::t::address, owner],                ;; OApp::owner
+            [cl::t::address, NULLADDRESS],          ;; OApp::tentativeOwner
+            [cl::t::bool, false],                   ;; OApp::authenticated
+            [cl::t::bool, false],                   ;; OApp::initialized
+            [cl::t::address, controllerAddress],    ;; OApp::controllerAddress
+            [cl::t::uint32, eid],                   ;; OApp::eid
+            [cl::t::dict256, cl::dict256::New()],   ;; OApp::maxReceivedNonce
+            [cl::t::dict256, cl::dict256::New()],   ;; OApp::peers
+            [cl::t::dict256, cl::dict256::New()],   ;; OApp::enforcedOptions
+            [cl::t::cellRef, endpointCode],         ;; OApp::endpointCode
+            [cl::t::cellRef, channelCode],          ;; OApp::channelCode
+            [cl::t::objRef, Endpoint::New(
+                eid,
+                0,
+                controllerAddress
+            )],                                     ;; OApp::endpointInitStorage
+            [cl::t::uint32, 0]                      ;; OApp::lzReceiveExecuteCallbackGas
+        ])
+    );
+}
+
+;;; ==========================================
+;; Modifiers
+() assertAuthenticated() impure inline {
+    cell $baseStorage = getContractStorage().cl::get<objRef>(BASE_OAPP_STORAGE_INDEX);
+    throw_unless(
+        ERROR::NotAuthenticated,
+        $baseStorage.cl::get<bool>(OApp::authenticated)
+    );
+}
+
+() assertInitialized() impure inline {
+    cell $baseStorage = getContractStorage().cl::get<objRef>(BASE_OAPP_STORAGE_INDEX);
+    throw_unless(
+        ERROR::NotInitialized,
+        $baseStorage.cl::get<bool>(OApp::initialized)
+    );
+}
+
+() assertTentativeOwner() impure inline {
+    cell $baseStorage = getContractStorage().cl::get<objRef>(BASE_OAPP_STORAGE_INDEX);
+    throw_unless(
+        ERROR::OnlyTentativeOwner,
+        getCaller() == $baseStorage.cl::get<address>(OApp::tentativeOwner)
+    );
+}
+
+;; assert the ctx sender is the owner of this contract
+;; expects the ctx to be populated. Does not require storage to be loaded
+() assertOwner() impure inline {
+    cell $baseStorage = getContractStorage().cl::get<objRef>(BASE_OAPP_STORAGE_INDEX);
+    throw_unless(
+        ERROR::OnlyOwner,
+        getCaller() == $baseStorage.cl::get<address>(OApp::owner)
+    );
+}
+
+() authenticate() impure inline {
+    ;; We apply a 'permission' check inside this function
+    ;; due to the way the 'contractMain.fc' is formatted, this is required
+    assertOwner();
+    cell $storage = getContractStorage();
+
+    setContractStorage(
+        $storage
+            .cl::set(
+                BASE_OAPP_STORAGE_INDEX,
+                $storage
+                    .cl::get<objRef>(BASE_OAPP_STORAGE_INDEX)
+                    .cl::set(OApp::authenticated, true)
+            )
+    );
+}
+
+() authenticateIfNecessary() impure inline {
+    if (getContractStorage()
+        .cl::get<objRef>(BASE_OAPP_STORAGE_INDEX)
+        .cl::get<bool>(OApp::authenticated) == false
+    ) {
+        authenticate();
+    }
+}
+
+(cell, tuple) _initialize(cell $md) impure inline;
+
+tuple initialize(cell $md) impure inline {
+    assertAuthenticated();
+
+    if (
+        getContractStorage()
+            .cl::get<objRef>(BASE_OAPP_STORAGE_INDEX)
+            .cl::get<bool>(OApp::initialized)
+    ) {
+        return emptyActions();
+    }
+
+    (cell $storage, tuple actions) = _initialize($md);
+
+    setContractStorage(
+        $storage
+            .cl::set(
+                BASE_OAPP_STORAGE_INDEX,
+                $storage
+                    .cl::get<objRef>(BASE_OAPP_STORAGE_INDEX)
+                    .cl::set(OApp::initialized, true)
+            )
+    );
+
+    return actions;
+}
+
+const int OApp::_ownerOffset = _HEADER_WIDTH;
+const int OApp::_tentativeOwnerOffset = OApp::_ownerOffset + 256;
+const int OApp::_authenticatedOffset = OApp::_tentativeOwnerOffset + 256;
+const int OApp::_initializedOffset = OApp::_authenticatedOffset + 1;
+const int OApp::_controllerAddressOffset = 0;
+const int OApp::_eidOffset = OApp::_controllerAddressOffset + 256;
+const int OApp::lzReceiveExecuteCallbackGasOffset = OApp::_eidOffset + 32;
+
+int OApp::getOwner(cell $self) impure inline {
+    return $self.cellPreloadAddressAt(OApp::_ownerOffset);
+}
+
+int OApp::getTentativeOwner(cell $self) impure inline {
+    return $self.cellPreloadAddressAt(OApp::_tentativeOwnerOffset);
+}
+
+int OApp::getAuthenticated(cell $self) impure inline {
+    return $self.cellPreloadBoolAt(OApp::_authenticatedOffset);
+}
+
+int OApp::getInitialized(cell $self) impure inline {
+    return $self.cellPreloadBoolAt(OApp::_initializedOffset);
+}
+
+int OApp::getControllerAddress(cell $self) impure inline {
+    return $self.cellPreloadRefAt(2).cellPreloadAddressAt(OApp::_controllerAddressOffset);
+}
+
+int OApp::getEid(cell $self) impure inline {
+    return $self.cellPreloadRefAt(2).cellPreloadUint32At(OApp::_eidOffset);
+}
+
+cell OApp::getMaxReceivedNonce(cell $self) impure inline {
+    return $self.cellPreloadRefAt(0);
+}
+
+cell OApp::getPeers(cell $self) impure inline {
+    return $self.cellPreloadRefAt(1);
+}
+
+cell OApp::getEnforcedOptions(cell $self) impure inline {
+    return $self.cellPreloadRefAt(2).cellPreloadRefAt(0);
+}
+
+cell OApp::getEndpointCode(cell $self) impure inline {
+    return $self.cellPreloadRefAt(2).cellPreloadRefAt(1);
+}
+
+cell OApp::getChannelCode(cell $self) impure inline {
+    return $self.cellPreloadRefAt(2).cellPreloadRefAt(2);
+}
+
+cell OApp::getEndpointInitStorage(cell $self) impure inline {
+    return $self.cellPreloadRefAt(2).cellPreloadRefAt(3);
+}
+
+int OApp::getLzReceiveExecuteCallbackGas(cell $self) impure inline {
+    return $self.cellPreloadRefAt(2).cellPreloadUint32At(OApp::lzReceiveExecuteCallbackGasOffset);
+}
+
+cell OApp::setTentativeOwner(cell $self, int tentativeOwner) impure inline {
+    slice $selfSlice = $self.begin_parse();
+    return begin_cell()
+        ;; data: keep owner
+        ;; refs: keep maxReceivedNonce, peers, enforcedOptions, endpointCode, channelCode, endpointInitStorage
+        .store_slice($selfSlice.scutfirst(OApp::_tentativeOwnerOffset, 3))
+        ;; data: set new tentativeOwner
+        .store_uint256(tentativeOwner)
+        ;; data: keep authenticated, initialized, controller, eid, lzReceiveExecuteCallbackGas
+        .store_slice($selfSlice.sskipfirst(OApp::_authenticatedOffset, 3))
+        .end_cell();
+}
+
+cell OApp::setAuthenticated(cell $self, int authenticated) impure inline {
+    slice $selfSlice = $self.begin_parse();
+    return begin_cell()
+        ;; data: keep owner, tentativeOwner
+        ;; refs: keep maxReceivedNonce, peers, enforcedOptions, endpointCode, channelCode, endpointInitStorage
+        .store_slice($selfSlice.scutfirst(OApp::_authenticatedOffset, 3))
+        ;; data: set authenticated
+        .store_bool(authenticated)
+        ;; data: keep initialized, controller, eid, lzReceiveExecuteCallbackGas
+        .store_slice($selfSlice.sskipfirst(OApp::_initializedOffset, 3))
+        .end_cell();
+}
+
+cell OApp::setInitialized(cell $self, int initialized) impure inline {
+    slice $selfSlice = $self.begin_parse();
+    return begin_cell()
+        ;; data: keep  owner, tentativeOwner, authenticated controller, eid, lzReceiveExecuteCallbackGas
+        ;; refs: keep maxReceivedNonce, peers, enforcedOptions, endpointCode, channelCode, endpointInitStorage
+        .store_slice($selfSlice.scutfirst(OApp::_initializedOffset, 3))
+        ;; data: set initialized
+        .store_bool(initialized)
+        .end_cell();
+}
+
+cell OApp::setLzReceiveExecuteCallbackGas(cell $self, int lzReceiveExecuteCallbackGas) impure inline {
+    slice $selfSlice = $self.begin_parse();
+    slice ref2Slice = $selfSlice.preloadRefSliceAt(2);
+
+    ;; create new ref2 cell with new lzReceiveExecuteCallbackGas
+    cell ref2 = begin_cell()
+        ;; data: keep controller, eid
+        ;; refs: keep enforcedOptions, endpointCode, channelCode, endpointInitStorage
+        .store_slice(ref2Slice.scutfirst(OApp::lzReceiveExecuteCallbackGasOffset, 4))
+        ;; data: set lzReceiveExecuteCallbackGas
+        .store_uint32(lzReceiveExecuteCallbackGas)
+    .end_cell();
+
+    return begin_cell()
+        ;; data: keep owner, tentativeOwner, authenticated, initialized
+        ;; refs: keep maxReceivedNonce, peers
+        .store_slice($selfSlice.sskiplast(0, 1))
+        .store_ref(ref2)
+        .end_cell();
+}
+
+cell OApp::setOwnerAndTentativeOwner(cell $self, int owner, int tentativeOwner) impure inline {
+    slice $selfSlice = $self.begin_parse();
+    return begin_cell()
+        .store_slice($selfSlice.scutfirst(OApp::_ownerOffset, 0))
+        ;; data: set owner, tentativeOwner
+        .store_uint256(owner)
+        .store_uint256(tentativeOwner)
+        ;; data: keep authenticated, initialized, controller, eid, lzReceiveExecuteCallbackGas
+        ;; refs: keep maxReceivedNonce, peers, enforcedOptions, endpointCode, channelCode, endpointInitStorage
+        .store_slice($selfSlice.sskipfirst(OApp::_authenticatedOffset, 0))
+        .end_cell();
+}

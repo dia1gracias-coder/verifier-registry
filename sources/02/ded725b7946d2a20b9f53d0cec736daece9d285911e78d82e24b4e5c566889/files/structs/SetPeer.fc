@@ -1,0 +1,30 @@
+#include "../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+;; required storage name
+const int SetPeer::NAME = "SetPeer"u;
+
+;; field names
+const int SetPeer::eid = 0;
+const int SetPeer::peer = 1;
+
+cell SetPeer::New(int eid, int peer) inline method_id {
+    return cl::declare(
+        SetPeer::NAME,
+        unsafeTuple([
+            [cl::t::uint32, eid],   ;; SetPeer::eid
+            [cl::t::address, peer]  ;; SetPeer::peer
+        ])
+    );
+}
+
+const int SetPeer::_eidOffset = _HEADER_WIDTH;
+const int SetPeer::_peerOffset = SetPeer::_eidOffset + 32;
+
+;; (eid, peer)
+(int, int) SetPeer::getEidAndPeer(cell $self) impure inline {
+    slice selfSlice = $self.begin_parse();
+    return (
+        selfSlice.preloadUint32At(SetPeer::_eidOffset),
+        selfSlice.preloadAddressAt(SetPeer::_peerOffset)
+    );
+}

@@ -1,0 +1,44 @@
+#include "../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+const int RecoverUsdt::NAME = "RcvUsdt"u;
+
+const int RecoverUsdt::to = 0;
+const int RecoverUsdt::amount = 1;
+;; This field is not used at initialization.
+;; It is assigned a value in the recoverUsdtInit handler, after which the entire RecoverUsdt object
+;; is stored in the Usdt OFT contract's storage for future use.
+;; Later, when the recoverUsdt handler is invoked, it uses this field's timestamp to verify that the
+;; recovery process is within the 24-48 hour recovery window.
+const int RecoverUsdt::recoveryTimeout = 2;
+
+cell RecoverUsdt::New(int to, int amount) inline method_id {
+    return cl::declare(
+        RecoverUsdt::NAME,
+        unsafeTuple([
+            [cl::t::address, to],      ;; RecoverUsdt::to
+            [cl::t::uint64, amount],   ;; RecoverUsdt::amount
+            [cl::t::uint64, 0]         ;; RecoverUsdt::recoveryTimeout
+        ])
+    );
+}
+
+const int RecoverUsdt::_toOffset = _HEADER_WIDTH;
+const int RecoverUsdt::_amountOffset = RecoverUsdt::_toOffset + 256;
+const int RecoverUsdt::_recoveryTimeoutOffset = RecoverUsdt::_amountOffset + 64;
+
+;; (to, amount, recoveryTimeout)
+(int, int, int) RecoverUsdt::getToAndAmountAndRecoveryTimeout(cell $self) impure inline {
+    slice selfSlice = $self.begin_parse();
+    return (
+        selfSlice.preloadAddressAt(RecoverUsdt::_toOffset),
+        selfSlice.preloadUint64At(RecoverUsdt::_amountOffset),
+        selfSlice.preloadUint64At(RecoverUsdt::_recoveryTimeoutOffset)
+    );
+}
+
+cell RecoverUsdt::sanitize(cell $self) impure inline {
+    return RecoverUsdt::New(
+        $self.cl::get<address>(RecoverUsdt::to),
+        $self.cl::get<uint64>(RecoverUsdt::amount)    
+    );
+}

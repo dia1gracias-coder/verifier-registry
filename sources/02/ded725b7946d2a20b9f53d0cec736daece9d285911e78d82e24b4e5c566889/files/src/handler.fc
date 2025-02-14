@@ -1,0 +1,162 @@
+#include "usdtOFT/handlerUsdt.fc";
+
+
+;;; =============================== PERMISSIONS =================================
+() _checkPermissions(int op, cell $md) impure inline {
+
+    ;; ----------- USDT wallet permissions --------------
+    if (op == Jetton::OP::TRANSFER_NOTIFICATION) {
+        assertContractWalletAddress();
+
+    ;; ----------- LZ permissions --------------
+    } elseif (
+        (op == Layerzero::OP::LZ_RECEIVE_EXECUTE)
+        | (op == Layerzero::OP::CHANNEL_SEND_CALLBACK) ;; effectively the callback from forceAbort it just passes an error code vs. success
+        | (op == Layerzero::OP::BURN_CALLBACK)
+        | (op == Layerzero::OP::NILIFY_CALLBACK)
+    ) {
+        assertChannelAddress($md.cl::get<objRef>(md::MdObj::obj));
+    } elseif (op == Layerzero::OP::LZ_RECEIVE_PREPARE) {
+        return (); ;; no permissions check needed
+
+    ;; ----------- OFT permissions --------------
+    } elseif (op == OP::SendCredits) {
+        assertPlanner();
+    } elseif (
+        (op == OP::WithdrawLocal)
+        | (op == OP::WithdrawRemote)
+     ) {
+        assertLpAdminOrOwner();
+    } elseif (
+        (op == OP::WithdrawFees)
+        | (op == OP::RecoverUsdtInit)
+        | (op == OP::RecoverUsdt)
+        | (op == OP::SetPlannerAddress)
+        | (op == OP::SetLpAdminAddress)
+        | (op == OP::SetGasAsserts)
+        | (op == OP::SetFee)
+    ) {
+        assertOwner();
+    } elseif (op == OP::SetCostAsserts) {
+        assertPlannerOrOwner();
+    } elseif (
+        ;; ----------- OApp permissions --------------
+        (op == OP::DeployChannel)
+        | (op == OP::DeployConnection)
+        | (op == OP::ForceAbort)
+        | (op == OP::Burn)
+        | (op == OP::Nilify)
+        | (op == OP::SetPeer)
+        | (op == OP::SetEnforcedOptions)
+        | (op == OP::SetLzConfig)
+        | (op == OP::TransferOwnership)
+    ) {
+        assertOwner();
+    } elseif (op == OP::ClaimOwnership) {
+        assertTentativeOwner();
+
+    ;; ----------- Default permissions --------------
+    } else {
+        ;; we must put a check for all opcodes to make sure we don't
+        ;; mistakenly miss an opp code's permissions
+        throw(BaseInterface::ERROR::invalidOpcode);
+    }
+}
+
+
+;;; =============================== OPCODES =================================
+tuple _executeOpcode(int op, cell $md) impure inline {
+
+    ;; ----------- USDT wallet opcodes --------------
+    if (op == Jetton::OP::TRANSFER_NOTIFICATION) {
+        ;; both of these share the same opcode, need to switch based on the md name
+        if ($md.is_null()) {
+            return depositLocal($md);
+        } elseif (cl::typeof($md) == OFTSend::NAME) {
+            return sendOFT($md);
+        }
+
+    ;; ----------- Lz opcodes -----------
+    } elseif (op == Layerzero::OP::CHANNEL_SEND_CALLBACK) {
+        return channelSendCallback($md);
+    } elseif (op == Layerzero::OP::LZ_RECEIVE_PREPARE) {
+        return lzReceivePrepare($md);
+    } elseif (op == Layerzero::OP::LZ_RECEIVE_EXECUTE) {
+        return lzReceiveExecute($md);
+    } elseif (op == Layerzero::OP::BURN_CALLBACK) {
+        return emptyActions(); ;; burn callback is not implemented by default
+    } elseif (op == Layerzero::OP::NILIFY_CALLBACK) {
+        return emptyActions(); ;; nilify callback is not implemented by default
+
+    ;; ----------- OFT opcodes --------------
+    } elseif (op == OP::SendCredits) {
+        return sendCredits($md);
+    } elseif (op == OP::WithdrawLocal) {
+        return withdrawLocal($md);
+    } elseif (op == OP::WithdrawRemote) {
+        return withdrawRemote($md);
+    } elseif (op == OP::WithdrawFees) {
+        return withdrawFees($md);
+    } elseif (op == OP::RecoverUsdtInit) {
+        return recoverUsdtInit($md);
+    } elseif (op == OP::RecoverUsdt) {
+        return recoverUsdt($md);
+    } elseif (op == OP::SetFee) {
+        return setFee($md);
+    } elseif (op == OP::SetPlannerAddress) {
+        return setPlanner($md);
+    } elseif (op == OP::SetLpAdminAddress) {
+        return setLpAdmin($md);
+    } elseif (op == OP::SetGasAsserts) {
+        return setGasAsserts($md);
+    } elseif (op == OP::SetCostAsserts) {
+        return setCostAsserts($md);
+
+    ;; ----------- OApp opcodes ---------
+    } elseif (op == OP::DeployChannel) {
+        return deployChannel($md);
+    } elseif (op == OP::DeployConnection) {
+        return deployConnection($md);
+    } elseif (op == OP::ForceAbort) {
+        return forceAbort($md);
+    } elseif (op == OP::Burn) {
+        return burn($md);
+    } elseif (op == OP::Nilify) {
+        return nilify($md);
+    } elseif (op == OP::SetPeer) {
+        return setPeer($md);
+    } elseif (op == OP::SetEnforcedOptions) {
+        return setEnforcedOptions($md);
+    } elseif (op == OP::SetLzConfig) {
+        return setLzConfig($md);
+    } elseif (op == OP::TransferOwnership) {
+        return transferOwnership($md);
+    } elseif (op == OP::ClaimOwnership) {
+        return claimOwnership($md);
+
+    ;; ---------- Opcode not found -------------
+    } else {
+        throw(BaseInterface::ERROR::invalidOpcode);
+    }
+
+    ;; Wont ever hit, but compiler requires this
+    return emptyActions();
+}
+
+;;; =============================== ACTIONS =================================
+int _executeAction(int actionType, tuple action) impure inline {
+    if (actionType == action::event::NAME) {
+        return executeEvent(action);
+    } elseif (actionType == action::call::NAME) {
+        return executeCall(action);
+    } elseif (actionType == action::dispatch::NAME) {
+        return executeDispatch(action);
+    } elseif (actionType == action::sendJettons::NAME) {
+        return executeSendJettons(action);
+    } else {
+        throw(BaseInterface::ERROR::invalidActionType);
+    }
+
+    ;; Wont ever hit, but compiler requires this
+    return false;
+}

@@ -1,0 +1,40 @@
+#include "../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+const int Address::NAME = "Address"u;
+
+const int Address::address = 0;
+
+cell Address::New(int address) inline method_id {
+    return cl::declare(
+        Address::NAME,
+        unsafeTuple([
+            [cl::t::address, address]
+        ])
+    );
+}
+
+const int Address::_headerInfo = 4825089589890555708795;
+
+const int Address::_headerInfoWidth = _BASIC_HEADER_WIDTH + _FIELD_INFO_WIDTH;
+const int Address::_headerFillerWidth = _HEADER_WIDTH - Address::_headerInfoWidth;
+
+cell Address::Build(int address) inline method_id {
+    return begin_cell()
+        .store_uint(Address::_headerInfo, Address::_headerInfoWidth)
+        .store_ones(Address::_headerFillerWidth)
+        .store_uint256(address)
+        .end_cell();
+}
+
+const int Address::_addressOffset = _HEADER_WIDTH;
+
+int Address::getAddress(cell $self) impure inline {
+    slice $selfSlice = $self.begin_parse();
+    return $selfSlice.preloadUint256At(Address::_addressOffset);
+}
+
+cell Address::sanitize(cell $self) impure inline {
+    return Address::New(
+        $self.cl::get<address>(Address::address)
+    );
+}

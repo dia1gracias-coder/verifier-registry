@@ -1,0 +1,30 @@
+#include "../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+const int MdGuid::NAME = "MdGuid"u;
+
+const int MdGuid::md = 0;
+const int MdGuid::guid = 1;
+
+cell MdGuid::New(cell $md, int guid) inline method_id {
+    return cl::declare(
+        MdGuid::NAME,
+        unsafeTuple([
+            [cl::t::objRef, $md],   ;; MdGuid::md
+            [cl::t::uint256, guid]  ;; MdGuid::errorCode
+        ])
+    );
+}
+
+const int MdGuid::_headerInfoBits = _BASIC_HEADER_WIDTH + (_FIELD_INFO_WIDTH * 2);
+const int MdGuid::_headerFillerBits = _HEADER_WIDTH - MdGuid::_headerInfoBits;
+
+const int MdGuid::_headerInfo = 5847552683615412884211067;
+
+cell MdGuid::Build(cell $md, int guid) inline method_id {
+    return begin_cell()
+        .store_uint(MdGuid::_headerInfo, MdGuid::_headerInfoBits)
+        .store_ones(MdGuid::_headerFillerBits)
+        .store_uint256(guid)
+        .store_ref($md)
+        .end_cell();
+}

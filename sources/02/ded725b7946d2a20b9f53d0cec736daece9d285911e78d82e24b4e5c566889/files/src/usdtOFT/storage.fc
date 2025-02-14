@@ -1,0 +1,249 @@
+#include "../oApp/storage.fc";
+#include "../../structs/GasAsserts.fc";
+#include "../../structs/CostAsserts.fc";
+
+;; required object name
+const int UsdtOFT::NAME = "usdtOFT"u;
+
+;; field names
+const int UsdtOFT::oAppStorage = 0; ;; == BASE_OAPP_STORAGE_INDEX
+
+const int UsdtOFT::creditsArbitrum = 1;
+const int UsdtOFT::creditsCelo = 2;
+const int UsdtOFT::creditsEth = 3;
+const int UsdtOFT::creditsTon = 4;
+const int UsdtOFT::creditsTron = 5;
+
+const int UsdtOFT::contractBalance = 6;
+const int UsdtOFT::feeBalance = 7;
+const int UsdtOFT::feeBps = 8;
+
+const int UsdtOFT::contractWalletAddress = 9;
+const int UsdtOFT::plannerAddress = 10;
+
+;; used for gas assertions when dealing with the protocol
+;; note that the last field is unused in this objRef, and is duplicated in the OApp
+const int UsdtOFT::gasAsserts = 11;
+const int UsdtOFT::costAsserts = 12;
+
+;; Store recover request at the end of storage to reduce gas for fetching gas asserts object.
+const int UsdtOFT::recoverRequest = 13;
+const int UsdtOFT::lpAdminAddress = 14;
+
+;; @owner oApp owner EOA
+cell UsdtOFT::New(
+    int owner,
+    int controllerAddress,
+    int eid,
+    cell endpointCode,
+    cell channelCode
+) method_id {
+    return cl::declare(
+        UsdtOFT::NAME,
+        unsafeTuple([
+            [cl::t::objRef, OApp::New(
+                owner,
+                controllerAddress,
+                eid,
+                endpointCode,
+                channelCode
+            )],                                 ;; UsdtOFT::oAppStorage
+            [cl::t::coins, 0],                  ;; UsdtOFT::creditsArbitrum
+            [cl::t::coins, 0],                  ;; UsdtOFT::creditsCelo
+            [cl::t::coins, 0],                  ;; UsdtOFT::creditsEth
+            [cl::t::coins, 0],                  ;; UsdtOFT::creditsTon
+            [cl::t::coins, 0],                  ;; UsdtOFT::creditsTron
+            [cl::t::coins, 0],                  ;; UsdtOFT::contractBalance
+            [cl::t::coins, 0],                  ;; UsdtOFT::feeBalance
+            [cl::t::uint16, 0],                 ;; UsdtOFT::feeBps
+            [cl::t::address, NULLADDRESS],      ;; UsdtOFT::contractWalletAddress
+            [cl::t::address, NULLADDRESS],      ;; UsdtOFT::plannerAddress
+            [cl::t::objRef, GasAsserts::New(
+                0, 0, 0, 0, 0
+            )],                                 ;; UsdtOFT::gasAsserts
+            [cl::t::objRef, cl::nullObject()],  ;; UsdtOFT::costAsserts
+            [cl::t::objRef, cl::nullObject()],  ;; UsdtOFT::recoverRequest
+            [cl::t::address, NULLADDRESS]       ;; UsdtOFT::lpAdminAddress
+        ])
+    );
+}
+
+;; ====================== Object Getters  =========================
+
+const int UsdtOFT::_creditsArbitrumOffset = _HEADER_WIDTH;
+const int UsdtOFT::_creditsCeloOffset = UsdtOFT::_creditsArbitrumOffset + 128;
+const int UsdtOFT::_creditsEthOffset =  UsdtOFT::_creditsCeloOffset + 128;
+const int UsdtOFT::_creditsTonOffset = UsdtOFT::_creditsEthOffset + 128;
+const int UsdtOFT::_creditsTronOffset = UsdtOFT::_creditsTonOffset + 128;
+
+const int UsdtOFT::_contractBalanceOffset = 0;
+const int UsdtOFT::_feeBalanceOffset = UsdtOFT::_contractBalanceOffset + 128;
+const int UsdtOFT::_feeBpsOffset = UsdtOFT::_feeBalanceOffset + 128;
+const int UsdtOFT::_contractWalletAddressOffset = UsdtOFT::_feeBpsOffset + 16;
+const int UsdtOFT::_plannerAddressOffset = UsdtOFT::_contractWalletAddressOffset + 256;
+
+cell UsdtOFT::getOAppStorage(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadRefAt(0);
+}
+
+int UsdtOFT::getCreditsArbitrum(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadCoinsAt(UsdtOFT::_creditsArbitrumOffset);
+}
+
+int UsdtOFT::getCreditsCelo(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadCoinsAt(UsdtOFT::_creditsCeloOffset);
+}
+
+int UsdtOFT::getCreditsEth(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadCoinsAt(UsdtOFT::_creditsEthOffset);
+}
+
+int UsdtOFT::getCreditsTon(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadCoinsAt(UsdtOFT::_creditsTonOffset);
+}
+
+int UsdtOFT::getCreditsTron(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadCoinsAt(UsdtOFT::_creditsTronOffset);
+}
+
+int UsdtOFT::getContractBalance(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadRefAt(2).cellPreloadCoinsAt(UsdtOFT::_contractBalanceOffset);
+}
+
+int UsdtOFT::getFeeBalance(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadRefAt(2).cellPreloadCoinsAt(UsdtOFT::_feeBalanceOffset);
+}
+
+int UsdtOFT::getFeeBps(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadRefAt(2).cellPreloadUint16At(UsdtOFT::_feeBpsOffset);
+}
+
+int UsdtOFT::getContractWalletAddress(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadRefAt(2).cellPreloadAddressAt(UsdtOFT::_contractWalletAddressOffset);
+}
+
+int UsdtOFT::getPlannerAddress(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadRefAt(2).cellPreloadAddressAt(UsdtOFT::_plannerAddressOffset);
+}
+
+cell UsdtOFT::getGasAsserts(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadRefAt(1);
+}
+
+cell UsdtOFT::getCostAsserts(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadRefAt(2).cellPreloadRefAt(0);
+}
+
+cell UsdtOFT::getRecoverRequest(cell $UsdtOFT) impure inline {
+    return $UsdtOFT.cellPreloadRefAt(2).cellPreloadRefAt(1);
+}
+
+;; ====================== Object Setters  =========================
+
+cell UsdtOFT::setCreditsArbitrum(cell $UsdtOFT, int amount) impure inline {
+    slice usdtOftSlice = $UsdtOFT.begin_parse();
+    return begin_cell()
+            .store_slice(usdtOftSlice.scutfirst(UsdtOFT::_creditsArbitrumOffset, 0))
+            .store_uint128(amount)
+            .store_slice(usdtOftSlice.sskipfirst(UsdtOFT::_creditsCeloOffset, 0))
+            .end_cell();
+}
+
+cell UsdtOFT::setCreditsCelo(cell $UsdtOFT, int amount) impure inline {
+    slice usdtOftSlice = $UsdtOFT.begin_parse();
+    return begin_cell()
+            .store_slice(usdtOftSlice.scutfirst(UsdtOFT::_creditsCeloOffset, 0))
+            .store_uint128(amount)
+            .store_slice(usdtOftSlice.sskipfirst(UsdtOFT::_creditsEthOffset, 0))
+            .end_cell();
+}
+
+cell UsdtOFT::setCreditsEth(cell $UsdtOFT, int amount) impure inline {
+    slice usdtOftSlice = $UsdtOFT.begin_parse();
+    return begin_cell()
+            .store_slice(usdtOftSlice.scutfirst(UsdtOFT::_creditsEthOffset, 0))
+            .store_uint128(amount)
+            .store_slice(usdtOftSlice.sskipfirst(UsdtOFT::_creditsTonOffset, 0))
+            .end_cell();
+}
+
+cell UsdtOFT::setCreditsTon(cell $UsdtOFT, int amount) impure inline {
+    slice usdtOftSlice = $UsdtOFT.begin_parse();
+    return begin_cell()
+            .store_slice(usdtOftSlice.scutfirst(UsdtOFT::_creditsTonOffset, 0))
+            .store_uint128(amount)
+            .store_slice(usdtOftSlice.sskipfirst(UsdtOFT::_creditsTronOffset, 0))
+            .end_cell();
+}
+
+cell UsdtOFT::setCreditsTron(cell $UsdtOFT, int amount) impure inline {
+    slice usdtOftSlice = $UsdtOFT.begin_parse();
+    return begin_cell()
+            .store_slice(usdtOftSlice.scutfirst(UsdtOFT::_creditsTronOffset, 4))
+            .store_uint128(amount)
+            .end_cell();
+}
+
+cell UsdtOFT::setContractBalance(cell $UsdtOFT, int amount) impure inline {
+    slice usdtOftSlice = $UsdtOFT.begin_parse();
+    slice ref2Slice = usdtOftSlice.preloadRefSliceAt(2);
+
+    cell newRef2 = begin_cell()
+                    .store_uint128(amount)
+                    .store_slice(ref2Slice.sskipfirst(UsdtOFT::_feeBalanceOffset, 0))
+                    .end_cell();
+
+    return begin_cell()
+            .store_slice(usdtOftSlice.sskiplast(0, 2))
+            .store_ref(newRef2)
+            .store_slice(usdtOftSlice.scutlast(0, 1))
+            .end_cell();
+}
+
+cell UsdtOFT::setFeeBalance(cell $UsdtOFT, int amount) impure inline {
+    slice usdtOftSlice = $UsdtOFT.begin_parse();
+    slice ref2Slice = usdtOftSlice.preloadRefSliceAt(2);
+    cell newRef2 = begin_cell()
+                    .store_slice(ref2Slice.scutfirst(UsdtOFT::_feeBalanceOffset, 0))
+                    .store_uint128(amount)
+                    .store_slice(ref2Slice.sskipfirst(UsdtOFT::_feeBpsOffset, 0))
+                    .end_cell();
+    
+    return begin_cell()
+            .store_slice(usdtOftSlice.sskiplast(0, 2))
+            .store_ref(newRef2)
+            .store_slice(usdtOftSlice.scutlast(0, 1))
+            .end_cell();
+}
+
+cell UsdtOFT::setFeeBps(cell $UsdtOFT, int bps) impure inline {
+    slice usdtOftSlice = $UsdtOFT.begin_parse();
+    slice ref2Slice = usdtOftSlice.preloadRefSliceAt(2);
+    cell newRef2 = begin_cell()
+                    .store_slice(ref2Slice.scutfirst(UsdtOFT::_feeBpsOffset, 0))
+                    .store_uint16(bps)
+                    .store_slice(ref2Slice.sskipfirst(UsdtOFT::_contractWalletAddressOffset, 0))
+                    .end_cell();
+    
+    return begin_cell()
+            .store_slice(usdtOftSlice.sskiplast(0, 2))
+            .store_ref(newRef2)
+            .store_slice(usdtOftSlice.scutlast(0, 1))
+            .end_cell();
+}
+
+cell UsdtOFT::setRecoverRequest(cell $UsdtOFT, cell $request) impure inline {
+    slice usdtOftSlice = $UsdtOFT.begin_parse();
+    slice ref2Slice = usdtOftSlice.preloadRefSliceAt(2);
+
+    cell newRef2 = begin_cell()
+                    .store_slice(ref2Slice.sskiplast(0, 1))
+                    .store_ref($request)
+                    .end_cell();
+    
+    return begin_cell()
+            .store_slice(usdtOftSlice.sskiplast(0, 2))
+            .store_ref(newRef2)
+            .store_slice(usdtOftSlice.scutlast(0, 1))
+            .end_cell();
+}

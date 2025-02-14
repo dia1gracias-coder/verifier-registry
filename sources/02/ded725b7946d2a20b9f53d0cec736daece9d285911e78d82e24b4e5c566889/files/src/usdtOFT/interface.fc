@@ -1,0 +1,72 @@
+#include "../oApp/interface.fc";
+
+;; operation codes
+const int OP::SendCredits = "OP::SendCredits"c;
+
+const int OP::WithdrawLocal = "OP::WithdrawLocal"c;
+const int OP::WithdrawRemote = "OP::WithdrawRemote"c;
+
+const int OP::WithdrawFees = "OP::WithdrawFees"c;
+const int OP::RecoverUsdtInit = "OP::RecoverUsdtInit"c;
+const int OP::RecoverUsdt = "OP::RecoverUsdt"c;
+
+const int OP::SetPlannerAddress = "OP::SetPlannerAddress"c;
+const int OP::SetLpAdminAddress = "OP::SetLpAdminAddress"c;
+const int OP::SetGasAsserts = "OP::SetGasAsserts"c;
+const int OP::SetCostAsserts = "OP::SetCostAsserts"c;
+const int OP::SetFee = "OP::SetFee"c;
+
+;; events
+const int EVENT::LocalDeposited = "EVENT::LocalDeposited"u;
+const int EVENT::LocalWithdrawn = "EVENT::LocalWithdrawn"u;
+
+const int EVENT::RemoteWithdrawInit = "EVENT::RemoteWithdrawInit"u;
+const int EVENT::RemoteWithdrawSucceed = "EVENT::RemoteWithdrawSucceed"u;
+const int EVENT::RemoteWithdrawFailed = "EVENT::RemoteWithdrawFailed"u;
+const int EVENT::RemoteWithdrawn = "EVENT::RemoteWithdrawn"u;
+
+const int EVENT::OFTSentInit = "EVENT::OFTSentInit"u;
+const int EVENT::OFTSentSucceed = "EVENT::OFTSentSucceed"u;
+const int EVENT::OFTSentFailed = "EVENT::OFTSentFailed"u;
+const int EVENT::OFTReceived = "EVENT::OFTReceived"u;
+
+const int EVENT::CreditsSentInit = "EVENT::CreditsSentInit"u;
+const int EVENT::CreditsSentSucceed = "EVENT::CreditsSentSucceed"u;
+const int EVENT::CreditsSentFailed = "EVENT::CreditsSentFailed"u;
+const int EVENT::CreditsReceived = "EVENT::CreditsReceived"u;
+
+const int EVENT::FeesWithdrawn = "EVENT::FeesWithdrawn"u;
+const int EVENT::UsdtRecoverInit = "EVENT::UsdtRecoverInit"u;
+const int EVENT::UsdtRecovered = "EVENT::UsdtRecovered"u;
+
+const int EVENT::PlannerSet = "EVENT::PlannerSet"u;
+const int EVENT::LpAdminSet = "EVENT::LpAdminSet"u;
+const int EVENT::GasAssertsSet = "EVENT::GasAssertsSet"u;
+const int EVENT::CostAssertsSet = "EVENT::CostAssertsSet"u;
+const int EVENT::FeeSet = "EVENT::FeeSet"u;
+
+;; error codes
+const int ERROR::OnlyPlanner = "ERROR::OnlyPlanner"c & ERRORCODE_MASK;
+const int ERROR::OnlyPlannerOrOwner = "ERROR::OnlyPlannerOrOwner"c & ERRORCODE_MASK;
+const int ERROR::OnlyLpAdminOrOwner = "ERROR::OnlyLpAdminOrOwner"c & ERRORCODE_MASK;
+const int ERROR::OnlyContractWalletAddress = "ERROR::OnlyContractWalletAddress"c & ERRORCODE_MASK;
+const int ERROR::InvalidAmount = "ERROR::invalidAmount"c & ERRORCODE_MASK;
+const int ERROR::InvalidEid = "ERROR::invalidEid"c & ERRORCODE_MASK;
+const int ERROR::InvalidFee = "ERROR::InvalidFee"c & ERRORCODE_MASK;
+const int ERROR::InvalidMsgType = "ERROR::InvalidMsgType"c & ERRORCODE_MASK;
+const int ERROR::InvalidMsgTypeOrMd = "ERROR::InvalidMsgTypeOrMd"c & ERRORCODE_MASK;
+const int ERROR::SlippageExceeded = "ERROR::slippageExceeded"c & ERRORCODE_MASK;
+const int ERROR::InvalidRecoverWindow = "ERROR::InvalidRecoverWindow"c & ERRORCODE_MASK;
+const int ERROR::NoRecoverInit = "ERROR::NoRecoverInit"c & ERRORCODE_MASK;
+const int ERROR::InsufficientLayerZeroFee = "ERROR::InsufficientLayerZeroFee"c & ERRORCODE_MASK;
+const int ERROR::NoError = "ERROR::NoError"c & ERRORCODE_MASK;
+const int ERROR::InvalidField = "ERROR::InvalidField"c & ERRORCODE_MASK;
+
+const int ERROR::InsufficientCreditsArbitrum = "ERROR::InsufficientCreditsArbitrum"c & ERRORCODE_MASK;
+const int ERROR::InsufficientCreditsCelo = "ERROR::InsufficientCreditsCelo"c & ERRORCODE_MASK;
+const int ERROR::InsufficientCreditsEth = "ERROR::InsufficientCreditsEth"c & ERRORCODE_MASK;
+const int ERROR::InsufficientCreditsTon = "ERROR::insufficientCreditsTon"c & ERRORCODE_MASK;
+const int ERROR::InsufficientCreditsTron = "ERROR::InsufficientCreditsTron"c & ERRORCODE_MASK;
+const int ERROR::InsufficientContractBalance = "ERROR::InsufficientContractBalance"c & ERRORCODE_MASK;
+const int ERROR::InsufficientFeeBalance = "ERROR::InsufficientFeeBalance"c & ERRORCODE_MASK;
+

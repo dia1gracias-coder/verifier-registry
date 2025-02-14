@@ -1,0 +1,30 @@
+#include "../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+const int MdError::NAME = "MdError"u;
+
+const int MdError::md = 0;
+const int MdError::errorCode = 1;
+
+cell MdError::New(cell $md, int errorCode) inline method_id {
+    return cl::declare(
+        MdError::NAME,
+        unsafeTuple([
+            [cl::t::objRef, $md],       ;; MdError::md
+            [cl::t::uint256, errorCode] ;; MdError::errorCode
+        ])
+    );
+}
+
+const int MdError::_headerInfoBits = _BASIC_HEADER_WIDTH + (_FIELD_INFO_WIDTH * 2);
+const int MdError::_headerFillerBits = _HEADER_WIDTH - MdError::_headerInfoBits;
+
+const int MdError::_headerInfo = 1496972893291694440024507771;
+
+cell MdError::Build(cell $md, int errorCode) inline method_id {
+    return begin_cell()
+        .store_uint(MdError::_headerInfo, MdError::_headerInfoBits)
+        .store_ones(MdError::_headerFillerBits)
+        .store_uint256(errorCode)
+        .store_ref($md)
+        .end_cell();
+}

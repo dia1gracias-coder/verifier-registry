@@ -1,0 +1,97 @@
+#include "../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+const int CostAsserts::NAME = "CostAssert"u;
+
+;; Below are for calculating native fee based on options
+const int CostAsserts::maxPriceRatioArbitrum = 0;
+const int CostAsserts::maxGasPriceArbitrum = 1;
+const int CostAsserts::maxPriceRatioCelo = 2;
+const int CostAsserts::maxGasPriceCelo = 3;
+const int CostAsserts::maxPriceRatioEth = 4;
+const int CostAsserts::maxGasPriceEth = 5;
+const int CostAsserts::maxPriceRatioTron = 6;
+const int CostAsserts::maxGasPriceTron = 7;
+
+cell CostAsserts::New(
+    int maxPriceRatioArbitrum,
+    int maxGasPriceArbitrum,
+    int maxPriceRatioCelo,
+    int maxGasPriceCelo,
+    int maxPriceRatioEth,
+    int maxGasPriceEth,
+    int maxPriceRatioTron,
+    int maxGasPriceTron
+) inline method_id {
+    return cl::declare(
+        CostAsserts::NAME,
+        unsafeTuple([
+            [cl::t::coins, maxPriceRatioArbitrum],   ;; CostAsserts::maxPriceRatioArbitrum
+            [cl::t::uint64, maxGasPriceArbitrum],    ;; CostAsserts::maxGasPriceArbitrum
+            [cl::t::coins, maxPriceRatioCelo],       ;; CostAsserts::maxPriceRatioCelo
+            [cl::t::uint64, maxGasPriceCelo],        ;; CostAsserts::maxGasPriceCelo
+            [cl::t::coins, maxPriceRatioEth],        ;; CostAsserts::maxPriceRatioEth
+            [cl::t::uint64, maxGasPriceEth],         ;; CostAsserts::maxGasPriceEth
+            [cl::t::coins, maxPriceRatioTron],       ;; CostAsserts::maxPriceRatioTron
+            [cl::t::uint64, maxGasPriceTron]         ;; CostAsserts::maxGasPriceTron
+        ])
+    );
+}
+
+;; ========================== Object Accessors ==========================
+const int CostAsserts::_maxPriceRatioArbitrumOffset = _HEADER_WIDTH;
+const int CostAsserts::_maxGasPriceArbitrumOffset = CostAsserts::_maxPriceRatioArbitrumOffset + 128;
+
+const int CostAsserts::_maxPriceRatioCeloOffset = CostAsserts::_maxGasPriceArbitrumOffset + 64;
+const int CostAsserts::_maxGasPriceCeloOffset = CostAsserts::_maxPriceRatioCeloOffset + 128;
+
+const int CostAsserts::_maxPriceRatioEthOffset = CostAsserts::_maxGasPriceCeloOffset + 64;
+const int CostAsserts::_maxGasPriceEthOffset = CostAsserts::_maxPriceRatioEthOffset + 128;
+
+const int CostAsserts::_maxPriceRatioTronOffset = 0;
+const int CostAsserts::_maxGasPriceTronOffset = CostAsserts::_maxPriceRatioTronOffset + 128;
+
+(int, int) CostAsserts::getMaxPriceRatioArbitrumAndMaxGasPriceArbitrum(cell $self) impure inline {
+    return (
+        $self.cellPreloadCoinsAt(CostAsserts::_maxPriceRatioArbitrumOffset),
+        $self.cellPreloadUint64At(CostAsserts::_maxGasPriceArbitrumOffset)
+    );
+}
+
+(int, int) CostAsserts::getMaxPriceRatioCeloAndMaxGasPriceCelo(cell $self) impure inline {
+    return (
+        $self.cellPreloadCoinsAt(CostAsserts::_maxPriceRatioCeloOffset),
+        $self.cellPreloadUint64At(CostAsserts::_maxGasPriceCeloOffset)
+    );
+}
+
+(int, int) CostAsserts::getMaxPriceRatioEthAndMaxGasPriceEth(cell $self) impure inline {
+    return (
+        $self.cellPreloadCoinsAt(CostAsserts::_maxPriceRatioEthOffset),
+        $self.cellPreloadUint64At(CostAsserts::_maxGasPriceEthOffset)
+    );
+}
+
+(int, int) CostAsserts::getMaxPriceRatioTronAndMaxGasPriceTron(cell $self) impure inline {
+    slice ref2Slice = $self.cellPreloadRefSliceAt(2);
+    return (
+        ref2Slice.preloadCoinsAt(CostAsserts::_maxPriceRatioTronOffset),
+        ref2Slice.preloadUint64At(CostAsserts::_maxGasPriceTronOffset)
+    );
+}
+
+cell CostAsserts::sanitize(cell $self) impure inline {
+    if (cl::isNullObject($self)) {
+        return cl::nullObject();
+    }
+
+    return CostAsserts::New(
+        $self.cl::get<coins>(CostAsserts::maxPriceRatioArbitrum),
+        $self.cl::get<uint64>(CostAsserts::maxGasPriceArbitrum),
+        $self.cl::get<coins>(CostAsserts::maxPriceRatioCelo),
+        $self.cl::get<uint64>(CostAsserts::maxGasPriceCelo),
+        $self.cl::get<coins>(CostAsserts::maxPriceRatioEth),
+        $self.cl::get<uint64>(CostAsserts::maxGasPriceEth),
+        $self.cl::get<coins>(CostAsserts::maxPriceRatioTron),
+        $self.cl::get<uint64>(CostAsserts::maxGasPriceTron)
+    );
+}

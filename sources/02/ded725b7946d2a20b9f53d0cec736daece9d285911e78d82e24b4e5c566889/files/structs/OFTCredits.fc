@@ -1,0 +1,65 @@
+#include "../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+const int OFTCredits::NAME = "OFTCredits"u;
+
+const int OFTCredits::dstEid = 0;
+const int OFTCredits::creditsArbitrum = 1;
+const int OFTCredits::creditsCelo = 2;
+const int OFTCredits::creditsEth = 3;
+const int OFTCredits::creditsTon = 4;
+const int OFTCredits::creditsTron = 5;
+const int OFTCredits::nativeFee = 6;
+const int OFTCredits::zroFee = 7;
+const int OFTCredits::extraOptions = 8;
+
+cell OFTCredits::New(
+    int dstEid,
+    int creditsArbitrum,
+    int creditsCelo,
+    int creditsEth,
+    int creditsTon,
+    int creditsTron,
+    int nativeFee,
+    int zroFee,
+    cell $extraOptions
+) inline method_id {
+    return cl::declare(
+        OFTCredits::NAME,
+        unsafeTuple([
+            [cl::t::uint32, dstEid],        ;; OFTCredits::dstEid
+            [cl::t::uint64, creditsArbitrum],   ;; OFTCredits::creditsArbitrum
+            [cl::t::uint64, creditsCelo],   ;; OFTCredits::creditsCelo
+            [cl::t::uint64, creditsEth],    ;; OFTCredits::creditsEth
+            [cl::t::uint64, creditsTon],    ;; OFTCredits::creditsTon
+            [cl::t::uint64, creditsTron],   ;; OFTCredits::creditsTron
+            [cl::t::coins, nativeFee],      ;; OFTCredits::nativeFee
+            [cl::t::coins, zroFee],         ;; OFTCredits::zroFee
+            [cl::t::objRef, $extraOptions]  ;; OFTCredits::extraOptions
+        ])
+    );
+}
+
+const int OFTCredits::_dstEidOffset = _HEADER_WIDTH;
+const int OFTCredits::_creditsArbitrumOffset = OFTCredits::_dstEidOffset + 32;
+const int OFTCredits::_creditsCeloOffset = OFTCredits::_creditsArbitrumOffset + 64;
+const int OFTCredits::_creditsEthOffset = OFTCredits::_creditsCeloOffset + 64;
+const int OFTCredits::_creditsTonOffset = OFTCredits::_creditsEthOffset + 64;
+const int OFTCredits::_creditsTronOffset = OFTCredits::_creditsTonOffset + 64;
+const int OFTCredits::_nativeFeeOffset = OFTCredits::_creditsTronOffset + 64;
+const int OFTCredits::_zroFeeOffset = OFTCredits::_nativeFeeOffset + 128;
+
+(int, int, int, int, int, int, int, int, cell) OFTCredits::deserialize($OFTCredits) impure inline {
+    slice oftCreditsSlice = $OFTCredits.begin_parse();
+
+    return (
+        oftCreditsSlice.preloadUint32At(OFTCredits::_dstEidOffset),
+        oftCreditsSlice.preloadUint64At(OFTCredits::_creditsArbitrumOffset),
+        oftCreditsSlice.preloadUint64At(OFTCredits::_creditsCeloOffset),
+        oftCreditsSlice.preloadUint64At(OFTCredits::_creditsEthOffset),
+        oftCreditsSlice.preloadUint64At(OFTCredits::_creditsTonOffset),
+        oftCreditsSlice.preloadUint64At(OFTCredits::_creditsTronOffset),
+        oftCreditsSlice.preloadCoinsAt(OFTCredits::_nativeFeeOffset),
+        oftCreditsSlice.preloadCoinsAt(OFTCredits::_zroFeeOffset),
+        oftCreditsSlice.preloadRefAt(0)
+    );
+}
