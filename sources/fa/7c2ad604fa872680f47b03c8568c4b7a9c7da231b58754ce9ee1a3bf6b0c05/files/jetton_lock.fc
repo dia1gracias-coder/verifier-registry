@@ -1,0 +1,40 @@
+#include "imports/extlib.fc";
+#include "imports/stdlib.fc";
+#include "utils/storage-utils.fc";
+#include "config/exit-codes.fc";
+#include "config/op-codes.fc";
+#include "config/exit-codes.fc";
+#include "utils/math-utils.fc";
+#include "utils/handles.fc";
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    throw_if(0, cs~load_uint(4) & 1); ;; ignore bounce
+    slice sender_addr = cs~load_msg_addr();
+    self::init();
+
+    if (equal_slices(self::jetton_addr, extlib::addr_none()))   { handle::jwall_init(sender_addr, in_msg_body); return (); }
+    if (equal_slices(sender_addr, self::owner))               { handle::withdraw_tokens(sender_addr); return (); }
+    if (equal_slices(sender_addr, self::jetton_addr))         { handle::receive_tokens(sender_addr, in_msg_body); return (); }
+
+    throw(0xffff);
+}
+
+(_) get::info() method_id {
+    self::init();
+    return (
+        self::regulator_addr, 
+        self::jetton_addr,
+        self::owner,
+        self::start_time,
+        self::end_time, 
+        self::last_received, 
+        self::tokens_unlocked, 
+        self::tokens_all
+        );
+}
+
+(cell) get::info_cell() method_id {
+    return get_data();
+}
