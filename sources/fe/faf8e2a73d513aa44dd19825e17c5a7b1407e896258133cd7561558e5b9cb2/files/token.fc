@@ -1,0 +1,83 @@
+;; Import standard library
+#include "imports/stdlib.fc";
+
+;; Define constants
+const int DEPOSIT_MINT = 1;
+const int MINT_OPCODE = 0x642b7d07;
+;; const slice rrr = "EQDbtlC0K1TYodoOK-UapjBxrm9Vvm5sOq1gGhgOWXMpMUoG";
+;; const slice ttt = begin_cell().store_slice(rrr).end_cell().begin_parse();
+;; Initialize contract storage with treasury and jetton master addresses
+() init() impure {
+    ;; Replace these addresses with your actual addresses
+    slice treasury_address = "EQDbtlC0K1TYodoOK-UapjBxrm9Vvm5sOq1gGhgOWXMpMUoG"; ;; Example treasury address
+    slice jetton_master_address = "EQCSMv6CJzIk0bMdAQtra5zV2107b6o6284CyRx8JnBZfPwg"; ;; Example jetton master address
+
+    ;; Initialize contract storage with both addresses
+    set_data(
+        begin_cell()
+            .store_slice(treasury_address)
+            .store_slice(jetton_master_address)
+        .end_cell()
+    );
+}
+
+;; Function to load treasury address from contract data
+(slice) get_treasury_address() impure {
+    slice ds = get_data().begin_parse();
+    return ds~load_msg_addr();
+}
+
+;; Function to load jetton master address from contract data
+(slice) get_jetton_master_address() impure {
+    slice ds = get_data().begin_parse();
+    ds~load_msg_addr(); ;; Skip treasury address
+    return ds~load_msg_addr();
+}
+
+;; Function to send a mint request to the jetton master contract
+(int) send_jetton_mint(slice receiver, int amount) impure {
+    slice jetton_master_address = get_jetton_master_address();
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; Message mode
+        .store_slice(jetton_master_address) ;; Destination address
+        .store_coins(0) ;; Attached value
+        .store_uint(DEPOSIT_MINT, 32) ;; Operation code
+        .store_slice(receiver) ;; Receiver address
+        .store_uint(amount, 64) ;; Amount to mint
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; Default params
+        .end_cell();
+    send_raw_message(msg, 0); ;; Send the message
+    return 1;
+}
+
+;; Main contract handler
+int recv_internal(slice in_msg) impure {
+    slice sender_addr = in_msg~load_msg_addr(); ;; Load sender address
+    int ton_amount = in_msg~load_coins(); ;; Load attached TONs
+    int op_code = in_msg~load_uint(32); ;; Load operation code
+
+    if (op_code == MINT_OPCODE) {
+        slice receiver = in_msg~load_msg_addr(); ;; Load receiver address
+        int mint_amount = in_msg~load_coins(); ;; Load mint amount
+
+        ;; Send mint request to jetton master contract
+        send_jetton_mint(receiver, mint_amount);
+
+        ;; Calculate tokens to mint based on TON amount and mint rate
+        int mint_rate = 1000;
+        int tokens_to_mint = ton_amount * mint_rate;
+        send_jetton_mint(sender_addr, tokens_to_mint);
+
+        ;; Send TONs to the treasury address
+        slice treasury_address = get_treasury_address();
+        var treasury_msg = begin_cell()
+            .store_uint(0x18, 6) ;; Message mode
+            .store_slice(treasury_address) ;; Destination address
+            .store_coins(ton_amount) ;; Attached value
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; Default params
+            .end_cell();
+        send_raw_message(treasury_msg, 0); ;; Send the message
+        return 1;
+    }
+    return 0;
+}
