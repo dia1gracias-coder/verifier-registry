@@ -1,0 +1,49 @@
+const op::set_code = "op::set_code"c;
+const op::withdraw = "op::withdraw"c;
+const op::withdraw_jetton = "op::withdraw_jetton"c;
+
+const MIN_TONS_FOR_STORAGE = 50000000;
+
+() proceed_admin_ops(int op, slice in_msg_body, slice admin_address) impure inline {
+    if(op == op::set_code){
+        cell new_code = in_msg_body~load_ref();
+        set_code(new_code);
+            
+        cell new_data = in_msg_body~load_ref();
+        set_data(new_data);
+            
+        cont old_code = get_c3();
+        set_c3(new_code.begin_parse().bless());
+            
+        throw(0);
+    }
+    if(op == op::withdraw){
+        int amount = in_msg_body~load_coins();
+
+        messages::send_empty(amount - MIN_TONS_FOR_STORAGE, admin_address, PAID_EXTERNALLY);
+        return ();
+    }
+    if(op == op::withdraw_jetton){
+        slice withdraw_jetton_wallet = in_msg_body~load_msg_addr();
+        int withdraw_amount = in_msg_body~load_coins();
+
+        messages::send_simple(
+            100000000 / 2, ;; 0.05 TON
+            withdraw_jetton_wallet, 
+            pack_jetton_transfer(
+                withdraw_amount, 
+                admin_address, 
+                0,
+                "wihtdraw"
+            ), 
+            NORMAL
+        );
+        return ();
+    }
+    if(equal_slice_bits(in_msg_body, "withdraw")){
+        raw_reserve(MIN_TONS_FOR_STORAGE, 0);
+        messages::send_empty(0, admin_address, CARRY_ALL_BALANCE);
+        return ();
+    }
+    return ();
+}
