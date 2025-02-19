@@ -1,0 +1,441 @@
+;; -----------------------------------------------------------------
+;; File: Fluida.fc
+;; -----------------------------------------------------------------
+
+#include "stdlib.fc";
+
+;; -----------------------------------------------------------------
+;; Constants & Error Codes
+;; -----------------------------------------------------------------
+const OP_COMPLETE_SWAP       = 2271560481;  ;; decimal 0x87654321
+const OP_REFUND_SWAP         = 2882400018;  ;; decimal 0xabcdef12
+const OP_INITIALIZE          = 1;           ;; New initialization operation
+const OP_DEPOSIT_NOTIFICATION = 260734629; ;; decimal 0xDEADBEEF
+
+const ERR_INVALID_AMOUNT                  = 65521; ;; 0xfff1
+const ERR_INVALID_TIMELOCK                = 65522; ;; 0xfff2
+const ERR_SWAP_COMPLETED                  = 65523; ;; 0xfff3
+const ERR_INVALID_PREIMAGE                = 65524; ;; 0xfff4
+const ERR_TIMELOCK_EXPIRED                = 65525; ;; 0xfff5
+const ERR_SWAP_ALREADY_COMPLETED_REFUND   = 65526; ;; 0xfff6
+const ERR_TIMELOCK_NOT_EXPIRED            = 65527; ;; 0xfff7
+const ERR_INVALID_OPERATION               = 65535; ;; 0xffff
+const ERR_SWAP_NOT_FOUND                  = 65520; ;; 0xfff0
+const ERR_ALREADY_INITIALIZED             = 65519; ;; 0xffef
+
+;; -----------------------------------------------------------------
+;; Global Variables (persistent storage)
+;; -----------------------------------------------------------------
+;; Storage now holds:
+;;  - jettonWallet: address of the approved jetton token wallet contract
+;;  - swapCounter: counter for swap IDs
+;;  - swaps: dictionary of swap records
+
+(slice, int, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    if (ds.slice_empty?()) {
+        return (my_address(), 0, new_dict());  
+    }
+    return (
+        ds~load_msg_addr(),  ;; jettonWallet address
+        ds~load_uint(64),    ;; swapCounter
+        ds~load_dict()       ;; swaps dictionary
+    );
+}
+
+() save_data(slice jettonWallet, int swapCounter, cell swaps) impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(jettonWallet)
+            .store_uint(swapCounter, 64)
+            .store_dict(swaps)
+            .end_cell()
+    );
+}
+
+;; -----------------------------------------------------------------
+;; Helpers
+;; -----------------------------------------------------------------
+
+;; Helper: compute sha256 of a 256-bit integer
+int sha256_int256(int preimage) inline {
+    ;; Create a hasher
+    slice s = begin_cell()
+        .store_uint(preimage, 256) ;; store the preimage
+        .end_cell()
+        .begin_parse();
+    return string_hash(s); ;; hash using TON's string_hash which is SHA256
+}
+
+;; Serialize a Swap record.
+;; Note: tokenAmount is stored as a 128-bit integer.
+builder buildSwap(
+    slice initiator,
+    slice recipient,
+    int tokenAmount,
+    int hashLock,
+    int timeLock,
+    int isCompleted
+) inline {
+    return begin_cell()
+        .store_slice(initiator)         ;; initiator address
+        .store_slice(recipient)         ;; recipient address
+        .store_uint(tokenAmount, 128)   ;; jetton token amount (128-bit)
+        .store_uint(hashLock, 256)        ;; hashLock
+        .store_uint(timeLock, 64)         ;; timeLock
+        .store_uint(isCompleted, 1)       ;; isCompleted flag
+    ;
+}
+
+(slice, slice, int, int, int, int) parseSwap(slice s) inline {
+    return (
+        s~load_msg_addr(),       ;; initiator address
+        s~load_msg_addr(),       ;; recipient address
+        s~load_uint(128),        ;; tokenAmount (128-bit)
+        s~load_uint(256),        ;; hashLock
+        s~load_uint(64),         ;; timeLock
+        s~load_uint(1)           ;; isCompleted flag (0 or 1)
+    );
+}
+
+;; Helper: Store a new swap record in storage.
+() storeSwap(slice jettonWallet, int swapCounter, cell swaps,
+             slice initiator, slice recipient,
+             int tokenAmount, int hashLock, int timeLock) impure inline {
+    
+    ~strdump("=== STORING SWAP ===");
+    ~strdump("Swap Counter:");
+    ~dump(swapCounter);
+    
+    ~strdump("Initiator Address:");
+    ~dump(initiator);
+    
+    ~strdump("Recipient Address:");
+    ~dump(recipient);
+    
+    ~strdump("Token Amount:");
+    ~dump(tokenAmount);
+    
+    ~strdump("Hash Lock:");
+    ~dump(hashLock);
+    
+    ~strdump("Time Lock:");
+    ~dump(timeLock);
+    
+    builder b = buildSwap(initiator, recipient, tokenAmount, hashLock, timeLock, 0);
+    swaps~udict_set(256, swapCounter, b.end_cell().begin_parse());
+    
+    ~strdump("Swap stored. New counter will be:");
+    ~dump(swapCounter + 1);
+    
+    save_data(jettonWallet, swapCounter + 1, swaps);
+    ~strdump("=== SWAP STORAGE COMPLETE ===");
+}
+
+;; Helper: Send a jetton transfer message.
+() sendJettonTransfer(slice jettonWallet, slice target, int tokenAmount) impure inline {
+    ~strdump("ERROR TRANSFER");
+
+
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(jettonWallet)
+        .store_coins(0)         ;; native coins are only used for gas
+        .store_uint(0, 107)
+        .store_ref(
+            begin_cell()
+                .store_uint(0x7362d09c, 32)  ;; jetton transfer op code (example)
+                .store_slice(target)
+                .store_uint(tokenAmount, 128) ;; token amount (128-bit)
+                .end_cell()
+        );
+    send_raw_message(msg.end_cell(), 64);
+}
+
+;; -----------------------------------------------------------------
+;; Initialize contract storage
+;; -----------------------------------------------------------------
+() initialize_storage(slice in_msg_body) impure {
+    ~strdump("ENTER INITIALIZE:");
+    
+    ;; Load current data
+    var (_, _, _) = load_data();
+    
+    ;; Read the jetton token wallet address from the message body
+    slice jettonWallet = in_msg_body~load_msg_addr();
+    ~strdump("JETTON WALLET:");
+    ~dump(jettonWallet);
+    
+    ;; Initialize with new values
+    cell swaps = new_dict();
+    
+    ;; Save new data
+    set_data(begin_cell()
+        .store_slice(jettonWallet)
+        .store_uint(0, 64)
+        .store_dict(swaps)
+        .end_cell());
+        
+    ~strdump("INITIALIZATION COMPLETE");
+}
+
+;; -----------------------------------------------------------------
+;; GETTERS (for off-chain calls)
+;; -----------------------------------------------------------------
+int get_swap_counter() method_id {
+    var (_, swapCounter, _) = load_data();
+    ~dump("==SWAP COUNTER==");
+    ~dump(swapCounter);
+    return swapCounter;
+}
+
+slice get_jetton_wallet() method_id {
+    var (jettonWallet, _, _) = load_data();
+    return jettonWallet;
+}
+
+int has_swap(int swapId) method_id {
+    var (_, _, swaps) = load_data();
+    var (_, found) = swaps.udict_get?(256, swapId);
+    return found ? 1 : 0;
+}
+
+(slice, slice, int, int, int, int) get_swap(int swapId) method_id {
+    ~strdump("==GETTING SWAP DATA==");
+
+    var (_, _, swaps) = load_data();
+    var (swapData, found) = swaps.udict_get?(256, swapId);
+    throw_unless(ERR_SWAP_NOT_FOUND, found);
+    return parseSwap(swapData);
+}
+
+;; -----------------------------------------------------------------
+;; Operation Handlers (jetton-only)
+;; -----------------------------------------------------------------
+
+;; onJettonTransfer: Called when the contract receives a jetton token transfer.
+;; Expected message structure:
+;;   [ tokenSender address,
+;;     tokenAmount (128-bit),
+;;     remainingGasTo address,
+;;     payload ref ]
+() onJettonTransfer(slice in_msg_body) impure {
+
+    var (jettonWallet, swapCounter, swaps) = load_data();
+    
+    slice tokenSender = in_msg_body~load_msg_addr();
+    int tokenAmount = in_msg_body~load_uint(128);
+    slice remainingGasTo = in_msg_body~load_msg_addr();
+    cell payload = in_msg_body~load_ref();
+    slice payloadSlice = payload.begin_parse();
+    
+    int hashLock = payloadSlice~load_uint(256);
+    int timeLock = payloadSlice~load_uint(64);
+    
+    ;; For this example, both the initiator and recipient are set to remainingGasTo.
+    slice initiator = remainingGasTo;
+    slice recipient = remainingGasTo;
+    
+    storeSwap(jettonWallet, swapCounter, swaps, initiator, recipient, tokenAmount, hashLock, timeLock);
+}
+
+;; depositNotification: Called when a deposit notification is received.
+;; Expected payload structure:
+;;   [ op code (32 bits), depositAmount (128-bit), depositor address,
+;;     recipient address (in a ref cell), hashLock (256-bit), timeLock (64-bit) ]
+() depositNotification(slice in_msg_body, sender_address) impure {
+
+    ~dump(2424);
+
+    var (jettonWallet, swapCounter, swaps) = load_data();
+
+    ~strdump("Accepted jetton wallet:");
+    ~dump(jettonWallet);
+    ~strdump("Accepted sender_address");
+    ~dump(sender_address);
+
+    int depositAmount = in_msg_body~load_uint(128);
+    ~strdump("Deposit amount:");
+    ~dump(depositAmount);
+
+    slice depositor = in_msg_body~load_msg_addr();
+    ~strdump("Depositor address:");
+    ~dump(depositor);
+    
+    int cmp = equal_slices(jettonWallet, sender_address);
+    ~strdump("Comparison result (equal_slices):");
+    ~dump(cmp);
+    ;;if (cmp == 0) {
+  ;;      ~strdump("Error: Depositor is not the accepted jetton wallet");
+ ;;       ~dump(depositor);
+;;        return ();
+ ;;   }
+    
+    cell recipientRef = in_msg_body~load_ref();
+    ~strdump("Raw recipient ref cell:");
+    ~dump(recipientRef);
+    slice recipientSlice = recipientRef.begin_parse();
+    slice recipient = recipientSlice~load_msg_addr();
+    ~strdump("Parsed recipient address:");
+    ~dump(recipient);
+
+    int hashLock = in_msg_body~load_uint(256);
+    ~strdump("HashLock:");
+    ~dump(hashLock);
+
+    int timeLock = in_msg_body~load_uint(64);
+    ~strdump("TimeLock:");
+    ~dump(timeLock);
+
+    ~strdump("Deposit Notification received (all):");
+
+    ~dump(242424);
+    ~dump(depositAmount);
+    ~dump(depositor);
+    ~dump(recipient);
+    ~dump(hashLock);
+    ~dump(timeLock);
+    ~dump(2424242);
+
+    
+    storeSwap(jettonWallet, swapCounter, swaps, depositor, recipient, depositAmount, hashLock, timeLock);
+    ~strdump("ABOUT TO SAVE");
+}
+
+;; completeSwap: Completes a swap if a valid preimage is provided.
+() completeSwap(slice in_msg_body) impure {
+    ~strdump("COMPLETE SWAP - ENTER");
+    var (jettonWallet, swapCounter, swaps) = load_data();
+    
+    int swapId = in_msg_body~load_uint(256);
+    int preimage = in_msg_body~load_uint(256);
+    
+    ~strdump("SwapId received:");
+    ~dump(swapId);
+    ~strdump("Preimage received:");
+    ~dump(preimage);
+    
+    var (swapData, found) = swaps.udict_get?(256, swapId);
+    if (found == 0) {
+        ~strdump("ERROR: Swap not found for swapId:");
+        ~dump(swapId);
+    }
+    throw_unless(ERR_SWAP_NOT_FOUND, found);
+    
+    var (initiator, recipient, tokenAmount, hashLock, timeLock, isCompleted) = parseSwap(swapData);
+    
+    ~strdump("Swap details:");
+    ~strdump("Initiator:");
+    ~dump(initiator);
+    ~strdump("Recipient:");
+    ~dump(recipient);
+    ~strdump("Token Amount:");
+    ~dump(tokenAmount);
+    ~strdump("Stored hashLock:");
+    ~dump(hashLock);
+    ~strdump("TimeLock:");
+    ~dump(timeLock);
+    ~strdump("IsCompleted:");
+    ~dump(isCompleted);
+    
+    if (isCompleted) {
+        ~strdump("ERROR: Swap already completed");
+    }
+    throw_if(ERR_SWAP_COMPLETED, isCompleted);
+    
+    int calculatedHash = sha256_int256(preimage);
+    ~strdump("Calculated hash from preimage:");
+    ~dump(calculatedHash);
+    if (calculatedHash != hashLock) {
+        ~strdump("ERROR: Invalid preimage. Expected hashLock:");
+        ~dump(hashLock);
+        ~strdump("but calculated:");
+        ~dump(calculatedHash);
+    }
+    throw_unless(ERR_INVALID_PREIMAGE, calculatedHash == hashLock);
+    
+    if (now() >= timeLock) {
+       ~strdump("ERROR: Timelock expired. Now:");
+       ~dump(now());
+       ~strdump("TimeLock:");
+       ~dump(timeLock);
+    }
+    throw_if(ERR_TIMELOCK_EXPIRED, now() >= timeLock);
+    
+    ~strdump("Marking swap as completed");
+    builder newSwap = buildSwap(initiator, recipient, tokenAmount, hashLock, timeLock, 1);
+    swaps~udict_set(256, swapId, newSwap.end_cell().begin_parse());
+    
+    save_data(jettonWallet, swapCounter, swaps);
+    ~strdump("Swap marked as completed and data saved");
+    
+    sendJettonTransfer(jettonWallet, recipient, tokenAmount);
+    ~strdump("Jetton transfer message sent");
+}
+
+;; refundSwap: Refunds a swap when the timelock has expired.
+() refundSwap(slice in_msg_body) impure {
+    var (jettonWallet, swapCounter, swaps) = load_data();
+    
+    int swapId = in_msg_body~load_uint(256);
+    
+    var (swapData, found) = swaps.udict_get?(256, swapId);
+    throw_unless(ERR_SWAP_NOT_FOUND, found);
+    
+    var (initiator, recipient, tokenAmount, hashLock, timeLock, isCompleted) = parseSwap(swapData);
+    
+    throw_if(ERR_SWAP_ALREADY_COMPLETED_REFUND, isCompleted);
+    throw_if(ERR_TIMELOCK_NOT_EXPIRED, now() < timeLock);
+    
+    sendJettonTransfer(jettonWallet, initiator, tokenAmount);
+}
+
+;; -----------------------------------------------------------------
+;; The main entry point
+;; -----------------------------------------------------------------
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ~strdump("-------------------------contract called:-------------------");
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    ~strdump("REC_INTERNAL: ");
+    ~strdump("SENDER ADDRESS: ");
+    ~dump(sender_address);
+
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+    
+    ;; Read the first 32 bits to check for an op code.
+    int op = in_msg_body~load_uint(32);
+    ~strdump("OP:");
+    ~dump(op);
+
+    (slice jettonWallet, int x, cell y) = load_data();
+    ~strdump("jettonWallet:");
+    ~dump(jettonWallet);
+
+    if (op == OP_INITIALIZE) {
+        initialize_storage(in_msg_body);
+        return ();
+    }
+    
+    if (op == OP_COMPLETE_SWAP) {
+        completeSwap(in_msg_body);
+        return ();
+    }
+    
+    if (op == OP_REFUND_SWAP) {
+        refundSwap(in_msg_body);
+        return ();
+    }
+    
+    if (op == OP_DEPOSIT_NOTIFICATION) {
+
+        ;;throw_unless(73, equal_slices(sender_address, jettonWallet));
+       ~strdump("OP DEPOSIT NOTIFICATION:");
+       depositNotification(in_msg_body, sender_address);
+        return ();
+    }
+    
+}
