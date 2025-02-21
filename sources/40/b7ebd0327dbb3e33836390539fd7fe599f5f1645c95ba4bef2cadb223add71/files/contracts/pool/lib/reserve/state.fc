@@ -1,0 +1,110 @@
+#include "../../constants.fc";
+#include "../math.fc";
+
+;; ----- PACK FUNCTIONS -----
+(slice) pack_reserve_state(cell supply_data, cell variable_borrow_data, cell stable_borrow_data, int last_update_timestamp) inline {
+    return begin_cell()
+        .store_ref(supply_data)
+        .store_ref(variable_borrow_data)
+        .store_ref(stable_borrow_data)
+        .store_uint(last_update_timestamp, 128)
+    .end_cell().begin_parse();
+}
+
+cell pack_reserve_supply_data(int scaled_balance, int liquidity, int liquidity_index, int liquidity_rate) inline {
+    return begin_cell()
+        .store_coins(scaled_balance)
+        .store_coins(liquidity)
+        .store_uint(liquidity_index, 128)
+        .store_uint(liquidity_rate, 128)
+    .end_cell();
+}
+
+cell pack_reserve_variable_borrow_data(int scaled_balance, int variable_borrow_index, int variable_borrow_rate) inline {
+    return begin_cell()
+        .store_coins(scaled_balance)
+        .store_uint(variable_borrow_index, 128)
+        .store_uint(variable_borrow_rate, 128)
+    .end_cell();
+}
+
+cell pack_reserve_stable_borrow_data(int principal_balance, int stable_borrow_rate, int average_stable_borrow_rate, int last_update_timestamp) inline {
+    return begin_cell()
+        .store_coins(principal_balance)
+        .store_uint(stable_borrow_rate, 128)
+        .store_uint(average_stable_borrow_rate, 128)
+        .store_uint(last_update_timestamp, 128)
+    .end_cell();
+}
+;; ---------- UNPACK FUNCTIONS ---------- ;;
+(slice, slice, slice, int) unpack_reserve_state(slice ds) inline {
+    return (ds~load_ref().begin_parse(), ds~load_ref().begin_parse(), ds~load_ref().begin_parse(), ds~load_uint(128));
+}
+
+(int, int, int, int) unpack_reserve_supply_data(slice ds) inline {
+    return (ds~load_coins(), ds~load_coins(), ds~load_uint(128), ds~load_uint(128));
+}
+
+(int, int, int) unpack_reserve_variable_borrow_data(slice ds) inline {
+    return (ds~load_coins(), ds~load_uint(128), ds~load_uint(128));
+}
+
+(int, int, int, int) unpack_reserve_stable_borrow_data(slice ds) inline {
+    return (ds~load_coins(), ds~load_uint(128), ds~load_uint(128), ds~load_uint(128));
+}
+
+;; ---------- GETTER FUNCTIONS ---------- ;;
+;; @return reserve_supply_data
+;; @return reserve_variable_borrow_data
+;; @return reserve_stable_borrow_data
+;; @return last_update_timestamp
+(slice, slice, slice, int) get_reserve_state(slice ds) inline {
+    return unpack_reserve_state(ds);
+}
+
+;; @return scaled_supply
+;; @return liquidity
+;; @return liquidity_index
+;; @return liquidity_rate
+(int, int, int, int) get_reserve_supply_data(slice state) inline {
+    if (null?(state)) {
+        return (0, 0, 0, 0);
+    }
+    var (ds, _, _, _) = get_reserve_state(state);
+    return unpack_reserve_supply_data(ds);
+}
+
+;; @return scaled_variable_debt
+;; @return variable_borrow_index
+;; @return variable_borrow_rate
+(int, int, int) get_reserve_variable_borrow_data(slice state) inline {
+    if (null?(state)) {
+        return (0, 0, 0);
+    }
+    var (_, ds, _, _) = get_reserve_state(state);
+    return unpack_reserve_variable_borrow_data(ds);
+}
+
+;; @return principal_stable_debt
+;; @return total_stable_debt
+;; @return stable_borrow_rate
+;; @return avg_stable_borrow_rate
+;; @return last_update_timestamp
+(int, int, int, int, int) get_reserve_stable_borrow_data(slice state) inline {
+    if (null?(state)) {
+        return (0, 0, 0, 0, 0);
+    }
+    var (_, _, ds, _) = get_reserve_state(state);
+    var (principal_stable_debt, stable_borrow_rate, avg_stable_borrow_rate, last_update_timestamp) = unpack_reserve_stable_borrow_data(ds);
+    var cumulated_interest = calculate_compounded_interest(avg_stable_borrow_rate, last_update_timestamp, now());
+    var total_stable_debt = principal_stable_debt.ray_mul(cumulated_interest);
+    return (principal_stable_debt, total_stable_debt, stable_borrow_rate, avg_stable_borrow_rate, last_update_timestamp);
+}
+
+(int) get_reserve_last_update_timestamp(slice state) inline {
+    if (null?(state)) {
+        return 0;
+    }
+    var (_, _, _, last_update_timestamp) = get_reserve_state(state);
+    return last_update_timestamp;
+}

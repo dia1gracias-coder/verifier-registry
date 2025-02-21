@@ -1,0 +1,63 @@
+global int init?;
+global cell storage::addresses;
+global cell storage::reserve_configs;
+global cell storage::reserve_states;
+global cell storage::rate_strategies;
+global cell storage::user_code;
+global int storage::be_public_key;
+global int storage::max_stable_rate_borrow_size_percent;
+
+() storage::load() impure inline {
+    if (~ null?(init?)) {
+        return ();
+    }
+
+    slice ds = get_data().begin_parse();
+    slice addresses = ds~load_ref().begin_parse();
+    storage::addresses = addresses~load_ref();
+    storage::user_code = addresses~load_ref();
+
+    storage::reserve_configs = ds~load_dict();
+    storage::reserve_states = ds~load_dict();
+    storage::rate_strategies = ds~load_dict();
+    storage::be_public_key = ds~load_uint(256);
+    storage::max_stable_rate_borrow_size_percent = ds~load_uint(16);
+
+    init? = true;
+}
+
+() storage::save() impure inline {
+    cell addresses = begin_cell()
+        .store_ref(storage::addresses)
+        .store_ref(storage::user_code)
+        .end_cell();
+
+    set_data(
+        begin_cell()
+            .store_ref(addresses)
+            .store_dict(storage::reserve_configs)
+            .store_dict(storage::reserve_states)
+            .store_dict(storage::rate_strategies)
+            .store_uint(storage::be_public_key, 256)
+            .store_uint(storage::max_stable_rate_borrow_size_percent, 16)
+        .end_cell()
+    );
+}
+
+(slice) storage::admin() impure inline {
+    slice ds = storage::addresses.begin_parse();
+    return ds~load_msg_addr();
+}
+
+(slice) storage::treasury() impure inline {
+    slice ds = storage::addresses.begin_parse();
+    ds~load_msg_addr();
+    return ds~load_msg_addr();
+}
+
+(slice) storage::liquidator() impure inline {
+    slice ds = storage::addresses.begin_parse();
+    ds~load_msg_addr();
+    ds~load_msg_addr();
+    return ds~load_msg_addr();
+}

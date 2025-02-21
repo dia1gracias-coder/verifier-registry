@@ -1,0 +1,83 @@
+#include "../utils.fc";
+#include "../cache.fc";
+#include "validation_logic.fc";
+
+slice DEFAULT_RESERVE_STATE() inline {
+    ;; (scaled_supply_balance, liquidity, liquidity_index, liquidity_rate)
+    cell supply_data = begin_cell()
+        .store_coins(0)
+        .store_coins(0)
+        .store_uint(RAY, 128)
+        .store_uint(0, 128)
+    .end_cell();
+
+    ;; (scaled_variable_debt, variable_borrow_index, variable_borrow_rate)
+    cell variable_borrow_data = begin_cell()
+        .store_coins(0)
+        .store_uint(RAY, 128)
+        .store_uint(0, 128)
+    .end_cell();
+
+    ;; (principal_stable_debt, stable_borrow_rate, average_stable_borrow_rate, stable_last_update_timestamp)
+    cell stable_borrow_data = begin_cell()
+        .store_coins(0)
+        .store_uint(0, 128)
+        .store_uint(0, 128)
+        .store_uint(0, 128)
+    .end_cell();
+
+    return begin_cell()
+        .store_ref(supply_data)
+        .store_ref(variable_borrow_data)
+        .store_ref(stable_borrow_data)
+        .store_uint(now(), 128) ;; last_update_timestamp
+    .end_cell().begin_parse();
+}
+
+() execute_init_reserve(slice sender, slice in_msg_body) impure inline {
+    ~strdump("[LOG] execute_init_reserve");
+    if (~ equal_slices(sender, storage::admin())) {
+        throw(ERR::UNAUTHORIZED);
+    }
+
+    var (query_id, pool_jw_address, reserve_config, rate_strategy) = in_msg_body.parse_init_reserve();
+    var asset_hash = __get_asset_hash(pool_jw_address);
+
+    throw_unless(ERR::RESERVE_CONFIG_ALREADY_EXISTED, storage::reserve_configs~udict_add?(KEY_LEN, asset_hash, reserve_config));
+    throw_unless(ERR::RATE_STRATEGY_ALREADY_EXISTED, storage::rate_strategies~udict_add?(KEY_LEN, asset_hash, rate_strategy));
+    throw_unless(ERR::RESERVE_STATE_ALREADY_EXISTED, storage::reserve_states~udict_add?(KEY_LEN, asset_hash, DEFAULT_RESERVE_STATE()));
+
+    storage::save();
+}
+
+() execute_set_use_reserve_as_collateral(cell user_data, slice in_msg_body) impure inline {
+    ~strdump("[RESERVE_LOGIC] execute_set_use_reserve_as_collateral");
+
+    var (query_id, pool_jw_address, use_as_collateral, price_data) = in_msg_body.parse_set_use_reserve_as_collateral();
+    cache(pool_jw_address);
+
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time) = unpack_user_data(user_data);
+    var (scaled_supply, _, is_using_as_collateral) = get_user_supply_data(supply_list, cache::asset_hash);
+
+    throw_if(ERR::USER_IN_PROCESSING, is_user_in_process & (now() <= process_expire_time));
+    validate_set_use_reserve_as_collateral(scaled_supply);
+
+    if (use_as_collateral == is_using_as_collateral) {
+        return ();
+    }
+
+    if (use_as_collateral) {
+        validate_use_as_collateral(supply_list);
+        supply_list~udict_set(KEY_LEN, cache::asset_hash, pack_user_supply_data(scaled_supply, 0, true));
+    } else {
+        supply_list~udict_set(KEY_LEN, cache::asset_hash, pack_user_supply_data(scaled_supply, 0, false));
+        var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time);
+        validate_hf_and_ltv(cache::asset_hash, new_user_data, price_data);
+    }
+
+    var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, false, now());
+
+    update_user_data(owner_address, owner_address, new_user_data);
+
+    transfer_ton(owner_address, 64, 0, null());
+}

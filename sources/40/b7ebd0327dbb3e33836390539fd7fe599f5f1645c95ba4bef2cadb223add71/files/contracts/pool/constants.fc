@@ -1,0 +1,28 @@
+const HEALTH_FACTOR_LIQUIDATION_THRESHOLD = 1000000000000000000;
+const INTEREST_MODE_STABLE = 0;
+const INTEREST_MODE_VARIABLE = 1;
+
+const KEY_LEN = 256;
+const OP_LEN = 32;
+
+const ONE_TON = 1000000000;
+int min_tons_for_pool_storage() asm "10000000 PUSHINT"; ;; 0.01 TON
+;; Note that 2 * gas_consumptions is expected to be able to cover fees on both wallets (sender and receiver)
+;; and also constant fees on inter-wallet interaction, in particular fwd fee on state_init transfer
+;; that means that you need to reconsider this fee when:
+;; a) jetton logic become more gas-heavy
+;; b) jetton-wallet code (sent with inter-wallet message) become larger or smaller
+;; c) global fee changes / different workchain
+int gas_consumption() asm "5000000 PUSHINT"; ;; 0.005 TON
+
+const FEE_UPDATE_USER_DATA = 2 * ONE_TON / 100;
+
+;; Repay fee
+const int MIN_TRADE_AMOUNT = 0;                                 ;; 0 TON
+const int TRADE_FEE = 320000000; ;; 0.32 TON
+builder store_zeros(builder b, int n) asm "STZEROES";
+slice addr_none() asm "b{00} PUSHSLICE";
+const int REQUIRED_GAS = 2 * ONE_TON / 100;                     ;;0.02 TON
+const int REPAY_LOGIC_GAS_CONSUMPTION = 11 * ONE_TON / 100;      ;;0.07 TON
+const int SUPPLY_LOGIC_GAS_CONSUMPTION = 7 * ONE_TON / 100;     ;;0.04 TON  
+const int WITHDRAW_LOGIC_GAS_CONSUMPTION = 6 * ONE_TON / 100;   ;;0.04 TON

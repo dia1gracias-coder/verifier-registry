@@ -1,0 +1,134 @@
+#include "../globals.fc";
+#include "../lib/reserve.fc";
+#include "../lib/math.fc";
+#include "../utils/transfer_helper.fc";
+
+;; @notice Calculate the next indexes
+;; @dev Must be called first in the execution function
+() __update_indexes() impure inline {
+    ~strdump("[RESERVE_LOGIC] _update_indexes");
+
+    var (scaled_supply, liquidity, liquidity_index, liquidity_rate) = cache::reserve_state.get_reserve_supply_data();
+    var (scaled_variable_debt, variable_borrow_index, variable_borrow_rate) = cache::reserve_state.get_reserve_variable_borrow_data();
+    var last_update_timestamp = cache::reserve_state.get_reserve_last_update_timestamp();
+
+    ;; * Update liquidity index when liquidity rate is not 0
+    if (liquidity_rate != 0) {
+        int cumulated_liquidity_interest = calculate_linear_interest(liquidity_rate, last_update_timestamp);
+        next::liquidity_index = cumulated_liquidity_interest.ray_mul(liquidity_index);
+    }
+
+    ;; * Update variable borrow index when variable borrow rate is not 0
+    if (scaled_variable_debt != 0) {
+        int cumulated_variable_borrow_interest = calculate_compounded_interest(variable_borrow_rate, last_update_timestamp, now());
+        next::variable_borrow_index = cumulated_variable_borrow_interest.ray_mul(variable_borrow_index);
+    }
+}
+
+
+
+;; () __accrue_to_treasury(slice response_address) impure inline {
+() __accrue_to_treasury() impure inline {
+    next::accrue_to_treasury = 0;
+
+    if cache::reserve_factor == 0 {
+        return ();
+    }
+    int last_update_timestamp = cache::reserve_state.get_reserve_last_update_timestamp();
+    if (last_update_timestamp == now()) {
+        return ();
+    }
+
+    ;; (next::scaled_supply, next::liquidity, next::liquidity_index, next::liquidity_rate) = state.get_reserve_supply_data();
+    (int cache::curr_scaled_variable_debt, int cache::curr_variable_borrow_index, _) = cache::reserve_state.get_reserve_variable_borrow_data();
+    (int cache::curr_principal_stable_debt, int cache::curr_total_stable_debt, _, int cache::curr_average_stable_borrow_rate, _) = cache::reserve_state.get_reserve_stable_borrow_data();
+
+    ;; Calculate the total variable debt at moment of the last interaction
+    int prev_total_variable_debt = cache::curr_scaled_variable_debt.ray_mul(cache::curr_variable_borrow_index);
+
+    ;; Calculate the new total variable debt after accumulation of the interest on the index
+    int curr_total_variable_debt = cache::curr_scaled_variable_debt.ray_mul(next::variable_borrow_index);
+
+    ;; Calculate the stable debt until the last timestamp update
+    int cumulated_stable_interest = calculate_compounded_interest(
+        cache::curr_average_stable_borrow_rate, 
+        next::stable_last_update_timestamp, 
+        cache::reserve_state.get_reserve_last_update_timestamp());
+
+    int prev_total_stable_debt = cache::curr_principal_stable_debt.ray_mul(cumulated_stable_interest);
+
+    ;; Debt accrued is the sum of the current debt minus the sum of the debt at the last update
+    int total_debt_accrued = curr_total_variable_debt + cache::curr_total_stable_debt - prev_total_variable_debt - prev_total_stable_debt;
+    int amount_to_mint = total_debt_accrued.percent_mul(cache::reserve_factor);
+    if amount_to_mint != 0 {
+        next::accrue_to_treasury = amount_to_mint.ray_div(next::liquidity_index);
+        
+        ;; if ( (accrued_to_treasury != 0) & (next::liquidity >= accrued_to_treasury) ) {
+        ;;     next::liquidity -= accrued_to_treasury;
+
+        ;;     transfer(storage::treasury(), response_address, cache::reserve_configuration.get_pool_jw_address(), accrued_to_treasury, 0, ONE_TON * 5 / 100, null());
+        ;; }
+
+    }
+}
+
+() update_state() impure inline {
+    ~strdump("[RESERVE_LOGIC] update_state");
+    int last_update_timestamp = cache::reserve_state.get_reserve_last_update_timestamp();
+    if (last_update_timestamp == now()) {
+        next::accrue_to_treasury = 0;
+        return ();
+    }
+
+    __update_indexes();
+    __accrue_to_treasury();
+}
+
+;; @notice Calculate the next interest rates based on the liquidity added or taken
+() update_interest_rates(int liquidity_added, int liquidity_taken) impure inline {
+    ~strdump("[RESERVE_LOGIC] update_interest_rates");
+
+    var (_, liquidity, _, _) = cache::reserve_state.get_reserve_supply_data();
+    var reserve_factor = cache::reserve_configuration.get_reserve_factor();
+
+    int total_variable_debt = next::scaled_variable_debt.ray_mul(next::variable_borrow_index);
+
+    (
+        next::liquidity_rate,
+        next::stable_borrow_rate,
+        next::variable_borrow_rate
+    ) = calculate_interest_rates(
+        liquidity_added,
+        liquidity_taken,
+        liquidity,
+        next::total_stable_debt,
+        total_variable_debt,
+        next::avg_stable_borrow_rate,
+        reserve_factor
+    );
+}
+
+(int) __get_normalized_income(slice state) inline {
+    var timestamp = state.get_reserve_last_update_timestamp();
+    ~strdump("[RESERVE_LOGIC] __get_normalized_income");
+    ~dump([timestamp, now()]);
+    var (scaled_supply, liquidity, liquidity_index, liquidity_rate) = state.get_reserve_supply_data();
+
+    if (timestamp == now()) {
+        ~strdump("[RESERVE_LOGIC] __get_normalized_income 2");
+        return liquidity_index;
+    }
+
+    return calculate_linear_interest(liquidity_rate, timestamp).ray_mul(liquidity_index);
+}
+
+(int) __get_normalized_debt(slice state) inline {
+    var timestamp = state.get_reserve_last_update_timestamp();
+    var (scaled_variable_debt, variable_borrow_index, variable_borrow_rate) = state.get_reserve_variable_borrow_data();
+
+    if (timestamp == now()) {
+        return variable_borrow_index;
+    }
+
+    return calculate_compounded_interest(variable_borrow_rate, timestamp, now()).ray_mul(variable_borrow_index);
+}

@@ -1,0 +1,186 @@
+#include "generic_logic.fc";
+
+(int, int) validate_health_factor(int asset_hash, cell user_data, cell price_data) impure inline {
+    var (_, _, _, _, health_factor, has_zero_ltv_collateral) = calculate_user_account_data(asset_hash, user_data, price_data);
+    if ((health_factor != -1) & (health_factor < HEALTH_FACTOR_LIQUIDATION_THRESHOLD)) {
+        throw(ERR::HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD);
+    }
+    return (health_factor, has_zero_ltv_collateral);
+}
+
+() validate_hf_and_ltv(int asset_hash, cell user_data, cell price_data) impure inline {
+    ~strdump("[VALIDATION_LOGIC] validate_hf_and_ltv");
+    var (health_factor, has_zero_ltv_collateral) = validate_health_factor(asset_hash, user_data, price_data);
+    int ltv = cache::reserve_configuration.get_ltv();
+    throw_unless(ERR::CURRENT_LTV_ZERO, (~ has_zero_ltv_collateral) | (ltv == 0));
+}
+
+() validate_withdraw(int amount, int user_balance) impure inline {
+    throw_if(ERR::INVALID_AMOUNT, amount == 0);
+    throw_if(ERR::NOT_ENOUGH_AVAILABLE_USER_BALANCE, amount > user_balance);
+
+    var (is_active, is_frozen, is_borrow_enabled, _, is_paused, _) = cache::reserve_configuration.get_flags();
+    throw_if(ERR::RESERVE_INACTIVE, ~ is_active);
+    throw_if(ERR::RESERVE_PAUSED, is_paused);
+}
+
+;; @notice Validate the supply action
+() validate_supply(int amount) impure inline {
+    ~strdump("[VALIDATE_LOGIC] validate_supply");
+
+    var (is_active, is_frozen, _, _, is_paused, _) = cache::reserve_configuration.get_flags();
+    var (scaled_supply, _, _, _) = cache::reserve_state.get_reserve_supply_data();
+    var supply_cap = cache::reserve_configuration.get_supply_cap();
+
+    throw_if(ERR::RESERVE_INACTIVE, ~ is_active);
+    throw_if(ERR::RESERVE_FROZEN, is_frozen);
+    throw_if(ERR::RESERVE_PAUSED, is_paused);
+    throw_if(ERR::INVALID_AMOUNT, amount == 0);
+    throw_unless(ERR::SUPPLY_CAP_EXCEEDED, (supply_cap == 0) | (scaled_supply.ray_mul(next::liquidity_index) + amount <= supply_cap));
+}
+
+
+() validate_borrow(cell user_data, cell price_data_dict, int asset_hash, int amount, int interest_rate_mode) impure inline {
+    ~strdump("[BORROW_LOGIC] validate_borrow");
+
+    ;; throw_if(ERR::INVALID_PRICE_DATA, ~ verify_price_signature_all(price_data_dict));
+    verify_price_data(price_data_dict);
+
+    var (scaled_variable_debt, variable_borrow_index, _) = cache::reserve_state.get_reserve_variable_borrow_data();
+    ;; TODO: Change it to be `principal_stable_debt`
+    var (principal_stable_debt, total_stable_debt, _, _, _) = cache::reserve_state.get_reserve_stable_borrow_data();
+
+    var (is_active, is_frozen, is_borrow_enabled, is_stable_borrow_enabled, is_paused, _) = cache::reserve_configuration.get_flags();
+    int decimals = cache::reserve_configuration.get_reserve_decimals();
+    int key_asset_hash = cache::reserve_configuration.get_underlying_address().__get_asset_hash();
+    int borrow_cap = cache::reserve_configuration.get_borrow_cap();
+
+    throw_if(ERR::INVALID_AMOUNT, amount == 0);
+    throw_if(ERR::RESERVE_INACTIVE, ~ is_active);
+    throw_if(ERR::RESERVE_PAUSED, is_paused);
+    throw_if(ERR::RESERVE_FROZEN, is_frozen);
+    throw_if(ERR::BORROWING_NOT_ENABLED, ~ is_borrow_enabled);
+    throw_unless(ERR::INVALID_INTEREST_RATE_MODE_SELECTED, (interest_rate_mode == INTEREST_MODE_STABLE) | (interest_rate_mode == INTEREST_MODE_VARIABLE));
+    if (borrow_cap != 0) {
+        int asset_unit = binpow(10, decimals);
+        int total_variable_debt = scaled_variable_debt.ray_mul(variable_borrow_index);
+        ;; TODO: Add the `total_stable_debt` to `total_debt`
+        int total_debt = total_stable_debt + total_variable_debt + amount;
+        throw_if(ERR::BORROWING_OVER_CAP, total_debt > borrow_cap);
+    }
+
+    var (user_collateral_in_base_currency, user_debt_in_base_currency, current_ltv, _, health_factor, _) = calculate_user_account_data(asset_hash, user_data, price_data_dict);
+
+    throw_if(ERR::COLLATERAL_BALANCE_IS_ZERO, user_collateral_in_base_currency == 0);
+    throw_if(ERR::LTV_VALIDATION_FAILED, current_ltv == 0);
+    throw_if(ERR::HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD, (health_factor <= HEALTH_FACTOR_LIQUIDATION_THRESHOLD) & (health_factor != -1));
+
+    ~strdump("[VALIDATION_LOGIC] validate_borrow done");
+
+    ;; var asset_price = price_data_dict.get_asset_price(asset_hash);
+    var asset_price = price_data_dict.get_asset_price(key_asset_hash);
+    var asset_unit = binpow(10, decimals);
+
+    var amount_in_base_currency = amount.muldiv(asset_price, asset_unit);
+    var collateral_needed_in_base_currency = (user_debt_in_base_currency + amount_in_base_currency).percent_div(current_ltv);
+
+    ~strdump("[VALIDATION_LOGIC] collateral_needed_in_base_currency");
+    ~dump([collateral_needed_in_base_currency, user_collateral_in_base_currency]);
+    throw_if(ERR::COLLATERAL_CANNOT_COVER_NEW_BORROW, collateral_needed_in_base_currency > user_collateral_in_base_currency);
+
+    if (interest_rate_mode == INTEREST_MODE_STABLE) {
+        throw_if(ERR::STABLE_BORROWING_NOT_ENABLED, ~ is_stable_borrow_enabled);
+        ;; TODO: Complete the remaining validation logic for stable borrowing
+        var (_, available_liquidity, _, _) = cache::reserve_state.get_reserve_supply_data();
+        int max_loan_size_stable = available_liquidity.percent_mul(storage::max_stable_rate_borrow_size_percent);
+        throw_unless(ERR::AMOUNT_BIGGER_THAN_MAX_LOAN_SIZE_STABLE, amount <= max_loan_size_stable);
+    }
+
+}
+
+(int) validate_use_as_collateral(cell supply_list) impure inline {
+    var ltv = cache::reserve_configuration.get_ltv();
+    var debt_ceiling = cache::reserve_configuration.get_debt_ceiling();
+
+    if (ltv == 0) {
+        return false;
+    }
+
+    if (~ supply_list.is_using_as_collateral_any?()) {
+        return true;
+    }
+
+    var isolation_mode_active = false;
+    return ((~ isolation_mode_active) & (debt_ceiling == 0));
+}
+
+(int) validate_automatic_use_as_collateral(cell supply_list) impure inline {
+    var debt_ceiling = cache::reserve_configuration.get_debt_ceiling();
+    ;; ensures only the ISOLATED_COLLATERAL_SUPPLIER_ROLE can enable collateral as sid
+    if (debt_ceiling != 0) {
+        ;; TODO: Handle the logic when debt ceiling is not zero
+    }
+
+    return validate_use_as_collateral(supply_list);
+}
+
+() validate_set_use_reserve_as_collateral(int user_balance) impure inline {
+    ~strdump("[VALIDATION_LOGIC] validate_set_use_reserve_as_collateral");
+    throw_if(ERR::UNDERLYING_BALANCE_ZERO, user_balance == 0);
+    var (is_active, _, _, _, is_paused, _) = cache::reserve_configuration.get_flags();
+    throw_if(ERR::RESERVE_INACTIVE, ~ is_active);
+    throw_if(ERR::RESERVE_PAUSED, is_paused);
+}
+
+() validate_repay(int amount, int interest_rate_mode, int stable_debt, int variable_debt) impure inline {
+    throw_if(ERR::INVALID_AMOUNT, amount == 0);
+    var (is_active, _, _, _, is_paused, _) = cache::reserve_configuration.get_flags();
+    throw_if(ERR::RESERVE_INACTIVE, ~ is_active);
+    throw_if(ERR::RESERVE_PAUSED, is_paused);
+
+    throw_if(ERR::NO_DEBT_OF_SELECTED_TYPE, 
+        ((interest_rate_mode == INTEREST_MODE_STABLE) & (stable_debt == 0)) | 
+        ((interest_rate_mode == INTEREST_MODE_VARIABLE) & (variable_debt == 0))
+    );
+}
+
+
+() validate_swap_rate_mode(int stable_debt, int variable_debt, int scaled_supply, int current_rate_mode, int is_using_as_collateral) impure inline {
+    ;; Get reserve configuration flags
+    var (is_active, is_frozen, _, is_stable_borrow_enabled, is_paused, _) = cache::reserve_configuration.get_flags();
+        
+    ;; Basic validations
+    throw_unless(ERR::RESERVE_INACTIVE, is_active);
+    throw_if(ERR::RESERVE_PAUSED, is_paused);
+    throw_if(ERR::RESERVE_FROZEN, is_frozen);
+
+    if (current_rate_mode == INTEREST_MODE_STABLE) {
+        ;; Validate when switching from stable to variable
+        throw_unless(ERR::NO_OUTSTANDING_STABLE_DEBT, stable_debt != 0);
+    } 
+    elseif (current_rate_mode == INTEREST_MODE_VARIABLE) {
+        ;; Validate when switching from variable to stable
+        throw_unless(ERR::NO_OUTSTANDING_VARIABLE_DEBT, variable_debt != 0);
+        
+        ;; Check if stable borrowing is enabled
+        throw_unless(ERR::STABLE_BORROWING_NOT_ENABLED, is_stable_borrow_enabled);
+        
+        ;; Get LTV for the asset
+        var ltv = cache::reserve_configuration.get_ltv();
+        
+        ;; Check if user is using asset as collateral
+        ;; var is_using_as_collateral = is_using_reserve_as_collateral(cache::asset_hash);
+        
+        ;; Validate collateral condition
+        ;; TODO: Implement collateral condition
+        ~dump([stable_debt, variable_debt, scaled_supply]);
+        throw_if(ERR::COLLATERAL_SAME_AS_BORROWING_CURRENCY,
+            is_using_as_collateral & 
+            (ltv != 0) & 
+            ((stable_debt + variable_debt) <= scaled_supply)
+        );
+    }
+    else {
+        throw(ERR::INVALID_INTEREST_RATE_MODE_SELECTED);
+    }
+}
