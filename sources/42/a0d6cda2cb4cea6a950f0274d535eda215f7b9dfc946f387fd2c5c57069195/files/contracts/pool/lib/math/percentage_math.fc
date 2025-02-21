@@ -1,0 +1,31 @@
+#include "../../errors.fc";
+
+(int) binpow(int n, int e) {
+    if (e == 0) {
+        return 1;
+    }
+    if (e == 1) {
+        return n;
+    }
+    int p = binpow(n, e / 2);
+    p *= p;
+    if ((e % 2) == 1) {
+        p *= n;
+    }
+    return p;
+}
+
+const PERCENTAGE_FACTOR = 10000;
+const HALF_PERCENTAGE_FACTOR = 5000;
+
+;; Executes a percentage multiplication
+int percent_mul(int value, int percentage) inline {
+    return (value * percentage + HALF_PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR;
+}
+
+;; Executes a percentage division
+int percent_div(int value, int percentage) inline {
+    throw_if(ERR::INVALID_PERCENTAGE_CALCULATION, (percentage == 0) | (value > (binpow(2, 255) - 1 - (percentage / 2)) / PERCENTAGE_FACTOR));
+    int product = value * PERCENTAGE_FACTOR + percentage / 2;
+    return product / percentage;
+}

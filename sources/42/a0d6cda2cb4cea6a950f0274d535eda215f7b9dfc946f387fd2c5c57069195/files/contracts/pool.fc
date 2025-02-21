@@ -1,0 +1,347 @@
+#include "pool/getters.fc";
+#include "pool/logic.fc";
+
+(int) storage_fee() asm "10000000 PUSHINT";
+(int) update_user_data_fee() asm "10000000 PUSHINT";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ~strdump("[POOL]");
+    ~dump([msg_value, my_balance]);
+    if (in_msg_body.slice_empty?()) {
+        ~strdump("[POOL] slice_empty");
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        ~strdump("[POOL] onbound");
+        return ();
+    }
+    slice sender = cs~load_msg_addr();
+    
+
+    storage::load();
+    
+    (int op) = in_msg_body~load_uint(OP_LEN);
+
+    if (op == op::user_data_fetched()) {
+        ;; cs~load_msg_addr();
+        ;; cs~load_coins();
+        ;; cs~skip_bits(1);
+        ;; cs~load_coins();
+        ;; int fwd_fee = muldiv(cs~load_coins(), 3, 2);
+        ;; int fees = storage_fee() + update_user_data_fee();
+        ;; throw_if(0, msg_value <= fees);
+        ;; msg_value -= fees;
+        int fwd_fee = 0;
+        on_user_data_fetched(sender, msg_value, my_balance, fwd_fee, in_msg_body);
+        return ();
+    }
+
+    if (op == op::transfer_notification()) {
+        on_transfer_notification(sender, msg_value, in_msg_body);
+        return ();
+    }
+
+    if ((op == op::supply()) | (op == op::borrow()) | (op == op::withdraw()) | (op == op::repay())
+         | (op == op::set_use_reserve_as_collateral()) | (op == op::repay_collateral()) | (op == op::swap_rate_mode())) {
+        fetch_user_data(sender, op, in_msg_body);
+        return ();
+    }
+
+    if (op == op::liquidation_call()) {
+        int query_id = in_msg_body~load_uint(64);
+        slice user = in_msg_body~load_msg_addr();
+        int debt_to_cover = in_msg_body~load_coins();
+        slice collateral_asset = in_msg_body~load_msg_addr();
+        slice collateral_pool_jw_address = in_msg_body~load_msg_addr();
+        cell price_data = in_msg_body~load_dict();
+
+        cell payload = begin_cell()
+            .store_slice(collateral_asset)
+            .store_slice(collateral_pool_jw_address)
+            .store_dict(price_data)
+        .end_cell();
+
+        var body = begin_cell()
+                        .store_uint(query_id, 64)
+                        .store_slice(my_address())
+                        .store_coins(debt_to_cover)
+                        .store_slice(sender)
+                        .store_ref(payload)
+                    .end_cell().begin_parse();
+
+        fetch_user_data(user, op, body);
+        return ();
+    }
+
+
+    ;; op code: dedust payout (receive TON)
+    if (op == op::repay_collateral_after_swap_ton()) {
+        int query_id = in_msg_body~load_uint(64);
+        
+        slice payload = in_msg_body~load_ref().begin_parse();
+        int sup_op = payload~load_uint(OP_LEN);
+        sender = payload~load_msg_addr();
+        int interest_rate_mode = payload~load_uint(1);
+        int is_max = payload~load_int(1);
+        int amount_repay = payload~load_coins();
+        int amount_supply = payload~load_coins();   
+
+        if (sup_op == op::repay_swap_reject() ) {
+            ~strdump("[POOL] return TON for User (swap reject)");
+            slice pool_jw_address = my_address();
+
+            ;; (query_id, pool_jw_address, amount, interest_rate_mode, is_max_repay)
+            int query_id = 0;
+            slice supply_in_msg_body = begin_cell()
+                                            .store_uint(query_id, 64)
+                                            .store_slice(pool_jw_address)
+                                            .store_coins(amount_supply)
+                                            .store_uint(interest_rate_mode, 1)  ;;not used
+                                            .store_int(is_max, 1)               ;;not used
+                                            .store_coins(msg_value)             ;;not used
+                                        .store_coins(amount_repay)              ;;not used
+                                        .end_cell().begin_parse();
+            fetch_user_data(sender, op::repay_swap_reject_supply(), supply_in_msg_body);
+
+            return ();
+        }
+
+        slice  new_in_msg_body = begin_cell()
+                                    .store_uint(interest_rate_mode, 1)
+                                    .store_int(is_max, 1)
+                                    .store_coins(msg_value)
+                                    .store_coins(amount_repay)
+                                .end_cell().begin_parse();
+        
+        fetch_user_data(sender, op, new_in_msg_body);
+        return ();
+    }
+
+    if (op == op::init_reserve()) {
+        on_init_reserve(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::excesses()) {
+        return ();
+    }
+
+    if (op == op::set_reserve_borrowing()) {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        int asset_hash = in_msg_body~load_uint(256);
+        int enabled = in_msg_body~load_int(1);
+
+        var (config, f) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        slice new_config = set_reserve_borrowing(config, enabled);
+        storage::reserve_configs~udict_set(KEY_LEN, asset_hash, new_config);
+        storage::save();
+
+        return ();
+    }
+
+    if op == op::set_reserve_stable_borrowing() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        int asset_hash = in_msg_body~load_uint(256);
+        int enabled = in_msg_body~load_int(1);
+
+        var (config, f) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        slice new_config = set_reserve_stable_borrowing(config, enabled);
+        storage::reserve_configs~udict_set(KEY_LEN, asset_hash, new_config);
+        storage::save();
+
+        return ();
+    }
+
+    if op == op::set_reserve_active() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        int asset_hash = in_msg_body~load_uint(256);
+        int active = in_msg_body~load_int(1);
+
+        var (config, f) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        var (state, f) = storage::reserve_states.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        var (scaled_supply, _, _, _) = get_reserve_supply_data(state);
+        throw_unless(ERR::RESERVE_LIQUIDITY_NOT_ZERO, scaled_supply == 0);
+
+        slice new_config = set_reserve_active(config, active);
+        storage::reserve_configs~udict_set(KEY_LEN, asset_hash, new_config);
+
+        storage::save();
+        return ();
+    }
+
+    if op == op::set_reserve_freeze() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        int asset_hash = in_msg_body~load_uint(256);
+        int frozen = in_msg_body~load_int(1);
+
+        var (config, f) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        slice new_config = set_reserve_freeze(config, frozen);
+        storage::reserve_configs~udict_set(KEY_LEN, asset_hash, new_config);
+        storage::save();
+
+        return ();
+    }
+
+    if op == op::set_reserve_pause() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        int asset_hash = in_msg_body~load_uint(256);
+        int paused = in_msg_body~load_int(1);
+
+        var (config, f) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        slice new_config = set_reserve_pause(config, paused);
+        storage::reserve_configs~udict_set(KEY_LEN, asset_hash, new_config);
+        storage::save();
+
+        return ();
+    }
+
+    if op == op::set_reserve_factor() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        int asset_hash = in_msg_body~load_uint(256);
+        int factor = in_msg_body~load_uint(32);
+
+        throw_unless(ERR::INVALID_RESERVE_FACTOR, (factor >= 0) & (factor <= PERCENTAGE_FACTOR));
+
+        var (config, f) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        slice new_config = set_reserve_factor(config, factor);
+        storage::reserve_configs~udict_set(KEY_LEN, asset_hash, new_config);
+        storage::save();
+
+        return ();
+    }
+
+    if op == op::set_supply_cap() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        int asset_hash = in_msg_body~load_uint(256);
+        int cap = in_msg_body~load_coins();
+
+        var (config, f) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        slice new_config = set_reserve_supply_cap(config, cap);
+        storage::reserve_configs~udict_set(KEY_LEN, asset_hash, new_config);
+        storage::save();
+
+        return ();
+    }
+
+    if op == op::set_borrow_cap() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        int asset_hash = in_msg_body~load_uint(256);
+        int cap = in_msg_body~load_coins();
+
+        var (config, f) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        slice new_config = set_reserve_borrow_cap(config, cap);
+        storage::reserve_configs~udict_set(KEY_LEN, asset_hash, new_config);
+        storage::save();
+
+        return ();
+    }
+
+    if op == op::set_liquidation_protocol_fee() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        int asset_hash = in_msg_body~load_uint(256);
+        int fee = in_msg_body~load_uint(16);
+
+        throw_unless(ERR::INVALID_LIQUIDATION_PROTOCOL_FEE, (fee >= 0) & (fee <= PERCENTAGE_FACTOR));
+
+        var (config, f) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+        throw_unless(ERR::RESERVE_NOT_FOUND, f);
+
+        slice new_config = set_reserve_liquidation_protocol_fee(config, fee);
+        storage::reserve_configs~udict_set(KEY_LEN, asset_hash, new_config);
+        storage::save();
+
+        return ();
+    }
+
+    if op == op::change_admin() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        slice new_admin = in_msg_body~load_msg_addr();
+
+        slice ds = storage::addresses.begin_parse();
+        slice admin = ds~load_msg_addr();
+        slice treasury = ds~load_msg_addr();
+        slice liquidator = ds~load_msg_addr();
+
+        storage::addresses = begin_cell()
+                                .store_slice(new_admin)
+                                .store_slice(treasury)
+                                .store_slice(liquidator)
+                            .end_cell();
+
+        storage::save();
+        return ();
+    }
+
+    if op == op::change_treasury() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        slice new_treasury = in_msg_body~load_msg_addr();
+
+        slice ds = storage::addresses.begin_parse();
+        slice admin = ds~load_msg_addr();
+        slice treasury = ds~load_msg_addr();
+        slice liquidator = ds~load_msg_addr();
+
+        storage::addresses = begin_cell()
+                                .store_slice(admin)
+                                .store_slice(new_treasury)
+                                .store_slice(liquidator)
+                            .end_cell();
+
+        storage::save();
+        return ();
+    }
+
+    if op == op::change_liquidator() {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        slice new_liquidator = in_msg_body~load_msg_addr();
+
+        slice ds = storage::addresses.begin_parse();
+        slice admin = ds~load_msg_addr();
+        slice treasury = ds~load_msg_addr();
+        slice liquidator = ds~load_msg_addr();
+
+        storage::addresses = begin_cell()
+                                .store_slice(admin)
+                                .store_slice(treasury)
+                                .store_slice(new_liquidator)
+                            .end_cell();
+
+        storage::save();
+        return ();
+    }
+
+    if (op == op::upgrade()) {
+        throw_unless(ERR::UNAUTHORIZED, sender.equal_slices(storage::admin()));
+        cell code = in_msg_body~load_ref();
+        set_code(code);
+        return ();
+    }
+
+        
+    throw(0xffff);
+}
+
+(int) version() method_id {
+    return 999;
+}

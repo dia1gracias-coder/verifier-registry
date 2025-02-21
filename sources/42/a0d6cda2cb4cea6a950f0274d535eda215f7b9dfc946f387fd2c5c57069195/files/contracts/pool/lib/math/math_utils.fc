@@ -1,0 +1,33 @@
+#include "wad_ray_math.fc";
+
+const SECONDS_PER_YEAR = 31536000; ;; Number of seconds in a year
+const RAY = 1000000000000000000000000000; ;; Value of RAY
+
+(int) calculate_linear_interest(int rate, int last_update_timestamp) {
+    ~strdump("[MATH_UTILS] calculate_linear_interest");
+    int time_difference = now() - last_update_timestamp;
+    int result = rate * time_difference;
+    
+    result = result / SECONDS_PER_YEAR;
+    return RAY + result;
+}
+
+
+(int) calculate_compounded_interest(int rate, int last_update_timestamp, int current_timestamp) {
+    ~strdump("[MATH_UTILS] calculate_compounded_interest");
+    int exp = current_timestamp - last_update_timestamp;
+
+    if (exp == 0) {
+        return RAY;
+    }
+
+    int exp_minus_one = exp - 1;
+    int exp_minus_two = exp > 2 ? exp - 2 : 0;
+
+    int base_power_two = ray_mul(rate, rate) / (SECONDS_PER_YEAR * SECONDS_PER_YEAR);
+    int base_power_three = ray_mul(base_power_two, rate) / SECONDS_PER_YEAR;
+    int second_term = exp * exp_minus_one * base_power_two / 2;
+    int third_term = exp * exp_minus_one * exp_minus_two * base_power_three / 6;
+
+    return RAY + (rate * exp) / SECONDS_PER_YEAR + second_term + third_term;
+}

@@ -1,0 +1,118 @@
+#include "constants.fc";
+#include "storage.fc";
+#include "globals.fc";
+#include "op.fc";
+#include "utils/reserve_utils.fc";
+#include "utils/user_utils.fc";
+#include "utils/data_parser.fc";
+#include "utils/transfer_helper.fc";
+#include "utils/price_utils.fc";
+
+(slice, slice, slice) __get_reserve_data(int asset_hash) inline {
+    storage::load();
+    
+    var (state, _) = storage::reserve_states.udict_get?(KEY_LEN, asset_hash);
+    var (config, _) = storage::reserve_configs.udict_get?(KEY_LEN, asset_hash);
+    var (rate_strategy, _) = storage::rate_strategies.udict_get?(KEY_LEN, asset_hash);
+
+    return (state, config, rate_strategy);
+}
+
+(tuple) __get_dict_values(cell dict) inline {
+    tuple res = empty_tuple();
+
+    var (key, value, f) = dict.udict_get_min?(KEY_LEN);
+    while (f) {
+        res~tpush(value);
+        (key, value, f) = dict.udict_get_next?(KEY_LEN, key);
+    }
+
+    return res;
+}
+
+(int) __get_asset_hash(slice underlying_asset) inline {
+    ;; TODO: Do something with workchain
+    var (workchain, asset_hash) = parse_std_addr(underlying_asset);
+    return asset_hash;
+}
+
+(slice) __get_user_address(slice owner_address) inline {
+    storage::load();
+    return calculate_user_address(my_address(), owner_address, storage::user_code);
+}
+
+() __update_reserve_data() impure inline {
+    var new_supply_data = pack_reserve_supply_data(next::scaled_supply, next::liquidity, next::liquidity_index, next::liquidity_rate);
+    var new_variable_borrow_data = pack_reserve_variable_borrow_data(next::scaled_variable_debt, next::variable_borrow_index, next::variable_borrow_rate);
+    var new_stable_borrow_data = pack_reserve_stable_borrow_data(next::principal_stable_debt, next::stable_borrow_rate, next::avg_stable_borrow_rate, next::stable_last_update_timestamp);
+
+    var new_reserve_state = pack_reserve_state(new_supply_data, new_variable_borrow_data, new_stable_borrow_data, now());
+    storage::reserve_states~udict_set(KEY_LEN, cache::asset_hash, new_reserve_state);
+    storage::save();
+}
+
+(int) __get_user_balance_in_base_currency(slice state, int u_scaled_supply, int asset_price, int asset_unit) inline {
+    var normalized_income = __get_normalized_income(state);
+    return u_scaled_supply.ray_mul(normalized_income).muldiv(asset_price, asset_unit);
+}
+
+(int) __get_user_debt_in_base_currency(slice state, int u_scaled_variable_debt, int u_stable_debt, int asset_price, int asset_unit) inline {
+    int user_total_debt = u_scaled_variable_debt;
+
+    if (u_scaled_variable_debt != 0) {
+        user_total_debt = u_scaled_variable_debt.ray_mul(__get_normalized_debt(state));
+    }
+
+    user_total_debt += u_stable_debt;
+
+    return user_total_debt.muldiv(asset_price, asset_unit);
+}
+
+(slice) __supply_info(slice user_address, slice underlying_address, int amount) inline {
+    return begin_cell()
+        .store_uint(op::supply(), OP_LEN)
+        .store_slice(user_address)
+        .store_slice(underlying_address)
+        .store_coins(amount)
+    .end_cell().begin_parse();
+}
+
+(slice) __borrow_info(slice user_address, slice underlying_address, int amount, int mode) inline {
+    return begin_cell()
+        .store_uint(op::borrow(), OP_LEN)
+        .store_slice(user_address)
+        .store_slice(underlying_address)
+        .store_coins(amount)
+        .store_uint(mode, 1)
+    .end_cell().begin_parse();
+}
+
+(slice) __withdraw_info(slice user_address, slice underlying_address, int amount) inline {
+    return begin_cell()
+        .store_uint(op::withdraw(), OP_LEN)
+        .store_slice(user_address)
+        .store_slice(underlying_address)
+        .store_coins(amount)
+    .end_cell().begin_parse();
+} 
+
+;; TODO: Need to add this to the repay_logic.fc
+(slice) __repay_info(slice user_address, slice underlying_address, int amount) inline {
+    return begin_cell()
+        .store_uint(op::repay(), OP_LEN)
+        .store_slice(user_address)
+        .store_slice(underlying_address)
+        .store_coins(amount)
+    .end_cell().begin_parse();
+}
+
+(slice) __liquidation_info(slice user_address, slice underlying_address, slice collateral_address, int actual_debt, int actual_collateral) inline {
+    return begin_cell()
+        .store_uint(op::liquidation_call(), OP_LEN)
+        .store_slice(user_address)
+        .store_slice(underlying_address)
+        .store_slice(collateral_address)
+        .store_coins(actual_debt)
+        .store_coins(actual_collateral)
+    .end_cell().begin_parse();
+}
