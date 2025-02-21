@@ -1,0 +1,54 @@
+#include "../constants.fc";
+#include "../op.fc";
+
+() transfer_ton(slice recipient, int mode, int value, slice message) impure inline {
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(recipient)
+        .store_coins(value)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1);
+
+    if (~ null?(message)) {
+        msg = msg.store_uint(1, 1).store_ref(begin_cell().store_uint(0, 32).store_slice(message).end_cell());
+    } else {
+        msg = msg.store_uint(0, 1);
+    }
+
+    send_raw_message(msg.end_cell(), mode);
+}
+
+() transfer_jetton(slice recipient, slice response_address, slice pool_jw_address, int amount, int mode, int value, slice message) impure inline {
+    var body = begin_cell()
+        .store_uint(op::transfer(), OP_LEN)
+        .store_uint(0, 64)
+        .store_grams(amount)
+        .store_slice(recipient)
+        .store_slice(response_address)
+        .store_dict(null())
+        .store_coins(0);
+
+    if (~ null?(message)) {
+        body = body.store_uint(1, 1).store_ref(begin_cell().store_uint(0, 32).store_slice(message).end_cell());
+    } else {
+        body = body.store_uint(0, 1);
+    }
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(pool_jw_address)
+        .store_coins(value)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body.end_cell())
+    .end_cell();
+
+    send_raw_message(msg, mode);
+}
+
+
+() transfer(slice recipient, slice response_address, slice pool_jw_address, int amount, int mode, int value, slice message) impure {
+    if (equal_slices(pool_jw_address, my_address())) {
+        transfer_ton(recipient, mode, amount + value, message);
+    } else {
+        transfer_jetton(recipient, response_address, pool_jw_address, amount, mode, value, message);
+    }
+}

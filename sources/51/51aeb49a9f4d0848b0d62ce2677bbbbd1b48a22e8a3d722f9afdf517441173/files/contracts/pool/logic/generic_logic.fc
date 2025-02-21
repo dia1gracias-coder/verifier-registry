@@ -1,0 +1,122 @@
+#include "../utils.fc";
+#include "../lib/math/math_utils.fc";
+
+;; @notice Returns the ongoing normalized income for the reserve
+;; @param timestamp The last timestamp the reserve is updated
+;; @param last_update_timestamp
+;; @param liquidity_index
+;; @param liquidity_rate
+;; int get_normalized_income(int last_update_timestamp, int liquidity_index, int liquidity_rate) inline {
+;;     ~strdump("[LOG] get_normalized_income");
+;;     if (last_update_timestamp == now()) {
+;;         return liquidity_index;
+;;     }
+;;     return calculate_linear_interest(liquidity_rate, last_update_timestamp).ray_mul(liquidity_index);
+;; }
+
+;; ;; @notice Returns the ongoing normalized variable debt for the reserve.
+;; int get_normalized_debt(int last_update_timestamp, int variable_borrow_index, int variable_borrow_rate) inline {
+;;     ~strdump("[LOG] get_normalized_debt");
+;;     if (last_update_timestamp == now()) {
+;;         return variable_borrow_index;
+;;     }
+;;     return calculate_compounded_interest(variable_borrow_rate, last_update_timestamp, now()).ray_mul(variable_borrow_index);
+;; }
+
+;; We don't need the `cur_asset_hash` anymore
+(int, int, int, int, int, int) calculate_user_account_data(int cur_asset_hash, cell user_data, cell price_data_dict) impure inline {
+    ~strdump("[GENERIC_LOGIC] calculate_user_account_data");
+
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, _, _) = unpack_user_data(user_data);
+
+    var (
+        total_collateral_in_base_currency,
+        total_debt_in_base_currency,
+        avg_ltv,
+        avg_liquidity_threshold,
+        health_factor,
+        has_zero_ltv_collateral
+    ) = (0, 0, 0, 0, -1, false);
+
+    ;; Loop through all the user's reserves
+    var (asset_hash, value, f) = reserves.udict_get_min?(256);
+    while (f) {
+        var (scaled_supply, liquidity_index, is_collateral) = get_user_supply_data(supply_list, asset_hash);
+        var (scaled_variable_debt, _) = get_user_variable_borrow_data(variable_borrow_list, asset_hash);
+        var (scaled_stable_debt, total_stable_debt, stable_borrow_rate, stable_last_update_timestamp) = get_user_stable_borrow_data(stable_borrow_list, asset_hash);
+
+        ~strdump("[GENERIC_LOGIC] ollateral , scaled_variable_debt, scaled_stable_de");
+        ~dump([is_collateral , scaled_variable_debt, scaled_stable_debt]);
+        ;; * If reserve is being used as collateral or if the user has debt on this reserve
+        if (is_collateral | (scaled_variable_debt > 0) | (scaled_stable_debt > 0)) {
+            ;; Get reserve data
+            var (state, config, rate_strategy) = __get_reserve_data(asset_hash);
+
+            var ltv = config.get_ltv();
+            var liquidation_threshold = config.get_liquidation_threshold();
+            var decimals = config.get_reserve_decimals();
+            var underlying_address = config.get_underlying_address();
+            var last_update_timestamp = state.get_reserve_last_update_timestamp();
+
+            var (_, _, liquidity_index, liquidity_rate) = state.get_reserve_supply_data();
+            var (_, variable_borrow_index, variable_borrow_rate) = state.get_reserve_variable_borrow_data();
+
+            var _asset_hash = __get_asset_hash(underlying_address);
+            var asset_price = price_data_dict.get_asset_price(_asset_hash);
+            var asset_unit = binpow(10, decimals);
+            if ((liquidation_threshold != 0) & is_collateral) {
+                ;; TODO: Calculate the user's balance in the base currency
+                var user_balance_in_base_currency = __get_user_balance_in_base_currency(state, scaled_supply, asset_price, asset_unit);
+
+                ;; if (asset_hash == cur_asset_hash) {
+                ;;     liquidity_index = next::liquidity_index;
+                ;;     variable_borrow_index = next::variable_borrow_index;
+                ;;     last_update_timestamp = next::last_updated_timestamp;
+                ;; }
+                ;; ;; TODO: Fix this
+                ;; var user_balance_in_base_currency = scaled_supply.ray_mul(get_normalized_income(last_update_timestamp, liquidity_index, liquidity_rate)).muldiv(asset_price, asset_unit);
+                total_collateral_in_base_currency += user_balance_in_base_currency;
+
+                if (ltv != 0) {
+                    avg_ltv += user_balance_in_base_currency * ltv;
+                } else {
+                    has_zero_ltv_collateral = true;
+                }
+
+                avg_liquidity_threshold += user_balance_in_base_currency * liquidation_threshold;
+                
+            }
+
+            var user_total_debt = __get_user_debt_in_base_currency(state, scaled_variable_debt, total_stable_debt, asset_price, asset_unit);
+            total_debt_in_base_currency += user_total_debt;
+            
+        }
+
+        ;; next iteration
+        (asset_hash, value, f) = reserves.udict_get_next?(256, asset_hash);
+    }
+
+    if (total_collateral_in_base_currency != 0) {
+        avg_ltv = avg_ltv / total_collateral_in_base_currency;
+        avg_liquidity_threshold = avg_liquidity_threshold / total_collateral_in_base_currency;
+    } else {
+        avg_ltv = 0;
+        avg_liquidity_threshold = 0;
+    }
+
+    if (total_debt_in_base_currency == 0) {
+        health_factor = -1;
+    } else {
+        health_factor = total_collateral_in_base_currency.percent_mul(avg_liquidity_threshold).wad_div(total_debt_in_base_currency);
+    }
+
+    return (
+        total_collateral_in_base_currency,
+        total_debt_in_base_currency,
+        avg_ltv,
+        avg_liquidity_threshold,
+        health_factor,
+        has_zero_ltv_collateral
+    );
+
+}

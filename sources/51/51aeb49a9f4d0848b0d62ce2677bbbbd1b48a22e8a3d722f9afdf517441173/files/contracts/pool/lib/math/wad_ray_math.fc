@@ -1,0 +1,48 @@
+#include "../../errors.fc";
+
+const WAD = 1000000000000000000;
+const HALF_WAD = 500000000000000000;
+const RAY = 1000000000000000000000000000;
+const HALF_RAY = 500000000000000000000000000;
+const WAD_RAY_RATIO = 1000000000;
+
+;; Multiplies two wad, rounding half up to the nearest wad
+int wad_mul(int a, int b) inline {
+    int product = a * b + HALF_WAD;
+    return product / WAD;
+}
+
+;; Divides two wad, rounding half up to the nearest wad
+int wad_div(int a, int b) inline {
+    throw_if(ERR::INVALID_NUMBER, b == 0);
+    int result = (a * WAD + b / 2) / b;
+    return result;
+}
+
+;; Multiplies two ray, rounding half up to the nearest ray
+int ray_mul(int a, int b) inline {
+    int product = a * b + HALF_RAY;
+    return product / RAY;
+}
+
+;; Divides two ray, rounding half up to the nearest ray
+int ray_div(int a, int b) inline {
+    throw_if(ERR::INVALID_NUMBER, b == 0);
+    int result = (a * RAY + b / 2) / b;
+    return result;
+}
+
+;; Casts ray down to wad
+int ray_to_wad(int a) inline {
+    int wad_value = a / WAD_RAY_RATIO;
+    int remainder = a % WAD_RAY_RATIO;
+    if (remainder >= WAD_RAY_RATIO / 2) {
+        wad_value += 1;
+    }
+    return wad_value;
+}
+
+;; Converts wad up to ray
+int wad_to_ray(int a) inline {
+    return a * WAD_RAY_RATIO;
+}

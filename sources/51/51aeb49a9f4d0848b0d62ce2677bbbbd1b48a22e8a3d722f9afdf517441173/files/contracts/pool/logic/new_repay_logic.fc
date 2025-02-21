@@ -1,0 +1,571 @@
+#include "./validation_logic.fc";
+#include "../cache.fc";
+#include "../utils/transfer_helper.fc";
+
+(int) withdraw_to_repay(int msg_value, cell user_data, slice pool_jw_address, cell price_data, int amount_collateral) impure inline {
+    ~strdump("[POOL]-[REPAY]-[REPAY_WITHDRAW_LOGIC] execute_withdraw");
+    ~dump(__get_asset_hash(pool_jw_address));
+    
+    cache(pool_jw_address);
+    update_state();
+
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time) = unpack_user_data(user_data);
+    var (scaled_supply, _, is_collateral) = get_user_supply_data(supply_list, cache::asset_hash);
+
+    int amount_to_withdraw = amount_collateral;
+    int user_balance = scaled_supply.ray_mul(next::liquidity_index);
+    if (user_balance < amount_collateral) {
+        amount_to_withdraw = user_balance;
+    }
+
+    ~dump([amount_collateral, user_balance, amount_to_withdraw]);
+
+    try {
+        throw_if(ERR::USER_IN_PROCESSING, is_user_in_process & (now() <= process_expire_time));
+        validate_withdraw(amount_to_withdraw, user_balance);
+        if (equal_slices(pool_jw_address, my_address())) {
+            throw_if(ERR::AMOUNT_COLLATERAL_SWAP_TOO_LOW, amount_to_withdraw < MIN_TRADE_AMOUNT + TRADE_FEE);
+        }
+    } catch(x, n) {
+        ;; transfer_ton(owner_address, 64, 0, __build_error_msg(n));
+        ;; transfer_ton(owner_address, 0, msg_value - WITHDRAW_LOGIC_GAS_CONSUMPTION , __build_error_msg(n));
+
+        reset_process_user(owner_address, n);
+        transfer_ton(owner_address, 64, 0, __build_error_msg(n));
+        return -1;
+    }
+    update_interest_rates(0, amount_to_withdraw + next::accrue_to_treasury);
+
+    ;; * Update reserve data
+    var scaled_amount = amount_to_withdraw.ray_div(next::liquidity_index);
+    next::scaled_supply -= scaled_amount;
+    next::liquidity -= amount_to_withdraw;
+    next::liquidity -= next::accrue_to_treasury;
+
+    if ( (next::scaled_supply < 0) | (next::liquidity < 0) ) {
+        ;; transfer_ton(owner_address, 0, msg_value - WITHDRAW_LOGIC_GAS_CONSUMPTION , __build_error_msg(ERR::INVALID_AMOUNT_WITHDRAW));
+
+        reset_process_user(owner_address, ERR::INVALID_AMOUNT_WITHDRAW);
+        transfer_ton(owner_address, 64, 0, __build_error_msg(ERR::INVALID_AMOUNT_WITHDRAW));
+        return -1;
+    }
+
+    int is_using_as_collateral = is_collateral;
+    
+    if (is_using_as_collateral & (amount_to_withdraw == user_balance)) {
+        is_collateral = false;
+    }
+    supply_list~udict_set(
+        KEY_LEN, 
+        cache::asset_hash, 
+        pack_user_supply_data(scaled_supply - scaled_amount, next::liquidity_index, is_collateral)
+    );
+
+    var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, false, now());
+
+    if (is_using_as_collateral & is_borrowing_any?(new_user_data)) {
+        try {
+            validate_hf_and_ltv(cache::asset_hash , new_user_data, price_data);
+        } catch(x, n) {
+            ;; transfer_ton(owner_address, 0, msg_value - WITHDRAW_LOGIC_GAS_CONSUMPTION , __build_error_msg(n));
+            reset_process_user(owner_address, n);
+            transfer_ton(owner_address, 64, 0, __build_error_msg(n));
+
+            return -1;
+        }
+    }
+
+    ;; __accrue_to_treasury(owner_address);
+    if (next::accrue_to_treasury > 0) {
+        transfer(storage::treasury(), owner_address, cache::reserve_configuration.get_pool_jw_address(),
+        next::accrue_to_treasury, 0, ONE_TON * 5 / 100, null());
+    }
+    
+    update_user_data_for_repay(owner_address, owner_address, new_user_data);
+    return amount_to_withdraw;
+}
+
+() swap_collateral_to_repay(int amount_expect_repay, int amount_collateral, slice pool_jw_collateral, cell user_data, int interest_rate_mode, int is_max, slice vault_address, slice swap_pool_address) impure inline {
+    ~strdump("[POOL]-[REPAY] swap_collateral_to_repay...");
+    var (_, owner_address, _, _, _, _, _, _) = unpack_user_data(user_data);
+    cell fulfill_payload = begin_cell()
+                            .store_uint(op::repay_collateral_after_swap(), 32)
+                            .store_slice(owner_address)
+                            .store_uint(interest_rate_mode, 1)
+                            .store_int(is_max, 1)
+                            .store_coins(amount_expect_repay)
+                            .store_coins(amount_collateral)
+                            .end_cell();
+
+    ;;TODO priority low
+    cell reject_payload = begin_cell()
+                            .store_uint(op::repay_swap_reject(), 32)
+                            .store_slice(owner_address)
+                            .store_uint(interest_rate_mode, 1)
+                            .store_int(is_max, 1)
+                            .store_coins(amount_expect_repay)
+                            .store_coins(amount_collateral)                            
+                            .end_cell();
+
+    ;; If Jetton swap else TON
+    if (~ equal_slices(pool_jw_collateral, my_address())) {
+        
+        ~strdump("[POOL]-[REPAY] swap_collateral_to_repay... by jetton ");
+
+        cell swap_details = begin_cell()
+                            .store_uint(0, 32)
+                            .store_slice(my_address()) ;; recipient
+                            .store_slice(my_address()) ;; referral
+                            .store_maybe_ref(fulfill_payload)
+                            .store_maybe_ref(reject_payload) ;; reject_body, we simply receive TON and send them back to the Vault
+                            .end_cell();
+        cell swap_payload = begin_cell()
+                    .store_uint(op::jetton_vault_swap(), 32)
+                    .store_slice(swap_pool_address)
+                    .store_uint(0, 1) ;; reserved
+        ;; .store_coins(amount_expect_repay * 11111)
+                    .store_coins(0)
+                    .store_maybe_ref(null()) ;; next
+                    .store_ref(swap_details).end_cell();
+
+        var body = begin_cell()
+            .store_uint(op::transfer(), 32)
+            .store_uint(0, 64)
+            .store_coins(amount_collateral)
+            .store_slice(vault_address)
+            .store_slice(owner_address)
+            .store_maybe_ref(null())
+            .store_coins(TRADE_FEE)
+            .store_maybe_ref(swap_payload)
+            .end_cell();
+
+        cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(pool_jw_collateral)
+            .store_coins(0)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(body)
+            .end_cell();
+
+        send_raw_message(msg, 64);
+    } else {
+        ~strdump("[POOL]-[REPAY] swap_collateral_to_repay... by TON ");
+        ;; int trade_value = my_balance - MIN_BALANCE;
+        ~dump([amount_collateral, amount_expect_repay]);
+
+        cell body = begin_cell()
+            .store_uint(op::ton_vault_swap(), 32)
+            .store_uint(0, 64) ;; query_id:int64
+            .store_coins(amount_collateral) ;; amount:Coins # subtract gas
+        ;; _:SwapStep
+            .store_slice(swap_pool_address) ;; pool_addr:MsgAddressInt TON_USDT_POOL_ADDR
+            .store_uint(0, 1) ;; kind:SwapKind
+        ;; .store_coins(amount_expect_repay * 10000000000) ;; limit:Coins
+            .store_coins(0) ;; limit:Coins
+            .store_maybe_ref(null()) ;; next:(Maybe ^SwapStep)
+        ;; swap_params:^SwapParams
+            .store_ref(
+            begin_cell()
+                    .store_uint(now() + 60 * 5, 32) ;; deadline:Timestamp # 5 min
+                    .store_slice(my_address()) ;; recipient_addr:MsgAddressInt
+                    .store_slice(addr_none()) ;; referral_addr:MsgAddress
+            ;; .store_maybe_ref(null()) ;; fulfill_payload:(Maybe ^Cell)
+                    .store_maybe_ref(fulfill_payload) ;; fulfill_payload:(Maybe ^Cell)
+                    .store_maybe_ref(reject_payload) ;; reject_payload:(Maybe ^Cell)
+                    .end_cell()
+        )
+            .end_cell();
+
+        send_raw_message(
+            begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(vault_address) ;;TON_VAULT_ADDR
+                .store_coins(amount_collateral + TRADE_FEE)
+                .store_zeros(1 + 4 + 4 + 64 + 32 + 1)
+                .store_maybe_ref(body)
+                .end_cell(),
+            0
+        );
+    }
+
+    ~strdump("[POOL]-[REPAY] swap_collateral_to_repay executed!");
+    return ();
+}
+
+int calculate_collateral_amount(int amount_repay, cell price_data, slice pool_jw_repay, slice pool_jw_collateral) impure inline {
+    var (_, config_repay, _) = __get_reserve_data(__get_asset_hash(pool_jw_repay));
+    var (_, config_collateral, _) = __get_reserve_data(__get_asset_hash(pool_jw_collateral));
+
+    var decimals_repay = config_repay.get_reserve_decimals();
+    var decimals_collateral = config_collateral.get_reserve_decimals();
+
+    var asset_unit_repay = binpow(10, decimals_repay);
+    var asset_unit_collateral = binpow(10, decimals_collateral);
+
+    var underlying_address_repay_hash = config_repay.get_underlying_address().__get_asset_hash();
+    var underlying_address_collateral_hash = config_collateral.get_underlying_address().__get_asset_hash();
+
+    var asset_price_repay = price_data.get_asset_price(underlying_address_repay_hash);
+    var asset_price_collateral = price_data.get_asset_price(underlying_address_collateral_hash);
+
+    var amount_repay_in_base_currency = amount_repay.muldiv(asset_price_repay, asset_unit_repay);
+    ;; * 105 / 100 : 5% slippage
+    return amount_repay_in_base_currency.muldiv(asset_unit_collateral, asset_price_collateral) * 105 / 100;
+}
+
+() execute_repay_collateral(int msg_value, cell user_data, slice in_msg_body) impure inline {
+    ~strdump("[POOL]-[REPAY] Executing repay collateral...");
+    ~dump(now());
+
+    var (query_id, amount_repay, _, interest_rate_mode, pool_jw_repay, pool_jw_collateral, is_max, price_data, dedust_info) = parse_repay_collateral(in_msg_body);
+    var (vault_address, swap_pool_address) = parse_dedust(dedust_info.begin_parse());
+
+    var amount_collateral = calculate_collateral_amount(amount_repay, price_data, pool_jw_repay, pool_jw_collateral);
+
+    ;; Step 1 - withdraw all asset collateral: balance_withdraw = xx 
+    int amount_withdraw = withdraw_to_repay(msg_value, user_data, pool_jw_collateral, price_data, amount_collateral);
+    if (amount_withdraw == -1) {
+        ~strdump("[POOL]-[REPAY] Executing repay collateral... 2");
+        return ();
+    }
+
+    ;; Step 2 - swap dedust asset collateral -> asset repay : balance_withdraw = xx -> balance repay: yy
+    swap_collateral_to_repay(amount_repay, amount_withdraw, pool_jw_collateral, user_data, interest_rate_mode, is_max, vault_address, swap_pool_address);
+
+    __update_reserve_data();
+
+    ;; Step 3 - deposit: with amount remaining yy-zz
+
+    ;; Step 4 - repay: with amount zz
+    ~strdump("[POOL]-[REPAY] - repay collateral executed!");
+}
+
+(cell) supply_after_swap(int msg_value, cell user_data, slice pool_jw_address, int amount) impure inline {
+    ~strdump("[POOL]-[REPAY] - [SUPPLY_LOGIC] supply_after_swap");
+    ~dump(amount);
+    cache(pool_jw_address);
+    update_state();
+    ;; validate_supply(amount);
+
+    try {
+        throw_if(0, msg_value < supply_gas_consumption());
+        validate_supply(amount);
+    } catch(x, n) {
+        
+        var (_, owner_address, _, _, _, _, _, _) = unpack_user_data(user_data);
+        
+        reset_process_user(owner_address, n);
+
+        if (equal_slices(pool_jw_address, my_address())) {
+            transfer_ton(owner_address, 64, 0, __build_error_msg(n));
+        } else {
+            transfer_jetton(owner_address, owner_address, pool_jw_address, amount, 64, 0, __build_error_msg(n));
+        }
+
+
+        return (begin_cell().end_cell());
+    }
+
+    ;; update_interest_rates(amount, 0);
+
+    ;; * Update reserve data
+    next::liquidity += amount;
+    next::scaled_supply += amount.ray_div(next::liquidity_index);
+
+    ;; * Update user data
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time) = unpack_user_data(user_data);
+
+    ;; *** Add new reserve if it does not exist
+    var underlying_address = cache::reserve_configuration.get_underlying_address();
+    reserves~udict_add?(KEY_LEN, cache::asset_hash, underlying_address);
+
+    ;; *** Automatically set reserve use as collateral if it is possible
+    var (scaled_supply, _, is_collateral) = get_user_supply_data(supply_list, cache::asset_hash);
+
+    ;; *** If it is the first time user supplies the asset
+    if (scaled_supply == 0) {
+        if (validate_automatic_use_as_collateral(supply_list)) {
+            is_collateral = true;
+        }
+    }
+
+    supply_list~udict_set(
+        KEY_LEN, 
+        cache::asset_hash,
+        pack_user_supply_data(scaled_supply + amount.ray_div(next::liquidity_index), next::liquidity_index, is_collateral)
+    );
+
+    var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time);
+    return new_user_data;
+}
+
+() logic_repay(cell user_data, int amount, int amount_receive, slice pool_jw_address, int interest_rate_mode, int use_a_token, int is_max_repay, int msg_value, int my_balance, int fwd_fee) impure inline {
+    ~strdump("[POOL]-[REPAY] logic_repay... ");
+    ~dump(use_a_token);
+
+    ;; if (use_a_token == 0) {
+        cache(pool_jw_address);
+        update_state();
+    ;; }
+
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time) = unpack_user_data(user_data);
+    var (scaled_supply, _, is_collateral) = get_user_supply_data(supply_list, cache::asset_hash);
+    var (scaled_variable_debt, _) = get_user_variable_borrow_data(variable_borrow_list, cache::asset_hash);
+    var (_, stable_debt, _, _) = get_user_stable_borrow_data(stable_borrow_list, cache::asset_hash);
+
+    var variable_debt = scaled_variable_debt.ray_mul(__get_normalized_debt(cache::reserve_state));
+    var supply_balance = scaled_supply.ray_mul(__get_normalized_income(cache::reserve_state));
+    try {
+        throw_if(0, msg_value < REPAY_LOGIC_GAS_CONSUMPTION);
+        throw_if(ERR::USER_IN_PROCESSING, is_user_in_process & (now() <= process_expire_time));
+
+        validate_repay(amount, interest_rate_mode, stable_debt, variable_debt);
+    } catch(x, n) {
+        ;; if (use_a_token == 0) {
+            ;; transfer_token_to_user(owner_address, pool_jw_address, amount, 0);
+            ;; transfer(owner_address, owner_address, pool_jw_address, amount_receive, 0, msg_value - REQUIRED_GAS, __build_error_msg(n));
+        ;; } 
+
+        reset_process_user(owner_address, n);
+
+        transfer(owner_address, owner_address, pool_jw_address, amount, 64, 0, __build_error_msg(n));
+        return ();
+    }
+
+    
+
+    var actual_amount = amount;
+    ;; Get the amount of debt that the user needs to pay back
+    var payback_amount = interest_rate_mode == INTEREST_MODE_STABLE ? stable_debt : variable_debt;
+    
+    ;; If repay max with a token, then 
+    ;; if (use_a_token & is_max_repay) {
+    ;;     actual_amount = supply_balance + amount_receive.ray_div(next::liquidity_index);
+    ;; }
+
+    if (actual_amount < payback_amount) {
+        payback_amount = actual_amount;
+    }
+
+    if (interest_rate_mode == INTEREST_MODE_STABLE) {
+        var (_, current_balance, balance_increase) = calculate_user_stable_debt_increase(stable_borrow_list, cache::asset_hash);
+        var (principal_stable_debt, total_stable_debt, stable_borrow_rate, current_avg_stable_rate, stable_last_update_timestamp) = cache::reserve_state.get_reserve_stable_borrow_data();
+        var (u_principal_stable_debt, _, u_current_stable_rate, u_stable_last_update_timestamp) = get_user_stable_borrow_data(stable_borrow_list, cache::asset_hash);
+
+        var previous_supply = total_stable_debt;
+        var next_avg_stable_rate = 0;
+        var next_supply = 0;
+        var user_stable_rate = u_current_stable_rate;
+
+        if (previous_supply <= payback_amount) {
+            next::avg_stable_borrow_rate = 0;
+            next::total_stable_debt = 0;
+        } else {
+            next_supply = next::total_stable_debt = previous_supply - payback_amount;
+            var first_term = next::avg_stable_borrow_rate.ray_mul(previous_supply.wad_to_ray());
+            var second_term = user_stable_rate.ray_mul(payback_amount.wad_to_ray());
+
+            if (second_term >= first_term) {
+                next_avg_stable_rate = next::total_stable_debt = next::avg_stable_borrow_rate = 0;
+            } else {
+                next_avg_stable_rate = next::avg_stable_borrow_rate = (first_term - second_term).ray_div(next_supply.wad_to_ray());
+            }
+        }
+
+        if (payback_amount == current_balance) {
+            u_current_stable_rate = 0;
+            u_stable_last_update_timestamp = 0;
+        } else {
+            u_stable_last_update_timestamp = now();
+        } 
+
+        next::principal_stable_debt = next::total_stable_debt;
+        next::avg_stable_borrow_rate = next_avg_stable_rate;
+        next::stable_last_update_timestamp = now();
+
+        if (balance_increase > payback_amount) {
+            stable_borrow_list~udict_set(
+                KEY_LEN,
+                cache::asset_hash,
+                pack_user_stable_borrow_data(u_principal_stable_debt + (balance_increase - payback_amount), u_current_stable_rate, u_stable_last_update_timestamp)
+            );
+        } else {
+            stable_borrow_list~udict_set(
+                KEY_LEN,
+                cache::asset_hash,
+                pack_user_stable_borrow_data(u_principal_stable_debt - (payback_amount - balance_increase), u_current_stable_rate, u_stable_last_update_timestamp)
+            );
+        }
+    } else {
+        next::scaled_variable_debt -= payback_amount.ray_div(next::variable_borrow_index);
+
+        variable_borrow_list~udict_set(
+            KEY_LEN, 
+            cache::asset_hash, 
+            pack_user_variable_borrow_data(scaled_variable_debt - payback_amount.ray_div(next::variable_borrow_index), next::variable_borrow_index)
+        );
+    }
+
+    ;; update_interest_rates(use_a_token ? amount_receive : payback_amount, next::accrue_to_treasury);
+    update_interest_rates( payback_amount, next::accrue_to_treasury );
+
+    ;; next::liquidity += (use_a_token ? amount_receive : payback_amount);
+    next::liquidity += payback_amount;
+    next::liquidity -= next::accrue_to_treasury;
+
+    ;; __accrue_to_treasury(owner_address);
+
+    ;; if (use_a_token) {
+    ;;     next::scaled_supply += (amount_receive - payback_amount).ray_div(next::liquidity_index);
+    ;;     supply_list~udict_set(
+    ;;         KEY_LEN,
+    ;;         cache::asset_hash,
+    ;;         pack_user_supply_data(scaled_supply + (amount_receive - payback_amount).ray_div(next::liquidity_index), next::liquidity_index, is_collateral)
+    ;;     );
+    ;; }
+
+    var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, false, now());
+    update_user_data(owner_address, owner_address, new_user_data);
+
+    __update_reserve_data();
+
+    if (next::accrue_to_treasury > 0) {
+        transfer(storage::treasury(), owner_address, cache::reserve_configuration.get_pool_jw_address(),
+        next::accrue_to_treasury, 0, ONE_TON * 5 / 100, null());
+    }
+    
+    var underlying_address = cache::reserve_configuration.get_underlying_address();
+
+    msg_value -= REPAY_LOGIC_GAS_CONSUMPTION;
+
+    if (amount_receive > payback_amount) {
+        ;; next::liquidity -= actual_amount - payback_amount;  ;;FIX miss liquidity >< token balance 
+
+        ;; int storage_fee = max(0, min_tons_for_pool_storage() - my_balance);
+        ;; msg_value -= (storage_fee + gas_consumption() + fwd_fee + FEE_UPDATE_USER_DATA);
+
+        msg_value = equal_slices(pool_jw_address, my_address()) ? msg_value - payback_amount : msg_value;
+        
+        ;; if (use_a_token) {
+        ;;     ;; transfer_ton(owner_address, 0, msg_value , __repay_info(owner_address, underlying_address, payback_amount));  
+        ;;     if (equal_slices(pool_jw_address, my_address())) {
+        ;;         transfer_ton(owner_address, 0, msg_value , __repay_info(owner_address, underlying_address, payback_amount));
+        ;;     } else {
+        ;;         transfer_ton(owner_address, 64, 0 , __repay_info(owner_address, underlying_address, payback_amount));
+        ;;     }
+        ;; } else {
+            if (equal_slices(pool_jw_address, my_address())) {
+                transfer(owner_address, owner_address, pool_jw_address, amount_receive - payback_amount, 0, msg_value, 
+                    __repay_info(owner_address, underlying_address, payback_amount));
+            } else {
+                transfer(owner_address, owner_address, pool_jw_address, amount_receive - payback_amount, 64, 0, 
+                    __repay_info(owner_address, underlying_address, payback_amount));
+            }
+
+        ;; }
+    } else {
+        msg_value = equal_slices(pool_jw_address, my_address()) ? ( ONE_TON / 100 ) : msg_value;
+        ;; transfer_ton(owner_address, 0, msg_value , __repay_info(owner_address, underlying_address, payback_amount));
+        if (equal_slices(pool_jw_address, my_address())) {
+            transfer_ton(owner_address, 0, msg_value , __repay_info(owner_address, underlying_address, payback_amount));
+        } else {
+            transfer_ton(owner_address, 64, 0 , __repay_info(owner_address, underlying_address, payback_amount));
+        }
+    }
+
+    ~strdump("[POOL]-[REPAY] logic_repay END");
+}
+
+;; in_msg_body: from swap forward
+;;      - query_id, 
+;;      - pool_jw_address, 
+;;      - amount: receive from swap dedust
+;;      - payload:
+;;         interest_rate_mode, is_max, pool_jw_collateral
+() execute_repay_collateral_after_swap(int msg_value, int my_balance, int fwd_fee, cell user_data, slice in_msg_body) impure inline {
+    ~strdump("[POOL]-[REPAY] Pool execute_repay_collateral_after_swap ...");
+    var (query_id, pool_jw_address, amount_receive, interest_rate_mode, is_max_repay, amount_repay) = parse_repay_after_swap(in_msg_body);
+
+    if (amount_receive < amount_repay) {
+        amount_repay = amount_receive;
+    }
+
+    ;; Step 3 - supply_after_swap: with amount remaining yy-zz
+    ;; cell new_user_data = supply_after_swap(msg_value, user_data, pool_jw_address, amount_receive);
+
+    ;; if (equal_slices(new_user_data.begin_parse(), begin_cell().end_cell().begin_parse())) {
+    ;;     return ();
+    ;; }
+
+    ;; Step 4 - repay: with amount zz
+    logic_repay(user_data, amount_repay, amount_receive, pool_jw_address, interest_rate_mode, 1, is_max_repay, msg_value, my_balance, fwd_fee);
+    
+    ~strdump("[POOL]-[REPAY] execute_repay_collateral_after_swap executed!");
+}
+
+;;  Case: Payout TON
+;;  in_msg_body: 
+;;      .store_uint(query_id, 32)
+;;      .store_ref(payload)
+;;  
+;;  new_in_msg_body add [msg_value] as amount TON receive from swap
+;;
+;;  payload: 
+;;      .store_uint(op::repay_collateral_after_swap(), 32)
+;;      .store_uint(interest_rate_mode, 1)
+;;      .store_uint(is_max, 1)
+() execute_repay_collateral_after_swap_ton(int msg_value, int my_balance, int fwd_fee, cell user_data, slice in_msg_body) impure inline {
+    ~strdump("[POOL]-[REPAY] Pool execute_repay_collateral_after_swap_ton ...");
+    var (interest_rate_mode, is_max, amount_receive, amount_repay) = parse_repay_after_swap_ton(in_msg_body);
+
+    if (amount_receive < amount_repay) {
+        amount_repay = amount_receive;
+    }
+
+    ;; swap TON => pool_jw_address = pool
+    slice pool_jw_address = my_address(); 
+
+    ;; Step 3 - supply_after_swap: with amount remaining yy-zz
+    ;; cell new_user_data = supply_after_swap(msg_value, user_data, pool_jw_address, amount_receive);
+    ;; if (equal_slices(new_user_data.begin_parse(), begin_cell().end_cell().begin_parse())) {
+    ;;     return ();
+    ;; }
+
+    ;; Step 4 - repay: with amount zz
+    logic_repay(user_data, amount_repay, amount_receive, pool_jw_address, interest_rate_mode, 1, is_max, msg_value, my_balance, fwd_fee);
+    
+    ~strdump("[POOL]-[REPAY] execute_repay_collateral_after_swap_ton executed!");
+}
+
+() execute_repay(int msg_value, int my_balance, int fwd_fee, cell user_data, slice in_msg_body) impure inline {
+    ;; `amount` is the jetton amount that the user sends to the pool
+    var (query_id, pool_jw_address, amount, interest_rate_mode, is_max_repay) = in_msg_body.parse_repay();
+    int use_a_token = 0;
+    logic_repay(user_data, amount, amount, pool_jw_address, interest_rate_mode, use_a_token, is_max_repay, msg_value, my_balance, fwd_fee);
+}
+
+() execute_repay_supply_after_reject_swap(int msg_value, int my_balance, int fwd_fee, cell user_data, slice in_msg_body) impure inline {
+    ~strdump("[POOL]-[REPAY] execute_repay_supply_after_reject_swap ... ");
+    var (_, pool_jw_address, amount_supply, _, _, _) = in_msg_body.parse_repay_after_swap();
+
+    cell new_user_data = supply_after_swap(msg_value, user_data, pool_jw_address, amount_supply);
+    if (equal_slices(new_user_data.begin_parse(), begin_cell().end_cell().begin_parse())) {
+        return ();
+    }
+
+    var (_, owner_address, _, _, _, _, _, _) = unpack_user_data(new_user_data);
+
+    __update_reserve_data();
+
+    update_user_data(owner_address, owner_address, new_user_data);
+
+    if (equal_slices(pool_jw_address, my_address())) {
+        msg_value -= amount_supply;
+    }
+
+    if (msg_value > SUPPLY_LOGIC_GAS_CONSUMPTION) {
+        transfer_ton(owner_address, 0, msg_value - SUPPLY_LOGIC_GAS_CONSUMPTION , null());
+    }
+    
+    ~strdump("[POOL]-[REPAY] execute_repay_supply_after_reject_swap executed!");
+}

@@ -1,0 +1,301 @@
+(slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, cell, int, int) _unpack_reserve_config(slice ds) inline {
+    slice addresses = ds~load_ref().begin_parse();
+    slice underlying_address = addresses~load_msg_addr();
+    slice pool_jw_address = addresses~load_msg_addr();
+
+    int ltv = ds~load_uint(16);
+    int liquidation_threshold = ds~load_uint(16);
+    int reserve_decimals = ds~load_uint(8);
+    int is_active = ds~load_int(1);
+    int is_frozen = ds~load_int(1);
+    int is_borrowing_enabled = ds~load_int(1);
+    int stable_borrowing_enabled = ds~load_int(1);
+    int is_paused = ds~load_int(1);
+    int is_jetton = ds~load_int(1);
+    int reserve_factor = ds~load_uint(32);
+    int supply_cap = ds~load_coins();
+    int borrow_cap = ds~load_coins();
+    int debt_ceiling = ds~load_coins();
+    cell content = ds~load_ref();
+    int liquidation_protocol_fee = ds~load_uint(16);
+    int liquidation_bonus = ds~load_uint(16);
+
+    return (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals, 
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton, 
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus);
+}
+
+(cell) _pack_reserve_config(
+    slice underlying_address, slice pool_jw_address, int ltv, int liquidation_threshold, int reserve_decimals, 
+    int is_active, int is_frozen, int is_borrowing_enabled, int stable_borrowing_enabled, int is_paused, int is_jetton, 
+    int reserve_factor, int supply_cap, int borrow_cap, int debt_ceiling, cell content, int liquidation_protocol_fee, int liquidation_bonus
+) inline {
+    cell addresses = begin_cell().store_slice(underlying_address).store_slice(pool_jw_address).end_cell();
+    return begin_cell()
+        .store_ref(addresses)
+        .store_uint(ltv, 16)
+        .store_uint(liquidation_threshold, 16)
+        .store_uint(reserve_decimals, 8)
+        .store_int(is_active, 1)
+        .store_int(is_frozen, 1)
+        .store_int(is_borrowing_enabled, 1)
+        .store_int(stable_borrowing_enabled, 1)
+        .store_int(is_paused, 1)
+        .store_int(is_jetton, 1)
+        .store_uint(reserve_factor, 32)
+        .store_coins(supply_cap)
+        .store_coins(borrow_cap)
+        .store_coins(debt_ceiling)
+        .store_ref(content)
+        .store_uint(liquidation_protocol_fee, 16)
+        .store_uint(liquidation_bonus, 16)
+        .end_cell();
+}
+
+(slice) get_addresses(slice config) inline {
+    return config~load_ref().begin_parse();
+}
+
+(slice) get_underlying_address(slice config) inline {
+    slice addresses = config.get_addresses();
+    return addresses~load_msg_addr();
+}
+
+(slice) get_pool_jw_address(slice config) inline {
+    slice addresses = config.get_addresses();
+    addresses~load_msg_addr();
+    return addresses~load_msg_addr();
+}
+
+(int) get_ltv(slice config) inline {
+    config~load_ref();
+    return config~load_uint(16);
+}
+
+(int) get_liquidation_threshold(slice config) inline {
+    config~load_ref();
+    config~skip_bits(16);
+    return config~load_uint(16);
+}
+
+    (int) get_reserve_decimals(slice config) inline {
+    config~load_ref();
+    config~skip_bits(32);
+    return config~load_uint(8);
+}
+
+    (int, int, int, int, int, int) get_flags(slice config) inline {
+    config~load_ref();
+    config~skip_bits(40);
+    return (config~load_int(1), config~load_int(1), config~load_int(1), config~load_int(1), config~load_int(1), config~load_int(1));
+}
+
+    (int) get_reserve_factor(slice config) inline {
+    config~load_ref();
+    config~skip_bits(46);
+    return config~load_uint(32);
+}
+
+    (int) get_supply_cap(slice config) inline {
+    config~load_ref();
+    config~skip_bits(78);
+    return config~load_coins();
+}
+
+    (int) get_borrow_cap(slice config) inline {
+    config~load_ref();
+    config~skip_bits(78);
+    config~load_coins();
+    return config~load_coins();
+}
+
+    (int) get_debt_ceiling(slice config) inline {
+    config~load_ref();
+    config~skip_bits(78);
+    config~load_coins();
+    config~load_coins();
+    return config~load_coins();
+}
+
+    (cell) get_content(slice config) inline {
+    config~load_ref();
+    config~skip_bits(78);
+    config~load_coins();
+    config~load_coins();
+    config~load_coins();
+    return config~load_ref();
+}
+
+    (int) get_liquidation_protocol_fee(slice config) inline {
+    config~load_ref();
+    config~skip_bits(78);
+    config~load_coins();
+    config~load_coins();
+    config~load_coins();
+    config~load_ref();
+    return config~load_uint(16);
+}
+
+    (int) get_liquidation_bonus(slice config) inline {
+    config~load_ref();
+    config~skip_bits(78);
+    config~load_coins();
+    config~load_coins();
+    config~load_coins();
+    config~load_ref();
+    config~load_uint(16);
+    return config~load_uint(16);
+}
+
+(slice) set_reserve_borrowing(slice config, int enabled) inline {
+    if (~ enabled) {
+        ;; TODO: Validate that the stable borrowing is not enabled
+    }
+
+    var (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals, 
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton, 
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    ) = _unpack_reserve_config(config);
+
+    cell new_config = _pack_reserve_config(
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals, 
+        is_active, is_frozen, enabled, stable_borrowing_enabled, is_paused, is_jetton, 
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    );
+
+    return new_config.begin_parse();
+}
+
+(slice) set_reserve_stable_borrowing(slice config, int enabled) inline {
+    var (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    ) = _unpack_reserve_config(config);
+
+    if (enabled) {
+        throw_unless(0xffff, is_borrowing_enabled);
+    }
+
+    cell new_config = _pack_reserve_config(
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    );
+
+    return new_config.begin_parse();
+}
+
+(slice) set_reserve_active(slice config, int enabled) inline {
+    var (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    ) = _unpack_reserve_config(config);
+
+    cell new_config = _pack_reserve_config(
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        enabled, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    );
+
+    return new_config.begin_parse();
+}
+
+(slice) set_reserve_freeze(slice config, int enabled) inline {
+    var (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    ) = _unpack_reserve_config(config);
+
+    cell new_config = _pack_reserve_config(
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, enabled, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    );
+
+    return new_config.begin_parse();
+}
+
+(slice) set_reserve_pause(slice config, int enabled) inline {
+    var (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    ) = _unpack_reserve_config(config);
+
+    cell new_config = _pack_reserve_config(
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, enabled, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    );
+
+    return new_config.begin_parse();
+}
+
+(slice) set_reserve_factor(slice config, int factor) inline {
+    var (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    ) = _unpack_reserve_config(config);
+
+    cell new_config = _pack_reserve_config(
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    );
+
+    return new_config.begin_parse();
+}
+
+(slice) set_reserve_supply_cap(slice config, int cap) inline {
+    var (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    ) = _unpack_reserve_config(config);
+
+    cell new_config = _pack_reserve_config(
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    );
+
+    return new_config.begin_parse();
+}
+
+(slice) set_reserve_borrow_cap(slice config, int cap) inline {
+    var (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    ) = _unpack_reserve_config(config);
+
+    cell new_config = _pack_reserve_config(
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    );
+
+    return new_config.begin_parse();
+}
+
+(slice) set_reserve_liquidation_protocol_fee(slice config, int fee) inline {
+    var (
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, liquidation_protocol_fee, liquidation_bonus
+    ) = _unpack_reserve_config(config);
+
+    cell new_config = _pack_reserve_config(
+        underlying_address, pool_jw_address, ltv, liquidation_threshold, reserve_decimals,
+        is_active, is_frozen, is_borrowing_enabled, stable_borrowing_enabled, is_paused, is_jetton,
+        reserve_factor, supply_cap, borrow_cap, debt_ceiling, content, fee, liquidation_bonus
+    );
+
+    return new_config.begin_parse();
+}

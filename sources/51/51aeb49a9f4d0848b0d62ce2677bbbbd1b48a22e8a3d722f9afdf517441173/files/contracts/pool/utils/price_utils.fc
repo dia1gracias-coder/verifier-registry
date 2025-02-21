@@ -1,0 +1,72 @@
+#include "../errors.fc";
+
+(int) verify_price_signature(cell price_data, slice signature) impure inline {
+    ~strdump("[VERIFY_PRICE_SIGNATURE] verify_price_signature");
+    var data_hash =  price_data.begin_parse().slice_hash();
+    return check_signature(data_hash, signature, storage::be_public_key);
+}
+
+(int) verify_price_signature_all(cell price_data_dict) impure inline {
+    ~strdump("[VERIFY_PRICE_SIGNATURE] verify_price_signature_all");
+    (int key_hash, _, int f) = price_data_dict.udict_get_min?(256);
+    var (price_data_item, f) = price_data_dict.udict_get_ref?(256, key_hash);
+
+    
+    while (f) {
+        slice ds = price_data_item.begin_parse();
+        cell price_data_cell = ds~load_ref();
+        slice sig = ds~load_bits(512);
+
+        int res = verify_price_signature(price_data_cell, sig);
+        if (~ res) {
+            return false;
+        }
+
+        (key_hash, _, f) = price_data_dict.udict_get_next?(256, key_hash);
+        if (f) {
+            (price_data_item, _) = price_data_dict.udict_get_ref?(256, key_hash);
+        }
+    }
+
+    return true;
+}
+
+(int) get_asset_price(cell price_data_dict, int asset_hash) inline {
+    var (price_data, f) = price_data_dict.udict_get_ref?(256, asset_hash);
+    throw_unless(ERR::INVALID_PRICE_DATA, f);
+
+    slice ds = price_data.begin_parse();
+    return ds~load_uint(64);
+}
+
+() verify_price_data(cell price_data_dict) impure inline {
+    var (key, config, f) = storage::reserve_configs.udict_get_min?(KEY_LEN);
+    while (f) {
+        slice underlying_address = config.get_underlying_address();
+        var (_, asset_hash) = parse_std_addr(underlying_address);
+
+        var (price_data_item, _f) = price_data_dict.udict_get_ref?(KEY_LEN, asset_hash);
+        ~strdump("[VERIFY_PRICE_DATA] _f");
+        ~dump([_f]);
+        throw_unless(ERR::INVALID_PRICE_DATA, _f);
+
+        slice price = price_data_item.begin_parse();
+        int price_number = price~load_uint(64);
+        int timestamp = price~load_uint(64);
+        slice signature = price~load_bits(512);
+
+        cell price_payload = begin_cell()
+            .store_uint(price_number, 64)
+            .store_uint(timestamp, 64)
+            .store_slice(underlying_address)
+        .end_cell();
+
+        int price_hash = price_payload.begin_parse().slice_hash();
+        int res = check_signature(price_hash, signature, storage::be_public_key);
+        ~strdump("[VERIFY_PRICE_DATA] res");
+        ~dump([res]);
+        throw_unless(ERR::INVALID_PRICE_DATA, res);
+
+        (key, config, f) = storage::reserve_configs.udict_get_next?(KEY_LEN, key);
+    }
+}

@@ -1,0 +1,129 @@
+#include "logic/borrow_logic.fc";
+#include "logic/reserve_logic.fc";
+#include "logic/supply_logic.fc";
+#include "logic/withdraw_logic.fc";
+#include "logic/new_repay_logic.fc";
+#include "logic/liquidation_logic.fc";
+
+() on_transfer_notification(slice pool_jw_address, int msg_value, slice in_msg_body) impure inline {
+    ~strdump("[POOL_LOGIC] on_transfer_notification");
+
+    var (query_id, jetton_amount, from_address, forward_payload) = in_msg_body.parse_transfer_notification();
+    slice owner_address = from_address;
+
+    int action = forward_payload~load_uint(32);
+
+    if (action == op::liquidation_call()) {
+        ~strdump("[POOL_LOGIC] op::liquidation_call");
+        ;; owner_address
+        ;; collateral_asset
+        ;; collateral_pool_address
+        ;; price_data
+        owner_address = forward_payload~load_msg_addr();
+    }
+
+    if (action == op::repay_collateral_after_swap()) {
+        owner_address = forward_payload~load_msg_addr();
+    }
+
+    if (action == op::repay_swap_reject()) {
+        owner_address = forward_payload~load_msg_addr();
+        transfer(owner_address, owner_address,  pool_jw_address, jetton_amount, 0, msg_value - REQUIRED_GAS, null());
+        action = op::repay_swap_reject_supply();
+    }
+
+    var msg_body = begin_cell()
+        .store_uint(op::fetch_user_data(), 32)
+        .store_uint(action, 32)
+        .store_uint(query_id, 64)
+        .store_slice(pool_jw_address)
+        .store_coins(jetton_amount);
+
+    if (slice_bits(forward_payload) >= 1) {
+        if (action == op::liquidation_call()) {
+            slice collateral_asset = forward_payload~load_msg_addr();
+            slice collateral_pool_jw_address = forward_payload~load_msg_addr();
+            cell price_data = forward_payload~load_dict();
+
+            cell payload = begin_cell()
+                .store_slice(collateral_asset)
+                .store_slice(collateral_pool_jw_address)
+                .store_dict(price_data)
+                .end_cell();
+
+            msg_body = msg_body.store_slice(from_address).store_ref(payload);
+        } else {
+            msg_body = msg_body.store_slice(forward_payload);
+            
+        }
+    }
+
+    send_message_to_user(owner_address, msg_body.end_cell(), 64);
+}
+
+() on_user_data_fetched(slice sender, int msg_value, int my_balance, int fwd_fee, slice in_msg_body) impure inline {
+    ~strdump("[POOL_LOGIC] on_user_data_fetched");
+
+    var (user_data, action, payload) = in_msg_body.parse_user_data_fetched();
+
+    if (action == op::set_use_reserve_as_collateral()) {
+        ~strdump("[POOL_LOGIC] op::set_use_reserve_as_collateral");
+        execute_set_use_reserve_as_collateral(user_data, payload);
+        return ();
+    }
+    
+    if (action == op::supply()) {
+        ~strdump("[POOL_LOGIC] op::supply");
+        execute_supply(msg_value, my_balance, fwd_fee, user_data, payload);
+    }
+
+    if (action == op::borrow()) {
+        ~strdump("[POOL_LOGIC] op::borrow");
+        execute_borrow(msg_value, my_balance, fwd_fee, user_data, payload);
+    }
+
+    if (action == op::withdraw()) {
+        ~strdump("[POOL_LOGIC] op::withdraw");
+        execute_withdraw(msg_value, my_balance, fwd_fee, user_data, payload);
+    }
+
+    if (action == op::repay()) {
+        ~strdump("[POOL_LOGIC] op::repay");
+        execute_repay(msg_value, my_balance, fwd_fee, user_data, payload);
+    }
+
+    if (action == op::repay_collateral()) {
+        ~strdump("[POOL_LOGIC] op::repay_collateral");
+        execute_repay_collateral(msg_value, user_data, payload);
+    }
+
+    if (action == op::repay_collateral_after_swap()) {
+        ~strdump("[POOL_LOGIC] op::after_swap");
+        execute_repay_collateral_after_swap(msg_value, my_balance, fwd_fee, user_data, payload);
+    }
+
+    if (action == op::repay_collateral_after_swap_ton()) {
+        ~strdump("[POOL_LOGIC] op::repay_collateral_after_swap_ton");
+        execute_repay_collateral_after_swap_ton(msg_value, my_balance, fwd_fee, user_data, payload);
+    }
+
+    if (action == op::repay_swap_reject_supply()) {
+        ~strdump("[POOL_LOGIC] op::repay_swap_reject_supply");
+        execute_repay_supply_after_reject_swap(msg_value, my_balance, fwd_fee, user_data, payload);
+    }
+
+    if (action == op::swap_rate_mode()) {
+        ~strdump("[POOL_LOGIC] op::swap_rate_mode");
+        execute_swap_borrow_rate_mode(msg_value, my_balance, fwd_fee, user_data, payload);
+    }
+
+    if (action == op::liquidation_call()) {
+        ~strdump("[POOL_LOGIC] op::liquidation_call");
+        execute_liquidation_call(user_data, payload);
+    }
+
+}
+
+() on_init_reserve(slice sender, slice in_msg_body) impure inline {
+    execute_init_reserve(sender, in_msg_body);
+}

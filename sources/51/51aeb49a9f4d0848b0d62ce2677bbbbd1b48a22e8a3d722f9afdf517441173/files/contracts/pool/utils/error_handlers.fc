@@ -1,0 +1,38 @@
+(int) __is_jetton?(slice pool_jw_address) impure inline_ref {
+    return ~ equal_slices(pool_jw_address, my_address());
+}
+
+(slice) __build_error_msg(int error_code) inline_ref {
+    return begin_cell()
+        .store_slice("has_error")
+        .store_int(error_code, 32)
+    .end_cell().begin_parse();
+}
+
+() __revert_supply(slice pool_jw_address, slice recipient, int amount, int error_code) impure inline {
+    slice error_msg = __build_error_msg(error_code);
+    if (__is_jetton?(pool_jw_address)) {
+        transfer_jetton(recipient, recipient, pool_jw_address, amount, 64, 0, error_msg);
+    } else {
+        transfer_ton(recipient, 64, 0, error_msg);
+    }
+}
+
+() __revert_borrow(slice recipient, int amount, int error_code) impure inline {
+    slice error_msg = __build_error_msg(error_code);
+    transfer_ton(recipient, 64, 0, error_msg);
+}
+
+() __revert_withdraw(slice recipient, int amount, int error_code) impure inline {
+    slice error_msg = __build_error_msg(error_code);
+    transfer_ton(recipient, 64, 0, error_msg);
+}
+
+() __revert_liquidation_call(slice pool_jw_address, slice recipient, int amount,  int error_code) impure inline {
+    slice error_msg = __build_error_msg(error_code);
+    if (__is_jetton?(pool_jw_address)) {
+        transfer_jetton(recipient, recipient, pool_jw_address, amount, 64, 0, error_msg);
+    } else {
+        transfer_ton(recipient, 64, 0, error_msg);
+    }
+}

@@ -1,0 +1,132 @@
+#include "../math.fc";
+
+;; @return base_variable_borrow_rate
+;; @return optimal_usage_ratio
+;; @return optimal_stable_to_total_debt_ratio
+;; @return variable_rate_slope_1
+;; @return variable_rate_slope_2
+;; @return stable_rate_slope_1
+;; @return stable_rate_slope_2
+;; @return base_stable_rate_offset
+;; @return stable_rate_excess_offset
+(int, int, int, int, int, int, int, int, int) unpack_rate_strategy(slice rs) inline {
+    ~strdump("[RATE_STRATEGY] parse rate strategy");
+    int base_variable_borrow_rate = rs~load_uint(128);
+    slice ratio = rs~load_ref().begin_parse();
+    slice slope = rs~load_ref().begin_parse();
+    slice offset = rs~load_ref().begin_parse();
+
+    return (
+        base_variable_borrow_rate,
+        ratio~load_uint(128),
+        ratio~load_uint(128),
+        slope~load_uint(128),
+        slope~load_uint(128),
+        slope~load_uint(128),
+        slope~load_uint(128),
+        offset~load_uint(128),
+        offset~load_uint(128)
+    );
+}
+;; @dev Calculates the overall borrow rate as the weighted average between the total variable debt and total stable debt
+;; @param total_stable_debt The total borrowed from the reserve at stable rate
+;; @param total_variable_debt The total borrowed from the reserve at variable rate 
+;; @param current_variable_borrow_rate The current variable borrow rate of the reserve
+;; @param current_averate_stable_borrow_rate The current weighted average of all teh stable rate loans
+;; @return The weighted average borrow rate
+int get_overall_borrow_rate(
+    int total_stable_debt, 
+    int total_variable_debt, 
+    int current_variable_borrow_rate, 
+    int current_average_stable_borrow_rate
+) inline {
+    ~strdump("[RATE_STRATEGY] get_overall_borrow_rate");
+    int total_debt = total_stable_debt + total_variable_debt;
+    if (total_debt == 0) {
+        return 0;
+    }
+
+    int weighted_stable_rate = total_stable_debt.wad_to_ray().ray_mul(current_average_stable_borrow_rate);
+    int weighted_variable_rate = total_variable_debt.wad_to_ray().ray_mul(current_variable_borrow_rate);
+    int overall_borrow_rate = (weighted_variable_rate + weighted_stable_rate).ray_div(total_debt.wad_to_ray());
+
+    return overall_borrow_rate;
+}
+
+
+;; @notice Calculates the interest rates depending on the reserve's state and configurations 
+;; @param rs Reserve's rate stratey
+;; @param payload The payload for calculating the interest rates
+;; @return liquidity_rate Next liquidity rate
+;; @return stable_borrow_rate Next stable borrow rate
+;; @return variable_borrow_rate Next variable borrow rate
+(int, int, int) calculate_interest_rates(
+    int liquidity_added, int liquidity_taken,
+    int liquidity, int total_stable_debt, int total_variable_debt,
+    int average_stable_borrow_rate,
+    int reserve_factor
+) inline {
+    ~strdump("[RATE_STRATEGY] calculate interest rates");
+
+    var (
+        base_variable_borrow_rate,
+        OPTIMAL_USAGE_RATIO, OPTIMAL_STABLE_TO_TOTAL_DEBT_RATIO,
+        variable_rate_slope_1, variable_rate_slope_2,
+        stable_rate_slope_1, stable_rate_slope_2,
+        base_stable_rate_offset, stable_rate_excess_offset
+    ) = cache::rate_strategy.unpack_rate_strategy();
+
+
+    int MAX_EXCESS_USAGE_RATIO = RAY - OPTIMAL_USAGE_RATIO;
+    int MAX_EXCESS_STABLE_TO_TOTAL_DEBT_RATIO = RAY - OPTIMAL_STABLE_TO_TOTAL_DEBT_RATIO;
+
+    int total_debt = total_stable_debt + total_variable_debt;
+
+    var (
+        current_liquidity_rate,
+        current_variable_borrow_rate,
+        current_stable_borrow_rate
+    ) = (0, base_variable_borrow_rate, variable_rate_slope_1 + base_stable_rate_offset);
+
+    var (
+        borrow_usage_ratio,
+        supply_usage_ratio,
+        stable_to_total_debt_ratio
+    ) = (0, 0, 0);
+
+    if (total_debt != 0) {
+        stable_to_total_debt_ratio = total_stable_debt.ray_div(total_debt);
+        int available_liquidity = liquidity + liquidity_added - liquidity_taken;
+        int available_liquidity_plus_debt = available_liquidity + total_debt;
+
+        borrow_usage_ratio = total_debt.ray_div(available_liquidity_plus_debt);
+        supply_usage_ratio = total_debt.ray_div(available_liquidity_plus_debt);
+    }
+
+    if (borrow_usage_ratio > OPTIMAL_USAGE_RATIO) {
+        int excess_borrow_usage_ratio = (borrow_usage_ratio - OPTIMAL_USAGE_RATIO).ray_div(MAX_EXCESS_USAGE_RATIO);
+        current_stable_borrow_rate += stable_rate_slope_1 + stable_rate_slope_2.ray_mul(excess_borrow_usage_ratio);
+        current_variable_borrow_rate += variable_rate_slope_1 + variable_rate_slope_2.ray_mul(excess_borrow_usage_ratio);
+    } else {
+        current_stable_borrow_rate += stable_rate_slope_1.ray_mul(borrow_usage_ratio).ray_div(OPTIMAL_USAGE_RATIO);
+        current_variable_borrow_rate += variable_rate_slope_1.ray_mul(borrow_usage_ratio).ray_div(OPTIMAL_USAGE_RATIO);
+    }
+
+    if (stable_to_total_debt_ratio > OPTIMAL_STABLE_TO_TOTAL_DEBT_RATIO) {
+        int excess_stable_debt_ratio = (stable_to_total_debt_ratio - OPTIMAL_STABLE_TO_TOTAL_DEBT_RATIO).ray_div(MAX_EXCESS_STABLE_TO_TOTAL_DEBT_RATIO);
+        current_stable_borrow_rate += stable_rate_excess_offset.ray_mul(excess_stable_debt_ratio);
+    }
+
+    current_liquidity_rate = get_overall_borrow_rate(
+        total_stable_debt, 
+        total_variable_debt, 
+        current_variable_borrow_rate, 
+        average_stable_borrow_rate
+    ).ray_mul(supply_usage_ratio).percent_mul(PERCENTAGE_FACTOR - reserve_factor);
+
+    return (
+        current_liquidity_rate,
+        current_stable_borrow_rate,
+        current_variable_borrow_rate
+    );
+}
