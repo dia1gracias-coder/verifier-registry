@@ -1,0 +1,10 @@
+int workchain() asm "0 PUSHINT";
+
+() force_chain(slice addr) impure {
+  (int wc, _) = parse_std_addr(addr);
+  throw_unless(333, wc == workchain());
+}
+
+const int TON_DECIMALS = 1000000000;
+const int USDT_DECIMALS = 1000000;
+const int KTON_DECIMALS = 1000000000;
