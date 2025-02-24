@@ -1,0 +1,92 @@
+;; @return (query_id, pool_jw_addres, amount)
+(int, slice, int) parse_supply(slice ds) inline {
+    return (ds~load_uint(64), ds~load_msg_addr(), ds~load_coins());   
+}
+
+;; @return (query_id, amount, interest_rate_mode, pool_jw, price_data)
+(int, int, int, slice, cell) parse_borrow(slice ds) inline {
+    return (
+        ds~load_uint(64), ds~load_coins(), ds~load_uint(1), ds~load_msg_addr(), ds~load_dict()
+    );
+}
+
+;; @return (query_id, pool_jw_address, amount, is_max_withdraw, price_data)
+(int, slice, int, int, cell) parse_withdraw(slice ds) inline {
+    return (ds~load_uint(64), ds~load_msg_addr(), ds~load_coins(), ds~load_int(1), ds~load_dict());
+}
+
+;; @return (query_id, pool_jw_address, amount, interest_rate_mode, is_max_repay, amount_repay)
+(int, slice ,int, int, int, int) parse_repay_after_swap(slice ds) inline {
+    return (ds~load_uint(64), ds~load_msg_addr(), ds~load_coins(), ds~load_uint(1), ds~load_int(1), ds~load_coins());
+}
+;; @return (query_id, pool_jw_address, amount, interest_rate_mode, is_max_repay)
+(int, slice ,int, int, int) parse_repay(slice ds) inline {
+    return (ds~load_uint(64), ds~load_msg_addr(), ds~load_coins(), ds~load_uint(1), ds~load_int(1));
+}
+
+;; @return (query_id, jetton_amount, owner_address, forward_payload)
+(int, int, slice, slice) parse_transfer_notification(slice ds) inline {
+    return (
+        ds~load_uint(64),
+        ds~load_coins(),
+        ds~load_msg_addr(),
+        ds~load_ref().begin_parse()
+    );
+}
+
+;; @return (user_data, action, payload)
+(cell, int, slice) parse_user_data_fetched(slice ds) inline {
+    return (ds~load_ref(), ds~load_uint(32), ds);
+}
+
+;; @return (pool_jw_address, reserve_config, rate_strategy)
+(int, slice, slice, slice) parse_init_reserve(slice ds) inline {
+    return (
+        ds~load_uint(64),
+        ds~load_msg_addr(),
+        ds~load_ref().begin_parse(),
+        ds~load_ref().begin_parse()
+    );
+}
+
+;; @notice Parse the user data slice to different dictionaries
+;; @param ds - The user data slice
+;; @return (reserves, supply_list, variable_borrow_list, stable_borrow_list)
+(cell, cell, cell, cell) parse_user_data(slice ds) inline {
+    return (ds~load_dict(), ds~load_dict(), ds~load_dict(), ds~load_dict());
+}
+
+(int, slice, int, cell) parse_set_use_reserve_as_collateral(slice ds) inline {
+    return (ds~load_uint(64), ds~load_msg_addr(), ds~load_int(1), ds~load_dict());
+}
+
+;; [ query_id, amount_repay, amount_collateral, interest_rate_mode, pool_jw_repay, pool_jw_collateral, is_max, price_data, dedust_info]
+(int, int, int, int, slice, slice, int, cell, cell) parse_repay_collateral(slice ds) inline {
+    return (
+        ds~load_uint(64),
+        ds~load_coins(),
+        ds~load_coins(),
+        ds~load_uint(1),
+        ds~load_msg_addr(),
+        ds~load_msg_addr(),
+        ds~load_int(1),
+        ds~load_dict(),
+        ds~load_ref()
+    );
+}
+(slice, slice) parse_dedust(slice ds) inline {
+    return (
+        ds~load_msg_addr(),
+        ds~load_msg_addr()
+    );
+}
+
+;; (interest_rate_mode, is_max, amount: after swap, amount_repay)
+(int, int, int, int) parse_repay_after_swap_ton(slice ds) inline {
+    ~strdump("[POOL]-[REPAY] parse_repay_after_swap_ton");
+    return (ds~load_uint(1), ds~load_int(1), ds~load_coins(), ds~load_coins());
+}
+
+(int, slice, int) parse_swap_rate_mode(slice ds) inline {
+    return (ds~load_uint(64), ds~load_msg_addr(), ds~load_uint(1));
+}

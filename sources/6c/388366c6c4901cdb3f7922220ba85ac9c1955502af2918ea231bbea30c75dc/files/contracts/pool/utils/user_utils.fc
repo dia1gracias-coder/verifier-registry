@@ -1,0 +1,238 @@
+#include "../constants.fc";
+#include "../op.fc";
+#include "../lib/math.fc";
+
+;; ---------- PACK FUNCTIONS ---------- ;;
+(cell) pack_user_data(slice pool_address, slice owner_address, cell reserves, cell supply_list, cell variable_borrow_list, cell stable_borrow_list, int is_user_in_process, int process_expire_time) inline {
+    return begin_cell()
+        .store_slice(pool_address)
+        .store_slice(owner_address)
+        .store_dict(reserves)
+        .store_dict(supply_list)
+        .store_dict(variable_borrow_list)
+        .store_dict(stable_borrow_list)
+        .store_int(is_user_in_process, 1)
+        .store_uint(process_expire_time, 128)
+    .end_cell();
+}
+
+(slice) pack_user_supply_data(int scaled_supply, int liquidity_index, int is_collateral) inline {
+    return begin_cell()
+        .store_coins(scaled_supply)
+        .store_uint(liquidity_index, 128)
+        .store_int(is_collateral, 1)
+    .end_cell().begin_parse();
+}
+
+(slice) pack_user_variable_borrow_data(int scaled_variable_debt, int variable_borrow_index) inline {
+    return begin_cell()
+        .store_coins(scaled_variable_debt)
+        .store_uint(variable_borrow_index, 128)
+    .end_cell().begin_parse();
+}
+
+(slice) pack_user_stable_borrow_data(int principal_stable_debt, int stable_borrow_rate, int stable_last_update_timestamp) inline {
+    return begin_cell()
+        .store_coins(principal_stable_debt)
+        .store_uint(stable_borrow_rate, 128)
+        .store_uint(stable_last_update_timestamp, 128)
+    .end_cell().begin_parse();
+}
+
+;; ---------- UNPACK FUNCTIONS ---------- ;;
+(slice, slice, cell, cell, cell, cell, int, int) unpack_user_data(cell data) inline {
+    var ds = data.begin_parse();
+    return (
+        ds~load_msg_addr(), 
+        ds~load_msg_addr(), 
+        ds~load_dict(), 
+        ds~load_dict(),
+        ds~load_dict(), 
+        ds~load_dict(),
+        ds~load_int(1),
+        ds~load_uint(128)
+    );
+}
+
+(int, int, int) unpack_user_supply_data(slice ds) inline {
+    return (ds~load_coins(), ds~load_uint(128), ds~load_int(1));
+}
+
+(int, int) unpack_user_variable_borrow_data(slice ds) inline {
+    return (ds~load_coins(), ds~load_uint(128));
+}
+
+(int, int, int) unpack_user_stable_borrow_data(slice ds) inline {
+    return (ds~load_coins(), ds~load_uint(128), ds~load_uint(128));
+}
+
+;; ---------- GETTER FUNCTIONS ---------- ;;
+(int, int, int) get_user_supply_data(cell supply_list, int asset_hash) inline {
+    var (value, f) = supply_list.udict_get?(KEY_LEN, asset_hash);
+    if (f) {
+        return unpack_user_supply_data(value);
+    }
+
+    return (0, 0, false);
+}
+
+(int, int) get_user_variable_borrow_data(cell variable_borrow_list, int asset_hash) inline {
+    var (value, f) = variable_borrow_list.udict_get?(KEY_LEN, asset_hash);
+    if (f) {
+        return unpack_user_variable_borrow_data(value);
+    }
+
+    return (0, 0);
+}
+
+(int, int, int, int) get_user_stable_borrow_data(cell stable_borrow_list, int asset_hash) inline {
+    var (value, f) = stable_borrow_list.udict_get?(KEY_LEN, asset_hash);
+    if (f) {
+        var (principal_stable_debt, stable_borrow_rate, stable_last_update_timestamp) = unpack_user_stable_borrow_data(value);
+        var cumulated_interest = calculate_compounded_interest(stable_borrow_rate, stable_last_update_timestamp, now());
+        return (principal_stable_debt, principal_stable_debt.ray_mul(cumulated_interest), stable_borrow_rate, stable_last_update_timestamp);
+    }
+
+    return (0, 0, 0, 0);
+}
+
+;; ---------- UTILITIES FUNCTIONS ---------- ;;
+(int) is_using_as_collateral_any?(cell supply_list) inline {
+    ~strdump("[USER_DATA] is_using_as_collateral_any");
+    var (asset_hash, value, f) = supply_list.udict_get_min?(KEY_LEN);
+    while (f) {
+        var (_, _, is_collateral) = unpack_user_supply_data(value);
+        if (is_collateral) {
+            return true;
+        }
+        (asset_hash, value, f) = supply_list.udict_get_next?(KEY_LEN, asset_hash);
+    }
+
+    return false;
+}
+
+(int) is_borrowing_any?(cell user_data) inline {
+    ~strdump("[USER_DATA] is_borrowing_any");
+    var (_, _, _, _, variable_borrow_list, stable_borrow_list, _, _) = unpack_user_data(user_data);
+
+    if (null?(variable_borrow_list) & null?(stable_borrow_list)) {
+        return false;
+    }
+
+    var (asset_hash, value, f) = variable_borrow_list.udict_get_min?(KEY_LEN);
+    while (f) {
+        if (value~load_coins() > 0) {
+            return true;
+        }
+        (asset_hash, value, f) = variable_borrow_list.udict_get_next?(KEY_LEN, asset_hash);
+    }
+
+    var (asset_hash, value, f) = stable_borrow_list.udict_get_min?(KEY_LEN);
+    while (f) {
+        if (value~load_coins() > 0) {
+            return true;
+        }
+        (asset_hash, value, f) = stable_borrow_list.udict_get_next?(KEY_LEN, asset_hash);
+    }
+
+    return false;
+}
+
+
+(int) is_user_in_process(int is_user_in_process, int process_expire_time) {
+    return true;
+    ;; return (is_user_in_process & (process_expire_time > now())) ? true : false;
+}
+
+;; ---------- INTERACTION FUNCTIONS ---------- ;;
+(cell) calculate_user_state_init(slice pool_address, slice owner_address, cell user_code) inline {
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_dict(user_code)
+        .store_dict(pack_user_data(pool_address, owner_address, new_dict(), new_dict(), new_dict(), new_dict(), 0, 0 ))
+        .store_uint(0, 1)
+    .end_cell();
+}
+
+(slice) calculate_user_address_from_state_init(cell state_init) inline {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_uint(workchain(), 8)
+        .store_uint(cell_hash(state_init), 256)
+    .end_cell().begin_parse();
+}
+
+(slice) calculate_user_address(slice pool_address, slice owner_address, cell user_code) inline {
+    return calculate_user_address_from_state_init(
+        calculate_user_state_init(pool_address, owner_address, user_code)
+    );
+}
+
+() send_message_to_user(slice owner_address, cell payload, int mode) impure inline {
+    ~strdump("[USER_UTILS] send_message_to_user");
+    cell state_init = calculate_user_state_init(my_address(), owner_address, storage::user_code);
+    slice user_address = calculate_user_address_from_state_init(state_init);
+
+    int fee = mode == 64 ? 0 : 2 * ONE_TON / 100;
+    ~dump([fee]);
+
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(user_address)
+        .store_coins(fee)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 32 + 64 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(payload)
+    .end_cell();
+
+    send_raw_message(msg, mode);
+}
+
+;; @notice Send a message to the User contract to update the user data
+;; @param owner_address - The address of the owner
+;; @param new_user_data - The new user data
+() update_user_data(slice owner_address, slice response_address, cell new_user_data) impure inline {
+    ~strdump("[USER_DATA] update_user_data");
+    var body = begin_cell()
+        .store_uint(op::update_user_data(), OP_LEN)
+        .store_slice(response_address)
+        .store_ref(new_user_data)
+    .end_cell();
+
+    send_message_to_user(owner_address, body, 0);
+}
+
+() reset_process_user(slice owner_address, int error_code) impure inline {
+    if (error_code == ERR::USER_IN_PROCESSING) {
+        return ();
+    }
+    ~strdump("[USER_DATA] reset_process_user");
+    var body = begin_cell()
+        .store_uint(op::reset_process(), OP_LEN)
+    .end_cell();
+
+    send_message_to_user(owner_address, body, 0);
+}
+
+() update_user_data_for_repay(slice owner_address, slice response_address, cell new_user_data) impure inline {
+    ~strdump("[USER_DATA] update_user_data");
+    var body = begin_cell()
+        .store_uint(op::update_user_data(), OP_LEN)
+        .store_slice(response_address)
+        .store_ref(new_user_data)
+    .end_cell();
+
+    send_message_to_user(owner_address, body, 0);
+}
+
+
+() fetch_user_data(slice owner_address, int action, slice in_msg_body) impure inline {
+    ~strdump("[POOL_LOGIC] fetch_user_data");
+    cell body = begin_cell()
+        .store_uint(op::fetch_user_data(), 32)
+        .store_uint(action, 32)
+        .store_slice(in_msg_body)
+    .end_cell();
+
+    send_message_to_user(owner_address, body, 64);
+}

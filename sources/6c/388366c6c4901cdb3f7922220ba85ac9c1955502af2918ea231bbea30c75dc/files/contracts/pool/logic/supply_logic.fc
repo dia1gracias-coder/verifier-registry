@@ -1,0 +1,82 @@
+#include "validation_logic.fc";
+#include "../cache.fc";
+#include "../utils/transfer_helper.fc";
+#include "../utils/error_handlers.fc";
+
+int supply_gas_consumption() asm "120000000 PUSHINT";    ;; storage fee + update user data fee + supply fee
+
+() execute_supply(int msg_value, int my_balance, int fwd_fee, cell user_data, slice in_msg_body) impure inline {
+    ~strdump("[SUPPLY_LOGIC] execute_supply");
+    var (query_id, pool_jw_address, amount) = in_msg_body.parse_supply();
+    cache(pool_jw_address);
+    update_state();
+
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time) = unpack_user_data(user_data);
+
+    try {
+        throw_if(0, msg_value < supply_gas_consumption());
+        throw_if(ERR::USER_IN_PROCESSING, is_user_in_process & (now() <= process_expire_time));
+        validate_supply(amount);
+    } catch(x, n) {
+        reset_process_user(owner_address, n);
+        __revert_supply(pool_jw_address, owner_address, amount, n);
+        return ();
+    }
+    
+    ;; __accrue_to_treasury(owner_address);
+
+    update_interest_rates(amount, next::accrue_to_treasury);
+
+    ;; * Update reserve data
+    next::liquidity += (amount - next::accrue_to_treasury);
+    next::scaled_supply += amount.ray_div(next::liquidity_index);
+
+    __update_reserve_data();
+
+    ;; * Update user data
+
+    ;; *** Add new reserve if it does not exist
+    var underlying_address = cache::reserve_configuration.get_underlying_address();
+    reserves~udict_add?(KEY_LEN, cache::asset_hash, underlying_address);
+
+    ;; *** Automatically set reserve use as collateral if it is possible
+    var (scaled_supply, _, is_collateral) = get_user_supply_data(supply_list, cache::asset_hash);
+
+    ;; *** If it is the first time user supplies the asset
+    if (scaled_supply == 0) {
+        if (validate_automatic_use_as_collateral(supply_list)) {
+            is_collateral = true;
+        }
+    }
+
+    supply_list~udict_set(
+        KEY_LEN, 
+        cache::asset_hash,
+        pack_user_supply_data(scaled_supply + amount.ray_div(next::liquidity_index), next::liquidity_index, is_collateral)
+    );
+
+    var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, false, now());
+    update_user_data(owner_address, owner_address, new_user_data);
+
+    if (next::accrue_to_treasury > 0) {
+        transfer(storage::treasury(), owner_address, cache::reserve_configuration.get_pool_jw_address(),
+        next::accrue_to_treasury, 0, ONE_TON * 5 / 100, null());
+    }
+
+    msg_value -= supply_gas_consumption();
+
+    if (msg_value > 0) {
+        if (equal_slices(pool_jw_address, my_address())) {
+            msg_value -= amount;
+            transfer_ton(owner_address, 0, msg_value, __supply_info(owner_address, underlying_address, amount));
+        } else {
+            ;; transfer_ton(owner_address, 0, msg_value, __supply_info(owner_address, underlying_address, amount));
+            transfer_ton(owner_address, 64, 0, __supply_info(owner_address, underlying_address, amount));
+        }
+
+
+        ;; transfer_ton(owner_address, 0, msg_value, __supply_info(owner_address, underlying_address, amount));
+    }
+    ~strdump("[SUPPLY_LOGIC] execute_supply successfully");
+}
+

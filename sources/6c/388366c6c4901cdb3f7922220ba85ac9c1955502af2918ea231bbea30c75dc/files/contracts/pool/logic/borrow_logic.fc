@@ -1,0 +1,247 @@
+#include "validation_logic.fc";
+#include "../cache.fc";
+#include "../utils/transfer_helper.fc";
+#include "../utils/error_handlers.fc";
+
+int borrow_gas_consumption() asm "120000000 PUSHINT";
+int swap_rate_mode_gas_consumption() asm "50000000 PUSHINT";
+
+;; @notice Calculate the increase in balance since the last user interaction
+;; @return The previous principal balance
+;; @return The new principal balance
+;; @return The balance increase
+(int, int, int) calculate_user_stable_debt_increase(cell stable_borrow_list, int asset_hash) inline {
+    var (principal_stable_debt, _, stable_borrow_rate, stable_last_update_timestamp) = get_user_stable_borrow_data(stable_borrow_list, asset_hash);
+
+    if (principal_stable_debt == 0) {
+        return (0, 0, 0);
+    }
+
+    var cumulated_interest = calculate_compounded_interest(stable_borrow_rate, stable_last_update_timestamp, now());
+    var new_principal_stable_debt = principal_stable_debt.ray_mul(cumulated_interest);
+
+    return (principal_stable_debt, new_principal_stable_debt, new_principal_stable_debt - principal_stable_debt);
+}
+
+;; 1. cache
+;; 2. update state --> update liquidity index and variable borrow index
+;; 3. validate borrow 
+;; 4. mint token --> increase user's scaled variable debt, update user's variable borrow index, increase reserve's variable debt
+;; 5. update interest rates
+;; - inputs: liquidity_added = 0, liquidity_taken = amount, 
+;; - calculate total variable debt = reserve's variable debt * current variable borrow index
+;; - calculate new interest rates
+;; 6. transfer underlying token to user
+;; - decrease liquidity
+
+() execute_borrow(int msg_value, int my_balance, int fwd_fee, cell user_data, slice in_msg_body) impure inline {
+    ~strdump("[BORROW_LOGIC] execute_borrow");
+    var (query_id, amount, interest_rate_mode, pool_jw_address, price_data_dict) = in_msg_body.parse_borrow();
+    cache(pool_jw_address);
+    update_state();
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time) = unpack_user_data(user_data);
+    try {
+        throw_if(ERR::USER_IN_PROCESSING, is_user_in_process & (now() <= process_expire_time));
+        validate_borrow(user_data, price_data_dict, cache::asset_hash, amount, interest_rate_mode);
+    } catch (x, n) {
+        reset_process_user(owner_address, n);
+        __revert_borrow(owner_address, 0, n);
+        return ();
+    }
+
+    ;; __accrue_to_treasury(owner_address);
+
+    var underlying_address = cache::reserve_configuration.get_underlying_address();
+    reserves~udict_add?(KEY_LEN, cache::asset_hash, underlying_address);
+    
+    if (interest_rate_mode == INTEREST_MODE_STABLE) {
+        ~strdump("[BORROW_LOGIC] interest_rate_mode == INTEREST_MODE_STABLE");
+        ;; TODO: Implement stable borrowing logic
+        var (_, current_balance, balance_increase) = calculate_user_stable_debt_increase(stable_borrow_list, cache::asset_hash);
+
+        var (principal_stable_debt, _, stable_borrow_rate, current_avg_stable_rate, stable_last_update_timestamp) = cache::reserve_state.get_reserve_stable_borrow_data();
+        var total_principal_stable_debt = next::total_stable_debt;
+        next::total_stable_debt += amount;
+
+        var amount_in_ray = amount.wad_to_ray();
+        var (u_principal_stable_debt, _, current_stable_rate, _) = get_user_stable_borrow_data(stable_borrow_list, cache::asset_hash);
+
+        var next_stable_rate = (current_stable_rate.ray_mul(current_balance.wad_to_ray()) + amount_in_ray.ray_mul(stable_borrow_rate)).ray_div((current_balance + amount).wad_to_ray());
+        var next_avg_stable_rate = (current_avg_stable_rate.ray_mul(total_principal_stable_debt.wad_to_ray()) + stable_borrow_rate.ray_mul(amount_in_ray)).ray_div(next::total_stable_debt.wad_to_ray());
+
+        next::principal_stable_debt = next::total_stable_debt;
+        next::avg_stable_borrow_rate = next_avg_stable_rate;
+        next::stable_last_update_timestamp = now();
+
+        stable_borrow_list~udict_set(
+            KEY_LEN,
+            cache::asset_hash,
+            pack_user_stable_borrow_data(u_principal_stable_debt + amount + balance_increase, next_stable_rate, now())
+        );
+    } else {
+        next::scaled_variable_debt += amount.ray_div(next::variable_borrow_index);
+
+        var (scaled_variable_debt, _) = get_user_variable_borrow_data(variable_borrow_list, cache::asset_hash);
+        variable_borrow_list~udict_set(
+            KEY_LEN, 
+            cache::asset_hash, 
+            pack_user_variable_borrow_data(scaled_variable_debt + amount.ray_div(next::variable_borrow_index), next::variable_borrow_index)
+        );
+    }
+
+    update_interest_rates(0, amount + next::accrue_to_treasury);
+
+    next::liquidity -= amount;
+    next::liquidity -= next::accrue_to_treasury;
+    ;; __accrue_to_treasury(owner_address);
+
+    if (next::liquidity < 0) {
+        reset_process_user(owner_address, ERR::INSUFFICIENT_LIQUIDITY);
+        __revert_borrow(owner_address, 0, ERR::INSUFFICIENT_LIQUIDITY);
+        return ();
+    }
+
+    __update_reserve_data();
+    
+    var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, false, now());
+    update_user_data(owner_address, owner_address, new_user_data);
+    
+    if (next::accrue_to_treasury > 0) {
+        transfer(storage::treasury(), owner_address, cache::reserve_configuration.get_pool_jw_address(),
+        next::accrue_to_treasury, 0, ONE_TON * 5 / 100, null());
+    }
+
+    msg_value -= borrow_gas_consumption();
+    ;; transfer(owner_address, owner_address, pool_jw_address, amount, 0, msg_value, __borrow_info(owner_address, underlying_address, amount, interest_rate_mode));
+    transfer(owner_address, owner_address, pool_jw_address, amount, 64, 0, __borrow_info(owner_address, underlying_address, amount, interest_rate_mode));
+
+    ~strdump("[BORROW_LOGIC] execute_borrow successfully");
+}
+
+() execute_swap_borrow_rate_mode(int msg_value, int my_balance, int fwd_fee, cell user_data, slice in_msg_body) impure inline {
+    ~strdump("[BORROW_LOGIC] execute_swap_borrow_rate_mode");
+    var (query_id, pool_jw_address, interest_rate_mode) = in_msg_body.parse_swap_rate_mode();
+    
+    cache(pool_jw_address);
+    update_state();
+    
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time) = unpack_user_data(user_data);
+        
+    ;; Get current debts
+    var (scaled_supply, _, is_collateral) = get_user_supply_data(supply_list, cache::asset_hash);
+    var (stable_debt, _, current_stable_rate, _) = get_user_stable_borrow_data(stable_borrow_list, cache::asset_hash);
+    var (_, stable_debt_with_interest, balance_increase) = calculate_user_stable_debt_increase(stable_borrow_list, cache::asset_hash);
+    var (variable_debt, _) = get_user_variable_borrow_data(variable_borrow_list, cache::asset_hash);
+    var variable_debt_with_interest = variable_debt.ray_mul(next::variable_borrow_index);
+
+    try {
+        ~strdump("[BORROW_LOGIC] execute_swap_borrow_rate_mode - validate");
+        ~dump([stable_debt_with_interest, variable_debt_with_interest, scaled_supply]);
+        ;; Validate user not in process
+        throw_if(ERR::USER_IN_PROCESSING, is_user_in_process & (now() <= process_expire_time));
+        ;; Validate swap rate mode
+        validate_swap_rate_mode(stable_debt_with_interest, variable_debt_with_interest, scaled_supply, interest_rate_mode, is_collateral);
+    } catch (x, n) {
+        ;; transfer_ton(owner_address, 0, msg_value, __build_error_msg(n));
+        
+        reset_process_user(owner_address, n);
+
+        transfer_ton(owner_address, 64, 0, __build_error_msg(n));
+
+        ~strdump("[BORROW_LOGIC] execute_swap_borrow_rate_mode - validate failed");
+        return ();
+    }
+
+    ;; __accrue_to_treasury(owner_address);
+
+    ;; interest_rate_mode is current rate mode
+    if (interest_rate_mode == INTEREST_MODE_VARIABLE) {
+        ;; Burn variable debt
+        next::scaled_variable_debt -= variable_debt_with_interest.ray_div(next::variable_borrow_index);
+        variable_borrow_list~udict_set(
+            KEY_LEN,
+            cache::asset_hash,
+            pack_user_variable_borrow_data(0, next::variable_borrow_index)
+        );
+        
+        ;; Mint stable debt
+        var user_next_stable_rate = (
+            current_stable_rate.ray_mul(stable_debt_with_interest.wad_to_ray()) 
+                + variable_debt_with_interest.wad_to_ray().ray_mul(next::stable_borrow_rate)
+        )
+            .ray_div((stable_debt_with_interest + variable_debt_with_interest).wad_to_ray());
+        
+        stable_borrow_list~udict_set(
+            KEY_LEN,
+            cache::asset_hash,
+            pack_user_stable_borrow_data(stable_debt_with_interest + variable_debt_with_interest, user_next_stable_rate, now())
+        );
+
+        var next_avg_stable_rate = (
+            next::avg_stable_borrow_rate.ray_mul(next::total_stable_debt.wad_to_ray()) 
+            + variable_debt_with_interest.wad_to_ray().ray_mul(next::stable_borrow_rate)
+        )
+            .ray_div((next::total_stable_debt + variable_debt_with_interest).wad_to_ray());
+
+        next::total_stable_debt += variable_debt_with_interest;
+        next::principal_stable_debt = next::total_stable_debt;
+        next::avg_stable_borrow_rate = next_avg_stable_rate;
+        next::stable_last_update_timestamp = now();
+
+    } else {
+        ;; Convert from stable to variable
+        ;; Burn stable debt
+        stable_borrow_list~udict_set(
+            KEY_LEN,
+            cache::asset_hash,
+            pack_user_stable_borrow_data(0, 0, now())
+        );
+        
+        ;; Mint variable debt
+        next::scaled_variable_debt += stable_debt_with_interest.ray_div(next::variable_borrow_index);
+        variable_borrow_list~udict_set(
+            KEY_LEN,
+            cache::asset_hash,
+            pack_user_variable_borrow_data(variable_debt + stable_debt_with_interest.ray_div(next::variable_borrow_index), next::variable_borrow_index)
+        );
+
+        var previous_supply = next::principal_stable_debt.ray_mul(
+            calculate_compounded_interest(next::avg_stable_borrow_rate, next::stable_last_update_timestamp, now())
+        );
+        var next_avg_stable_rate = 0;
+        var next_supply = 0;
+        var user_stable_rate = current_stable_rate;
+        var user_stable_time = 0;
+
+        if (previous_supply <= stable_debt_with_interest) {
+            next::avg_stable_borrow_rate = 0;
+            next::total_stable_debt = 0;
+        } else {
+            next_supply = next::total_stable_debt = previous_supply - stable_debt_with_interest;
+            var first_term = next::avg_stable_borrow_rate.ray_mul(previous_supply.wad_to_ray());
+            var second_term = user_stable_rate.ray_mul(stable_debt_with_interest.wad_to_ray());
+
+            if (second_term >= first_term) {
+                next_avg_stable_rate = next::total_stable_debt = next::avg_stable_borrow_rate = 0;
+            } else {
+                next_avg_stable_rate = next::avg_stable_borrow_rate = 
+                (first_term - second_term).ray_div(next_supply.wad_to_ray());
+            }
+        }
+
+        ;; next::total_stable_debt -= stable_debt_with_interest;
+        next::principal_stable_debt = next::total_stable_debt;
+        next::avg_stable_borrow_rate = next_avg_stable_rate;
+        next::stable_last_update_timestamp = now();
+        
+    }
+
+    update_interest_rates(0, next::accrue_to_treasury);
+    next::liquidity -= next::variable_borrow_rate;
+
+    __update_reserve_data();
+    
+    var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, false, now());
+    update_user_data(owner_address, owner_address, new_user_data);
+    ~strdump("[BORROW_LOGIC] execute_swap_borrow_rate_mode successfully");
+}

@@ -1,0 +1,390 @@
+#include "generic_logic.fc";
+#include "../utils.fc";
+#include "../utils/error_handlers.fc";
+
+const int HEALTH_FACTOR_LIQUIDATION_THRESHOLD = 1000000000000000000; ;; 100%
+const int CLOSE_FACTOR_HF_THRESHOLD = 950000000000000000;
+const int DEFAULT_LIQUIDATION_CLOSE_FACTOR = 5000; ;; 50%
+const int MAX_LIQUIDATION_CLOSE_FACTOR = 10000; ;; 100%
+
+(int, slice, int, slice, slice, slice, cell) parse_liquidation_call(slice ds) inline {
+    int query_id = ds~load_uint(64);
+    slice debt_pool_jw_address = ds~load_msg_addr();
+    int debt_to_cover = ds~load_coins();
+    slice liquidator_address = ds~load_msg_addr();
+    slice payload = ds~load_ref().begin_parse();
+    slice collateral_asset = payload~load_msg_addr();
+    slice collateral_pool_jw_address = payload~load_msg_addr();
+    cell price_data = payload~load_dict();
+
+    return (query_id, debt_pool_jw_address, debt_to_cover, liquidator_address, collateral_asset, collateral_pool_jw_address, price_data);
+}
+
+(int) get_user_variable_debt(cell user_data, int debt_asset_hash) inline {
+    var (_, _, reserves, _, variable_borrow_list, _, _, _) = unpack_user_data(user_data);
+
+    if (variable_borrow_list.dict_empty?()) {
+        return 0;
+    }
+
+    var (scaled_variable_debt, _) = get_user_variable_borrow_data(variable_borrow_list, debt_asset_hash);
+    var (state, _, _) = __get_reserve_data(debt_asset_hash);
+    return scaled_variable_debt.ray_mul(__get_normalized_debt(state));
+}
+
+(int) get_user_stable_debt(cell user_data, int debt_asset_hash) inline {
+    var (_, _, reserves, _, _, stable_borrow_list, _, _) = unpack_user_data(user_data);
+    
+    if (stable_borrow_list.dict_empty?()) {
+        return 0;
+    }
+
+    var (principal_stable_debt, total_stable_debt, _, _) = get_user_stable_borrow_data(stable_borrow_list, debt_asset_hash);
+    return total_stable_debt;
+}
+
+;; @return (variable_debt, stable_debt)
+(int, int) get_user_current_debt(cell user_data, int debt_asset_hash) inline {
+    return (get_user_variable_debt(user_data, debt_asset_hash), get_user_stable_debt(user_data, debt_asset_hash));
+}
+
+(int, int, int) _calculate_debt(cell user_data, int debt_asset_hash, int health_factor, int debt_to_cover) {
+    var (user_variable_debt, user_stable_debt) = get_user_current_debt(user_data, debt_asset_hash);
+    var user_total_debt = user_variable_debt + user_stable_debt;
+    var close_factor = health_factor > CLOSE_FACTOR_HF_THRESHOLD ? DEFAULT_LIQUIDATION_CLOSE_FACTOR : MAX_LIQUIDATION_CLOSE_FACTOR;
+    var max_liquidatable_debt = user_total_debt.percent_mul(close_factor);
+    var actual_debt_to_liquidate = min(max_liquidatable_debt, debt_to_cover);
+
+    return (user_variable_debt, user_total_debt, actual_debt_to_liquidate);
+}
+
+() validate_liquidation_call(cell user_data, int collateral_asset_hash, int debt_asset_hash, int total_debt, int health_factor) impure inline {
+    var (_, collateral_config, _) = __get_reserve_data(collateral_asset_hash);
+    var (_, debt_config, _) = __get_reserve_data(debt_asset_hash);
+
+    var (is_collateral_active, _, _, _, is_collateral_paused, _) = collateral_config.get_flags();
+    var (is_debt_active, _, _, _, is_debt_paused, _) = debt_config.get_flags();
+
+    throw_unless(ERR::RESERVE_INACTIVE, is_collateral_active & is_debt_active);
+    throw_unless(ERR::RESERVE_PAUSED, ~ is_collateral_paused & ~ is_debt_paused);
+
+    throw_unless(ERR::HEALTH_FACTOR_NOT_BELOW_THRESHOLD, (health_factor != -1) & (health_factor < HEALTH_FACTOR_LIQUIDATION_THRESHOLD));
+
+    var (_, _, _, supply_list, _, _, _, _) = unpack_user_data(user_data);
+    var (_, _, is_collateral) = get_user_supply_data(supply_list, collateral_asset_hash);
+
+    int is_collateral_enabled = (collateral_config.get_liquidation_threshold() != 0) & is_collateral;
+    throw_unless(ERR::COLLATERAL_CANNOT_BE_LIQUIDATED, is_collateral_enabled);
+    throw_unless(ERR::SPECIFIED_CURRENCY_NOT_BORROWED_BY_USER, total_debt > 0);
+}
+
+
+;; @return actual_collateral_to_liquidate
+;; @return actual_debt_to_liquidate
+;; @return liquidation_protocol_fee
+(int, int, int) _calculate_available_collateral_to_liquidate(cell price_data, int collateral_asset_hash, int debt_asset_hash, int debt_to_cover, int user_collateral_balance) impure inline {
+    var (_, collateral_config, _) = __get_reserve_data(collateral_asset_hash);
+    var (_, debt_config, _) = __get_reserve_data(debt_asset_hash);
+    var collateral_underlying_address = collateral_config.get_underlying_address();
+    var debt_underlying_address = debt_config.get_underlying_address();
+    var collateral_price = price_data.get_asset_price(__get_asset_hash(collateral_underlying_address));
+    var debt_price = price_data.get_asset_price(__get_asset_hash(debt_underlying_address));
+
+    var collateral_decimals = collateral_config.get_reserve_decimals();
+    var debt_decimals = debt_config.get_reserve_decimals();
+    var collateral_asset_unit = binpow(10, collateral_decimals);
+    var debt_asset_unit = binpow(10, debt_decimals);
+    var liquidation_protocol_fee_percentage = collateral_config.get_liquidation_protocol_fee();
+    
+    ;; ? The corresponding collateral amount in the base currency based on the debt amount to cover
+    var base_collateral = (debt_price * debt_to_cover * collateral_asset_unit) / (collateral_price * debt_asset_unit);
+    var liquidation_bonus = collateral_config.get_liquidation_bonus();
+    var max_collateral_to_liquidate = base_collateral.percent_mul(liquidation_bonus);
+    
+    int collateral_amount = 0;
+    int debt_amount_needed = 0;
+
+    ;; ? If the user collateral balance is not enough to cover the actual debt amount
+    if (max_collateral_to_liquidate > user_collateral_balance) {
+        collateral_amount = user_collateral_balance;
+        debt_amount_needed = ((collateral_price * collateral_amount * debt_asset_unit) / (debt_price * collateral_asset_unit)).percent_div(liquidation_bonus);
+    } else {
+        ;; ? Otherwise, 
+        collateral_amount = max_collateral_to_liquidate;
+        debt_amount_needed = debt_to_cover;
+    }
+
+    if (liquidation_protocol_fee_percentage != 0) {
+        int bonus_collateral = collateral_amount - collateral_amount.percent_div(liquidation_bonus);
+        int liquidation_protocol_fee = bonus_collateral.percent_mul(liquidation_protocol_fee_percentage);
+
+        return (
+            collateral_amount - liquidation_protocol_fee,
+            debt_amount_needed,
+            liquidation_protocol_fee
+        );
+    }
+
+    return (collateral_amount, debt_amount_needed, 0);
+}
+
+(cell) update_stable_debt_after_liquidation(cell stable_borrow_list, int cache::asset_hash, int actual_debt_to_liquidate, int user_variable_debt) impure inline {
+
+    ~strdump("[LIQUIDATION] update_stable_debt_after_liquidation  ");
+    var (_, current_balance, balance_increase) = calculate_user_stable_debt_increase(stable_borrow_list, cache::asset_hash);
+    var (principal_stable_debt, total_stable_debt, stable_borrow_rate, current_avg_stable_rate, stable_last_update_timestamp) = cache::reserve_state.get_reserve_stable_borrow_data();
+    var (u_principal_stable_debt, _, u_current_stable_rate, u_stable_last_update_timestamp) = get_user_stable_borrow_data(stable_borrow_list, cache::asset_hash);
+
+    var remaining_to_liquidate = actual_debt_to_liquidate - user_variable_debt; ;; Use remaining_to_liquidate for stable debt
+    var previous_supply = total_stable_debt;
+    var next_avg_stable_rate = 0;
+    var next_supply = 0;
+    var user_stable_rate = u_current_stable_rate;
+
+    if (previous_supply <= remaining_to_liquidate) {
+        next::avg_stable_borrow_rate = 0;
+        next::total_stable_debt = 0;
+    } else {
+        next_supply = next::total_stable_debt = previous_supply - remaining_to_liquidate;
+        var first_term = next::avg_stable_borrow_rate.ray_mul(previous_supply.wad_to_ray());
+        var second_term = user_stable_rate.ray_mul(remaining_to_liquidate.wad_to_ray());
+
+        if (second_term >= first_term) {
+            next_avg_stable_rate = next::total_stable_debt = next::avg_stable_borrow_rate = 0;
+        } else {
+            next_avg_stable_rate = next::avg_stable_borrow_rate = (first_term - second_term).ray_div(next_supply.wad_to_ray());
+        }
+    }
+
+    if (remaining_to_liquidate == current_balance) {
+        u_current_stable_rate = 0;
+        u_stable_last_update_timestamp = 0;
+    } else {
+        u_stable_last_update_timestamp = now();
+    } 
+
+    next::principal_stable_debt = next::total_stable_debt;
+    next::avg_stable_borrow_rate = next_avg_stable_rate;
+    next::stable_last_update_timestamp = now();
+
+    if (balance_increase > remaining_to_liquidate) {
+        stable_borrow_list~udict_set(
+            KEY_LEN,
+            cache::asset_hash,
+            pack_user_stable_borrow_data(u_principal_stable_debt + (balance_increase - remaining_to_liquidate), u_current_stable_rate, u_stable_last_update_timestamp)
+        );
+    } else {
+        stable_borrow_list~udict_set(
+            KEY_LEN,
+            cache::asset_hash,
+            pack_user_stable_borrow_data(u_principal_stable_debt - (remaining_to_liquidate - balance_increase), u_current_stable_rate, u_stable_last_update_timestamp)
+        );
+    }
+
+    return stable_borrow_list;
+}
+
+
+
+() execute_liquidation_call(cell user_data, slice payload) impure inline {
+    ~strdump("[LIQUIDATION] execute_liquidation_call");
+    var (query_id, debt_pool_jw_address, debt_to_cover, liquidator_address, collateral_asset, collateral_pool_jw_address, price_data) = parse_liquidation_call(payload);
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_processing, process_expire_time) = unpack_user_data(user_data);
+    
+    try {
+        var debt_asset_hash = __get_asset_hash(debt_pool_jw_address);
+        var collateral_asset_hash = __get_asset_hash(collateral_pool_jw_address);
+        
+        ;; Cache the debt asset data
+        cache(debt_pool_jw_address);
+        update_state();
+        
+        ;; var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_processing, process_expire_time) = unpack_user_data(user_data);
+        
+        ;; Calculate the user's health factor
+        var (_, _, _, _, health_factor, _) = calculate_user_account_data(cache::asset_hash, user_data, price_data);
+        
+        ;; Calculate user's variable debt and total debt and the actual debt to liquidate
+        var (user_variable_debt, user_total_debt, actual_debt_to_liquidate) = _calculate_debt(user_data, debt_asset_hash, health_factor, debt_to_cover);
+    
+        throw_if(ERR::USER_IN_PROCESSING, is_processing & (now() <= process_expire_time));
+        verify_price_data(price_data);
+        validate_liquidation_call(user_data, collateral_asset_hash, debt_asset_hash, user_total_debt, health_factor);
+        ;; throw_unless(ERR::UNAUTHORIZED, liquidator_address.equal_slices(storage::liquidator()));
+
+    
+
+        var (user_scaled_collateral_balance, _, _) = get_user_supply_data(supply_list, collateral_asset_hash);
+        var (state, _, _) = __get_reserve_data(collateral_asset_hash);
+        var user_collateral_balance = user_scaled_collateral_balance.ray_mul(__get_normalized_income(state));
+        
+        var (actual_collateral_to_liquidate, actual_debt_to_liquidate, liquidation_protocol_fee) = _calculate_available_collateral_to_liquidate(price_data, collateral_asset_hash, debt_asset_hash, actual_debt_to_liquidate, user_collateral_balance);
+
+        if (user_total_debt == actual_debt_to_liquidate) {
+            ;; TODO: Remove the user's debt? 
+        }
+        
+        ;; ? If the collateral being liquidated is equal to the user balance,
+        ;; ? we set the currency as not being used as collateral anymore.
+        if (actual_collateral_to_liquidate + liquidation_protocol_fee == user_collateral_balance) {
+            ;; TODO: Set the user's is_collateral to false
+        }
+        
+        var (u_scaled_variable_debt, u_variable_borrow_index) = get_user_variable_borrow_data(variable_borrow_list, debt_asset_hash);
+        var (u_scaled_stable_debt, _, _, _) = get_user_stable_borrow_data(stable_borrow_list, debt_asset_hash);
+        
+        ;; * Burn the debt tokens
+        if (user_variable_debt >= actual_debt_to_liquidate) {
+            var scaled_actual_debt_to_liquidate = actual_debt_to_liquidate.ray_div(next::variable_borrow_index);
+            variable_borrow_list~udict_set(KEY_LEN, debt_asset_hash, pack_user_variable_borrow_data(u_scaled_variable_debt - scaled_actual_debt_to_liquidate, next::variable_borrow_index));
+            next::scaled_variable_debt -= scaled_actual_debt_to_liquidate;
+        } else {
+            if (user_variable_debt != 0) {
+                variable_borrow_list~udict_set(KEY_LEN, debt_asset_hash, pack_user_variable_borrow_data(0, next::variable_borrow_index));
+            }
+
+            stable_borrow_list = update_stable_debt_after_liquidation(stable_borrow_list, cache::asset_hash, actual_debt_to_liquidate, user_variable_debt);
+        }
+
+        next::liquidity += actual_debt_to_liquidate;
+        next::liquidity -= next::accrue_to_treasury;
+        
+        ;; TODO: Update interest rates of the debt asset
+        update_interest_rates(actual_debt_to_liquidate, next::accrue_to_treasury);
+
+        ;; We need to validate before this one.
+        var (collateral_supply_data, _, _) = __get_reserve_data(collateral_asset_hash);
+        var (_, collateral_liquidity, _, _) = get_reserve_supply_data(collateral_supply_data);
+        if (collateral_liquidity < actual_collateral_to_liquidate + liquidation_protocol_fee) {
+            throw(ERR::INSUFFICIENT_LIQUIDITY);
+            ;; reset_process_user(owner_address, ERR::INSUFFICIENT_LIQUIDITY);
+            ;; __revert_liquidation_call(debt_pool_jw_address, liquidator_address, debt_to_cover, ERR::INSUFFICIENT_LIQUIDITY);
+            ;; return ();
+        }
+        
+        ;; Update the debt reserve's data
+        __update_reserve_data();
+
+        if (next::accrue_to_treasury > 0) {
+            transfer(storage::treasury(), owner_address, cache::reserve_configuration.get_pool_jw_address(),
+            next::accrue_to_treasury, 0, ONE_TON * 5 / 100, null());
+        }
+        
+        ;; TODO: Burn the user's and reserve's collateral
+        
+        ;; ? From now on, the debt reserve's data must be updated properly. 
+        ;; ? Start to update the collateral reserve's data.
+        cache(collateral_pool_jw_address);
+        update_state();
+        ;; __accrue_to_treasury(liquidator_address);
+        ;; update_interest_rates(0, actual_collateral_to_liquidate + next::accrue_to_treasury);
+        
+        ;; Burn collateral
+        var (u_scaled_collateral_balance, u_liquidity_index, u_is_collateral) = get_user_supply_data(supply_list, collateral_asset_hash);
+        var scaled_actual_collateral_to_liquidate = actual_collateral_to_liquidate.ray_div(next::liquidity_index);
+        ;; var scaled_liquidation_protocol_fee = liquidation_protocol_fee.ray_div(next::liquidity_index);
+        ~strdump("[LIQUIDATION] scaled_actual_collateral_to_liquidate");
+        
+        ~dump([u_scaled_collateral_balance, scaled_actual_collateral_to_liquidate, liquidation_protocol_fee]);
+        supply_list~udict_set(KEY_LEN, collateral_asset_hash, pack_user_supply_data(u_scaled_collateral_balance - scaled_actual_collateral_to_liquidate, next::liquidity_index, u_is_collateral));
+        next::scaled_supply -= scaled_actual_collateral_to_liquidate;
+
+        ~strdump("collateral liquidity before");
+        ~dump([next::liquidity, actual_collateral_to_liquidate]);
+
+        ;; if (actual_collateral_to_liquidate + liquidation_protocol_fee > next::liquidity) {
+        ;;     __revert_liquidation_call(debt_pool_jw_address, liquidator_address, ERR::INSUFFICIENT_LIQUIDITY);
+        ;;     reset_process_user(owner_address, ERR::INSUFFICIENT_LIQUIDITY);
+        ;;     return ();
+        ;; }
+
+        next::liquidity -= actual_collateral_to_liquidate;
+        next::liquidity -= next::accrue_to_treasury;
+
+        if (liquidation_protocol_fee != 0) {
+            var (u_scaled_collateral_balance, u_liquidity_index, u_is_collateral) = get_user_supply_data(supply_list, collateral_asset_hash);
+            var scaled_liquidation_protocol_fee = liquidation_protocol_fee.ray_div(next::liquidity_index);
+            var scaled_user_collateral_balance = user_collateral_balance.ray_div(next::liquidity_index);
+            if (scaled_liquidation_protocol_fee > scaled_user_collateral_balance) {
+                liquidation_protocol_fee = scaled_user_collateral_balance.ray_mul(next::liquidity_index);
+            }
+
+            var scaled_liquidation_protocol_fee = liquidation_protocol_fee.ray_div(next::liquidity_index);
+            supply_list~udict_set(KEY_LEN, collateral_asset_hash, pack_user_supply_data(u_scaled_collateral_balance - scaled_liquidation_protocol_fee, next::liquidity_index, u_is_collateral));
+            next::scaled_supply -= scaled_liquidation_protocol_fee;
+            next::liquidity -= liquidation_protocol_fee;
+
+            transfer(storage::treasury(), liquidator_address, collateral_pool_jw_address, liquidation_protocol_fee, 0, ONE_TON / 20, null());
+            
+            ;; __update_user_data_treasury(scaled_liquidation_protocol_fee);
+        }
+
+        update_interest_rates(0, actual_collateral_to_liquidate + liquidation_protocol_fee + next::accrue_to_treasury);
+        
+        __update_reserve_data();
+
+        var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, false, now());
+        update_user_data(owner_address, liquidator_address, new_user_data);
+        
+        var (_, debt_config, _) = __get_reserve_data(debt_asset_hash);
+        slice debt_asset = debt_config.get_underlying_address();
+
+        ;; transfer(liquidator_address, liquidator_address, collateral_pool_jw_address, actual_collateral_to_liquidate, 0, ONE_TON / 20, __liquidation_info(owner_address, debt_asset, collateral_asset, actual_debt_to_liquidate, actual_collateral_to_liquidate));
+
+        ;; if (next::accrue_to_treasury > 0) {
+        ;;     transfer(storage::treasury(), owner_address, cache::reserve_configuration.get_pool_jw_address(),
+        ;;     next::accrue_to_treasury, 0, ONE_TON * 5 / 100, null());
+        ;; }
+
+        if (next::accrue_to_treasury > 0) {
+            transfer(storage::treasury(), owner_address, cache::reserve_configuration.get_pool_jw_address(),
+            next::accrue_to_treasury, 0, ONE_TON * 5 / 100, null());
+        }
+
+        if (debt_to_cover > actual_debt_to_liquidate) {
+            ~dump([debt_to_cover, actual_debt_to_liquidate]);
+            transfer(liquidator_address, liquidator_address, debt_pool_jw_address, debt_to_cover - actual_debt_to_liquidate, 0, ONE_TON / 20, null());
+        }
+
+        if (equal_slices(debt_pool_jw_address, my_address())) {
+            transfer(liquidator_address, liquidator_address, collateral_pool_jw_address, actual_collateral_to_liquidate, 0, ONE_TON / 20, __liquidation_info(owner_address, debt_asset, collateral_asset, actual_debt_to_liquidate, actual_collateral_to_liquidate));
+        } else {
+            transfer(liquidator_address, liquidator_address, collateral_pool_jw_address, actual_collateral_to_liquidate, 64, 0, __liquidation_info(owner_address, debt_asset, collateral_asset, actual_debt_to_liquidate, actual_collateral_to_liquidate));
+        }
+
+    } catch (e, n) {
+        reset_process_user(owner_address, n);
+        __revert_liquidation_call(debt_pool_jw_address, liquidator_address, debt_to_cover, n);
+        return ();
+    }
+}
+
+;; 1. Cache the debt asset's reserve data
+;; 2. Update the debt asset's state (liquidity index, variable borrow index)
+;; 3. Calculate the user's health factor
+;; 4. Calculate user's debt (variable debt, stable debt, total debt, and the actual debt to liquidate)
+;;    a. Get the user's current debt (interest included)
+;;    b. If the health factor is smaller than 1 and greater than 0.95 -> liquidate 50%
+;;    c. If the health factor is smaller than 0.95 -> liquidate 100%
+;;    d. If the `debtToCover` param is greater than the maxLiquidatableDebt -> set the debt to liquidate to the maxLiquidatableDebt
+;;    e. Otherwise, set the debt to liquidate to the `debtToCover` param
+;; 5. Validate the liquidation call
+;; 6. Get the user's collateral balance (interest included)
+;; 7. Calculate the available collateral to liquidate
+;; 8. If the user's total debt is equal to the actual debt to liquidate -> output (1)
+;; 9. If the actual collateral to liquidate plus the liquidation protocol fee is equal to the user's collateral balance -> output (2)
+;; 10. Burn the debt tokens
+;;     a. If there's enough variable debt -> output (3)
+;;     b. Otherwise, if burn all the variable debt if there's any and burn the remaining debt as stable debt -> output (4)
+;; 11. Update the debt asset reserve's interest rates
+;; 12. Burn the user's collateral -> output (5)
+;; 13. If there's any liquidation protocol fee -> output (6)
+
+
+;; Expected output:
+;; 1. Reset the user's borrowing state if there's no more debt
+;; 2. Set the user's collateral to `false`
+;; 3. Update the user's and the reserve's variable debt
+;; 4. Update the user's and the reserve's stable debt
+;; 5. Burn the user collateral -> update the user's and reserve's collateral
+;; 6.
