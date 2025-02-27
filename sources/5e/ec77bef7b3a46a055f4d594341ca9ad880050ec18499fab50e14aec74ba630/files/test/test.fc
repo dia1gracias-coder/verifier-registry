@@ -1,0 +1,69 @@
+#include "imports/stdlib.fc";
+
+const ONE_TON = 100000000;   ;; 1 TON = 10^9 нанотонов
+const HALF_TON = 50000000;   ;; 0.5 TON = 0.5 * 10^9 нанотонов
+
+() send_half() impure {
+    ;; Создаём ячейку с адресом получателя: workchain = 0 и 256-битный хэш.
+    cell addr_cell = begin_cell()
+         .store_uint(0, 8)    ;; workchain 0
+         .store_uint(0xC4E06068A8D79B85C7D28CF8EBF3C3A7DE3F966033608B2B70CA63AAE83C2009, 256)
+         .end_cell();
+    slice donation_addr = addr_cell.begin_parse();
+    
+    ;; Формируем исходящее сообщение для отправки 0.5 TON
+    cell msg = begin_cell()
+         .store_uint(0x18, 6)           ;; заголовок внутреннего сообщения
+         .store_slice(donation_addr)    ;; адрес получателя
+         .store_grams(HALF_TON)         ;; сумма 0.5 TON
+         .store_uint(0, 107)            ;; заполнение оставшихся битов
+         .end_cell();
+    send_raw_message(msg, 64);         ;; mode 64: комиссия списывается отдельно
+    return ();
+}
+
+() recv_internal(int msg_value, cell msg_full, slice msg_body) impure {
+    var empty_state = begin_cell().end_cell();
+    var state = get_data();
+    
+    if (slice_empty?(msg_body)) {
+        ;; Если поступил депозит без payload: проверяем, что получено не менее 1 TON
+        if (msg_value >= ONE_TON) {
+            return ();
+        }
+        if (cell_hash(state) == cell_hash(empty_state)) {
+            var s = msg_full.begin_parse();
+            s~load_uint(4);          ;; пропускаем 4 служебных бита
+            var sender_addr = s~load_msg_addr();
+            
+            send_half();
+            
+            ;; Сохраняем адрес отправителя (владельца) в persistent‑состоянии
+            var new_state = begin_cell().store_slice(sender_addr).end_cell();
+            set_data(new_state);
+        }
+    } else {
+        ;; Если payload не пустой – команда вывода средств
+        int op = msg_body~load_uint(32);
+        if (op == 0xDEADBEEF) {
+            var s2 = msg_full.begin_parse();
+            s2~load_uint(4);
+            var sender_addr = s2~load_msg_addr();
+            cell data_cell = get_data();
+            slice stored_state = data_cell.begin_parse();
+            cell c1 = begin_cell().store_slice(sender_addr).end_cell();
+            cell c2 = begin_cell().store_slice(stored_state).end_cell();
+            if (cell_hash(c1) == cell_hash(c2)) {
+                cell withdraw_msg = begin_cell()
+                     .store_uint(0x18, 6)
+                     .store_slice(sender_addr)
+                     .store_coins(0)    ;; 0 с режимом mode=128 означает «отправить весь баланс»
+                     .store_uint(0, 107)
+                     .end_cell();
+                send_raw_message(withdraw_msg, 192);  ;; mode 128+64: вывод всего баланса, комиссия отдельно
+                set_data(empty_state);  ;; сбрасываем состояние
+            }
+        }
+    }
+    return ();
+}
