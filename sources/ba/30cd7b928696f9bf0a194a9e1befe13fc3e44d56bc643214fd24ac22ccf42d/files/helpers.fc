@@ -1,0 +1,157 @@
+;; -----------------------------------------------------------------
+#include "stdlib.fc";
+#include "error-codes.fc";  ;; include error codes file
+
+;; -----------------------------------------------------------------
+;; Global Variables (persistent storage)
+;; -----------------------------------------------------------------
+;; Storage now holds:
+;;  - jettonWallet: address of the approved jetton token wallet contract
+;;  - swapCounter: counter for swap IDs
+;;  - swaps: dictionary of swap records
+;;  - hashlock_map: dictionary mapping hashlocks to swap IDs
+
+(slice, int, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    if (ds.slice_empty?()) {
+        return (my_address(), 0, new_dict(), new_dict());
+    }
+    return (
+        ds~load_msg_addr(),  ;; jettonWallet address
+        ds~load_uint(64),    ;; swapCounter
+        ds~load_dict(),      ;; swaps dictionary
+        ds~load_dict()       ;; hashlock_map dictionary
+    );
+}
+
+() save_data(slice jettonWallet, int swapCounter, cell swaps, cell hashlock_map) impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(jettonWallet)
+            .store_uint(swapCounter, 64)
+            .store_dict(swaps)
+            .store_dict(hashlock_map)
+            .end_cell()
+    );
+}
+
+;; -----------------------------------------------------------------
+;; Helper Functions
+;; -----------------------------------------------------------------
+
+;; Compute sha256 of a 256-bit integer
+int sha256_int256(int preimage) inline {
+    slice s = begin_cell()
+        .store_uint(preimage, 256)
+        .end_cell()
+        .begin_parse();
+    return string_hash(s);
+}
+
+;; Serialize a Swap record.
+builder buildSwap(
+    slice initiator,
+    slice recipient,
+    int tokenAmount,
+    int hashLock,
+    int timeLock,
+    int isCompleted
+) inline {
+    return begin_cell()
+        .store_slice(initiator)
+        .store_slice(recipient)
+        .store_uint(tokenAmount, 128)
+        .store_uint(hashLock, 256)
+        .store_uint(timeLock, 64)
+        .store_uint(isCompleted, 1);
+}
+
+(slice, slice, int, int, int, int) parseSwap(slice s) inline {
+    return (
+        s~load_msg_addr(),       ;; initiator address
+        s~load_msg_addr(),       ;; recipient address
+        s~load_uint(128),        ;; tokenAmount
+        s~load_uint(256),        ;; hashLock
+        s~load_uint(64),         ;; timeLock
+        s~load_uint(1)           ;; isCompleted flag
+    );
+}
+
+;; Store a new swap record in storage.
+() storeSwap(slice jettonWallet, int swapCounter, cell swaps, cell hashlock_map,
+    slice initiator, slice recipient,
+    int tokenAmount, int hashLock, int timeLock) impure inline {
+
+    builder b = buildSwap(initiator, recipient, tokenAmount, hashLock, timeLock, 0);
+    swaps~udict_set(256, swapCounter, b.end_cell().begin_parse());
+
+    ;; Store hashLock -> swapId mapping
+    hashlock_map~udict_set(256, hashLock, begin_cell().store_uint(swapCounter, 256).end_cell().begin_parse());
+
+    save_data(jettonWallet, swapCounter + 1, swaps, hashlock_map);
+}
+
+;; Send a jetton transfer message.
+() sendJettonTransfer(slice jettonWallet, slice target, int tokenAmount, int msg_value) impure inline {
+    int fwd_fee = 50000000;
+    int gas_consumption = 10000000;
+    int min_tons_for_storage = 10000000;
+
+    try {
+        int forward_ton_amount = 10000000;
+        int required_value = forward_ton_amount + 2 * gas_consumption + fwd_fee + min_tons_for_storage;
+
+        if (msg_value <= required_value) {
+            throw(ERR_INSUFFICIENT_VALUE);
+        }
+
+        if (target.slice_empty?()) {
+            throw(ERR_EMPTY_TARGET);
+        }
+
+        if (tokenAmount <= 0) {
+            throw(ERR_INVALID_AMOUNT);
+        }
+
+        if (jettonWallet.slice_empty?()) {
+            throw(ERR_EMPTY_WALLET);
+        }
+
+        var msg = null();
+        try {
+            msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(jettonWallet)
+                .store_coins(0)
+                .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+        } catch (_, _) {
+            throw(ERR_MSG_BUILD);
+        }
+
+        var msg_body = null();
+        try {
+            msg_body = begin_cell()
+                .store_uint(0xf8a7ea5, 32)
+                .store_uint(0, 64)
+                .store_coins(tokenAmount)
+                .store_slice(target)
+                .store_slice(target)
+                .store_uint(0, 1)
+                .store_coins(forward_ton_amount)
+                .store_uint(0, 1);
+        } catch (_, _) {
+            throw(ERR_BODY_BUILD);
+        }
+
+        msg = msg.store_ref(msg_body.end_cell());
+
+        try {
+            send_raw_message(msg.end_cell(), 64);
+        } catch (_, _) {
+            throw(ERR_SEND_FAILED);
+        }
+
+    } catch (err) {
+        throw(ERR_SEND_FAILED);
+    }
+}
