@@ -1,0 +1,49 @@
+#include "stdlib.fc";
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+  if (in_msg_body.slice_empty?()) { return (); }
+  
+  ;; Load admin address from contract data
+  slice ds = get_data().begin_parse();
+  slice admin_address = ds~load_msg_addr();
+  
+  ;; Parse sender address from incoming message
+  slice cs = in_msg.begin_parse();
+  cs~skip_bits(4);  ;; Skip flags
+  slice sender_address = cs~load_msg_addr();
+  
+  ;; Admin check - use equal_slices_bits instead of equal_slices
+  throw_unless(301, equal_slice_bits(sender_address, admin_address));
+  
+  ;; Parse mint parameters
+  slice user_address = in_msg_body~load_msg_addr();
+  int uri_len = in_msg_body~load_uint(8); ;; Load string length
+  slice metadata_uri = in_msg_body~load_bits(uri_len * 8); ;; Load the actual string
+  
+  ;; Deploy NFT with metadata
+  var nft_content = begin_cell()
+    .store_uint(0x00, 8)        ;; NFT prefix
+    .store_slice(metadata_uri)  ;; IPFS metadata
+  .end_cell();
+  
+  cell msg = begin_cell()
+    .store_uint(0x18, 6)         ;; non-bounceable message
+    .store_slice(user_address)   ;; destination address
+    .store_coins(0)              ;; amount of TON to send
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; default message header
+    .store_ref(nft_content)      ;; message body with NFT content
+  .end_cell();
+  
+  send_raw_message(msg, 64); ;; Pay fees separately, ignore errors
+}
+
+;; Royalty parameters (TEP-66 compliant)
+(int, int, slice) get_royalty_params() method_id {
+  slice ds = get_data().begin_parse();
+  ds~load_msg_addr(); ;; Skip admin address
+  ds~load_ref();      ;; Skip metadata reference
+  int numerator = ds~load_uint(16);    ;; 1% = 1/100
+  int denominator = ds~load_uint(16);
+  slice royalty_address = ds~load_msg_addr();
+  return (numerator, denominator, royalty_address);
+}
