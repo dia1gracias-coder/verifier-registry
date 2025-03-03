@@ -1,0 +1,398 @@
+#include "imports/stdlib.fc";
+
+;; Storage field constants
+const int FIELD_NEXT_VOTING_ID_BITS = 32;
+
+;; Helper functions
+int equal_slices(slice a, slice b) inline {
+  return slice_hash(a) == slice_hash(b);
+}
+
+;; Storage Section
+(int, cell, slice, int, int) load_data() inline {
+  var ds = get_data().begin_parse();
+  return (
+    ds~load_uint(FIELD_NEXT_VOTING_ID_BITS), ;; next_voting_id
+    ds~load_dict(), ;; votings_map
+    ds~load_msg_addr(), ;; admin_address
+    ds~load_coins(), ;; total_fees
+    ds~load_coins() ;; min_vote_amount
+  );
+}
+
+() save_data(int next_voting_id, cell votings_map, slice admin_address, int total_fees, int min_vote_amount) impure inline {
+  set_data(begin_cell()
+    .store_uint(next_voting_id, FIELD_NEXT_VOTING_ID_BITS)
+    .store_dict(votings_map)
+    .store_slice(admin_address)
+    .store_coins(total_fees)
+    .store_coins(min_vote_amount)
+    .end_cell());
+}
+
+;; Helper function to create a voting cell
+cell create_voting_cell(int id, slice creator, slice title, cell options, int start_time, int end_time,
+                        cell votes, int fee_percent, int active, int funds_transferred) inline {
+  return begin_cell()
+    .store_uint(id, 32)
+    .store_slice(creator)
+    .store_ref(begin_cell().store_slice(title).end_cell())
+    .store_dict(options)
+    .store_uint(start_time, 64)
+    .store_uint(end_time, 64)
+    .store_dict(votes)
+    .store_uint(fee_percent, 8)
+    .store_uint(active, 1)
+    .store_uint(funds_transferred, 1)
+    .end_cell();
+}
+
+;; Messages Section
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+  if (in_msg.slice_empty?()) {
+    return (); ;; Accept empty messages (simple transfers)
+  }
+
+  slice cs = in_msg_cell.begin_parse();
+  int flags = cs~load_uint(4);
+
+  if (flags & 1) {
+    return (); ;; Ignore bounced messages
+  }
+
+  slice sender_address = cs~load_msg_addr();
+
+  int op = in_msg~load_uint(32);
+  int query_id = in_msg~load_uint(64);
+
+  var (next_voting_id, votings_map, admin_address, total_fees, min_vote_amount) = load_data();
+
+  if (op == 1) { ;; create_voting
+    ;; Only admin can create votings
+    if (~ equal_slices(sender_address, admin_address)) {
+      ;; Allow if admin is not set (first deployment)
+      if (~ equal_slices(admin_address, null())) {
+        throw(401); ;; Not authorized
+      }
+    }
+
+    slice title = in_msg~load_ref().begin_parse();
+    cell options = in_msg~load_dict();
+    int duration = in_msg~load_uint(32);
+
+    ;; Default duration is 2 hours = 7200 seconds
+    if (duration == 0) {
+      duration = 7200;
+    }
+
+    int start_time = now();
+    int end_time = start_time + duration;
+
+    ;; Create new voting
+    int voting_id = next_voting_id;
+    cell votes = new_dict();
+    int fee_percent = 5; ;; Default platform fee is 5%
+
+    ;; Store voting
+    cell voting_cell = create_voting_cell(voting_id, sender_address, title, options,
+                                         start_time, end_time, votes, fee_percent, 1, 0);
+
+    votings_map~udict_set(32, voting_id, voting_cell.begin_parse());
+
+    ;; Increment next_voting_id
+    next_voting_id += 1;
+
+    ;; Save updated data
+    save_data(next_voting_id, votings_map, admin_address, total_fees, min_vote_amount);
+
+    ;; Note: Event emission removed as emit_log_cell is not available
+
+    return ();
+  }
+
+  if (op == 2) { ;; vote
+    int voting_id = in_msg~load_uint(32);
+    int option_id = in_msg~load_uint(8);
+
+    ;; Load voting
+    var (voting_slice, found?) = votings_map.udict_get?(32, voting_id);
+
+    if (~ found?) {
+      throw(402); ;; Voting not found
+    }
+
+    ;; Fix: voting_slice is already a slice, don't call begin_parse() again
+    var vs = voting_slice;
+
+    int id = vs~load_uint(32);
+    slice creator = vs~load_msg_addr();
+    cell title_cell = vs~load_ref();
+    cell options = vs~load_dict();
+    int start_time = vs~load_uint(64);
+    int end_time = vs~load_uint(64);
+    cell votes = vs~load_dict();
+    int fee_percent = vs~load_uint(8);
+    int active = vs~load_uint(1);
+    int funds_transferred = vs~load_uint(1);
+
+    ;; Check if voting is active
+    if (~ active) {
+      throw(403); ;; Voting is not active
+    }
+
+    ;; Check if voting has not ended
+    if (now() >= end_time) {
+      throw(404); ;; Voting has ended
+    }
+
+    ;; Check if option exists
+    var (option_slice, option_found?) = options.udict_get?(8, option_id);
+
+    if (~ option_found?) {
+      throw(405); ;; Option not found
+    }
+
+    ;; Check minimum vote amount
+    if (msg_value < min_vote_amount) {
+      throw(406); ;; Insufficient vote amount
+    }
+
+    ;; Update votes for this option
+    var (option_votes_slice, votes_found?) = votes.udict_get?(8, option_id);
+    int new_votes = msg_value;
+
+    if (votes_found?) {
+      new_votes += option_votes_slice~load_coins();
+    }
+
+    votes~udict_set(8, option_id, begin_cell().store_coins(new_votes).end_cell().begin_parse());
+
+    ;; Update voting
+    cell voting_cell = create_voting_cell(id, creator, title_cell.begin_parse(), options,
+                                         start_time, end_time, votes, fee_percent, active, funds_transferred);
+
+    votings_map~udict_set(32, voting_id, voting_cell.begin_parse());
+
+    ;; Save updated data
+    save_data(next_voting_id, votings_map, admin_address, total_fees, min_vote_amount);
+
+    ;; Note: Event emission removed
+
+    return ();
+  }
+
+  if (op == 3) { ;; close_voting
+    int voting_id = in_msg~load_uint(32);
+
+    ;; Load voting
+    var (voting_slice, found?) = votings_map.udict_get?(32, voting_id);
+
+    if (~ found?) {
+      throw(402); ;; Voting not found
+    }
+
+    ;; Fix: voting_slice is already a slice
+    var vs = voting_slice;
+
+    int id = vs~load_uint(32);
+    slice creator = vs~load_msg_addr();
+    cell title_cell = vs~load_ref();
+    cell options = vs~load_dict();
+    int start_time = vs~load_uint(64);
+    int end_time = vs~load_uint(64);
+    cell votes = vs~load_dict();
+    int fee_percent = vs~load_uint(8);
+    int active = vs~load_uint(1);
+    int funds_transferred = vs~load_uint(1);
+
+    ;; Check if voting is active
+    if (~ active) {
+      throw(403); ;; Voting is not active
+    }
+
+    ;; Only creator or admin can close voting
+    if ((~ equal_slices(sender_address, creator)) & (~ equal_slices(sender_address, admin_address))) {
+      throw(407); ;; Not authorized
+    }
+
+    ;; Check if voting has ended or forced close by admin
+    if ((now() < end_time) & (~ equal_slices(sender_address, admin_address))) {
+      throw(408); ;; Voting has not ended
+    }
+
+    ;; Calculate total donations
+    int total_donated = 0;
+    int key = -1;
+
+    do {
+      (key, var cs, var f) = votes.udict_get_next?(8, key);
+      if (f) {
+        total_donated += cs~load_coins();
+      }
+    } until (~ f);
+
+    ;; Calculate platform fee
+    int platform_amount = muldiv(total_donated, fee_percent, 100);
+    int creator_amount = total_donated - platform_amount;
+
+    ;; Update total fees
+    total_fees += platform_amount;
+
+    ;; Set voting as inactive and funds transferred
+    active = 0;
+    funds_transferred = 1;
+
+    ;; Update voting
+    cell voting_cell = create_voting_cell(id, creator, title_cell.begin_parse(), options,
+                                         start_time, end_time, votes, fee_percent, active, funds_transferred);
+
+    votings_map~udict_set(32, voting_id, voting_cell.begin_parse());
+
+    ;; Save updated data
+    save_data(next_voting_id, votings_map, admin_address, total_fees, min_vote_amount);
+
+    ;; Transfer funds to creator
+    if (creator_amount > 0) {
+      var msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(creator)
+        .store_coins(creator_amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(0, 32)
+        .end_cell();
+
+      send_raw_message(msg, 1);
+    }
+
+    ;; Note: Event emission removed
+
+    return ();
+  }
+
+  if (op == 4) { ;; withdraw_fees
+    ;; Only admin can withdraw fees
+    if (~ equal_slices(sender_address, admin_address)) {
+      throw(407); ;; Not authorized
+    }
+
+    ;; Check if there are fees to withdraw
+    if (total_fees == 0) {
+      throw(409); ;; No fees to withdraw
+    }
+
+    ;; Transfer fees to admin
+    var msg = begin_cell()
+      .store_uint(0x10, 6) ;; nobounce
+      .store_slice(admin_address)
+      .store_coins(total_fees)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_uint(0, 32)
+      .end_cell();
+
+    send_raw_message(msg, 1);
+
+    ;; Reset total fees
+    total_fees = 0;
+
+    ;; Save updated data
+    save_data(next_voting_id, votings_map, admin_address, total_fees, min_vote_amount);
+
+    return ();
+  }
+
+  throw(0xffff); ;; Unknown operation
+}
+
+;; Getters Section
+int get_voting_count() method_id {
+  var (next_voting_id, _, _, _, _) = load_data();
+  return next_voting_id;
+}
+
+(int, slice, int, int, int) get_voting_info(int voting_id) method_id {
+  var (_, votings_map, _, _, _) = load_data();
+  var (voting_slice, found?) = votings_map.udict_get?(32, voting_id);
+
+  if (~ found?) {
+    return (0, null(), 0, 0, 0);
+  }
+
+  var vs = voting_slice; ;; Already a slice
+
+  int id = vs~load_uint(32);
+  slice creator = vs~load_msg_addr();
+  vs~load_ref(); ;; skip title
+  vs~load_dict(); ;; skip options
+  int start_time = vs~load_uint(64);
+  int end_time = vs~load_uint(64);
+  vs~load_dict(); ;; skip votes
+  vs~load_uint(8); ;; skip fee_percent
+  int active = vs~load_uint(1);
+
+  return (id, creator, start_time, end_time, active);
+}
+
+slice get_voting_title(int voting_id) method_id {
+  var (_, votings_map, _, _, _) = load_data();
+  var (voting_slice, found?) = votings_map.udict_get?(32, voting_id);
+
+  if (~ found?) {
+    return null();
+  }
+
+  var vs = voting_slice; ;; Already a slice
+
+  vs~load_uint(32); ;; skip id
+  vs~load_msg_addr(); ;; skip creator
+  return vs~load_ref().begin_parse();
+}
+
+cell get_voting_options(int voting_id) method_id {
+  var (_, votings_map, _, _, _) = load_data();
+  var (voting_slice, found?) = votings_map.udict_get?(32, voting_id);
+
+  if (~ found?) {
+    return null();
+  }
+
+  var vs = voting_slice; ;; Already a slice
+
+  vs~load_uint(32); ;; skip id
+  vs~load_msg_addr(); ;; skip creator
+  vs~load_ref(); ;; skip title
+  return vs~load_dict();
+}
+
+cell get_voting_results(int voting_id) method_id {
+  var (_, votings_map, _, _, _) = load_data();
+  var (voting_slice, found?) = votings_map.udict_get?(32, voting_id);
+
+  if (~ found?) {
+    return null();
+  }
+
+  var vs = voting_slice; ;; Already a slice
+
+  vs~load_uint(32); ;; skip id
+  vs~load_msg_addr(); ;; skip creator
+  vs~load_ref(); ;; skip title
+  vs~load_dict(); ;; skip options
+  vs~load_uint(64); ;; skip start_time
+  vs~load_uint(64); ;; skip end_time
+  return vs~load_dict();
+}
+
+slice get_admin_address() method_id {
+  var (_, _, admin_address, _, _) = load_data();
+  return admin_address;
+}
+
+int get_total_fees() method_id {
+  var (_, _, _, total_fees, _) = load_data();
+  return total_fees;
+}
+
+int get_min_vote_amount() method_id {
+  var (_, _, _, _, min_vote_amount) = load_data();
+  return min_vote_amount;
+}
