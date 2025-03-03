@@ -1,0 +1,254 @@
+#include "imports/stdlib.fc";
+
+;; 操作码定义 - 必须与wrapper完全匹配 
+const int op::add_order = 0x193a4483;    ;; wrapper中定义的值
+const int op::update_status = 0x605c1e7;  ;; wrapper中定义的值
+const int op::transfer_to_wallet =  0x6b7407bf;
+
+;; 全局存储变量
+global int ctx_id;
+global cell ctx_orders; ;; 订单字典，用于存储所有订单数据
+
+global cell public_key;   ;; 验证签名用的公钥
+
+;; 加载数据函数
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    ctx_id = ds~load_uint(32);
+    public_key = ds~load_ref();  ;; 存储的是包含256位整数的Cell
+    ctx_orders = ds~load_dict();
+    ds.end_parse();
+}
+
+;; 定义最小gas费用
+const int min_gas_fee = 1000000;  ;; 根据需要调整
+
+;; 保存数据函数
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(ctx_id, 32)
+            .store_ref(public_key)
+            .store_dict(ctx_orders)
+            .end_cell()
+    );
+}
+
+;; 接收内部消息的处理函数
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; 检查消息是否带有足够的gas费用
+    if (msg_value < min_gas_fee) {
+        ;; 如果gas费用不足，直接返回
+        return ();
+    }
+
+    ;; 标准消息检查
+    if (in_msg_body.slice_empty?()) { return (); }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { return (); }
+
+    load_data();
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    ;; 添加订单处理
+    if (op == op::add_order) {
+        ;; 完全按照wrapper中的结构解析消息
+        slice order_id = in_msg_body~load_ref().begin_parse();
+        int amount = in_msg_body~load_uint(64);
+        slice currency = in_msg_body~load_ref().begin_parse();
+        int status = in_msg_body~load_uint(8);
+        slice driver_id = in_msg_body~load_ref().begin_parse();
+        
+        ;; 加载额外数据引用单元
+        cell extra_cell = in_msg_body~load_ref();
+        slice extra_slice = extra_cell.begin_parse();
+        slice user_id = extra_slice~load_ref().begin_parse();
+        slice channel = extra_slice~load_ref().begin_parse();
+        slice signature = extra_slice~load_ref().begin_parse();
+        int create_time = extra_slice~load_uint(64);
+        int update_time = extra_slice~load_uint(64);
+
+                
+        ;; 构造待签名消息
+        cell msg_cell = begin_cell()
+            .store_ref(begin_cell().store_slice(order_id).end_cell())
+            .store_uint(amount, 64)
+            .store_ref(begin_cell().store_slice(currency).end_cell())
+            .end_cell();
+        
+        ;; 从公钥Cell中提取256位整数公钥
+        int public_key_int = public_key.begin_parse().preload_uint(256);
+        
+        ;; 验证签名
+        throw_unless(403, check_signature(slice_hash(msg_cell.begin_parse()), signature, public_key_int));
+
+
+        ;; 订单ID哈希作为键
+        int order_hash = slice_hash(order_id);
+
+        ;; 创建新订单单元
+        cell new_order_data = begin_cell()
+            .store_ref(begin_cell().store_slice(order_id).end_cell())
+            .store_uint(amount, 64)
+            .store_ref(begin_cell().store_slice(currency).end_cell())
+            .store_uint(status, 8)
+            .store_ref(begin_cell().store_slice(driver_id).end_cell())
+            .store_ref(begin_cell()
+                .store_ref(begin_cell().store_slice(user_id).end_cell())
+                .store_ref(begin_cell().store_slice(channel).end_cell())
+                .store_uint(create_time, 64)
+                .store_uint(update_time, 64)
+                .end_cell())
+            .end_cell();
+
+        ;; 保存到字典
+        ctx_orders~udict_set_ref(256, order_hash, new_order_data);
+        save_data();
+        return ();
+    }
+
+    ;; 更新状态处理
+    if (op == op::update_status) {
+        slice order_id = in_msg_body~load_ref().begin_parse();
+        int new_status = in_msg_body~load_uint(8);
+        int update_time = in_msg_body~load_uint(64);
+        slice signature = in_msg_body~load_ref().begin_parse();
+
+        int order_hash = slice_hash(order_id);
+
+        ;; 获取订单数据
+        (cell order_data, int success) = ctx_orders.udict_get_ref?(256, order_hash);
+        if (~ success) {
+            ;; 订单不存在，直接返回而不抛出错误
+            return ();
+        }
+
+  
+        ;; 构造待签名消息
+        cell msg_cell = begin_cell()
+            .store_ref(begin_cell().store_slice(order_id).end_cell())
+            .store_uint(new_status, 8)
+            .store_uint(update_time, 64)
+            .end_cell();
+        
+        ;; 从公钥Cell中提取256位整数公钥
+        int public_key_int = public_key.begin_parse().preload_uint(256);
+        
+        ;; 验证签名
+        throw_unless(403, check_signature(slice_hash(msg_cell.begin_parse()), signature, public_key_int));
+
+
+        ;; 解析订单数据
+        slice order_slice = order_data.begin_parse();
+        cell order_id_cell = order_slice~load_ref();
+        int amount = order_slice~load_uint(64);
+        cell currency_cell = order_slice~load_ref();
+        int old_status = order_slice~load_uint(8); ;; 老状态
+        cell driver_id_cell = order_slice~load_ref();
+        cell extra_cell = order_slice~load_ref();
+        
+        ;; 解析额外数据
+        slice extra_slice = extra_cell.begin_parse();
+        cell user_id_cell = extra_slice~load_ref();
+        cell channel_cell = extra_slice~load_ref();
+        int create_time = extra_slice~load_uint(64);
+        
+        ;; 创建新订单数据
+        cell new_order_data = begin_cell()
+            .store_ref(order_id_cell)
+            .store_uint(amount, 64)
+            .store_ref(currency_cell)
+            .store_uint(new_status, 8)
+            .store_ref(driver_id_cell)
+            .store_ref(begin_cell()
+                .store_ref(user_id_cell)
+                .store_ref(channel_cell)
+                .store_uint(create_time, 64)
+                .store_uint(update_time, 64)
+                .end_cell())
+            .end_cell();
+
+        ;; 更新字典
+        ctx_orders~udict_set_ref(256, order_hash, new_order_data);
+        save_data();
+        return ();
+    }
+
+    ;; 转账到钱包处理
+    if (op == op::transfer_to_wallet) {
+        ;; 解析参数
+        slice to_address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        slice signature = in_msg_body~load_ref().begin_parse();
+        
+        ;; 构造待签名消息
+        cell msg_cell = begin_cell()
+            .store_slice(to_address)
+            .store_coins(amount)
+            .end_cell();
+        
+        ;; 从公钥Cell中提取256位整数公钥
+        int public_key_int = public_key.begin_parse().preload_uint(256);
+        
+        ;; 验证签名
+        throw_unless(403, check_signature(slice_hash(msg_cell.begin_parse()), signature, public_key_int));
+
+        int gas_reserve = 50000000; ;; 预留0.05 TON作为gas费用
+        throw_unless(405, my_balance > amount + gas_reserve);
+    
+        throw_unless(407, slice_bits(to_address) >= 256); ;; 确保有效地址
+
+        ;; 发送转账消息
+        send_raw_message(
+            begin_cell()
+            .store_uint(0x18, 6) ;; bounce标记
+            .store_slice(to_address)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell(),
+            64 + 32 ;; 发送模式
+        );
+    
+        ;; 更新状态
+        save_data();
+        return ();
+    }
+}
+
+;; 获取订单详情
+(slice, int, slice, int, slice, slice, slice, int, int) get_order_by_id(slice order_id) method_id {
+    load_data();
+    int order_hash = slice_hash(order_id);
+    
+    (cell order_data, int success) = ctx_orders.udict_get_ref?(256, order_hash);
+    throw_unless(404, success);
+    
+    slice order_slice = order_data.begin_parse();
+    
+    ;; 解析所有字段
+    slice saved_order_id = order_slice~load_ref().begin_parse();
+    int amount = order_slice~load_uint(64);
+    slice currency = order_slice~load_ref().begin_parse();
+    int status = order_slice~load_uint(8);
+    slice driver_id = order_slice~load_ref().begin_parse();
+    
+    ;; 解析额外数据
+    cell extra_cell = order_slice~load_ref();
+    slice extra_slice = extra_cell.begin_parse();
+    slice user_id = extra_slice~load_ref().begin_parse();
+    slice channel = extra_slice~load_ref().begin_parse();
+    int create_time = extra_slice~load_uint(64);
+    int update_time = extra_slice~load_uint(64);
+    
+    return (saved_order_id, amount, currency, status, driver_id, user_id, channel, create_time, update_time);
+}
+
+;; 获取合约ID
+int get_id() method_id {
+    load_data();
+    return ctx_id;
+} 
+
+
