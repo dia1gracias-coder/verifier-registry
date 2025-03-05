@@ -1,0 +1,107 @@
+#include "../imports/math.fc";
+
+const op::echo = "op::echo"c;
+
+const ONE_TON = 1000000000;
+const ONE_TON_DEC = ONE_TON / 10;
+const TON10 = ONE_TON * 10;
+const TON100 = ONE_TON * 100;
+const TON1000 = ONE_TON * 100;
+const DENOMINATOR = 100000;
+
+const ZEROADDR = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ"a;
+
+(slice, int) sdict_get?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTGET" "NULLSWAPIFNOT";
+(cell, int) sdict_get_ref?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTGETREF" "NULLSWAPIFNOT";
+cell sdict_get_ref(cell dict, int key_len, slice index) asm(index dict key_len) "DICTGETOPTREF";
+
+;; () log(slice str, int value) impure inline {
+;;     str~strdump();
+;;     value~dump();
+;; }
+;; () log_str(slice str, slice str2) impure inline {
+;;     str~strdump();
+;;     str2~strdump();
+;; }
+
+int get_int_len(int num) inline {
+    if(num < 10){
+        return 1;
+    }
+    if(num < 100){
+        return 2;
+    }
+    if(num < 1000){
+        return 3;
+    }
+    return 4;
+}
+
+() refund_bet(slice error_msg) impure inline_ref {
+    messages::send_simple(0, player, begin_cell().store_uint(0, 32).store_slice(error_msg).end_cell(), 64);
+    return ();
+}
+
+slice get_win_msg(cell msg_dict) inline {
+    (int max_k, slice max_value, int max_exists) = udict_get_max?(msg_dict, 8);
+
+    int msg_idx = last_used_msg_idx < max_k ? last_used_msg_idx + 1 : 0;
+    last_used_msg_idx = msg_idx;
+    
+    (slice msg_text, int is) = udict_get?(msg_dict, 8, msg_idx);
+
+    return msg_text;
+}
+
+slice coins_to_string(int coins) inline {
+    if(coins < ONE_TON){
+        builder b = begin_cell().store_slice("0.");
+        int tons_decimals = coins / ONE_TON_DEC;
+        b~store_int(tons_decimals + 48, 8);
+
+        int tons_cents = (coins % ONE_TON_DEC) / (ONE_TON_DEC / 10);
+        ;; log("< ton, tons_cents", tons_cents);
+        if(tons_cents > 0){
+            b~store_int(tons_cents + 48, 8);
+        }
+        return b.end_cell().begin_parse();
+    }
+    int tons = coins / ONE_TON;
+    int tons_len = get_int_len(tons);
+
+    builder b = begin_cell();
+
+    int i = tons_len;
+    repeat(tons_len){
+        int denom = math::pow(10, i - 1);
+        int digit = tons / denom;
+        b~store_int(digit + 48, 8);
+        tons = tons - digit * denom;
+        i -= 1;
+    }
+    int tons_decimals = (coins % ONE_TON) / ONE_TON_DEC;
+    if(tons_decimals > 0){
+        b = b.store_slice(".");
+        b~store_int(tons_decimals + 48, 8);
+    }
+
+    return b.end_cell().begin_parse(); ;; 
+}
+
+slice response_w_coins(slice base_string, int coins, slice symbol) inline {
+    slice coins_str = coins_to_string(coins);
+    slice full_str = begin_cell()
+       .store_slice(base_string)
+       .store_slice(coins_str)
+       .store_slice(" ")
+       .store_slice(symbol)
+       .end_cell()
+    .begin_parse();
+
+    return full_str;
+}
+
+int get_max_bet(int my_balance, int max_win, int leverage){
+    int max_bet_balance = my_balance / leverage;
+    return min(max_win / leverage, max_bet_balance);
+}
