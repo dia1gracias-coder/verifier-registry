@@ -1,0 +1,26 @@
+#include "../imports/stdlib.fc";
+#include "../imports/messages.fc";
+#include "../shared/jetton_utils.fc";
+#include "../shared/admin_ops.fc";
+
+const ADMIN = "UQDO8VPQ7rx3A0tUPdyM80a45yFmbRaWZvX_1o8PmrrdayJv"a;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    cs~load_uint(4); ;; skip flags
+    
+    slice sender_address = cs~load_msg_addr();
+
+    if equal_slices(sender_address, ADMIN) {
+        proceed_admin_ops(in_msg_body~load_uint(32), in_msg_body, ADMIN);
+        return ();
+    }
+
+    send_raw_message(begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_uint(0, 107)
+        .store_slice(in_msg_body)
+    .end_cell(), 64);
+}
