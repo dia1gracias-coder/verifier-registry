@@ -1,0 +1,79 @@
+#include "utils.fc";
+
+(tuple) get_reserves_state() method_id {
+    storage::load();
+    return __get_dict_values(storage::reserve_states);
+}
+
+(tuple) get_reserves_config() method_id {
+    storage::load();
+    return __get_dict_values(storage::reserve_configs);
+}
+
+(tuple) get_reserves_rate_strategy() method_id {
+    storage::load();
+    return __get_dict_values(storage::rate_strategies);
+}
+
+(slice, slice, slice) get_reserve_data(slice pool_jw_address) method_id {
+    var asset_hash = __get_asset_hash(pool_jw_address);
+    return __get_reserve_data(asset_hash);
+}
+
+(tuple, tuple, tuple) get_reserves_data() method_id {
+    storage::load();
+    return (get_reserves_state(), get_reserves_config(), get_reserves_rate_strategy());
+}
+
+(slice) get_admin() method_id {
+    storage::load();
+    return storage::admin();
+}
+
+(slice) get_treasury() method_id {
+    storage::load();
+    return storage::treasury();
+}
+
+(slice) get_user_address(slice owner_address) method_id {
+    return __get_user_address(owner_address);
+}
+
+(tuple) get_reserve_list() method_id {
+    storage::load();
+    var res = empty_tuple();
+    var (key, value, f) = storage::reserve_states.udict_get_min?(KEY_LEN);
+    while (f) {
+        res~tpush(key);
+        (key, value, f) = storage::reserve_states.udict_get_next?(KEY_LEN, key);
+    }
+    return res;
+}
+
+(int) get_normalized_income(slice pool_jw_address) method_id {
+    storage::load();
+    var asset_hash = __get_asset_hash(pool_jw_address);
+    var (state, f) = storage::reserve_states.udict_get?(KEY_LEN, asset_hash);
+    if (~ f) {
+        return 0;
+    }
+
+    return __get_normalized_income(state);
+}
+
+(int) get_normalized_debt(slice pool_jw_address) method_id {
+    storage::load();
+    var asset_hash = __get_asset_hash(pool_jw_address);
+    var (state, f) = storage::reserve_states.udict_get?(KEY_LEN, asset_hash);
+    if (~ f) {
+        return 0;
+    }
+
+    return __get_normalized_debt(state);
+}
+
+(int) get_pool_balance() method_id {
+    var [balance, _] = get_balance();
+    return balance;
+}
+

@@ -1,0 +1,98 @@
+#include "validation_logic.fc";
+#include "../utils/transfer_helper.fc";
+
+int withdraw_gas_consumption() asm "120000000 PUSHINT";    ;; storage fee + update user data fee + withdraw fee
+
+;; 1. Updates liquidity index and variable borrow index
+;; 2. If the user selects to withdraw max amount, then it will withdraw all of their balance
+;; Otherwise, it will withdraw the amount that user selects
+;; 3. Validate if the amount to withdraw is valid
+;; 4. Update interest rates
+;; 5. If the asset to withdraw is used as collateral and user withdraws all of their balance
+;; Then, set is_collateral to false
+;; 6. Burn the user's aTokens --> 
+() execute_withdraw(int msg_value, int my_balance, int fwd_fee, cell user_data, slice in_msg_body) impure inline {
+    ~strdump("[WITHDRAW_LOGIC] execute_withdraw");
+    var (query_id, pool_jw_address, amount, is_max_withdraw, price_data) = parse_withdraw(in_msg_body);
+    ~dump(pool_jw_address);
+    
+    cache(pool_jw_address);
+    update_state();
+
+    var (pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, is_user_in_process, process_expire_time) = unpack_user_data(user_data);
+    var (scaled_supply, _, is_collateral) = get_user_supply_data(supply_list, cache::asset_hash);
+
+    int user_balance = scaled_supply.ray_mul(next::liquidity_index);
+    int amount_to_withdraw = is_max_withdraw ? user_balance : amount;
+    try {
+        throw_if(ERR::USER_IN_PROCESSING, is_user_in_process & (now() <= process_expire_time));
+        verify_price_data(price_data);
+        validate_withdraw(amount_to_withdraw, user_balance);
+    } catch(x, n) {
+        reset_process_user(owner_address, n);
+        transfer_ton(owner_address, 64, 0, __build_error_msg(n));
+        return ();
+    }
+
+    ;; * Update reserve data
+    var scaled_amount = amount_to_withdraw.ray_div(next::liquidity_index);
+    next::scaled_supply -= scaled_amount;
+    next::liquidity -= amount_to_withdraw;
+
+    if (next::scaled_supply == 0) {
+        next::accrue_to_treasury = next::liquidity;
+    }
+    
+    update_interest_rates(0, amount_to_withdraw + next::accrue_to_treasury);
+
+    next::liquidity -= next::accrue_to_treasury;
+
+    ;;TODO investigate
+    if ((next::liquidity == 0) & (next::scaled_variable_debt + next::total_stable_debt == 0)) {
+        next::scaled_supply = 0;
+        scaled_amount = scaled_supply;
+    }
+
+    int is_using_as_collateral = is_collateral;
+    
+    if (is_using_as_collateral & (amount_to_withdraw == user_balance)) {
+        is_collateral = false;
+    }
+
+    supply_list~udict_set(
+        KEY_LEN, 
+        cache::asset_hash, 
+        pack_user_supply_data(scaled_supply - scaled_amount, next::liquidity_index, is_collateral)
+    );
+
+    var new_user_data = pack_user_data(pool_address, owner_address, reserves, supply_list, variable_borrow_list, stable_borrow_list, false, now());
+
+    if (is_using_as_collateral & is_borrowing_any?(new_user_data)) {
+        try {
+            validate_hf_and_ltv(cache::asset_hash, new_user_data, price_data);
+        } catch(x, n) {
+            ;; transfer_ton(owner_address, 0, msg_value, __build_error_msg(n));
+            reset_process_user(owner_address, n);
+            transfer_ton(owner_address, 64, 0, __build_error_msg(n));
+
+            return ();
+        } 
+    }
+
+    ;; __accrue_to_treasury(owner_address);
+
+    __update_reserve_data();
+    update_user_data(owner_address, owner_address, new_user_data);
+
+    if (next::accrue_to_treasury > 0) {
+        transfer(storage::treasury(), owner_address, cache::reserve_configuration.get_pool_jw_address(),
+        next::accrue_to_treasury, 0, ONE_TON * 5 / 100, null());
+    }
+
+    msg_value -= withdraw_gas_consumption();
+    var (_, asset_config, _) = __get_reserve_data(cache::asset_hash);
+    slice underlying_address = asset_config.get_underlying_address();
+    ;; transfer(owner_address, owner_address, pool_jw_address, amount_to_withdraw, 0, msg_value, __withdraw_info(owner_address, underlying_address, amount_to_withdraw));
+    transfer(owner_address, owner_address, pool_jw_address, amount_to_withdraw, 64, 0, __withdraw_info(owner_address, underlying_address, amount_to_withdraw));
+
+}
