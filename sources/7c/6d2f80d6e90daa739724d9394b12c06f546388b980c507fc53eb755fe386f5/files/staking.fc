@@ -1,0 +1,329 @@
+#include "imports/stdlib.fc";
+#include "constants.fc";
+#include "jetton_utils.fc";
+
+global slice storage::super_admin_address;
+global slice storage::admin_address;
+global slice storage::jetton_master_address;
+global cell storage::jetton_wallet_code;
+global int storage::is_paused;
+global int storage::total_jetton_staked;
+global int storage::total_jetton_unstaked;
+global int storage::total_reward_claimable;
+global int storage::total_reward_claimed;
+
+global slice message::sender;
+
+() load_data() impure inline_ref {
+    slice ds = get_data().begin_parse();
+    storage::super_admin_address = ds~load_msg_addr();
+    storage::admin_address = ds~load_msg_addr();
+    
+    cell jetton_data = ds~load_ref();
+    slice jetton_ds = jetton_data.begin_parse();
+    storage::jetton_master_address = jetton_ds~load_msg_addr();
+    storage::jetton_wallet_code = jetton_ds~load_ref();
+    jetton_ds.end_parse();
+
+    storage::total_jetton_staked = ds~load_coins();
+    storage::total_jetton_unstaked = ds~load_coins();
+    storage::total_reward_claimable = ds~load_coins();
+    storage::total_reward_claimed = ds~load_coins();
+    
+    storage::is_paused = ds~load_uint(1);
+    ds.end_parse();
+}
+
+() save_data() impure inline_ref {
+    ;; Build jetton data cell
+    cell jetton_data = begin_cell()
+        .store_slice(storage::jetton_master_address)
+        .store_ref(storage::jetton_wallet_code)
+        .end_cell();
+    
+    ;; Build main cell with references
+    cell data = begin_cell()
+        .store_slice(storage::super_admin_address)
+        .store_slice(storage::admin_address)
+        .store_ref(jetton_data)
+        .store_coins(storage::total_jetton_staked)
+        .store_coins(storage::total_jetton_unstaked)
+        .store_coins(storage::total_reward_claimable)
+        .store_coins(storage::total_reward_claimed)
+        .store_uint(storage::is_paused, 1)
+        .end_cell();
+
+    set_data(data);
+}
+
+cell create_jetton_transfer_payload(
+    int query_id, 
+    int amount, 
+    slice to_address, 
+    slice response_address, 
+    slice forward_payload
+) inline_ref {
+    return begin_cell()
+        .store_uint(0xf8a7ea5, 32)  ;; New opcode instead of op::jetton_transfer
+        .store_uint(query_id, 64)
+        .store_coins(amount)
+        .store_slice(to_address)
+        .store_slice(response_address)
+        .store_uint(0, 1)  ;; No custom payload
+        .store_coins(1)    ;; forward_ton_amount
+        .store_uint(1, 1)  ;; Has forward payload
+        .store_ref(begin_cell().store_slice(forward_payload).end_cell())
+        .end_cell();
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_int(4);
+    message::sender = cs~load_msg_addr();
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::set_admin) {
+        throw_unless(error::unauthorized, equal_slices(message::sender, storage::super_admin_address));
+        storage::admin_address = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+
+    if (op == op::set_super_admin) {
+        throw_unless(error::unauthorized, equal_slices(message::sender, storage::super_admin_address));
+        storage::super_admin_address = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+
+    if (op == op::withdraw_jetton) {
+        throw_unless(error::unauthorized, 
+            equal_slices(message::sender, storage::admin_address) |
+            equal_slices(message::sender, storage::super_admin_address)
+        );
+
+        throw_if(error::nothing_to_withdraw, storage::total_reward_claimed >= storage::total_reward_claimable);
+        
+        var receiver_address = in_msg_body~load_msg_addr();
+        var withdraw_amount = in_msg_body~load_coins();
+        slice forward_payload = in_msg_body~load_ref().begin_parse();
+
+        slice jetton_wallet_address = calculate_user_jetton_wallet_address(my_address(), storage::jetton_master_address, storage::jetton_wallet_code);
+
+        cell transfer_payload = create_jetton_transfer_payload(
+            query_id, 
+            withdraw_amount, 
+            receiver_address, 
+            my_address(), 
+            forward_payload
+        );
+
+        cell msg = begin_cell()
+            .store_uint(flag::bounceable, 6)
+            .store_slice(jetton_wallet_address)
+            .store_coins(SENT_JETTON_FEE)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(transfer_payload)
+            .end_cell();
+            
+        send_raw_message(msg, mode::remaining_amount + flag::bounce_on_fail);
+        save_data();
+        return ();
+    }
+
+    if (op == op::set_paused) {
+        throw_unless(error::unauthorized, equal_slices(message::sender, storage::super_admin_address));
+        storage::is_paused = in_msg_body~load_uint(1);
+        save_data();
+        return ();
+    }
+
+    if (op == op::upgrade) { ;; upgrade to new version
+        throw_unless(401, equal_slices(message::sender, storage::super_admin_address));
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_data(new_data);
+        set_code(new_code);
+        return ();
+    }
+
+    if (op == op::upgrade_only_code) { ;; upgrade only code
+        throw_unless(401, equal_slices(message::sender, storage::super_admin_address));
+        (cell new_code) = (in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_code(new_code);
+        return ();
+    }
+
+    if (op == op::update_total_jetton_staked) {
+        storage::total_jetton_staked = in_msg_body~load_coins();
+        save_data();
+        return ();
+    }
+
+    if (op == op::update_total_reward_claimable) {
+        storage::total_reward_claimable = in_msg_body~load_coins();
+        save_data();
+        return ();
+    }
+
+    if (op == op::unstake_tokens) {
+        throw_if(error::paused, storage::is_paused);
+        throw_unless(error::unauthorized, 
+            equal_slices(message::sender, storage::admin_address) |
+            equal_slices(message::sender, storage::super_admin_address)
+        );
+
+        throw_if(error::nothing_to_unstake, storage::total_jetton_unstaked >= storage::total_jetton_staked);
+        
+        var receiver_address = in_msg_body~load_msg_addr();
+        var withdraw_amount = in_msg_body~load_coins();
+        slice forward_payload = in_msg_body~load_ref().begin_parse();
+
+        slice jetton_wallet_address = calculate_user_jetton_wallet_address(my_address(), storage::jetton_master_address, storage::jetton_wallet_code);
+
+        cell transfer_payload = create_jetton_transfer_payload(
+            query_id, 
+            withdraw_amount, 
+            receiver_address, 
+            my_address(), 
+            forward_payload
+        );
+
+        cell msg = begin_cell()
+            .store_uint(flag::bounceable, 6)
+            .store_slice(jetton_wallet_address)
+            .store_coins(SENT_JETTON_FEE)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(transfer_payload)
+            .end_cell();
+            
+        send_raw_message(msg, mode::remaining_amount + flag::bounce_on_fail);
+
+        storage::total_jetton_unstaked = storage::total_jetton_unstaked + withdraw_amount;
+        save_data();
+        return ();
+    }
+
+    if (op == op::claim_rewards) {
+        throw_if(error::paused, storage::is_paused);
+        throw_unless(error::unauthorized, 
+            equal_slices(message::sender, storage::admin_address) |
+            equal_slices(message::sender, storage::super_admin_address)
+        );
+
+        throw_if(error::nothing_to_claim, storage::total_reward_claimed >= storage::total_reward_claimable);
+        
+        var receiver_address = in_msg_body~load_msg_addr();
+        var withdraw_amount = in_msg_body~load_coins();
+        slice forward_payload = in_msg_body~load_ref().begin_parse();
+
+        slice jetton_wallet_address = calculate_user_jetton_wallet_address(my_address(), storage::jetton_master_address, storage::jetton_wallet_code);
+
+        cell transfer_payload = create_jetton_transfer_payload(
+            query_id, 
+            withdraw_amount, 
+            receiver_address, 
+            my_address(), 
+            forward_payload
+        );
+
+        cell msg = begin_cell()
+            .store_uint(flag::bounceable, 6)
+            .store_slice(jetton_wallet_address)
+            .store_coins(SENT_JETTON_FEE)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(transfer_payload)
+            .end_cell();
+            
+        send_raw_message(msg, mode::remaining_amount + flag::bounce_on_fail);
+
+        storage::total_reward_claimed = storage::total_reward_claimed + withdraw_amount;
+        save_data();
+        return ();
+    }
+
+    if (op == op::unstake_and_claim) {
+        throw_if(error::paused, storage::is_paused);
+        throw_unless(error::unauthorized, 
+            equal_slices(message::sender, storage::admin_address) |
+            equal_slices(message::sender, storage::super_admin_address)
+        );
+
+        throw_if(error::nothing_to_claim, storage::total_reward_claimed >= storage::total_reward_claimable);
+        throw_if(error::nothing_to_unstake, storage::total_jetton_unstaked >= storage::total_jetton_staked);
+        
+        var receiver_address = in_msg_body~load_msg_addr();
+        var unstake_amount = in_msg_body~load_coins();
+        var claim_amount = in_msg_body~load_coins();
+        var withdraw_amount = unstake_amount + claim_amount;
+        slice forward_payload = in_msg_body~load_ref().begin_parse();
+
+        slice jetton_wallet_address = calculate_user_jetton_wallet_address(my_address(), storage::jetton_master_address, storage::jetton_wallet_code);
+
+        cell transfer_payload = create_jetton_transfer_payload(
+            query_id, 
+            withdraw_amount, 
+            receiver_address, 
+            my_address(), 
+            forward_payload
+        );
+
+        cell msg = begin_cell()
+            .store_uint(flag::bounceable, 6)
+            .store_slice(jetton_wallet_address)
+            .store_coins(SENT_JETTON_FEE)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(transfer_payload)
+            .end_cell();
+            
+        send_raw_message(msg, mode::remaining_amount + flag::bounce_on_fail);
+
+        storage::total_reward_claimed = storage::total_reward_claimed + claim_amount;
+        storage::total_jetton_unstaked = storage::total_jetton_unstaked + unstake_amount;
+        save_data();
+        return ();
+    }
+
+
+    if (op == op::withdraw_excess_ton) {
+        throw_unless(401, equal_slices(message::sender, storage::super_admin_address));
+        var withdraw_msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(message::sender)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+        send_raw_message(withdraw_msg.end_cell(), 128);
+
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+(slice, slice, slice, cell, int, int, int, int, int) get_contract_state() method_id {
+    load_data();
+    return (
+        storage::super_admin_address,
+        storage::admin_address,
+        storage::jetton_master_address,
+        storage::jetton_wallet_code,
+        storage::total_jetton_staked,
+        storage::total_jetton_unstaked,
+        storage::total_reward_claimable,
+        storage::total_reward_claimed,
+        storage::is_paused
+    );
+}
