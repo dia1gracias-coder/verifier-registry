@@ -1,0 +1,112 @@
+#include "stdlib.fc";
+
+global slice owner;
+global slice validator;
+global slice collection_address;
+global slice storage_address;
+global cell locked_nfts;
+
+int compare_slices(slice a, slice b) inline {
+    return equal_slice_bits(a, b);
+}
+
+
+() accept_nft(slice nft_addr, slice cs) impure {
+    var query_id = cs~load_uint(64);
+    var new_owner = cs~load_msg_addr();
+    var response_dest = cs~load_msg_addr();
+    var custom_payload = cs~load_maybe_ref();
+    var forward_amount = cs~load_coins();
+    var forward_payload = cs~load_maybe_ref();
+
+    if (compare_slices(new_owner, my_address()) != 0) {
+        throw(1001);
+    }
+
+    locked_nfts = idict_set(locked_nfts, 256, slice_hash(nft_addr), response_dest);
+
+    var req_body = begin_cell()
+        .store_uint(0x2fcb26a2, 32) 
+        .store_uint(0, 64)          
+        .end_cell();
+
+    send_raw_message(begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(nft_addr)
+        .store_coins(50000000) 
+        .store_uint(1, 1)
+        .store_uint(0, 1)
+        .store_uint(64, 7)
+        .store_ref(req_body)
+        .end_cell(), 64);
+}
+
+() process_collection_response(slice nft_addr, slice cs) impure {
+    var query_id = cs~load_uint(64);
+    var nft_collection_addr = cs~load_msg_addr();
+
+    if (compare_slices(nft_collection_addr, collection_address) != 0) {
+        throw(1002); 
+    }
+
+    
+}
+
+() confirm_transfer(slice sender, slice cs) impure {
+    if (compare_slices(sender, validator)  != 0) {
+        throw(1003);
+    }
+
+    var nft_addr = cs~load_msg_addr();
+
+    var (response_dest, exists) = idict_get?(locked_nfts, 256, slice_hash(nft_addr));
+
+    if (exists == 0) {
+        throw(1004);
+    }
+
+    var transfer_body = begin_cell()
+        .store_uint(0x5fcc3d14, 32)
+        .store_uint(0, 64)
+        .store_slice(storage_address)
+        .store_slice(response_dest)
+        .store_maybe_ref(null())
+        .store_coins(0)
+        .store_maybe_ref(null())
+        .end_cell();
+
+    send_raw_message(begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(nft_addr)
+        .store_coins(50000000)
+        .store_uint(1, 1)
+        .store_uint(0, 1)
+        .store_uint(3, 7)
+        .store_ref(transfer_body)
+        .end_cell(), 3);
+
+    var (locked_nfts, ok) = idict_delete?(locked_nfts, 256, slice_hash(nft_addr));
+}
+
+() recv_internal(int msg_value, cell msg_body, slice msg_sender) impure {
+    var cs = msg_body.begin_parse();
+    var op = cs~load_uint(32);
+
+    if (op == 0x05138d91) { 
+        accept_nft(msg_sender, cs);
+    } elseif (op == 0x12345678) { 
+        confirm_transfer(msg_sender, cs);
+    } elseif (op == 0x7362d09c) { 
+        process_collection_response(msg_sender, cs);
+    } else {
+        throw(1000);
+    }
+}
+
+() init(slice sc_owner, slice sc_validator, slice sc_collection) impure {
+    owner = sc_owner;
+    validator = sc_validator;
+    collection_address = sc_collection;
+    storage_address = sc_validator;
+    locked_nfts = new_dict(); 
+}
