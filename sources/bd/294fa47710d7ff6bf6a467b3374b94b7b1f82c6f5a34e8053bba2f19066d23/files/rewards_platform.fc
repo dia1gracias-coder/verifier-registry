@@ -1,0 +1,414 @@
+;; RewardsPlatform Contract v1.0
+;; Manages Jetton rewards for influencers with developer fee
+
+;; Storage TL-B Scheme;
+;; storage#_ owner_address:MsgIntAddress developer_address:MsgIntAddress 
+;;           jetton_balance:(HashmapE 256 Coins) 
+;;           reward_table:(HashmapE 256 Coins) = Storage;
+
+#include "imports/stdlib.fc";
+#include "imports/constants.fc";
+
+() save_data(slice owner_address, slice developer_address, cell jetton_balance, cell reward_table) impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(owner_address)
+            .store_slice(developer_address)
+            .store_dict(jetton_balance)
+            .store_dict(reward_table)
+            .end_cell()
+    );
+}
+
+(slice, slice, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),   ;; owner_address
+        ds~load_msg_addr(),   ;; developer_address
+        ds~load_dict(),       ;; jetton_balance
+        ds~load_dict()        ;; reward_table
+    );
+}
+
+;; Computes the hash part of an address for dictionary key
+int address_to_key(slice address) inline {
+    (int wc, int hash_part) = parse_std_addr(address);
+    return hash_part;
+}
+
+;; Calculate total claimable rewards in the reward_table
+int get_total_available_rewards(cell reward_table) inline {
+    int total = 0;
+    
+    (int key, slice value, int flag) = reward_table.udict_get_min?(256);
+    while (flag) {
+        total += value~load_coins();
+        (key, value, flag) = reward_table.udict_get_next?(256, key);
+    }
+    
+    return total;
+}
+
+;; Calculate amount for developer (fee_percent% of total)
+int calculate_developer_fee(int amount) inline {
+    return (amount * fee_percent) / 100;
+}
+
+;; Main entry point for the contract
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    (int sender_wc, int sender_hashpart) = parse_std_addr(sender_address);
+    
+    ;; Ignore bounced messages
+    if (flags & 1) { return (); }
+    
+    ;; Throw if not from the workchain
+    throw_unless(error::wrong_workchain, sender_wc == workchain);
+    
+    ;; Load data
+    (slice owner_address, slice developer_address, cell jetton_balance, cell reward_table) = load_data();
+    
+    ;; If empty message, accept coins
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+    
+    ;; Parse op and query_id
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    
+    ;; Handle standard jetton operations
+    if (op == op::transfer_notification) {
+        ;; Jetton transfer was received
+        int amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        
+        ;; Update total jetton balance
+        int current_balance = 0;
+        (slice balance_value, int success) = jetton_balance.udict_get?(256, 0);
+        if (success) {
+            current_balance = balance_value~load_coins();
+        }
+        
+        jetton_balance~udict_set_builder(
+            256, 0,
+            begin_cell().store_coins(current_balance + amount)
+        );
+        
+        save_data(owner_address, developer_address, jetton_balance, reward_table);
+        return ();
+    }
+    
+    if (op == op::excesses) {
+        return (); ;; Just accept excesses
+    }
+    
+    ;; Handle RewardsPlatform specific operations
+    
+    ;; Set/Change Owner (available for owner and developer)
+    if (op == op::set_owner) {
+        throw_unless(error::access_denied, 
+            equal_slices_bits(sender_address, owner_address) | 
+            equal_slices_bits(sender_address, developer_address)
+        );
+        
+        slice new_owner_address = in_msg_body~load_msg_addr();
+        save_data(new_owner_address, developer_address, jetton_balance, reward_table);
+        return ();
+    }
+    
+    ;; Distribute Rewards (only owner)
+    if (op == op::distribute_rewards) {
+        throw_unless(error::access_denied, equal_slices_bits(sender_address, owner_address));
+        
+        int total_jetton_balance = 0;
+        (slice balance_value, int success) = jetton_balance.udict_get?(256, 0);
+        if (success) {
+            total_jetton_balance = balance_value~load_coins();
+        }
+        
+        cell influencers = in_msg_body~load_dict();
+        int total_new_rewards = 0;
+        
+        ;; Process all influencers in the dictionary
+        (int key, slice value, int flag) = influencers.udict_get_min?(256);
+        while (flag) {
+            slice influencer_address = value~load_msg_addr();
+            int reward_amount = value~load_coins();
+            total_new_rewards += reward_amount;
+            
+            ;; Get current reward amount for influencer
+            int influencer_key = address_to_key(influencer_address);
+            int current_reward = 0;
+            (slice reward_value, int reward_exists) = reward_table.udict_get?(256, influencer_key);
+            if (reward_exists) {
+                current_reward = reward_value~load_coins();
+            }
+            
+            ;; Update reward amount
+            reward_table~udict_set_builder(
+                256, influencer_key,
+                begin_cell().store_coins(current_reward + reward_amount)
+            );
+            
+            (key, value, flag) = influencers.udict_get_next?(256, key);
+        }
+        
+        ;; Ensure we have enough balance to distribute
+        throw_unless(error::insufficient_balance, total_jetton_balance >= total_new_rewards);
+        
+        ;; Update total jetton balance
+        jetton_balance~udict_set_builder(
+            256, 0,
+            begin_cell().store_coins(total_jetton_balance - total_new_rewards)
+        );
+        
+        save_data(owner_address, developer_address, jetton_balance, reward_table);
+        return ();
+    }
+    
+    ;; Get Rewards (for any influencer)
+    if (op == op::get_rewards) {
+        int influencer_key = address_to_key(sender_address);
+        int reward_amount = 0;
+        (slice reward_value, int reward_exists) = reward_table.udict_get?(256, influencer_key);
+        if (reward_exists) {
+            reward_amount = reward_value~load_coins();
+        }
+        
+        ;; Send response with reward amount
+        send_raw_message(
+            begin_cell()
+                .store_uint(0x18, 6) ;; bounceable address, bounce is on
+                .store_slice(sender_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_ref(
+                    begin_cell()
+                        .store_uint(op::get_rewards, 32)
+                        .store_uint(query_id, 64)
+                        .store_coins(reward_amount)
+                        .end_cell()
+                )
+                .end_cell(),
+            64 ;; SEND_MODE_REGULAR
+        );
+        return ();
+    }
+    
+    ;; Claim Rewards (for any influencer)
+    if (op == op::claim_rewards) {
+        int influencer_key = address_to_key(sender_address);
+        int reward_amount = 0;
+        (slice reward_value, int reward_exists) = reward_table.udict_get?(256, influencer_key);
+        if (reward_exists) {
+            reward_amount = reward_value~load_coins();
+        }
+        
+        ;; Check if there's anything to claim
+        throw_unless(error::insufficient_balance, reward_amount > 0);
+        
+        ;; Calculate developer fee (2%)
+        int developer_fee = calculate_developer_fee(reward_amount);
+        int influencer_amount = reward_amount - developer_fee;
+        
+        ;; Get current Jetton balance from the contract
+        int total_jetton_balance = 0;
+        (slice balance_value, int success) = jetton_balance.udict_get?(256, 0);
+        if (success) {
+            total_jetton_balance = balance_value~load_coins();
+        }
+        
+        ;; Ensure contract has enough Jettons to send
+        throw_unless(error::insufficient_balance, total_jetton_balance >= reward_amount);
+        
+        ;; Update reward_table to zero for this influencer
+        reward_table~udict_set_builder(
+            256, influencer_key,
+            begin_cell().store_coins(0)
+        );
+        
+        ;; Extract message parameters - the contract's jetton wallet address is passed to us
+        slice ref_slice = in_msg_body~load_ref().begin_parse();
+        slice contract_jetton_wallet = ref_slice~load_msg_addr();
+        
+        ;; --- SEND TO INFLUENCER ---
+        ;; Create transfer message for the Jetton wallet
+        cell transfer_body = begin_cell()
+            .store_uint(0x0f8a7ea5, 32)     ;; op::transfer with exact value
+            .store_uint(query_id, 64)         ;; query_id
+            .store_coins(influencer_amount)    ;; amount
+            .store_slice(sender_address)       ;; destination (influencer)
+            .store_slice(my_address())         ;; response_destination (this contract)
+            .store_uint(0, 1)                  ;; custom_payload null
+            .store_coins(1)                    ;; forward_ton_amount
+            .store_uint(0, 1)                  ;; forward_payload null
+            .end_cell();
+            
+        ;; Send message to transfer tokens to influencer
+        send_raw_message(
+            begin_cell()
+                .store_uint(0x18, 6)           ;; bounce flag
+                .store_slice(contract_jetton_wallet)
+                .store_coins(50000000)         ;; 0.05 TON for gas
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)  ;; no state init, standard message
+                .store_ref(transfer_body)      ;; reference with transfer body
+                .end_cell(),
+            1  ;; pay fees separately
+        );
+        
+        ;; --- SEND TO DEVELOPER ---
+        ;; Only send to developer if fee amount is greater than zero
+        if (developer_fee > 0) {
+            ;; Create transfer message for developer
+            cell developer_transfer_body = begin_cell()
+                .store_uint(op::transfer, 32)     ;; op::transfer
+                .store_uint(query_id, 64)         ;; query_id
+                .store_coins(developer_fee)       ;; amount
+                .store_slice(developer_address)   ;; destination (developer)
+                .store_slice(my_address())        ;; response_destination (this contract)
+                .store_uint(0, 1)                 ;; custom_payload null
+                .store_coins(1)                   ;; forward_ton_amount
+                .store_uint(0, 1)                 ;; forward_payload null
+                .end_cell();
+                
+            ;; Send message to transfer tokens to developer
+            send_raw_message(
+                begin_cell()
+                    .store_uint(0x18, 6)           ;; bounce flag
+                    .store_slice(contract_jetton_wallet)
+                    .store_coins(30000000)         ;; 0.03 TON for gas
+                    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)  ;; no state init, standard message
+                    .store_ref(developer_transfer_body)  ;; reference with transfer body
+                    .end_cell(),
+                1  ;; pay fees separately
+            );
+        }
+        
+        save_data(owner_address, developer_address, jetton_balance, reward_table);
+        return ();
+    }
+    
+    ;; TopUp Jettons balance (only owner)
+    if (op == op::top_up) {
+        throw_unless(error::access_denied, equal_slices_bits(sender_address, owner_address));
+        
+        int amount = in_msg_body~load_coins();
+        cell jetton_wallet_cell = in_msg_body~load_ref();
+        slice jetton_wallet = jetton_wallet_cell.begin_parse();
+        
+        send_raw_message(
+            begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(jetton_wallet)
+                .store_coins(50000000) ;; 0.05 TON for gas
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_ref(
+                    begin_cell()
+                        .store_uint(op::transfer, 32)
+                        .store_uint(query_id, 64)
+                        .store_coins(amount)
+                        .store_slice(my_address())
+                        .store_slice(owner_address)
+                        .store_uint(0, 1) ;; custom_payload in ref flag
+                        .store_coins(1) ;; forward ton amount
+                        .store_uint(0, 1) ;; forward_payload in ref flag
+                        .end_cell()
+                )
+                .end_cell(),
+            1 ;; SEND_MODE_PAY_FEES_SEPARATELY
+        );
+        
+        return ();
+    }
+    
+    ;; Balance Sync operation (only owner)
+    if (op == op::balance_sync) {
+        throw_unless(error::access_denied, equal_slices_bits(sender_address, owner_address));
+        
+        ;; Extract the actual Jetton balance from the message
+        int actual_balance = in_msg_body~load_coins();
+        
+        ;; Calculate total distributed rewards from reward_table
+        int total_distributed_rewards = get_total_available_rewards(reward_table);
+        
+        ;; Calculate available balance by subtracting distributed rewards from actual balance
+        ;; This corrects any accounting errors that may have accumulated
+        int available_balance = actual_balance - total_distributed_rewards;
+        
+        ;; Ensure we don't set negative balance if there's an accounting issue
+        ;; This should never happen in normal operation, but provides a safety check
+        if (available_balance < 0) {
+            available_balance = 0;
+        }
+        
+        ;; Update jetton_balance with the correct available balance
+        jetton_balance~udict_set_builder(
+            256, 0,
+            begin_cell().store_coins(available_balance)
+        );
+        
+        save_data(owner_address, developer_address, jetton_balance, reward_table);
+        return ();
+    }
+    
+    throw(error::unknown_op);
+}
+
+;; GET Methods
+
+(slice, slice, int, int) get_platform_data() method_id {
+    (slice owner_address, slice developer_address, cell jetton_balance, cell reward_table) = load_data();
+    
+    int total_balance = 0;
+    (slice balance_value, int success) = jetton_balance.udict_get?(256, 0);
+    if (success) {
+        total_balance = balance_value~load_coins();
+    }
+    
+    int total_rewards = get_total_available_rewards(reward_table);
+    
+    return (owner_address, developer_address, total_balance, total_rewards);
+}
+
+int get_reward_amount(slice influencer_address) method_id {
+    (_, _, _, cell reward_table) = load_data();
+    
+    int influencer_key = address_to_key(influencer_address);
+    int reward_amount = 0;
+    (slice reward_value, int reward_exists) = reward_table.udict_get?(256, influencer_key);
+    if (reward_exists) {
+        reward_amount = reward_value~load_coins();
+    }
+    
+    return reward_amount;
+}
+
+int total_jetton_balance() method_id {
+    (_, _, cell jetton_balance, _) = load_data();
+    
+    int total_balance = 0;
+    (slice balance_value, int success) = jetton_balance.udict_get?(256, 0);
+    if (success) {
+        total_balance = balance_value~load_coins();
+    }
+    
+    return total_balance;
+}
+
+int total_available_rewards() method_id {
+    (_, _, _, cell reward_table) = load_data();
+    return get_total_available_rewards(reward_table);
+}
+
+slice get_owner_address() method_id {
+    (slice owner_address, _, _, _) = load_data();
+    return owner_address;
+}
+
+slice get_developer_address() method_id {
+    (_, slice developer_address, _, _) = load_data();
+    return developer_address;
+}
