@@ -1,0 +1,205 @@
+(int) tlen (tuple t) asm "TLEN";
+forall X -> (tuple) to_tuple (X x) asm "NOP";
+forall X -> int is_int (X x) asm "<{ TRY:<{ 0 PUSHINT ADD DROP -1 PUSHINT }>CATCH<{ 2DROP 0 PUSHINT }> }>CONT 1 1 CALLXARGS";
+
+#include "imports/stdlib.fc";
+#include "imports/utils.fc";
+#include "imports/constants.fc";
+
+() payout(slice sender_addr, int amount) impure inline_ref {
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender_addr)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(0, 32)
+        .store_slice("you won money!")
+      .end_cell();
+
+    send_raw_message(msg, 0);
+}
+
+(slice, int, int, cell, int) load_data() {
+    cell data = get_data();
+
+    slice ds = data.begin_parse();
+   
+    int total = ds~load_coins();
+    
+    int count = ds~load_uint(32);
+
+    slice owner_address = ds~load_msg_addr();
+
+    cell dict = ds~load_dict();
+
+    int last_random_number = ds~load_uint(32);
+
+    ds.end_parse();
+
+    return (owner_address, total, count, dict, last_random_number);
+}
+
+() clear_data(int x) impure inline_ref {
+  (slice owner_address, int total, int count, cell dic, int last_random_number) = load_data();
+  cell new_data = begin_cell()
+      .store_coins(total)
+      .store_uint(0, 32)
+      .store_slice(owner_address)
+      .store_dict(new_dict())
+      .store_uint(x, 32)
+    .end_cell();
+  set_data(new_data);
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+  slice cs = in_msg.begin_parse();
+
+  throw_if(0, cs~load_uint(4) & 1);
+
+  throw_if(304, msg_value < min_value);
+ 
+  slice sender_address = cs~load_msg_addr();
+
+  int op = in_msg_body~load_uint(32);
+
+  (slice owner_address, int total, int count, cell dic, int last_random_number) = load_data();
+
+  if(op == op::new_player) {
+
+    int bet = in_msg_body~load_uint(32);
+
+    throw_if(305, is_int(bet) == 0);
+
+    count += 1;
+
+    slice dict_value = begin_cell()
+      .store_uint(bet, 32)
+      .store_coins(msg_value)
+      .store_slice(sender_address)
+    .end_cell().begin_parse();
+
+    dic~udict_set(256, count, dict_value);
+    total += msg_value;
+
+    cell new_data = begin_cell()
+      .store_coins(total)
+      .store_uint(count, 32)
+      .store_slice(owner_address)
+      .store_dict(dic)
+      .store_uint(last_random_number, 32)
+    .end_cell();
+
+    set_data(new_data);
+
+    return ();
+  }
+    
+  throw_unless(103, equal_slice_bits(sender_address, owner_address));
+
+  if(op == op::game_over) {
+    randomize_lt();
+    int x = rand(9) + 1;
+    int common_winner_sum = 0;
+
+    int key = 0;
+
+    do {
+      (key, slice ts, int f) = dic.udict_get_next?(256, key);
+     
+      if (f) {
+        int bet = ts~load_uint(32);
+        int coins = ts~load_coins();
+
+        if (bet == x) {
+          common_winner_sum += coins;
+        }
+      }
+      
+    } until(~ f);
+
+    if (common_winner_sum == 0) {
+      key = 0;
+
+      do {
+        (key, slice fs, int f) = dic.udict_get_next?(256, key);
+      
+        if (f) {
+          int bet = fs~load_uint(32);
+          int coins = fs~load_coins();
+          slice sender_address = fs~load_msg_addr();
+          payout(sender_address, coins);
+        }
+        
+      } until(~ f);
+
+      clear_data(x);
+      return();
+    }
+    
+    int commission = muldiv(total, 1, 100); ;; 1% commission
+
+    int total_without_commission = total - commission;
+
+    payout(owner_address, commission);
+
+    key = 0;
+
+    do {
+      (key, slice cs, int f) = dic.udict_get_next?(256, key);
+
+      if (f) {
+        int bet = cs~load_uint(32);
+
+        if (bet == x) {
+          int coins = cs~load_coins();
+
+          slice sender_address = cs~load_msg_addr();
+          
+          int d = utils::devider(coins, common_winner_sum);
+        
+          int winnerSum = utils::from_ton(total_without_commission * d);
+
+          payout(sender_address, winnerSum);
+        }
+      }
+      
+    } until(~ f);
+
+    clear_data(x);
+    return();
+  }
+
+  if(op == op::update_code) {
+    cell new_code = in_msg_body~load_ref();
+    set_code(new_code);
+    set_c3(new_code.begin_parse().bless());
+    return();
+  }
+
+  if(op == op::clear) {
+    clear_data(0);
+    return ();
+  }
+
+  if(op == op::destroy) {
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(owner_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(0, 32)
+        .store_slice("destroy")
+      .end_cell();
+
+    send_raw_message(msg, 160);
+    return ();
+  }
+
+  throw(12);
+}
+
+(int, int, cell) get_game_data() method_id {
+  (slice owner_address, int total, int count, cell dic, int last_random_number) = load_data();
+
+  return (count, last_random_number, dic);
+}

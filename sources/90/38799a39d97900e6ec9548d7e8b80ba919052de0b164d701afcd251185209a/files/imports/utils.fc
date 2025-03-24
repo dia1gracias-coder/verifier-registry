@@ -1,0 +1,24 @@
+#include "constants.fc";
+
+(int) utils::to_ton(int amount) inline {
+    return amount * one_ton;
+}
+
+(int) utils::from_ton(int amount) inline {
+    return amount / one_ton;
+}
+
+(int) utils::devider(int a, int b) {
+    throw_unless(101, b != 0);
+
+    int integerPart = a / b;
+    int remainder = a % b;
+
+    if(remainder == 0) {
+      return utils::to_ton(integerPart);
+    }
+
+    int fractionalPart = utils::to_ton(remainder) / b;
+
+    return integerPart + fractionalPart;   
+}
