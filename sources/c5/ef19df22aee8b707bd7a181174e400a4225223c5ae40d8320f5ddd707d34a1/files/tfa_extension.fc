@@ -1,0 +1,554 @@
+#include "imports/stdlib.fc";
+#include "imports/shared.fc";
+
+const op::install =              0x43563174;
+const op::internal_signed =      0x53684037;
+const op::confirm_removal =      0xc2d7f22b;
+
+const op::send_actions =         0xb15f2c8c;
+const op::remove_extension =     0x9d8084d6;
+const op::delegation =           0x23d9c15c;
+const op::cancel_delegation =    0xde82b501;
+
+const ONE_DAY = 60 * 60 * 24;
+const config::DELEGATION_TIMEOUT = ONE_DAY * 14;
+const config::RETRAY_TIMEOUT = ONE_DAY;
+
+const err::extension_already_installed = 160;
+const err::sender_is_not_owner         = 161;
+const err::wrong_certificate_signature = 162;
+const err::wrong_root_ca_signature     = 163;
+const err::wrong_seed_signature        = 164;
+const err::wrong_seqno                 = 165;
+const err::expired                     = 166;
+const err::recovery_in_progress        = 167;
+const err::action_timeout              = 170;
+const err::mismatched_data             = 171;
+const err::no_delegation_initiated     = 174;
+const err::only_send_actions_supported = 175;
+
+const INSTALL_PLUGIN_GAS_USAGE = 4128;
+const CONFIRM_REMOVAL_GAS_USAGE = 3042;
+const int GAS_WALLET_PROCESS_BASE = 3545;
+const int GAS_WALLET_PROCESS_PER_ACTION = 717;
+const int GAS_WALLET_PROCESS_PER_ACTION_EXT = 2000;
+
+slice get_last_bits(slice s, int n) asm "SDCUTLAST";
+slice remove_last_bits(slice s, int n) asm "SDSKIPLAST";
+
+(int, slice, int, int, int, slice) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_uint(32),
+        ds~load_msg_addr(),
+        ds~load_uint(256),
+        ds~load_uint(256),
+        ds~load_uint(1),
+        ds
+    );
+}
+
+;; Initialize starting values properly.
+;; Note: If the last 32 bits are used to mine the contract address,
+;;       they will not be stored in the state.
+() save_state_after_install(
+    slice wallet,
+    int root_ca_pubkey,
+    int seed_pubkey
+) impure inline {
+    set_data(
+        begin_cell()
+            .store_uint(1, 32)
+            .store_slice(wallet)
+            .store_uint(root_ca_pubkey, 256)
+            .store_uint(seed_pubkey, 256)
+            .store_uint(0, 1 + 64)
+            .end_cell()
+    );
+}
+
+() save_state(
+    int seqno,
+    slice wallet,
+    int root_ca_pubkey,
+    int seed_pubkey,
+    int state_,
+    slice state
+) impure inline {
+    set_data(
+        begin_cell()
+            .store_uint(seqno, 32)
+            .store_slice(wallet)
+            .store_uint(root_ca_pubkey, 256)
+            .store_uint(seed_pubkey, 256)
+            .store_uint(state_, 1)
+            .store_slice(state)
+            .end_cell()
+    );
+}
+
+(slice, ()) check_2fa(slice cs, slice service_signature, int root_ca_pubkey, int seed_pubkey, int stored_seqno) impure {
+    slice certificate_info = cs~load_ref().begin_parse();
+    slice certificate_signature = certificate_info.get_last_bits(512);
+    certificate_info = certificate_info.remove_last_bits(512);
+
+    slice certificate_info_cs = certificate_info;
+    int certificate_valid_until = certificate_info_cs~load_uint(64);
+
+    int certificate_pubkey = certificate_info_cs~load_uint(256);
+    certificate_info_cs.end_parse();
+
+    throw_unless(
+        err::wrong_root_ca_signature,
+        check_signature(slice_hash(certificate_info), certificate_signature, root_ca_pubkey)
+    );
+    throw_unless(
+        err::expired,
+        certificate_valid_until >= now()
+    );
+
+    slice seed_info = cs~load_ref().begin_parse();
+    slice seed_signature = seed_info~load_bits(512);
+    seed_info.end_parse();
+
+    int root_hash = slice_hash(cs);
+
+    throw_unless(
+        err::wrong_seed_signature,
+        check_signature(root_hash, seed_signature, seed_pubkey)
+    );
+    throw_unless(
+        err::wrong_certificate_signature,
+        check_signature(root_hash, service_signature, certificate_pubkey)
+    );
+
+    ;; op code
+    cs~skip_bits(32);
+
+    int seqno = cs~load_uint(32);
+    throw_unless(err::wrong_seqno, seqno == stored_seqno);
+
+    int valid_until = cs~load_uint(64);
+    throw_unless(err::expired, valid_until >= now());
+
+    return (cs, ());
+}
+
+(slice, ()) check_seed_auth(slice cs, slice seed_signature, int seed_pubkey, int stored_seqno) impure inline {
+    int root_hash = slice_hash(cs);
+
+    throw_unless(err::wrong_seed_signature, check_signature(root_hash, seed_signature, seed_pubkey));
+
+    cs~skip_bits(32);
+
+    int seqno = cs~load_uint(32);
+    throw_unless(err::wrong_seqno, seqno == stored_seqno);
+
+    int valid_until = cs~load_uint(64);
+    throw_unless(err::expired, valid_until >= now());
+
+    return (cs, ());
+}
+
+
+() handle_request(
+    slice in_msg,
+    int is_external?
+) impure inline {
+    slice signature1 = in_msg.get_last_bits(512);
+    in_msg = in_msg.remove_last_bits(512);
+
+    int op = in_msg.preload_uint(32);
+
+    var ds = get_data().begin_parse();
+
+    int seqno = ds~load_uint(32);
+    slice immutable_tail = ds;
+
+    slice wallet_addr = ds~load_msg_addr();
+    int root_ca_pubkey = ds~load_uint(256);
+    int seed_pubkey = ds~load_uint(256);
+    int delegation_started? = ds~load_uint(1);
+    slice rest_state = ds;
+
+    if (op == op::send_actions) {
+        throw_if(err::recovery_in_progress, delegation_started?);
+        in_msg~check_2fa(signature1, root_ca_pubkey, seed_pubkey, seqno);
+        accept_message();
+
+        set_data(
+            begin_cell()
+                .store_uint(seqno + 1, 32)
+                .store_slice(immutable_tail)
+                .end_cell()
+        );
+        commit();
+
+        int mode = in_msg~load_uint(8);
+        cell msg = in_msg~load_ref();
+        in_msg.end_parse();
+
+        send_raw_message(msg, mode);
+
+        return ();
+    }
+
+    throw_unless(err::only_send_actions_supported, is_external?);
+
+    if (op == op::remove_extension) {
+        in_msg~check_2fa(signature1, root_ca_pubkey, seed_pubkey, seqno);
+        in_msg.end_parse();
+
+        throw_if(err::recovery_in_progress, delegation_started?);
+        accept_message();
+
+        var confirmation_msg = begin_cell()
+            .store_nonbounce_flags()
+            .store_slice(my_address())
+            .store_coins(get_compute_fee(0, CONFIRM_REMOVAL_GAS_USAGE))
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::confirm_removal, 32)
+            .end_cell();
+
+        var msg = begin_cell()
+            .store_nonbounce_flags()
+            .store_slice(wallet_addr)
+            .store_coins(
+                get_compute_fee(
+                    0,
+                    GAS_WALLET_PROCESS_BASE * 3
+                    + GAS_WALLET_PROCESS_PER_ACTION * 1
+                    + GAS_WALLET_PROCESS_PER_ACTION_EXT * 2
+                )
+            )
+            .store_ref_body(
+                begin_cell()
+                    .store_uint(op::wallet::request_by_extension, 32)
+                    .store_uint(0, 64)
+                    .store_out_action_list(
+                        new_out_action_send_msg(
+                            begin_cell().end_cell(),
+                            PAY_FEE_SEPARATELY + IGNORE_ACTION_ERRORS,
+                            confirmation_msg
+                        )
+                    )
+                    .store_int(-1, 1)
+                    .store_set_signature_auth(
+                        1,
+                        begin_cell()
+                            .store_delete_ext_action(
+                                my_address(),
+                                null()
+                            ).end_cell()
+                    )
+                    .end_cell()
+            );
+
+        send_raw_message(msg.end_cell(), PAY_FEE_SEPARATELY);
+        return ();
+    }
+
+    if (op == op::delegation) {
+        in_msg~check_seed_auth(signature1, seed_pubkey, seqno);
+
+        int recovery_blocked_until = rest_state~load_uint(64);
+        throw_unless(err::action_timeout, recovery_blocked_until <= now());
+
+        ifnot (delegation_started?) {
+            cell new_state_init = in_msg~load_ref();
+            int forward_amount = in_msg~load_coins();
+            in_msg.end_parse();
+
+            accept_message();
+
+            slice new_recovery_state = begin_cell()
+                .store_uint(now() + config::DELEGATION_TIMEOUT, 64) ;; recovery_blocked_until
+                .store_ref(new_state_init)
+                .store_coins(forward_amount)
+                .end_cell()
+                .begin_parse();
+
+            save_state(
+                seqno + 1,
+                wallet_addr,
+                root_ca_pubkey,
+                seed_pubkey,
+                1,
+                new_recovery_state
+            );
+
+            return ();
+        } else {
+            cell new_state_init = rest_state~load_ref();
+            int forward_amount = rest_state~load_coins();
+
+            throw_unless(err::mismatched_data, cell_hash(new_state_init) == cell_hash(in_msg~load_ref()));
+            throw_unless(err::mismatched_data, forward_amount == in_msg~load_coins());
+            in_msg.end_parse();
+
+            accept_message();
+
+            save_state(
+                seqno + 1,
+                wallet_addr,
+                root_ca_pubkey,
+                seed_pubkey,
+                0,
+                begin_cell().store_uint(0, 64).end_cell().begin_parse()
+            );
+
+            slice new_extension_address = calculate_address(0, new_state_init);
+
+            var delegate_creation_msg = begin_cell()
+                .store_nonbounce_flags()
+                .store_slice(new_extension_address)
+                .store_coins(forward_amount)
+                .store_uint(4 + 2, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+                .store_ref(new_state_init)
+                .end_cell();
+
+            var confirmation_msg = begin_cell()
+                .store_nonbounce_flags()
+                .store_slice(my_address())
+                .store_coins(get_compute_fee(0, CONFIRM_REMOVAL_GAS_USAGE))
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::confirm_removal, 32)
+                .end_cell();
+
+            var msg = begin_cell()
+                .store_nonbounce_flags()
+                .store_slice(wallet_addr)
+                .store_coins(
+                    get_compute_fee(
+                        0,
+                        GAS_WALLET_PROCESS_BASE * 3
+                        + GAS_WALLET_PROCESS_PER_ACTION * 2
+                        + GAS_WALLET_PROCESS_PER_ACTION_EXT * 2
+                    )
+                )
+                .store_ref_body(
+                    begin_cell()
+                        .store_uint(op::wallet::request_by_extension, 32)
+                        .store_uint(0, 64)
+                        .store_out_action_list(
+                            new_out_action_send_msg(
+                                new_out_action_send_msg(
+                                    begin_cell().end_cell(),
+                                    IGNORE_ACTION_ERRORS,
+                                    delegate_creation_msg
+                                ),
+                                IGNORE_ACTION_ERRORS + PAY_FEE_SEPARATELY,
+                                confirmation_msg
+                            )
+                        )
+                        .store_uint(1, 1)
+                        .store_add_ext_action_continue(
+                            new_extension_address,
+                            begin_cell().store_delete_ext_action_end(my_address()).end_cell()
+                        )
+                        .end_cell()
+                );
+
+            send_raw_message(msg.end_cell(), PAY_FEE_SEPARATELY);
+            return ();
+        }
+    }
+
+    if (op == op::cancel_delegation) {
+        in_msg~check_seed_auth(signature1, seed_pubkey, seqno);
+        in_msg.end_parse();
+
+        throw_unless(err::no_delegation_initiated, delegation_started?);
+        accept_message();
+
+        save_state(
+            seqno + 1,
+            wallet_addr,
+            root_ca_pubkey,
+            seed_pubkey,
+            0,
+            begin_cell().store_uint(now() + config::RETRAY_TIMEOUT, 64).end_cell().begin_parse()
+        );
+
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+
+() recv_internal(cell in_msg_full, slice in_msg_body) impure {
+    if (slice_empty?(in_msg_body)) {
+        ;; refill
+        return ();
+    }
+
+    var cs = in_msg_full.begin_parse();
+    cs~load_uint(4); ;; skip flags
+    slice sender = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+
+    if (op == op::internal_signed) {
+        return handle_request(in_msg_body, 0);
+    }
+
+    (
+        int seqno,
+        slice wallet_addr,
+        int root_ca_pubkey,
+        int seed_pubkey,
+        int delegation_started?,
+        slice rest_state
+    ) = load_data();
+
+    if (op == op::install) {
+        throw_unless(err::extension_already_installed, seqno == 0);
+        throw_unless(err::sender_is_not_owner, equal_slices(sender, wallet_addr));
+
+        int new_root_ca_pubkey = in_msg_body~load_uint(256);
+        int new_seed_pubkey = in_msg_body~load_uint(256);
+
+        save_state_after_install(
+            sender,
+            new_root_ca_pubkey,
+            new_seed_pubkey
+        );
+
+        (int wc, int _hash) = parse_std_addr(my_address());
+
+        cell msg = begin_cell()
+            .store_nonbounce_flags()
+            .store_slice(wallet_addr)
+            .store_coins(get_compute_fee(wc, GAS_WALLET_PROCESS_BASE * 3 + GAS_WALLET_PROCESS_PER_ACTION_EXT))
+            .store_ref_body(
+                begin_cell()
+                .store_uint(op::wallet::request_by_extension, 32)
+                .store_uint(0, 64)
+                .store_out_action_list(null())
+                .store_int(-1, 1)
+                .store_set_signature_auth(
+                    0,
+                    null()
+                )
+                .end_cell()
+            )
+            .end_cell();
+
+        send_raw_message(msg, PAY_FEE_SEPARATELY);
+
+        return ();
+    }
+
+    if (op == op::confirm_removal) {
+        throw_unless(err::sender_is_not_owner, equal_slices(sender, wallet_addr));
+
+        var msg = begin_cell()
+            .store_nonbounce_flags()
+            .store_slice(wallet_addr)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+
+        send_raw_message(msg.end_cell(), CARRY_CONTRACT_BALANCE + DESTROY_IF_BALANCE_ZERO);
+
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+() recv_external(slice in_msg) impure {
+    return handle_request(in_msg, 1);
+}
+
+;; GET METHODS
+
+int get_seqno() method_id {
+    (
+        int seqno,
+        slice wallet_addr,
+        int root_ca_pubkey,
+        int seed_pubkey,
+        int delegation_started?,
+        slice rest_state
+    ) = load_data();
+    return seqno;
+}
+
+slice get_wallet_addr() method_id {
+    (
+        int seqno,
+        slice wallet_addr,
+        int root_ca_pubkey,
+        int seed_pubkey,
+        int delegation_started?,
+        slice rest_state
+    ) = load_data();
+    return wallet_addr;
+}
+
+int get_root_pubkey() method_id {
+    (
+        int seqno,
+        slice wallet_addr,
+        int root_ca_pubkey,
+        int seed_pubkey,
+        int delegation_started?,
+        slice rest_state
+    ) = load_data();
+    return root_ca_pubkey;
+}
+
+int get_seed_pubkey() method_id {
+    (
+        int seqno,
+        slice wallet_addr,
+        int service_pubkey,
+        int seed_pubkey,
+        int delegation_started?,
+        slice rest_state
+    ) = load_data();
+    return seed_pubkey;
+}
+
+forall X -> tuple to_tuple(X x) asm "NOP";
+
+(int, int, tuple) get_delegation_state() method_id {
+    (
+        int seqno,
+        slice wallet_addr,
+        int service_pubkey,
+        int seed_pubkey,
+        int delegation_started?,
+        slice rest_state
+    ) = load_data();
+
+    int recovery_blocked_until = rest_state~load_uint(64);
+
+    ifnot (delegation_started?) {
+        return (delegation_started?, recovery_blocked_until, to_tuple([]));
+    } else {
+        cell new_state_init = rest_state~load_ref();
+        int forward_amount = rest_state~load_coins();
+
+        return (delegation_started?, recovery_blocked_until, to_tuple([new_state_init, forward_amount]));
+    }
+}
+
+int get_estimated_attached_value(
+    cell forward_msg,
+    int msg_actions,
+    int extended_actions
+) method_id {
+    int compute_fee = get_compute_fee(
+        0,
+            ;; there can be more than 1 extension in the wallet and that can increase the cost
+            ;; of processing the message
+            (GAS_WALLET_PROCESS_BASE * 3)
+            + GAS_WALLET_PROCESS_PER_ACTION * msg_actions
+            + GAS_WALLET_PROCESS_PER_ACTION_EXT * extended_actions
+    );
+    (int cells, int bits, int z, int w) = compute_data_size?(forward_msg, 10000);
+    int fwd_fees = get_forward_fee(0, bits, cells);
+    return compute_fee + fwd_fees;
+}
