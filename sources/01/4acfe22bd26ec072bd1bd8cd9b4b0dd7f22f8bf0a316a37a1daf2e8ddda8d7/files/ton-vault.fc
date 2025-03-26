@@ -1,0 +1,172 @@
+#pragma version >=0.4.4;
+
+#include "./imports/stdlib.fc";
+#include "./imports/workchain.fc";
+#include "./vault/op-codes.fc";
+#include "./vault/vault-utils.fc";
+#include "./vault/gas.fc";
+
+{-
+  Storage
+  storage#_ balance:Coins owner_address:MsgAddressInt;
+-}
+
+(int, slice) load_data() inline {
+    slice ds = get_data().begin_parse();
+    var data = (ds~load_coins(), ds~load_msg_addr());
+    ds.end_parse();
+    return data;
+}
+
+() save_data(int balance, slice owner_address) impure inline {
+    builder data_builder = pack_vault_wallet_data_builder(balance, owner_address);
+    set_data(data_builder.end_cell());
+}
+
+() send_ton(slice in_msg_body, slice sender_address, int msg_value) impure inline_ref {
+    ;; see transfer TL-B layout in jetton.tlb
+    int query_id = in_msg_body~load_query_id();
+    int ton_amount = in_msg_body~load_coins();
+    slice to_address = in_msg_body~load_msg_addr();
+
+    (int balance, slice owner_address) = load_data();
+    throw_unless(error::not_owner, equal_slices_bits(owner_address, sender_address));
+
+    balance -= ton_amount;
+    throw_unless(error::balance_error, balance >= 0); ;; TODO + fees
+
+    slice response_address = in_msg_body~load_msg_addr();
+    in_msg_body~skip_maybe_ref(); ;; custom_payload
+    in_msg_body~load_coins(); ;; forward_ton_amount
+    
+    check_either_forward_payload(in_msg_body);
+    slice either_forward_payload = in_msg_body;
+
+    if (ton_amount > 0) {
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+        builder msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(to_address)
+            .store_coins(ton_amount);
+        
+        if (either_forward_payload~load_uint(1)) {
+            cell msd_body = either_forward_payload~load_ref();
+            msg = msg
+                .store_only_body_ref(msd_body);
+        } else {
+            msg = msg
+                .store_prefix_only_body()
+                .store_slice(either_forward_payload);
+        }
+
+        send_raw_message(msg.end_cell(), SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+    }
+
+    if (~ is_address_none(response_address)) {
+        int to_leave_on_balance = balance + my_storage_due();
+        raw_reserve(to_leave_on_balance, RESERVE_AT_MOST);
+
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+        cell msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(response_address)
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_op(op::excesses)
+            .store_query_id(query_id)
+            .end_cell();
+
+        send_raw_message(msg, SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_IGNORE_ERRORS);
+    }
+
+    save_data(balance, owner_address);
+}
+
+() receive_ton(slice in_msg_body, slice sender_address, int msg_value, int fwd_fee) impure inline {
+    (int balance, slice owner_address) = load_data();
+
+    int query_id = in_msg_body~load_query_id();
+    int ton_amount = in_msg_body~load_coins();
+    slice response_address = in_msg_body~load_msg_addr();
+    int forward_ton_amount = in_msg_body~load_coins();
+
+    int fes_amount = amount_to_transfer(forward_ton_amount, fwd_fee);
+
+    throw_if(error::balance_error, ton_amount + fes_amount > msg_value);
+
+    balance += ton_amount;
+
+    if (forward_ton_amount) {
+        slice either_forward_payload = in_msg_body;
+
+        ;; see transfer_notification TL-B layout in jetton.tlb
+        cell msg_body = begin_cell()
+            .store_op(op::transfer_notification)
+            .store_query_id(query_id)
+            .store_coins(ton_amount)
+            .store_slice(sender_address)
+            .store_slice(either_forward_payload)
+            .end_cell();
+
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+        cell msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(owner_address)
+            .store_coins(forward_ton_amount)
+            .store_only_body_ref(msg_body)
+            .end_cell();
+
+        send_raw_message(msg, SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+    }
+
+    if (~ is_address_none(response_address)) {
+        int to_leave_on_balance = balance + my_storage_due();
+        raw_reserve(to_leave_on_balance, RESERVE_AT_MOST);
+
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+        cell msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(response_address)
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_op(op::excesses)
+            .store_query_id(query_id)
+            .end_cell();
+
+        send_raw_message(msg, SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_REGULAR);
+    }
+    save_data(balance, owner_address);
+}
+
+() recv_internal(int my_ton_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    int msg_flags = in_msg_full_slice~load_msg_flags();
+    if (is_bounced(msg_flags)) {
+        return ();
+    }
+    slice sender_address = in_msg_full_slice~load_msg_addr();
+
+    int op = in_msg_body~load_op();
+    int fwd_fee_from_in_msg = in_msg_full_slice~retrieve_fwd_fee();
+    int fwd_fee = get_original_fwd_fee(MY_WORKCHAIN, fwd_fee_from_in_msg);
+
+    ;; outgoing transfer
+    if (op == op::transfer) {
+        return send_ton(in_msg_body, sender_address, msg_value);
+    }
+
+    if (op == op::deposit_vault) {
+        return receive_ton(in_msg_body, sender_address, msg_value, fwd_fee);
+    }
+
+    if (op == op::top_up) {
+        return ();
+    }
+
+    throw(error::wrong_op);
+}
+
+(int, slice) get_vault_data() method_id {
+    (int balance, slice owner_address) = load_data();
+    return (balance, owner_address);
+}
