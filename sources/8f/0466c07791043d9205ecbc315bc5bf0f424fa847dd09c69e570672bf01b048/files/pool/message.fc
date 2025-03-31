@@ -1,0 +1,56 @@
+{-
+Copyright
+    (c) 2025 shardex.finance 
+All Rights Reserved.
+
+This source code is licensed under the GPL-3.0 license found in the
+LICENSE file in the root directory of this source tree.
+-}
+
+() send_tokens(
+    int query_id, slice to_wallet_address, int jetton_amount, 
+    slice owner_address, slice response_address, slice payload
+) impure {
+
+    var msg_body = begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(query_id, 64)
+        .store_coins(jetton_amount)
+        .store_slice(owner_address)
+        .store_slice(response_address)
+        .store_slice(payload)
+        .end_cell();
+
+    var msg = begin_cell()
+        .store_msg_flags_and_address_none(BOUNCEABLE)
+        .store_slice(to_wallet_address)
+        .store_coins(0)
+        .store_only_body_ref(msg_body)
+        .end_cell();
+
+    send_raw_message(msg, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_IGNORE_ERRORS);
+}
+
+() send_tokens_back(
+    int query_id, int value, slice jetton_address, int amount, slice owner, slice response_address
+) impure {
+    var msg_body = begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(query_id, 64)
+        .store_coins(amount)
+        .store_slice(owner)
+        .store_slice(response_address)
+        .store_maybe_ref(null())
+        .store_coins(0) ;; without jetton notify
+        .store_maybe_ref(null())
+        .end_cell();
+
+    var msg = begin_cell()
+        .store_msg_flags_and_address_none(BOUNCEABLE)
+        .store_slice(jetton_address)
+        .store_coins(value)
+        .store_only_body_ref(msg_body)
+        .end_cell();
+
+    send_raw_message(msg, SEND_MODE_REGULAR);
+}

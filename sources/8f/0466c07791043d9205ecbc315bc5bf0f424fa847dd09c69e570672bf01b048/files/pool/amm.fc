@@ -1,0 +1,63 @@
+{-
+Copyright
+    (c) 2025 shardex.finance 
+All Rights Reserved.
+
+This source code is licensed under the GPL-3.0 license found in the
+LICENSE file in the root directory of this source tree.
+-}
+
+const ct_fee_divider = 10000;
+const ct_slippage_divider = 1000;
+
+(int, int) get_amount_out(
+    int amountIn,
+    int reserveIn, int reserveOut,
+    int lpFee, int protocolFee
+) {
+  int amountInWithFee = amountIn * (ct_fee_divider - lpFee);
+  int numerator = amountInWithFee * reserveOut;
+  int denominator = (reserveIn * ct_fee_divider) + amountInWithFee;
+  int baseOut = (amountInWithFee * reserveOut) / denominator;
+
+  int protocolFeeOut = divc(baseOut * protocolFee, ct_fee_divider);
+  baseOut -= protocolFeeOut;
+
+  return (baseOut, protocolFeeOut);
+}
+
+(int, int) get_amount_in(
+    int amountOut,
+    int reserveIn, int reserveOut,
+    int lpFee, int protocolFee
+) {
+  int numerator = (reserveIn * amountOut) * ct_fee_divider;
+  int denominator = (reserveOut - amountOut) * (ct_fee_divider - lpFee);
+  int baseIn = (numerator / denominator) + 1;
+
+  int protocolFeeIn = divc(baseIn * protocolFee, ct_fee_divider);
+  baseIn -= protocolFeeIn;
+
+  return (baseIn, protocolFeeIn);
+}
+
+(int, int, int, int) count_swap(
+    int amount_in, int amount_out,
+    int reserve_in, int reserve_out,
+    int lp_fee, int protocol_fee,
+    int exact_out, int slippage
+) impure inline_ref {
+    if (exact_out == 1) {
+        (int base_in, int protocol_fee_in) = get_amount_in(amount_out, reserve_in, reserve_out, lp_fee, protocol_fee);
+        if (base_in + protocol_fee_in > amount_in) {
+             throw(728);
+        }
+        return (base_in, amount_out, protocol_fee_in, 0);
+    } else {
+        (int base_out, int protocol_fee_out) = get_amount_out(amount_in, reserve_in, reserve_out, lp_fee, protocol_fee);
+        if (base_out * ct_slippage_divider < amount_out * (ct_slippage_divider - slippage)) {
+            throw(726);
+        }
+        return (amount_in, base_out, 0, protocol_fee_out);
+    }
+}
