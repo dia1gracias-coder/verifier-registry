@@ -1,0 +1,80 @@
+#include "storage.fc";
+#include "../common/dic.fc";
+#include "../common/stdlib.fc";
+#include "../common/utils.fc";
+#include "../common/message.fc";
+
+(int) delete_message(int messageId) inline {
+    slice messageKey = begin_cell().store_int(messageId, 128).end_cell().begin_parse();
+    (storage::usedMessages, int deleted) = dict_delete?(storage::usedMessages, MESSAGE_KEY_LENGTH, messageKey);
+
+    return deleted; 
+}
+
+(int) delete_message_with_timestamp(int timestamp, int message_id) inline {
+    slice timestampKey = begin_cell().store_uint(timestamp, 64).store_int(message_id, 128).end_cell().begin_parse();
+    (storage::messageRecordDicBucket, int deleted) = dict_delete?(storage::messageRecordDicBucket, TIMESTAMP_MESSAGE_KEY_LENGTH, timestampKey);
+
+    return deleted; 
+}
+
+() clear_expired_message() impure inline {
+    (slice key_slice, slice value, int flag) = dict_get_min?(storage::messageRecordDicBucket, TIMESTAMP_MESSAGE_KEY_LENGTH);
+
+    while (flag) {
+        int timestamp_key = key_slice~load_uint(64);
+        if (timestamp_key + EXPIRE_TIME <= now()) {
+            int messageId = key_slice~load_int(128);
+            int deleteMessageResult = delete_message(messageId);
+
+            slice key_to_delete = begin_cell().store_uint(timestamp_key, 64).store_int(messageId, 128).end_cell().begin_parse();
+            (storage::messageRecordDicBucket,int deleteTimestampValueResult) = dict_delete?(storage::messageRecordDicBucket, TIMESTAMP_MESSAGE_KEY_LENGTH, key_to_delete);
+            (key_slice, value, flag) = dict_get_next?(storage::messageRecordDicBucket, TIMESTAMP_MESSAGE_KEY_LENGTH, key_to_delete);
+        } else {
+            flag = 0;
+        }
+    }
+}
+
+(slice, int) find_message(int message_id) inline {
+    slice messageKey = begin_cell().store_int(message_id, 128).end_cell().begin_parse();
+    return dict_get?(storage::usedMessages, MESSAGE_KEY_LENGTH, messageKey);
+}
+
+;; Check whether the message has an expired timestamp. 
+() store_message_expiration_timestamp(int timestamp, int message_id) impure inline {
+    slice timestampKey = begin_cell().store_uint(timestamp, 64).store_int(message_id, 128).end_cell().begin_parse();
+    ;; Update to the latest expiration date
+    slice timestampValue = begin_cell().store_int(-1, 1).end_cell().begin_parse();
+    storage::messageRecordDicBucket = dict_set(storage::messageRecordDicBucket, TIMESTAMP_MESSAGE_KEY_LENGTH, timestampKey, timestampValue);
+
+    clear_expired_message();
+}
+
+(int) store_message(int timestamp, int message_id, slice receiver) inline {
+    load_data();
+
+    slice messageKey = begin_cell().store_int(message_id, 128).end_cell().begin_parse();
+    (slice storedMessageValue, int found) = dict_get?(storage::usedMessages, MESSAGE_KEY_LENGTH, messageKey);
+
+    ;; If the message already exists, it will not be stored to prevent replay attacks.
+    if (found) {
+        return 0; 
+    }
+
+    ;; Store the message and the receiver and expiration time at the same time
+    slice messageValue = begin_cell()
+        .store_slice(receiver)
+        .store_uint(timestamp, 64)
+        .end_cell()
+        .begin_parse();
+        
+    storage::usedMessages = dict_set(storage::usedMessages, MESSAGE_KEY_LENGTH, messageKey, messageValue);
+
+    store_message_expiration_timestamp(timestamp, message_id);
+
+    save_data();
+
+    ;; Return -1 if the storage is successful, return 0 if the storage fails
+    return -1;  
+}

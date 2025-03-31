@@ -1,0 +1,98 @@
+#include "stdlib.fc";
+
+const int BOUNCEABLE = 0x18;
+const int NON_BOUNCEABLE = 0x10;
+
+
+const int SEND_MODE_REGULAR = 0;
+const int SEND_MODE_PAY_FEES_SEPARETELY = 1;
+const int SEND_MODE_IGNORE_ERRORS = 2;
+const int SEND_MODE_BOUNCE_TRANSACTION = 16;
+const int SEND_MODE_DESTROY = 32;
+const int SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE = 64;
+const int SEND_MODE_CARRY_ALL_BALANCE = 128;
+
+const HOLE_ADDRESS = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"a;
+
+builder store_msgbody_prefix_stateinit(builder b) inline { 
+  return b.store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1);
+}
+builder store_msgbody_prefix_slice(builder b) inline { 
+  return b.store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+}
+builder store_msgbody_prefix_ref(builder b) inline { 
+  return b.store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+}
+
+builder store_msg_flags(builder b, int msg_flag) inline { 
+    return b.store_uint(msg_flag, 6); 
+}
+
+builder store_body_header(builder b, int op, int query_id) inline {
+  return b.store_uint(op, 32)
+          .store_uint(query_id, 64);
+}
+
+() send_empty_message(int amount, slice to, int mode) impure inline_ref {
+    cell msg = begin_cell()
+        .store_msg_flags(BOUNCEABLE)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_msgbody_prefix_slice()
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() send_simple_message(int amount, slice to, cell body, int mode) impure inline_ref {
+    cell msg = begin_cell()
+        .store_msg_flags(BOUNCEABLE)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_msgbody_prefix_ref()
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() send_message_nobounce(int amount, slice to, cell body, int mode) impure inline_ref {
+    cell msg = begin_cell()
+        .store_msg_flags(NON_BOUNCEABLE)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_msgbody_prefix_ref()
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() send_message_with_stateinit(int amount, slice to, cell state_init, cell body, int mode) impure inline_ref {
+    cell msg = begin_cell()
+        .store_msg_flags(BOUNCEABLE)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_msgbody_prefix_stateinit()
+        .store_ref(state_init)
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() emit_log_simple(int event_id, cell data, int need_separate_cell) impure inline {
+    ;; 1023 - (4+2+9+256+64+32+2) = 654 bit free
+
+    var msg = begin_cell()
+            .store_uint (12, 4)         ;; ext_out_msg_info$11 src:MsgAddressInt () 1100
+            .store_uint (1, 2)          ;; addr_extern$01
+            .store_uint (256, 9)        ;; len:(## 9)
+            .store_uint(event_id, 256); ;; external_address:(bits len)
+
+    if (need_separate_cell) {
+        msg = msg.store_uint(1, 64 + 32 + 2) ;; created_lt, created_at, init:Maybe, body:Either
+                .store_ref(data);
+    } else {
+        msg = msg.store_uint(0, 64 + 32 + 2) ;; created_lt, created_at, init:Maybe, body:Either
+                .store_slice(data.begin_parse());
+    }
+
+    send_raw_message(msg.end_cell(), SEND_MODE_REGULAR);
+}

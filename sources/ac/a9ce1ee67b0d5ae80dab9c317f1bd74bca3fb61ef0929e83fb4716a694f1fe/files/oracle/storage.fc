@@ -1,0 +1,65 @@
+#include "../common/stdlib.fc";
+
+global int storage::oracleNodeCount;
+global int storage::epochId;
+global int storage::forwardFee;
+global int storage::receiveFee;
+global int storage::proxyFee;
+global slice storage::owner;
+global cell storage::tempUpgrade;
+
+global cell storage::whiteOracleAddress;
+global cell storage::whiteContractAddress;
+global cell storage::publicKeyDic;
+global cell storage::usedMessages;
+global cell storage::messageRecordDicBucket;
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    slice clusterInfo = ds~load_ref().begin_parse();
+    storage::epochId = clusterInfo~load_uint(64);
+    storage::oracleNodeCount = clusterInfo~load_uint(32);
+    storage::whiteOracleAddress = clusterInfo~load_dict();
+    storage::publicKeyDic = clusterInfo~load_dict();
+    clusterInfo.end_parse();
+
+    slice commonInfo = ds~load_ref().begin_parse();
+    storage::forwardFee = commonInfo~load_uint(32);
+    storage::receiveFee = commonInfo~load_uint(32);
+    storage::proxyFee = commonInfo~load_uint(32);
+    storage::owner = commonInfo~load_msg_addr();
+    storage::whiteContractAddress = commonInfo~load_dict();
+    commonInfo.end_parse();
+
+    slice messageInfo = ds~load_ref().begin_parse();
+    storage::usedMessages = messageInfo~load_dict();
+    storage::messageRecordDicBucket = messageInfo~load_dict();
+    messageInfo.end_parse();
+
+    storage::tempUpgrade = ds~load_ref();
+
+    ds.end_parse();
+}
+
+() save_data() impure inline {
+    set_data(begin_cell()
+        .store_ref(begin_cell()
+            .store_uint(storage::epochId, 64)
+            .store_uint(storage::oracleNodeCount, 32)
+            .store_dict(storage::whiteOracleAddress)
+            .store_dict(storage::publicKeyDic)
+            .end_cell())
+        .store_ref(begin_cell()
+            .store_uint(storage::forwardFee, 32)
+            .store_uint(storage::receiveFee, 32)
+            .store_uint(storage::proxyFee, 32)
+            .store_slice(storage::owner)
+            .store_dict(storage::whiteContractAddress)
+            .end_cell())
+        .store_ref(begin_cell()
+            .store_dict(storage::usedMessages)
+            .store_dict(storage::messageRecordDicBucket)
+            .end_cell())
+        .store_ref(storage::tempUpgrade)
+        .end_cell());
+}

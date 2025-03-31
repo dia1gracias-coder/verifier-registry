@@ -1,0 +1,478 @@
+#include "common/stdlib.fc";
+#include "common/utils.fc";
+#include "oracle/const.fc";
+#include "oracle/messageIdDicHelper.fc";
+#include "oracle/storage.fc";
+
+(int) check_address_in_dic(cell dic, slice address) inline_ref {
+    if (dic.dict_empty?()) {
+        return 0;
+    }
+
+    int hash = address.slice_hash();
+    (slice data, _) = dic.udict_get?(256, hash);
+    if (data.null?()) {
+        return 0;
+    }
+
+    return -1;
+}
+
+() validate_multi_sign(int reportHash, slice input_body) impure inline_ref {    
+    cell signDataDic = input_body~load_ref();
+    slice signDicSlice = signDataDic.begin_parse();
+    cell signDic = signDicSlice~load_dict();
+    signDicSlice.end_parse();
+
+    (int publicIndex, slice signatureRef, int flag) = signDic.udict_get_min?(256);
+    int signCount = 0;
+    int leastSignerCount = (storage::oracleNodeCount / 2) + 1;
+
+    while (flag) {
+        (slice publicKeySlice, _) = storage::publicKeyDic.udict_get?(256, publicIndex);
+        throw_unless(rsp::NotInWhiteList, ~ publicKeySlice.null?());
+        int publicKey = publicKeySlice~load_uint(256);
+        slice signature = signatureRef~load_ref().begin_parse();
+
+        if (check_signature(reportHash, signature, publicKey)) {
+            signCount = signCount + 1;
+        }
+
+        (publicIndex, signatureRef, flag) = signDic.udict_get_next?(256, publicIndex);
+    }
+
+    throw_unless(rsp::SignerNotEnough, signCount >= leastSignerCount);
+}
+
+() forward_message(slice sender, slice in_msg_body) impure inline_ref {
+    throw_unless(rsp::PermissionDenied, check_address_in_dic(storage::whiteOracleAddress, sender));
+    
+    slice context = in_msg_body~load_ref().begin_parse();
+    int messageId = context~load_int(128);
+    int timestamp = context~load_uint(64); 
+    throw_unless(rsp::ExpiredMessage, timestamp + EXPIRE_TIME > now());
+    
+    slice oracleAddress = context~load_msg_addr();
+    throw_unless(rsp::InputDataError, equal_slices(oracleAddress, my_address()));
+
+    slice receiver = context~load_msg_addr();
+    throw_unless(rsp::InputDataError, ~ equal_slices(receiver, my_address()));
+    
+    context.end_parse();
+
+    int success = store_message(timestamp, messageId, receiver); 
+    throw_unless(rsp::AlreadyRecord, success != 0); ;; success == 0 => Failed to store message | success == -1  => Successfully stored message
+
+    cell body = in_msg_body~load_ref();
+    int reportHash = begin_cell()
+        .store_int(messageId, 128)
+        .store_uint(timestamp, 64)
+        .store_slice(oracleAddress)
+        .store_slice(receiver)
+        .store_ref(body)
+        .end_cell()
+        .cell_hash();
+
+    validate_multi_sign(reportHash, in_msg_body);
+
+    cell proxyBody = begin_cell()
+        .store_int(messageId, 128)
+        .store_ref(body)
+        .end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(receiver)
+        .store_coins(storage::proxyFee)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::ProxyTransactionToTon, 32)
+        .store_slice(proxyBody.begin_parse())
+        .end_cell();
+
+    send_raw_message(msg, 1);
+}
+
+() receive_message(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotInWhiteList, check_address_in_dic(storage::whiteContractAddress, sender));
+
+    storage::epochId += 1;
+    save_data();
+
+    ;; target chain id
+    int targetChainId = in_msg_body~load_int(32);
+
+    ;; target contract address
+    cell targetContractCell = in_msg_body~load_ref();
+
+    ;; orignal data
+    cell orignalData = in_msg_body~load_ref();
+    builder msgBody = begin_cell()
+        .store_int(storage::epochId, 64)
+        .store_int(targetChainId, 32)
+        .store_ref(targetContractCell)
+        .store_slice(sender)
+        .store_ref(orignalData);
+
+    ;; extra data
+    cell extraData = in_msg_body~load_ref();
+
+    if (~ extraData.null?()) {
+        msgBody = msgBody.store_ref(extraData);
+    }
+
+    throw_unless(rsp::InputDataError, in_msg_body.slice_empty?());  
+
+    emit_log_simple(op::ProxyTransactionToOtherChain,msgBody.end_cell(), -1);
+
+    return ();
+}
+
+() upsert_white_contract_address(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotOwner, equal_slices(sender, storage::owner));
+
+    if (storage::whiteContractAddress.dict_empty?()) {
+        storage::whiteContractAddress = new_dict();
+    }
+
+    slice address = in_msg_body~load_msg_addr();
+
+    int inputAddrHash = address.slice_hash();
+    storage::whiteContractAddress~udict_set(256, inputAddrHash, "true");
+
+    save_data();
+}
+
+() upsert_white_oracle_address(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotOwner, equal_slices(sender, storage::owner));
+
+    if (storage::whiteOracleAddress.dict_empty?()) {
+        storage::whiteOracleAddress = new_dict();
+    }
+
+    int op = in_msg_body~load_int(8);
+
+    slice address = in_msg_body~load_msg_addr();
+
+    ;; set public key
+    int publicIndex = in_msg_body~load_uint(256);
+    slice publicKeySlice = in_msg_body~load_bits(256);
+
+    ;; set white wallet address
+    int inputAddrHash = address.slice_hash();
+
+    if (op == OracleNodeOp::Upsert) {
+        storage::publicKeyDic~udict_set(256, publicIndex, publicKeySlice);
+        storage::whiteOracleAddress~udict_set(256, inputAddrHash, "true");
+    } elseif (op == OracleNodeOp::Delete) {
+        (slice queryPublick, _) = storage::publicKeyDic.udict_get?(256, publicIndex);
+        throw_unless(rsp::InputDataError, equal_slices(queryPublick, publicKeySlice));
+
+        storage::publicKeyDic~udict_delete?(256, publicIndex);
+        storage::whiteOracleAddress~udict_delete?(256, inputAddrHash);
+    } else {
+        throw(rsp::InputDataError); 
+    }
+
+    save_data();
+}
+
+() withdraw(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotOwner, equal_slices(sender, storage::owner));
+
+    int withdrawAmount = in_msg_body~load_uint(256);
+    slice addr = in_msg_body~load_msg_addr();
+
+    [int balance, _] = get_balance();
+    int gas = 10000000;
+
+    throw_unless(rsp::BalanceNotEnough, balance >= (withdrawAmount + gas));
+
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(addr)
+        .store_coins(withdrawAmount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+
+    send_raw_message(msg, 0);
+}
+
+() update_oracle_node_count(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotOwner, equal_slices(sender, storage::owner));
+
+    int latestOracleNodeCount = in_msg_body~load_uint(32);
+    if (storage::oracleNodeCount == latestOracleNodeCount) {
+        return ();
+    }
+
+    throw_unless(rsp::InputDataError, latestOracleNodeCount >= 3);
+    storage::oracleNodeCount = latestOracleNodeCount;
+
+    save_data();
+}
+
+() notify_resend_needed(slice sender, slice in_msg_body) impure inline {
+    int messageId = in_msg_body~load_int(128);
+    throw_unless(rsp::InputDataError, in_msg_body~load_int(8) == resend::AppointTime);
+    
+    int delayTime = in_msg_body~load_int(32);
+    int maxDelaySeconds = 60 * 60 * 24;
+    throw_unless(rsp::InputDataError, maxDelaySeconds > delayTime);
+
+    (slice messageValue, int exists) = find_message(messageId);
+    throw_unless(rsp::MessageNotFound, exists == -1);
+
+    slice storedReceiver = messageValue~load_msg_addr();
+    throw_unless(rsp::PermissionDenied, equal_slices(storedReceiver, sender));
+
+    int timestamp = messageValue~load_uint(64);
+    ;; When deleting a message, the expiration time of the message is also deleted. 
+    ;; The expiration time of the message is recalculated based on the time of notifying the transaction.
+    int timestampDeleted = delete_message_with_timestamp(timestamp, messageId);
+    throw_unless(rsp::TimestampMessageDeletedFailed, timestampDeleted == -1);
+    int messageDeleted = delete_message(messageId);
+    throw_unless(rsp::MessageDeletedFailed, messageDeleted == -1);
+
+    cell logData = begin_cell()
+        .store_int(messageId, 128)
+        .store_slice(sender)
+        .store_slice(my_address())  
+        .store_int(now(), 64)
+        .store_int(delayTime, 32)
+        .end_cell();
+
+    emit_log_simple(op::NotifyResendNeeded, logData, -1);
+
+    save_data();
+}
+
+() update_fee(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotOwner, equal_slices(sender, storage::owner));
+
+    int latestForwardFee = in_msg_body~load_uint(32);
+    int latestReceiveFee = in_msg_body~load_uint(32);
+    int latestProxyFee = in_msg_body~load_uint(32);
+
+    throw_unless(rsp::InputDataError, latestForwardFee > 0);
+    throw_unless(rsp::InputDataError, latestReceiveFee > 0);
+    throw_unless(rsp::InputDataError, latestProxyFee > 0);
+
+    storage::forwardFee = latestForwardFee;
+    storage::receiveFee = latestReceiveFee;
+    storage::proxyFee = latestProxyFee;
+
+    save_data();
+}
+
+() init_update_owner(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotOwner, equal_slices(sender, storage::owner));
+
+    (int end_owner, _, int end_code, cell new_code) = unpack_temp_upgrade(storage::tempUpgrade);
+    throw_unless(rsp::InvalidCall, end_owner == 0); ;; upgrade already in progress, end_owner == 0 => no owner need to update| end_owner != 0 => new owner is waiting for upgrade
+    storage::tempUpgrade = pack_temp_upgrade(end_code, new_code, now() + ONEMINUTESFORSECONDS, in_msg_body~load_msg_addr());
+
+    save_data();
+}
+
+() init_update_contract_code(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotOwner, equal_slices(sender, storage::owner));
+
+    (int end_owner, slice owner,int end_code, _) = unpack_temp_upgrade(storage::tempUpgrade);
+    throw_unless(rsp::InvalidCall, end_code == 0); ;; upgrade already in progress,  end_code == 0 => no code need to update| end_code != 0 => new code is waiting for upgrade
+    storage::tempUpgrade = pack_temp_upgrade(now() + ONEMINUTESFORSECONDS,  in_msg_body~load_ref(), end_owner, owner);
+    
+    save_data();
+}
+
+() cancel_update_owner(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotOwner, equal_slices(sender, storage::owner));
+
+    (int end_owner, _, int end_code, cell code) = unpack_temp_upgrade(storage::tempUpgrade);
+    throw_unless(rsp::InvalidCall, end_owner > 0); 
+    storage::tempUpgrade = pack_temp_upgrade(end_code, code, 0, HOLE_ADDRESS);
+
+    save_data();
+}
+
+() cancel_update_contract_code(slice sender, slice in_msg_body) impure inline {
+    throw_unless(rsp::NotOwner, equal_slices(sender, storage::owner));
+
+    ( int end_owner, slice owner, int end_code, _) = unpack_temp_upgrade(storage::tempUpgrade);
+    throw_unless(rsp::InvalidCall, end_code > 0); 
+    storage::tempUpgrade = pack_temp_upgrade(0, empty_cell(), end_owner, owner);
+
+    save_data();
+}
+
+() finalize_upgrades() impure inline {
+    (int end_owner, slice new_owner, int end_code, cell new_code) = unpack_temp_upgrade(storage::tempUpgrade);
+    throw_unless(rsp::InvalidCall, (end_code + end_owner) > 0); ;; make sure at least one upgrade process is in progress
+
+    if ((end_code > 0) & (now() >= end_code)) {
+        set_code(new_code);
+        emit_log_simple(op::UpdateCode,
+            begin_cell()
+                .store_uint(end_code,64)
+                .store_ref(new_code)
+                .end_cell()
+                ,1);
+        end_code = 0;
+        new_code = empty_cell();
+    }
+
+    if ((end_owner > 0) & (now() >= end_owner)) {
+        storage::owner = new_owner;
+        emit_log_simple(op::UpdateOwner,
+            begin_cell()
+                    .store_uint(end_owner,64)
+                    .store_slice(new_owner)
+                    .end_cell()
+                ,1);
+        end_owner = 0;
+        new_owner = HOLE_ADDRESS;
+    }
+
+    storage::tempUpgrade = pack_temp_upgrade(end_code, new_code, end_owner, new_owner);
+
+    save_data();
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        return ();
+    }
+
+    int op = in_msg_body~load_int(32);
+    slice sender = cs~load_msg_addr();
+
+    load_data();
+
+    ;;
+    ;; if (op == op::RecordLog()) {
+    ;;     throw_unless(rsp::PermissionDenied, equal_slices(sender, my_address()));
+    ;;     ;; for record log
+    ;;     return ();
+    ;; }
+
+    if (op == op::ProxyTransactionToTon) {
+        throw_unless(rsp::FeeToLow, msg_value >= storage::forwardFee);
+        forward_message(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::ProxyTransactionToOtherChain) {
+        throw_unless(rsp::FeeToLow, msg_value >= storage::receiveFee);
+        receive_message(sender, in_msg_body);
+        return ();
+    }
+
+    ;; add ton white contract address
+    if (op == op::UpsertWhiteContractAddress) {
+        upsert_white_contract_address(sender, in_msg_body);
+        return ();
+    }
+
+    ;; add white wallet address
+    if (op == op::UpsertWhiteOracleAddress) {
+        upsert_white_oracle_address(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::ResendTx) {
+        throw_unless(rsp::FeeToLow, msg_value >= storage::forwardFee);
+        notify_resend_needed(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::Withdraw) {
+        withdraw(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::UpdateOracleNodeCount) {
+        update_oracle_node_count(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::UpdateCode) {
+        init_update_contract_code(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::UpdateFee) {
+        update_fee(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::UpdateOwner){
+        init_update_owner(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::CancelUpdateOwner){
+        cancel_update_owner(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::CancelUpdateCode){
+        cancel_update_contract_code(sender, in_msg_body);
+        return ();
+    }
+
+    if (op == op::FinalizeUpgrades) {
+        finalize_upgrades();
+        return ();
+    }
+
+    throw(rsp::OperateNotMatch);
+}
+
+;;
+;; check contract address in whiteaddresses
+;;
+;; ruturn -1:true , 0:false
+;;
+(int) check_contract_address_has_permission(cell contractAddress) method_id {
+    load_data();
+    slice address = contractAddress.begin_parse();
+    return check_address_in_dic(storage::whiteContractAddress, address);
+}
+
+;;
+;; check oracle address in whiteaddresses
+;;
+;; ruturn -1:true , 0:false
+;;
+(int) check_oracle_address_has_permission(cell walletAddress) method_id {
+    load_data();
+    return check_address_in_dic(storage::whiteOracleAddress, walletAddress.begin_parse());
+}
+
+(int) get_oracle_node_count() method_id {
+    load_data();
+    return (storage::oracleNodeCount);
+}
+
+(int) get_resume_balance() method_id {
+    [int balance, _] = get_balance();
+
+    return balance;
+}
+
+(int, int, int) get_current_fee() method_id {
+    load_data();
+    return (storage::forwardFee, storage::receiveFee, storage::proxyFee);
+}
+
+(slice) get_current_owner() method_id {
+    load_data();
+    return (storage::owner);
+}

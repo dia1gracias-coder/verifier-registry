@@ -1,0 +1,42 @@
+
+;; declare const op code
+const op::UpsertWhiteContractAddress = 0x00000001;
+const op::UpsertWhiteOracleAddress = 0x00000002;
+const op::ProxyTransactionToTon = 0x00000003;
+const op::ProxyTransactionToOtherChain = 0x00000004;
+const op::Withdraw = 0x00000005;
+const op::UpdateOracleNodeCount = 0x00000006;
+const op::UpdateFee = 0x00000007;
+const op::UpdateCode = 0x00000008;
+const op::ResendTx = 0x00000009;
+const op::RecordLog = 0x0000000a;
+const op::NotifyResendNeeded = 0x0000000b;
+const op::UpdateOwner = 0x0000000c;
+const op::CancelUpdateOwner = 0x0000000d;
+const op::CancelUpdateCode = 0x0000000e;
+const op::FinalizeUpgrades = 0x0000000f;
+
+;; declare resend type;
+const resend::AppointTime = 0x01;
+
+;; declare op of inliner contract
+const OracleNodeOp::Upsert = 0x01;
+const OracleNodeOp::Delete = 0x02;
+
+;; declare error code
+const rsp::NotOwner = 100;
+const rsp::PermissionDenied = 101;
+const rsp::NotInWhiteList = 102;
+const rsp::BalanceNotEnough = 103;
+const rsp::FeeToLow = 104;
+const rsp::InputDataError = 105;
+const rsp::SignerNotEnough = 106;
+const rsp::SignatureError = 107;
+const rsp::OperateNotMatch = 108;
+const rsp::MessageExisted = 109;
+const rsp::MessageNotFound = 110;
+const rsp::ExpiredMessage = 111;
+const rsp::AlreadyRecord = 112;
+const rsp::InvalidCall = 113;
+const rsp::MessageDeletedFailed = 114;
+const rsp::TimestampMessageDeletedFailed = 115;
