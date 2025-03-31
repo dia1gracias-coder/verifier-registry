@@ -1,0 +1,62 @@
+#include "stdlib.fc";
+(cell) empty_cell() asm "<b b> PUSHREF";
+
+const WORKCHAIN = 0;
+
+() send_payload(slice caller, cell payload) impure inline_ref {
+  cell msg = begin_cell()
+    .store_uint(0x18, 6)
+    .store_slice(caller) 
+    .store_coins(0) 
+    .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_ref(payload)
+  .end_cell();
+  send_raw_message(msg, 128); ;; CARRY_ALL_BALANCE
+}
+
+const TWODAYS = 172800; ;; 24 * 60 * 60 * 2
+const SEVENDAYS = 604800; ;; 24 * 60 * 60 * 7
+const ONEDAY = 86400; ;; 24 * 60 * 60
+const HALF_ONE_DAY = 43200; ;; 12 * 60 * 60
+const ONEMINUTESFORSECONDS = 60; ;; 1 * 60
+const TENMINUTESFORSECONDS = 600; ;; 10 * 60
+const ONEHOURE = 3600; ;; 1 * 60 * 60
+const EXPIRE_TIME = 172800; ;; 24 * 60 * 60 * 2
+const ONEMINUTES = 1;
+const TENMINUTES = 10;
+
+(cell) pack_temp_upgrade(int end_code, cell code, int end_owner, slice owner,int end_admin,slice admin) inline {
+    cell data = begin_cell()
+        .store_uint(end_code, 64)
+        .store_uint(end_owner, 64)
+        .store_uint(end_admin, 64)
+        .store_slice(owner)
+        .store_ref(code)
+        .store_slice(admin)
+    .end_cell();
+    return data;
+}
+
+(int, cell, int, slice, int, slice) unpack_temp_upgrade(cell c_data) inline {
+    slice s_data = c_data.begin_parse();
+    (int end_code, int end_owner, int end_admin, slice owner, cell code,slice admin) = (s_data~load_uint(64), s_data~load_uint(64),s_data~load_uint(64), s_data~load_msg_addr(), s_data~load_ref(),s_data~load_msg_addr());
+    return (end_code, code, end_owner, owner, end_admin,admin);
+}
+
+(int) get_workchain(slice address) inline {
+  (int wc, _) = parse_std_addr(address);
+  return wc;
+}
+
+() force_chain(int workchain, slice address, int error_code) impure inline {
+  (int wc) = get_workchain(address);
+  throw_unless(error_code, wc == workchain);
+}
+
+slice create_address(int wc, int address_hash) inline {
+    return begin_cell().store_uint(4, 3)
+        .store_int(wc, 8)
+        .store_uint(address_hash, 256)
+        .end_cell()
+        .begin_parse();
+}

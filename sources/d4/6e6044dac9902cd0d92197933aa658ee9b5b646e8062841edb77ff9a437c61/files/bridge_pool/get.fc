@@ -1,0 +1,119 @@
+
+(int) get_pool_liquidity() method_id {
+    load_storage();
+    return storage::liquidity;
+}
+
+(slice) get_pool_liquidity_account_address(slice owner_address) method_id {
+    load_storage();
+    cell acc_state_init = calculate_bridge_pool_liquidity_account_state_init(owner_address, my_address(), storage::jetton_address, storage::pool_liquidity_account_code);
+    slice brigde_pool_liquidity_account_address = calculate_bridge_pool_liquidity_account_address(acc_state_init);
+    return brigde_pool_liquidity_account_address;
+}
+
+(int, int, int) get_receipt_daily_limit(int target_chain_id) method_id {
+    load_storage();
+    int key_hash = create_key(target_chain_id, RECEIPT);
+    (slice receipt_daily_limit, int found) = storage::daily_limit.udict_get?(DEFAULT_KEY_LENGTH, key_hash);
+    if (found) {
+        (int cur_remain_token_amount, int cur_refresh_time, int cur_daily_limit) =
+        (receipt_daily_limit~load_uint(256), receipt_daily_limit~load_uint(64), receipt_daily_limit~load_uint(256));
+        (int refresh_time, int remain_token_amount) = _refresh_current_daily_limit(cur_refresh_time, cur_remain_token_amount, cur_daily_limit);
+        return (remain_token_amount, refresh_time, cur_daily_limit);
+    } else {
+        return (0, 0, 0);
+    }
+}
+
+(int, int, int) get_swap_daily_limit(int from_chain_id) method_id {
+    load_storage();
+    int key_hash = create_key(from_chain_id, SWAP);
+    (slice swap_daily_limit, int found) = storage::daily_limit.udict_get?(DEFAULT_KEY_LENGTH, key_hash);
+    if (found) {
+        (int cur_remain_token_amount, int cur_refresh_time, int cur_daily_limit) =
+        (swap_daily_limit~load_uint(256), swap_daily_limit~load_uint(64), swap_daily_limit~load_uint(256));
+        (int refresh_time, int remain_token_amount) = _refresh_current_daily_limit(cur_refresh_time, cur_remain_token_amount, cur_daily_limit);
+        return (remain_token_amount, refresh_time, cur_daily_limit);
+    } else {
+        return (0, 0, 0);
+    }
+}
+
+(int, int, int, int, int) get_receipt_rate_limit_state(int target_chain_id) method_id {
+    load_storage();
+    int key_hash = create_key(target_chain_id, RECEIPT);
+    return get_rate_limit(key_hash);
+}
+
+(int, int, int, int, int) get_swap_rate_limit_state(int from_chain_id) method_id {
+    load_storage();
+    int key_hash = create_key(from_chain_id, SWAP);
+    return get_rate_limit(key_hash);
+}
+
+(slice) get_owner() method_id {
+    load_storage();
+    return storage::owner;
+}
+
+(slice) get_admin() method_id {
+    load_storage();
+    return storage::admin;
+}
+
+(slice) get_bridge_address() method_id {
+    load_storage();
+    return storage::bridge_address;
+}
+
+(slice, slice) get_jetton_address() method_id {
+    load_storage();
+    return (storage::jetton_address, storage::jetton_pool_wallet_address);
+}
+
+(cell) get_upgrade_status() method_id {
+    load_storage();
+    return storage::temp_upgrade;
+}
+
+(int, int) get_receipt_info(int target_chain_id) method_id {
+    load_storage();
+    (slice receipt_info, int found) = udict_get?(storage::receipt_dic, CHAIN_ID_KEY_LENGTH, target_chain_id);
+    if (found) {
+        int total_amount = receipt_info~load_uint(256);
+        int index = receipt_info~load_uint(64);
+        return (index, total_amount);
+    } else {
+        return (0, 0);
+    }
+}
+
+(int,int,int,int,int,int) get_swap_data(int from_chain_id) method_id {
+    load_storage();
+    cell swap_id_cell = begin_cell().store_uint(from_chain_id,32).store_slice(storage::jetton_address).end_cell();
+    int swap_id_hash = cell_hash(swap_id_cell);
+    (var swap_info_cell, int found) = udict_get_ref?(storage::swap_dic,DEFAULT_KEY_LENGTH, swap_id_hash);
+    if(found) {
+        slice swap_info = swap_info_cell.begin_parse();
+        (var chain_id,var origin_share,var target_share,var swapped_amount,var swapped_times) =
+        (swap_info~load_uint(32),swap_info~load_uint(64),swap_info~load_uint(64),swap_info~load_uint(256),swap_info~load_uint(256));
+        return (swap_id_hash,chain_id,origin_share,target_share,swapped_amount,swapped_times);
+    }
+    return (0,0,0,0,0,0);
+}
+
+(int) get_estimate_add_liquidity_fee() method_id {
+    return calculate_add_liquidity_fee();
+}
+
+(int) get_estimate_add_native_liquidity_fee() method_id {
+    return calculate_add_native_token_liquidity_fee();
+}
+
+(int) get_estimate_remove_liquidity_fee() method_id {
+    return calculate_remove_liquidity_fee();
+}
+
+(int) get_estimate_remove_native_liquidity_fee() method_id {
+    return calculate_remove_native_liquidity_fee();
+}

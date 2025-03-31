@@ -1,0 +1,336 @@
+;; test [Pipeline.spec.ts]
+const ONE_TON = 1000000000;
+const MIN_STORAGE_DURATION = 10 * 365 * 24 * 3600; ;; 10 years
+
+const RECEIVE_FROM_ORACLE_TON = 50000000; ;; 0.05 ton
+const TO_ORACLE_TON = 10000000; ;; 0.01 ton
+
+const TRANSFER_FEE = 40000000; ;; 0.04 ton 2 * 14000000 + 10000000 (from mock jetton)
+
+const BRIDGE_LIQUIDITY_ACCOUNT_BITS = 4413;
+const BRIDGE_LIQUIDITY_ACCOUNT_CELLS = 11;
+
+const BRIDGE_LIQUIDITY_ACCOUNT_INITSTATES_BITS = 4311;
+const BRIDGE_LIQUIDITY_ACCOUNT_INITSTATES_CELLS = 11;
+
+const CREATE_RECEIPT_BITS = 587; ;; 32+32+256+(3+8+256)
+const CREATE_RECEIPT_CELLS = 1;
+
+const CREATE_NATIVE_RECEIPT_BITS = 508; ;; 32+64+32+256+124
+const CREATE_NATIVE_RECEIPT_CELLS = 1;
+
+const LOCK_NATIVE_BITS = 786; ;;32+64+32+(3+8+256)+(3+8+256)+124
+const LOCK_NATIVE_CELLS = 1;
+
+const LOCK_BITS = 598; ;;32+32+(3+8+256)+(3+8+256)
+const LOCK_CELLS = 1;
+
+const RECEIPT_OK_BITS = 1554; ;;32+32+64+124+(256+256)+((3+8+256)+(3+8+256)+256)
+const RECEIPT_OK_CELLS = 3;
+
+const SEND_TO_ORACLE_BITS = 2523; ;;32+64+(256)+(16+768+8+16+512+8)+(64+256+(3+8+256)+256)
+const SEND_TO_ORACLE_CELLS = 6;
+
+const TRANSMIT_BITS = 3090; ;;32+128+(64+64+256+(3+8+256))+(16+768+8+(16+608+8))+(256+64+(3+8+256)+(3+8+256)+1)
+const TRANSMIT_CELLS = 11;
+
+const RELEASE_BITS = 1639; ;;32+128+256+(256+256)+256+(3+8+256)+124+64
+const RELEASE_CELLS = 4;
+
+const RELEASE_TRANSFER_BITS = 0;
+const RELEASE_TRANSFER_CELLS = 1;
+
+const ADD_LIQUIDITY_BITS = 32;
+const ADD_LIQUIDITY_CELLS = 1;
+
+const PROVIDER_LIQUIDITY_BITS = 220; ;;32+64+124
+const PROVIDER_LIQUIDITY_CELLS = 1;
+
+const ADD_NATIVE_LIQUIDITY_BITS = 220; ;;32+64+124
+const ADD_NATIVE_LIQUIDITY_CELLS = 1;
+
+const USER_REMOVE_LIQUIDITY_BITS = 220; ;;32+64+124
+const USER_REMOVE_LIQUIDITY_CELLS = 1;
+
+const REMOVE_LIQUIDITY_BITS = 487; ;;32+64+124 +(3+8+256)
+const REMOVE_LIQUIDITY_CELLS = 1;
+
+const REMOVE_LIQUIDITY_TRANSFER_BITS = 267; ;;3+8+256
+const REMOVE_LIQUIDITY_TRANSFER_CELLS = 1;
+
+const LOCKED_EVENT_BITS = 989; ;; 32+32+124+(3+8+256+3+8+256+3+8+256);
+const LOCKED_EVENT_CELLS = 2;
+
+const RELEASED_EVENT_BITS = 1234; ;; 32+3+8+256+3+8+256+124+32+(256+256)
+const RELEASED_EVENT_CELLS = 2;
+
+const RESEND_TO_BRIDGE_BITS = 779; ;;32+(3+8+256)+(128+256)+32+64
+const RESEND_TO_BRIDGE_CELLS = 2;
+
+const LIMIT_CONSUMED_EVENT_BITS = 321; ;;32+32+1+256
+const LIMIT_CONSUMED_EVENT_CELLS = 1;
+
+const NEW_RECEIPT_EVENT_BITS = 1309; ;;32+32+124+(3+8+256)*3+(64+256)
+const NEW_RECEIPT_EVENT_CELLS = 3;
+
+const TRANSFER_BITS = 912;
+const TRANSFER_CELLS = 1;
+
+const SEND_TRANFSER_GAS_CONSUMPTION = 8341;
+const SEND_INTERNAL_TRANFSER_GAS_CONSUMPTION = 10123;
+const SEND_CREATE_RECEIPT_IN_TRANSFER_NOTIFICATION_GAS_CONSUMPTION = 11130;
+const SEND_LOCK_IN_TRANSFER_NOTIFICATION_GAS_CONSUMPTION = 47392;
+const SEND_RECEIPT_OK_GAS_CONSUMPTION = 20843;
+const SEND_TO_ORACLE_GAS_CONSUMPTION = 8213;
+const RECEIPT_OK_BOUNCE_GAS_CONSUMPTION = 16293;
+
+const SEND_CREATE_NATIVE_RECEIPT_GAS_CONSUMPTION = 8962;
+const SEND_LOCK_NATIVE_GAS_CONSUMPTION = 50000;
+
+const SEND_TRANSMIT_GAS_CONSUMPTION = 24853;
+const SEND_RELEASE_GAS_CONSUMPTION = 37859;
+const SEND_RESEND_TO_BRIDGE_GAS_CONSUMPTION = 14860;
+const SEND_TRANSFER_GAS_CONSUMPTION = 8341;
+const SEND_INTERNAL_TRANSFER_GAS_CONSUMPTION = 7822;
+
+const SEND_RELEASE_NATIVE_TOKEN_GAS_CONSUMPTION = 36233;
+const SEND_RELEASE_TRANSFER_GAS_CONSUMPTION = 309;
+
+const SEND_ADD_LIQUIDITY_GAS_CONSUMPTION = 14989;
+const PROVIDE_LIQUIDITY_GAS_CONSUMPTION = 3412;
+
+const SEND_ADD_NATIVE_LIQUIDITY_GAS_CONSUMPTION = 14975;
+
+const SEND_USER_REMOVE_LIQUIDITY_GAS_CONSUMPTION = 6026;
+const SEND_REMOVE_LIQUIDITY_GAS_CONSUMPTION = 14626;
+
+const SEND_REMOVE_NATIVE_LIQUIDITY_GAS_CONSUMPTION = 14898;
+
+int calculate_bridge_liquidity_account_min_storage_fee() inline {
+    return get_storage_fee(WORKCHAIN, MIN_STORAGE_DURATION, BRIDGE_LIQUIDITY_ACCOUNT_BITS, BRIDGE_LIQUIDITY_ACCOUNT_CELLS);
+}
+
+int forward_init_state_overhead() inline {
+    return get_simple_forward_fee(WORKCHAIN, BRIDGE_LIQUIDITY_ACCOUNT_INITSTATES_BITS, BRIDGE_LIQUIDITY_ACCOUNT_INITSTATES_CELLS);
+}
+
+{- There are following costs:
+   1) Gas cost on create receipt
+   2) User -> user jetton wallet
+   3) User jetton wallet -> BridgeJettonWallet
+   4) BridgeJettonWallet -> bridge
+   5) Bridge -> BridgeJettonWallet
+   6) BridgeJettonWallet -> BridgePoolJettonWallet
+   7) BridgePoolJettonWallet -> BridgePool
+   8) BridgePool -> Brigde
+   9) Bridge -> oracle 0.01 ton
+-}
+(int) calculate_create_receipt_process_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+
+    int create_receipt_gas_consumption = null?(gas_consumption) ? SEND_CREATE_RECEIPT_IN_TRANSFER_NOTIFICATION_GAS_CONSUMPTION : gas_consumption;
+    int lock_gas_consumption = null?(gas_consumption) ? SEND_LOCK_IN_TRANSFER_NOTIFICATION_GAS_CONSUMPTION : gas_consumption;
+    int receipt_ok_gas_consumption = null?(gas_consumption) ? SEND_RECEIPT_OK_GAS_CONSUMPTION : gas_consumption;
+    int send_to_oracle_gas_consumption = null?(gas_consumption) ? SEND_TO_ORACLE_GAS_CONSUMPTION : gas_consumption;
+
+    int gas_fee = get_compute_fee(WORKCHAIN, create_receipt_gas_consumption)
+    + get_compute_fee(WORKCHAIN, lock_gas_consumption)
+    + get_compute_fee(WORKCHAIN, receipt_ok_gas_consumption)
+    + get_compute_fee(WORKCHAIN, send_to_oracle_gas_consumption);
+
+    int fwd_fee = get_forward_fee(WORKCHAIN, LOCK_BITS, LOCK_CELLS)
+    + get_forward_fee(WORKCHAIN, RECEIPT_OK_BITS, RECEIPT_OK_CELLS)
+    + get_forward_fee(WORKCHAIN, SEND_TO_ORACLE_BITS, SEND_TO_ORACLE_CELLS)
+    + get_forward_fee(WORKCHAIN, NEW_RECEIPT_EVENT_BITS, RELEASED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN,LOCKED_EVENT_BITS, LOCKED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN, LIMIT_CONSUMED_EVENT_BITS, LIMIT_CONSUMED_EVENT_CELLS);
+
+    return gas_fee + fwd_fee + TRANSFER_FEE + TO_ORACLE_TON;
+}
+
+;; lock fee
+;; bridge pool - bridge : receipt_ok fee
+;; bridge - oracle : send_to_oracle fee
+;; for bounce message receipt_ok ： transfer fee
+(int) calculate_transfer_lock_fwd_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+
+    int lock_gas_consumption = null?(gas_consumption) ? SEND_LOCK_IN_TRANSFER_NOTIFICATION_GAS_CONSUMPTION : gas_consumption;
+    int receipt_ok_gas_consumption = null?(gas_consumption) ? SEND_RECEIPT_OK_GAS_CONSUMPTION : gas_consumption;
+    int receipt_ok_bounce_gas_consumption = null?(gas_consumption) ? RECEIPT_OK_BOUNCE_GAS_CONSUMPTION : gas_consumption;
+    int send_to_oracle_gas_consumption = null?(gas_consumption) ? SEND_TO_ORACLE_GAS_CONSUMPTION : gas_consumption;
+
+    int gas_fee = get_compute_fee(WORKCHAIN, lock_gas_consumption)
+    + get_compute_fee(WORKCHAIN, receipt_ok_gas_consumption)
+    + get_compute_fee(WORKCHAIN, send_to_oracle_gas_consumption)
+    + get_compute_fee(WORKCHAIN, receipt_ok_bounce_gas_consumption);
+
+    int fwd_fee = get_forward_fee(WORKCHAIN, LOCK_BITS, LOCK_CELLS)
+    + get_forward_fee(WORKCHAIN, RECEIPT_OK_BITS, RECEIPT_OK_CELLS)
+    + get_forward_fee(WORKCHAIN, SEND_TO_ORACLE_BITS, SEND_TO_ORACLE_CELLS)
+    + get_forward_fee(WORKCHAIN, NEW_RECEIPT_EVENT_BITS, RELEASED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN,LOCKED_EVENT_BITS, LOCKED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN, LIMIT_CONSUMED_EVENT_BITS, LIMIT_CONSUMED_EVENT_CELLS);
+
+    return gas_fee + fwd_fee + TO_ORACLE_TON + TRANSFER_FEE;
+}
+
+(int) send_to_bridge_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int receipt_ok_gas_consumption = null?(gas_consumption) ? SEND_RECEIPT_OK_GAS_CONSUMPTION : gas_consumption;
+    int send_to_oracle_gas_consumption = null?(gas_consumption) ? SEND_TO_ORACLE_GAS_CONSUMPTION : gas_consumption;
+    int receipt_ok_bounce_gas_consumption = null?(gas_consumption) ? RECEIPT_OK_BOUNCE_GAS_CONSUMPTION : gas_consumption;
+
+    int gas_fee = get_compute_fee(WORKCHAIN, receipt_ok_gas_consumption)
+    + get_compute_fee(WORKCHAIN, send_to_oracle_gas_consumption)
+    + get_compute_fee(WORKCHAIN, receipt_ok_bounce_gas_consumption);
+
+    int fwd_fee = 
+    get_forward_fee(WORKCHAIN, RECEIPT_OK_BITS, RECEIPT_OK_CELLS)
+    + get_forward_fee(WORKCHAIN, SEND_TO_ORACLE_BITS, SEND_TO_ORACLE_CELLS)
+    + get_forward_fee(WORKCHAIN, NEW_RECEIPT_EVENT_BITS, RELEASED_EVENT_CELLS);
+    return gas_fee + fwd_fee + TO_ORACLE_TON + TRANSFER_FEE;
+}
+
+(int) calculate_lock_native_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int lock_gas_consumption = null?(gas_consumption) ? SEND_LOCK_IN_TRANSFER_NOTIFICATION_GAS_CONSUMPTION : gas_consumption;
+    int fee = get_compute_fee(WORKCHAIN, lock_gas_consumption)
+    + get_forward_fee(WORKCHAIN, LOCK_NATIVE_BITS, LOCK_NATIVE_CELLS)
+    + get_forward_fee(WORKCHAIN, RECEIPT_OK_BITS, RECEIPT_OK_CELLS)
+    + get_forward_fee(WORKCHAIN,LOCKED_EVENT_BITS, LOCKED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN, LIMIT_CONSUMED_EVENT_BITS, LIMIT_CONSUMED_EVENT_CELLS);
+    return fee;
+}
+
+;; bridge - bridge pool : release
+;; bridge pool - user : transfer - jetton transfer
+;; bridge pool : released event / dailylimit consumed event / ratelimit consumed event
+;; bridge pool - bridge : resend
+(int) calculate_release_jetton_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int release_gas_consumption = null?(gas_consumption) ? SEND_RELEASE_GAS_CONSUMPTION : gas_consumption;
+    int resend_to_bridge_gas_consumption = null?(gas_consumption) ? SEND_RESEND_TO_BRIDGE_GAS_CONSUMPTION : gas_consumption;
+
+    int gas_fee =
+    get_compute_fee(WORKCHAIN, release_gas_consumption)
+    + get_compute_fee(WORKCHAIN, resend_to_bridge_gas_consumption);
+
+    int fwd_fee =
+    get_forward_fee(WORKCHAIN, RELEASE_BITS, RELEASE_CELLS)
+    + get_forward_fee(WORKCHAIN, RESEND_TO_BRIDGE_BITS, RESEND_TO_BRIDGE_CELLS)
+    + get_forward_fee(WORKCHAIN, RELEASED_EVENT_BITS, RELEASED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN, LIMIT_CONSUMED_EVENT_BITS, LIMIT_CONSUMED_EVENT_CELLS);
+    return gas_fee + fwd_fee + TRANSFER_FEE;
+}
+
+(int) calculate_create_native_receipt_process_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int create_receipt_gas_consumption = null?(gas_consumption) ? SEND_CREATE_NATIVE_RECEIPT_GAS_CONSUMPTION : gas_consumption;
+    int lock_gas_consumption = null?(gas_consumption) ? SEND_LOCK_NATIVE_GAS_CONSUMPTION : gas_consumption;
+    int receipt_ok_gas_consumption = null?(gas_consumption) ? SEND_RECEIPT_OK_GAS_CONSUMPTION : gas_consumption;
+    int send_to_oracle_gas_consumption = null?(gas_consumption) ? SEND_TO_ORACLE_GAS_CONSUMPTION : gas_consumption;
+
+    int gas_fee = 
+    get_compute_fee(WORKCHAIN, create_receipt_gas_consumption)
+    + get_compute_fee(WORKCHAIN, lock_gas_consumption)
+    + get_compute_fee(WORKCHAIN,receipt_ok_gas_consumption)
+    + get_compute_fee(WORKCHAIN, send_to_oracle_gas_consumption);
+    int fwd_fee = 
+    get_forward_fee(WORKCHAIN, CREATE_NATIVE_RECEIPT_BITS, CREATE_NATIVE_RECEIPT_CELLS)
+    + get_forward_fee(WORKCHAIN, LOCK_NATIVE_BITS, LOCK_NATIVE_CELLS)
+    + get_forward_fee(WORKCHAIN, RECEIPT_OK_BITS, RECEIPT_OK_CELLS)
+    + get_forward_fee(WORKCHAIN, SEND_TO_ORACLE_BITS, SEND_TO_ORACLE_CELLS)
+    + get_forward_fee(WORKCHAIN, NEW_RECEIPT_EVENT_BITS, RELEASED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN,LOCKED_EVENT_BITS, LOCKED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN, LIMIT_CONSUMED_EVENT_BITS, LIMIT_CONSUMED_EVENT_CELLS);
+
+    return gas_fee + fwd_fee + TO_ORACLE_TON;
+}
+
+;; bridge - bridge pool : release
+;; bridge pool - user : transfer
+;; bridge pool : released event / limit consumed event
+;; bridge pool - bridge : resend
+(int) calculate_release_native_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int release_gas_consumption = null?(gas_consumption) ? SEND_RELEASE_NATIVE_TOKEN_GAS_CONSUMPTION : gas_consumption;
+    int release_transfer_gas_consumption = null?(gas_consumption) ? SEND_RELEASE_TRANSFER_GAS_CONSUMPTION : gas_consumption;
+    int resend_to_bridge_gas_consumption = null?(gas_consumption) ? SEND_RESEND_TO_BRIDGE_GAS_CONSUMPTION : gas_consumption;
+    
+    int gas_fee = get_compute_fee(WORKCHAIN, resend_to_bridge_gas_consumption)
+    + get_compute_fee(WORKCHAIN, release_gas_consumption)
+    + get_compute_fee(WORKCHAIN, release_transfer_gas_consumption);
+
+    int fwd_fee =
+    get_forward_fee(WORKCHAIN, RELEASE_BITS, RELEASE_CELLS)
+    + get_forward_fee(WORKCHAIN, RESEND_TO_BRIDGE_BITS, RESEND_TO_BRIDGE_CELLS)
+    + get_forward_fee(WORKCHAIN, RELEASED_EVENT_BITS, RELEASED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN, LIMIT_CONSUMED_EVENT_BITS, LIMIT_CONSUMED_EVENT_CELLS)
+    + get_forward_fee(WORKCHAIN, RELEASE_TRANSFER_BITS, RELEASE_TRANSFER_CELLS);
+    return gas_fee + fwd_fee;
+}
+
+(int) calculate_release_transfer_fee() impure inline {
+    int fwd_fee = get_forward_fee(WORKCHAIN, TRANSFER_BITS, TRANSFER_CELLS);
+    return fwd_fee + TRANSFER_FEE;
+}
+
+
+
+(int) calculate_add_liquidity_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int add_liquidity_gas_consumption = null?(gas_consumption) ? SEND_ADD_LIQUIDITY_GAS_CONSUMPTION : gas_consumption;
+    int provide_liquidity_gas_consumption = null?(gas_consumption) ? PROVIDE_LIQUIDITY_GAS_CONSUMPTION : gas_consumption;
+    int gas_fee = get_compute_fee(WORKCHAIN, add_liquidity_gas_consumption)
+    + get_compute_fee(WORKCHAIN, provide_liquidity_gas_consumption);
+    int fwd_fee = get_forward_fee(WORKCHAIN, ADD_LIQUIDITY_BITS, ADD_LIQUIDITY_CELLS)
+    + get_forward_fee(WORKCHAIN, PROVIDER_LIQUIDITY_BITS, PROVIDER_LIQUIDITY_CELLS);
+    return gas_fee + fwd_fee + TRANSFER_FEE + forward_init_state_overhead() + calculate_bridge_liquidity_account_min_storage_fee();
+}
+
+(int) calculate_add_native_token_liquidity_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int add_liquidity_gas_consumption = null?(gas_consumption) ? SEND_ADD_NATIVE_LIQUIDITY_GAS_CONSUMPTION : gas_consumption;
+    int provide_liquidity_gas_consumption = null?(gas_consumption) ? PROVIDE_LIQUIDITY_GAS_CONSUMPTION : gas_consumption;
+    int gas_fee = get_compute_fee(WORKCHAIN, add_liquidity_gas_consumption)
+    + get_compute_fee(WORKCHAIN, provide_liquidity_gas_consumption);
+    int fwd_fee = get_forward_fee(WORKCHAIN, ADD_NATIVE_LIQUIDITY_BITS, ADD_NATIVE_LIQUIDITY_CELLS)
+    + get_forward_fee(WORKCHAIN, PROVIDER_LIQUIDITY_BITS, PROVIDER_LIQUIDITY_CELLS);
+    return gas_fee + fwd_fee + forward_init_state_overhead() + calculate_bridge_liquidity_account_min_storage_fee();
+}
+
+(int) add_native_token_liquidity_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int add_liquidity_gas_consumption = null?(gas_consumption) ? SEND_ADD_NATIVE_LIQUIDITY_GAS_CONSUMPTION : gas_consumption;
+    int gas_fee = get_compute_fee(WORKCHAIN, add_liquidity_gas_consumption);
+    int fwd_fee = get_forward_fee(WORKCHAIN, ADD_NATIVE_LIQUIDITY_BITS, ADD_NATIVE_LIQUIDITY_CELLS)
+    + get_forward_fee(WORKCHAIN, PROVIDER_LIQUIDITY_BITS, PROVIDER_LIQUIDITY_CELLS);
+    return gas_fee + fwd_fee;
+}
+
+(int) calculate_remove_liquidity_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int user_remove_liquidity_gas_consumption = null?(gas_consumption) ? SEND_USER_REMOVE_LIQUIDITY_GAS_CONSUMPTION : gas_consumption;
+    int remove_liquidity_gas_consumption = null?(gas_consumption) ? SEND_REMOVE_LIQUIDITY_GAS_CONSUMPTION : gas_consumption;
+    int gas_fee = get_compute_fee(WORKCHAIN, user_remove_liquidity_gas_consumption)
+    + get_compute_fee(WORKCHAIN, remove_liquidity_gas_consumption);
+    int fwd_fee = get_forward_fee(WORKCHAIN, USER_REMOVE_LIQUIDITY_BITS, USER_REMOVE_LIQUIDITY_CELLS)
+    + get_forward_fee(WORKCHAIN, REMOVE_LIQUIDITY_BITS, REMOVE_LIQUIDITY_CELLS);
+    return gas_fee + fwd_fee + TRANSFER_FEE + forward_init_state_overhead() + calculate_bridge_liquidity_account_min_storage_fee();
+}
+
+(int) calculate_remove_native_liquidity_fee() impure inline {
+    int gas_consumption = get_precompiled_gas_consumption();
+    int user_remove_liquidity_gas_consumption = null?(gas_consumption) ? SEND_USER_REMOVE_LIQUIDITY_GAS_CONSUMPTION : gas_consumption;
+    int remove_liquidity_gas_consumption = null?(gas_consumption) ? SEND_REMOVE_NATIVE_LIQUIDITY_GAS_CONSUMPTION : gas_consumption;
+    int transfer_gas_consumption = null?(gas_consumption) ? SEND_RELEASE_TRANSFER_GAS_CONSUMPTION : gas_consumption;
+
+    int gas_fee = get_compute_fee(WORKCHAIN, user_remove_liquidity_gas_consumption)
+    + get_compute_fee(WORKCHAIN, remove_liquidity_gas_consumption)
+    + get_compute_fee(WORKCHAIN, transfer_gas_consumption);
+    int fwd_fee = get_forward_fee(WORKCHAIN, USER_REMOVE_LIQUIDITY_BITS, USER_REMOVE_LIQUIDITY_CELLS)
+    + get_forward_fee(WORKCHAIN, REMOVE_LIQUIDITY_BITS, REMOVE_LIQUIDITY_CELLS)
+    + get_forward_fee(WORKCHAIN, REMOVE_LIQUIDITY_TRANSFER_BITS, REMOVE_LIQUIDITY_TRANSFER_CELLS);
+    return gas_fee + fwd_fee + forward_init_state_overhead() + calculate_bridge_liquidity_account_min_storage_fee();
+}

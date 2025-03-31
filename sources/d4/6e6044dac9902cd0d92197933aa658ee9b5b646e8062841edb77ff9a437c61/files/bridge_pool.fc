@@ -1,0 +1,536 @@
+#include "common/stdlib.fc";
+#include "common/jetton-utils.fc";
+#include "common/message.fc";
+#include "common/dic.fc";
+#include "common/commonutils.fc";
+#include "bridge_pool/storage.fc";
+#include "bridge_pool/op.fc";
+#include "bridge_pool/errors.fc";
+#include "bridge_pool/params.fc";
+#include "bridge_pool/owner-calls.fc";
+#include "bridge_pool/limiter.fc";
+#include "bridge_pool/bridge_pool_liquidity_account-utils.fc";
+#include "bridge_pool/getter.fc";
+#include "gas.fc";
+#include "bridge_pool/get.fc";
+
+
+() return_jetton_to_user(int query_id, int jetton_amount, slice transfer_to, slice response, slice message_to, int exit_code) impure inline_ref {
+    builder body = create_simple_transfer_body(query_id, jetton_amount, transfer_to, response, 0);
+    body = body.store_uint(exit_code, 32);
+    send_simple_message(0, message_to, body.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+}
+
+() cleanup_expired_receipt_owner() inline {
+    int current_day = now() / ONEDAY;
+    (int key, _, int flag) = udict_get_min?(storage::receipt_owner_tmp_dic, BUCKET_KEY_LENGTH);
+    while (flag) {
+        if (key + 2 <= current_day) {
+            (storage::receipt_owner_tmp_dic, _) = udict_delete?(storage::receipt_owner_tmp_dic, BUCKET_KEY_LENGTH, key);
+            (key, _, flag) = udict_get_next?(storage::receipt_owner_tmp_dic, BUCKET_KEY_LENGTH, key);
+        } else {
+            flag = 0;
+        }
+    }
+}
+
+(int) record_receipt(slice owner, int query_id, int target_chain_id, slice target_address, int amount, int is_native, int msg_value) impure inline_ref {
+    cell body = null();
+    try {
+        (slice receipt_info, int found) = udict_get?(storage::receipt_dic, CHAIN_ID_KEY_LENGTH, target_chain_id);
+        int index_value = 0;
+        if (found) {
+            int total_amount = receipt_info~load_uint(256);
+            int index = receipt_info~load_uint(64);
+            total_amount += amount;
+            index += 1;
+            index_value = index;
+            storage::receipt_dic~udict_set_builder(CHAIN_ID_KEY_LENGTH,
+                target_chain_id,
+                begin_cell().store_uint(total_amount, 256).store_uint(index, 64));
+        } else {
+            storage::receipt_dic~udict_set_builder(CHAIN_ID_KEY_LENGTH,
+                target_chain_id,
+                begin_cell().store_uint(amount, 256).store_uint(1, 64));
+            index_value = 1;
+        }
+        (int wc, int address_hash) = parse_std_addr(storage::jetton_address);
+        cell token_key = begin_cell()
+            .store_uint(WORKCHAIN, 32)
+            .store_uint(CHAINID, 32)
+            .store_uint(target_chain_id, 32)
+            .store_uint(address_hash, 256).end_cell();
+        int key_hash = string_hash(token_key.begin_parse());
+        cell receipt_id = begin_cell()
+            .store_uint(key_hash, 256)
+            .store_uint(index_value, 64)
+            .end_cell();
+        int current_day = now() / ONEDAY;
+        (cell receipt_owner, int found) = udict_get_ref?(storage::receipt_owner_tmp_dic, BUCKET_KEY_LENGTH, current_day);
+        if (~ found) {
+            receipt_owner = new_dict();
+        }
+        int combined_key = (target_chain_id << 64) | index_value;
+        receipt_owner = udict_set(receipt_owner, 96, combined_key, owner);
+        storage::receipt_owner_tmp_dic = udict_set_ref(storage::receipt_owner_tmp_dic, BUCKET_KEY_LENGTH, current_day, receipt_owner);
+        cleanup_expired_receipt_owner();
+        body = begin_cell()
+            .store_uint(receipt_ok, 32)
+            .store_uint(target_chain_id, 32)
+            .store_uint(index_value, 64)
+            .store_coins(amount)
+            .store_ref(receipt_id)
+            .store_ref(begin_cell()
+                .store_slice(owner)
+                .store_slice(storage::jetton_address)
+                .store_slice(target_address)
+                .end_cell())
+            .end_cell();
+    } catch (x, n) {
+        if (is_native) {
+            send_message_nobounce(0, owner, begin_cell().store_uint(n, 32).end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        } else {
+            return_jetton_to_user(query_id, amount, owner, owner, storage::jetton_pool_wallet_address, n);
+        }
+        return false;
+    }
+    emit_log_simple(LOCKED,
+        begin_cell()
+            .store_uint(LOCKED, 32)
+            .store_uint(target_chain_id, 32)
+            .store_coins(amount)
+            .store_ref(begin_cell()
+                .store_slice(owner)
+                .store_slice(storage::jetton_address)
+                .store_slice(target_address)
+                .end_cell())
+            .end_cell(),
+        1);
+    if (is_native) {
+        int estimate_fee = calculate_lock_native_fee();
+        msg_value -= estimate_fee;
+        send_simple_message(msg_value, storage::bridge_address, body, SEND_MODE_REGULAR);
+    } else {
+        send_simple_message(send_to_bridge_fee(), storage::bridge_address, body, SEND_MODE_REGULAR);
+    }
+    return true;
+}
+
+() resend_to_bridge(int receipt_hash, int timestamp, int message_id, int error, int min_wait) impure inline_ref {
+    cell body = begin_cell()
+        .store_uint(resend_to_oracle, 32)
+        .store_slice(storage::jetton_address)
+        .store_ref(begin_cell()
+            .store_int(message_id, 128)
+            .store_uint(receipt_hash, 256)
+            .store_uint(timestamp, 64)
+            .end_cell())
+        .store_uint(error, 32)
+        .store_uint(min_wait, 64)
+        .end_cell();
+    send_message_nobounce(0, storage::bridge_address, body, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+}
+
+int to_64(int message_id) {
+    var message_id_cell = begin_cell().store_int(message_id, 128).end_cell().begin_parse();
+    int hash64 = message_id_cell~load_uint(64);
+    return hash64;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        ;; ignore empty messages
+        return ();
+    }
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+
+    slice sender_address = cs~load_msg_addr();
+
+    load_storage();
+
+    if (flags & 1) {
+        in_msg_body~skip_bits(32);
+        int op = in_msg_body~load_uint(32);
+        if (op == receipt_ok) {
+            int target_chain_id = in_msg_body~load_uint(32);
+            int index = in_msg_body~load_uint(64);
+            int amount = in_msg_body~load_coins();
+            (var receipt_info, var found) = udict_get?(storage::receipt_dic, CHAIN_ID_KEY_LENGTH, target_chain_id);
+            if (found) {
+                var total_amount = receipt_info~load_uint(256);
+                var index_value = receipt_info~load_uint(64);
+                total_amount -= amount;
+                storage::receipt_dic~udict_set_builder(CHAIN_ID_KEY_LENGTH,
+                    target_chain_id,
+                    begin_cell().store_uint(total_amount, 256).store_uint(index_value, 64));
+                storage::liquidity -= amount;
+                ;; found receipt owner
+                var current_day = now() / ONEDAY;
+                int found_receipt = 0;
+                cell receipt_owner = null();
+                (receipt_owner, found_receipt) = udict_get_ref?(storage::receipt_owner_tmp_dic, BUCKET_KEY_LENGTH, current_day);
+                if (~ found_receipt) {
+                    (receipt_owner, found_receipt) = udict_get_ref?(storage::receipt_owner_tmp_dic, BUCKET_KEY_LENGTH, current_day - 1);
+                }
+                if (found_receipt) {
+                    int combined_key = (target_chain_id << 64) | index;
+                    (slice owner, var found) = udict_get?(receipt_owner, 96, combined_key);
+                    if (found) {
+                        if (equal_slices(storage::jetton_address, HOLE_ADDRESS)) {
+                            send_message_nobounce(amount, owner, begin_cell().store_slice(owner).end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+                        } else {
+                            return_jetton_to_user(0, amount, owner, owner, storage::jetton_pool_wallet_address, RECEIPT_FAILED);
+                        }
+                        (receipt_owner, _) = udict_delete?(receipt_owner, 96, combined_key);
+                    }
+                }
+            }
+        }
+        save_storage();
+        return ();
+    }
+
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins();
+
+    force_chain(WORKCHAIN, sender_address, WRONG_WORKCHAIN);
+    int op = in_msg_body~load_uint(32);
+    if (op == release) {
+        throw_unless(UNAUTHORIZED, equal_slices(sender_address, storage::bridge_address));
+        (int message_id, cell swap_id_ref, cell receipt_cell, int receipt_amount) = (in_msg_body~load_int(128), in_msg_body~load_ref(), in_msg_body~load_ref(), in_msg_body~load_coins());
+        slice receipt_info = receipt_cell.begin_parse();
+        (var receipt_id, int receipt_hash, int timestamp, slice receiver) = (receipt_info~load_ref(), receipt_info~load_uint(256), receipt_info~load_uint(64), receipt_info~load_msg_addr());
+        slice swap_id_slice = swap_id_ref.begin_parse();
+        int swap_id = swap_id_slice~load_uint(256);
+        (var swap_info_cell, int found_swap) = udict_get_ref?(storage::swap_dic, DEFAULT_KEY_LENGTH, swap_id);
+        ifnot (found_swap) {
+            resend_to_bridge(receipt_hash, timestamp, message_id, SWAP_NOT_FOUND, HALF_ONE_DAY);
+            return ();
+        }
+        ;; 1. calculate actual amount
+        slice swap_info = swap_info_cell.begin_parse();
+        (int from_chain_id, int origin_share, int target_share, int swapped_amount, int swapped_times) = (swap_info~load_uint(32), swap_info~load_uint(64), swap_info~load_uint(64), swap_info~load_uint(256), swap_info~load_uint(256));
+        int amount = receipt_amount * target_share / origin_share;
+        ;; 2. check liquidity
+        if (storage::liquidity < amount) {
+            resend_to_bridge(receipt_hash, timestamp, message_id, LIQUIDITY_NOT_ENOUGH, HALF_ONE_DAY);
+            return ();
+        }
+        ;; 3. consume limit
+        (var success, var error, var min_wait_seconds) = consume_limit(from_chain_id, SWAP, amount);
+        if (success) {
+            int query_id = to_64(message_id);
+            storage::liquidity -= amount;
+            ;; 4. send token to receiver
+            if (equal_slices(storage::jetton_address, HOLE_ADDRESS)) {
+                ;; release native token
+                var body = begin_cell().store_uint(from_chain_id, 32).end_cell();
+                send_message_nobounce(amount, receiver, body, SEND_MODE_PAY_FEES_SEPARETELY);
+            } else {
+                var body0 = create_simple_transfer_body(query_id, amount, receiver, storage::bridge_address, 0);
+                body0 = body0.store_uint(swap_ok, 32);
+                send_simple_message(calculate_release_transfer_fee(), storage::jetton_pool_wallet_address, body0.end_cell(), SEND_MODE_REGULAR);
+            }
+            ;; 5. update swap info
+            swapped_amount += amount;
+            swapped_times += 1;
+            storage::swap_dic = udict_set_ref(storage::swap_dic, DEFAULT_KEY_LENGTH, swap_id, begin_cell()
+                .store_uint(from_chain_id, 32)
+                .store_uint(origin_share, 64)
+                .store_uint(target_share, 64)
+                .store_uint(swapped_amount, 256)
+                .store_uint(swapped_times, 256)
+                .end_cell()
+            );
+            emit_log_simple(LIMIT_CONSUMED,
+                begin_cell()
+                    .store_uint(LIMIT_CONSUMED, 32)
+                    .store_uint(from_chain_id, 32)
+                    .store_uint(SWAP, 1)
+                    .store_uint(amount, 256)
+                    .end_cell(),
+                1
+            );
+        } else {
+            resend_to_bridge(receipt_hash, timestamp, message_id, error, min_wait_seconds);
+            return ();
+        }
+        emit_log_simple(RELEASED,
+            begin_cell()
+                .store_uint(RELEASED, 32)
+                .store_slice(receiver)
+                .store_slice(storage::jetton_address)
+                .store_coins(amount)
+                .store_uint(from_chain_id, 32)
+                .store_ref(receipt_id)
+                .end_cell(),
+            1);
+        save_storage();
+        return ();
+    }
+    int query_id = in_msg_body~load_uint(64);
+    if (op == excesses) {
+        ;; just accept ton
+        return ();
+    }
+    if (op == transfer_notification) {
+        (int jetton_amount, slice from_sender) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+        cell ref_cs = null();
+        try {
+            ref_cs = in_msg_body~load_ref();
+        } catch (_, n) {
+            return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, n);
+            return ();
+        }
+        throw_unless(INVALID_AMOUNT, jetton_amount > 0);
+        slice ref_ds = null();
+        int transfer_op = 0;
+        try {
+            ref_ds = ref_cs.begin_parse();
+            transfer_op = ref_ds~load_uint(32);
+        } catch (_, n) {
+            return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, n);
+            return ();
+        }
+        if (transfer_op == lock) {
+            if (~ equal_slices(from_sender, storage::bridge_address)) {
+                return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, UNAUTHORIZED);
+                return ();
+            }
+            if (~ equal_slices(sender_address, storage::jetton_pool_wallet_address)) {
+                return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, UNAUTHORIZED_JETTON_WALLET);
+                return ();
+            }
+            (int target_chain_id, slice target_address, slice owner) = (0, null(), null());
+            try {
+                (target_chain_id, target_address, owner) = (ref_ds~load_uint(32), ref_ds~load_bits(256), ref_ds~load_msg_addr());
+            } catch (x, n) {
+                return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, n);
+                return ();
+            }
+            (var success, var error, var min_wait_seconds) = consume_limit(target_chain_id, RECEIPT, jetton_amount);
+            if (success) {
+                storage::liquidity += jetton_amount;
+                var success_record = record_receipt(owner, query_id, target_chain_id, target_address, jetton_amount, 0, 0);
+                if (~ success_record) {
+                    return ();
+                } else {
+                    emit_log_simple(LIMIT_CONSUMED,
+                        begin_cell()
+                            .store_uint(LIMIT_CONSUMED, 32)
+                            .store_uint(target_chain_id, 32)
+                            .store_uint(RECEIPT, 1)
+                            .store_uint(jetton_amount, 256)
+                            .end_cell(),
+                        1
+                    );
+                }
+            } else {
+                var body = create_simple_transfer_body(query_id, jetton_amount, owner, owner, 0);
+                body = body.store_uint(error, 32);
+                if (min_wait_seconds > 0) {
+                    body.store_uint(min_wait_seconds, 64);
+                } else {
+                    body.store_uint(0, 64);
+                }
+                send_simple_message(0, sender_address, body.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+                return ();
+            }
+            save_storage();
+            return ();
+        }
+
+        if (transfer_op == add_liquidity) {
+            ;; check token address
+            if (msg_value < calculate_add_liquidity_fee()) {
+                return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, NOT_ENOUGH_TONS);
+                return ();
+            }
+            if (~ equal_slices(sender_address, storage::jetton_pool_wallet_address)) {
+                return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, UNAUTHORIZED_JETTON_WALLET);
+                return ();
+            }
+            storage::liquidity += jetton_amount;
+            cell acc_state_init = calculate_bridge_pool_liquidity_account_state_init(from_sender, my_address(), storage::jetton_address, storage::pool_liquidity_account_code);
+            var body = begin_cell()
+                .store_uint(provider_liquidity, 32)
+                .store_uint(query_id, 64)
+                .store_coins(jetton_amount);
+            send_message_with_stateinit(0, calculate_bridge_pool_liquidity_account_address(acc_state_init), acc_state_init, body.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            save_storage();
+        }
+        return ();
+    }
+    ;; native token bridge entrance
+    if (op == lock_native_token) {
+        (int target_chain_id, slice target_address, slice owner, int amount) = (in_msg_body~load_uint(32), in_msg_body~load_bits(256), in_msg_body~load_msg_addr(), in_msg_body~load_coins());
+        if (~ (equal_slices(sender_address, storage::bridge_address))) {
+            send_message_nobounce(0, sender_address, begin_cell().store_uint(UNAUTHORIZED, 32).end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            return ();
+        }
+        int is_support_jetton_op = equal_slices(storage::jetton_address, HOLE_ADDRESS);
+        if (~ is_support_jetton_op) {
+            send_message_nobounce(0, owner, begin_cell().store_uint(UNSUPPORT_JETTON_OP, 32).end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            return ();
+        }
+        (var success, var error, var min_wait_seconds) = consume_limit(target_chain_id, RECEIPT, amount);
+        if (success) {
+            storage::liquidity += amount;
+            var success_record = record_receipt(owner, query_id, target_chain_id, target_address, amount, -1, msg_value - amount);
+            if (~ success_record) {
+                return ();
+            } else {
+                emit_log_simple(LIMIT_CONSUMED,
+                    begin_cell()
+                        .store_uint(LIMIT_CONSUMED, 32)
+                        .store_uint(target_chain_id, 32)
+                        .store_uint(RECEIPT, 1)
+                        .store_uint(amount, 256)
+                        .end_cell(),
+                    1
+                );
+            }
+        } else {
+            send_message_nobounce(0, owner, begin_cell().store_uint(error, 32).end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            return ();
+        }
+        save_storage();
+        return ();
+    }
+
+    if (op == add_native_token_liquidity) {
+        int amount = in_msg_body~load_coins();
+        throw_unless(NOT_ENOUGH_TONS, msg_value > amount + calculate_add_native_token_liquidity_fee());
+        throw_unless(UNSUPPORT_JETTON_OP, equal_slices(storage::jetton_address, HOLE_ADDRESS));
+        storage::liquidity += amount;
+        int amount_fee = msg_value - amount - add_native_token_liquidity_fee();
+        cell acc_state_init = calculate_bridge_pool_liquidity_account_state_init(sender_address, my_address(), storage::jetton_address, storage::pool_liquidity_account_code);
+        builder body = begin_cell()
+            .store_uint(provider_liquidity, 32)
+            .store_uint(query_id, 64)
+            .store_coins(amount);
+        send_message_with_stateinit(amount_fee, calculate_bridge_pool_liquidity_account_address(acc_state_init), acc_state_init, body.end_cell(), SEND_MODE_REGULAR);
+        save_storage();
+        return ();
+    }
+
+    if (op == remove_liquidity) {
+        int liquidity = in_msg_body~load_coins();
+        slice owner = in_msg_body~load_msg_addr();
+        cell acc_state_init = calculate_bridge_pool_liquidity_account_state_init(owner, my_address(), storage::jetton_address, storage::pool_liquidity_account_code);
+        throw_unless(UNAUTHORIZED, equal_slices(calculate_bridge_pool_liquidity_account_address(acc_state_init), sender_address));
+        throw_unless(LIQUIDITY_NOT_ENOUGH, storage::liquidity >= liquidity);
+        storage::liquidity -= liquidity;
+        if (equal_slices(storage::jetton_address, HOLE_ADDRESS)) {
+            send_message_nobounce(liquidity, owner, begin_cell().store_slice(owner).end_cell(), SEND_MODE_PAY_FEES_SEPARETELY);
+        } else {
+            builder body0 = create_simple_transfer_body(query_id, liquidity, owner, owner, 0);
+            body0 = body0.store_uint(remove_liquidity_ok, 32); ;; append exit code
+            send_simple_message(0, storage::jetton_pool_wallet_address, body0.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        }
+        save_storage();
+        return ();
+    }
+
+    if (op == set_daily_limit_config) {
+        throw_unless(UNAUTHORIZED, equal_slices(sender_address, storage::admin));
+        slice ref_cs = in_msg_body;
+        int has_refs = 0;
+        do {
+            (int chain_id, int limit_type, int refresh_time, int daily_limit) = (ref_cs~load_uint(32), ref_cs~load_uint(1), ref_cs~load_uint(64), ref_cs~load_uint(256));
+            _set_daily_limit_config(chain_id, limit_type, refresh_time, daily_limit);
+            has_refs = ref_cs.slice_refs() > 0;
+            if (has_refs) {
+                cell ref = ref_cs~load_ref();
+                ref_cs.end_parse();
+                ref_cs = ref.begin_parse();
+            }
+        } until (~ has_refs);
+        save_storage();
+        return ();
+    }
+
+    if (op == set_rate_limit_config) {
+        throw_unless(UNAUTHORIZED, equal_slices(sender_address, storage::admin));
+        slice ref_cs = in_msg_body;
+        int has_refs = 0;
+        do {
+            (int chain_id, int limit_type, int is_enable, int token_capacity, int rate) = (ref_cs~load_uint(32), ref_cs~load_uint(1), ref_cs~load_int(1), ref_cs~load_uint(256), ref_cs~load_uint(256));
+            _set_rate_limit_config(chain_id, limit_type, is_enable, token_capacity, rate);
+            has_refs = ref_cs.slice_refs() > 0;
+            if (has_refs) {
+                cell ref = ref_cs~load_ref();
+                ref_cs.end_parse();
+                ref_cs = ref.begin_parse();
+            }
+        } until (~ has_refs);
+        save_storage();
+        return ();
+    }
+
+    if (op == create_swap) {
+        throw_unless(UNAUTHORIZED, equal_slices(sender_address, storage::admin));
+        slice ref_cs = in_msg_body;
+        int has_refs = 0;
+        do {
+            int from_chain_id = ref_cs~load_uint(32);
+            int origin_share = ref_cs~load_uint(64);
+            int target_share = ref_cs~load_uint(64);
+            int swapped_amount = 0;
+            int swapped_times = 0;
+            cell swap_id_cell = begin_cell().store_uint(from_chain_id, 32).store_slice(storage::jetton_address).end_cell();
+            int swap_id_hash = cell_hash(swap_id_cell);
+
+            var info_cell = begin_cell()
+                .store_uint(from_chain_id, 32)
+                .store_uint(origin_share, 64)
+                .store_uint(target_share, 64)
+                .store_uint(swapped_amount, 256)
+                .store_uint(swapped_times, 256)
+                .end_cell();
+
+            storage::swap_dic = udict_set_ref(storage::swap_dic, DEFAULT_KEY_LENGTH, swap_id_hash, info_cell);
+            emit_log_simple(SWAP_CREATED, begin_cell().store_uint(from_chain_id, 32).store_uint(swap_id_hash, 256).end_cell(), 1);
+            has_refs = ref_cs.slice_refs() > 0;
+            if (has_refs) {
+                cell ref = ref_cs~load_ref();
+                ref_cs.end_parse();
+                ref_cs = ref.begin_parse();
+            }
+        } until (~ has_refs);
+        save_storage();
+        return ();
+    }
+
+    if (op == set_bridge) {
+        throw_unless(UNAUTHORIZED, equal_slices(sender_address, storage::admin));
+        slice bridge_address = in_msg_body~load_msg_addr();
+        storage::bridge_address = bridge_address;
+        save_storage();
+        return ();
+    }
+
+    if (op == set_jetton_wallet_address) {
+        throw_unless(UNAUTHORIZED, equal_slices(sender_address, storage::admin));
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+        storage::jetton_pool_wallet_address = jetton_wallet_address;
+        save_storage();
+        return ();
+    }
+
+    if (equal_slices(sender_address, storage::owner)) {
+        handle_owner_messages(op, query_id, my_balance, msg_value, in_msg_body);
+        return ();
+    }
+
+    ;; make sure that the message has been processed
+    if (handle_getter_messages(op, query_id, sender_address, in_msg_body)) {
+        return ();
+    }
+
+    throw(WRONG_OP);
+}

@@ -1,0 +1,30 @@
+
+cell pack_bridge_pool_liquidity_account_data(slice user_address, slice pool_address, slice jetton_address) inline {
+    return begin_cell()
+        .store_slice(user_address)
+        .store_ref(begin_cell()
+            .store_slice(pool_address)
+            .store_slice(jetton_address)
+            .end_cell())
+        .store_coins(0)
+        .end_cell();
+}
+
+cell calculate_bridge_pool_liquidity_account_state_init(slice user_address, slice pool_address, slice jetton_address, cell pool_liquidity_account_code) inline {
+    return begin_cell()
+        .store_uint(0, 1) ;;split_depth	
+        .store_uint(0, 1) ;;special(TickTock)
+        .store_dict(pool_liquidity_account_code)
+        .store_dict(pack_bridge_pool_liquidity_account_data(user_address, pool_address, jetton_address))
+        .store_uint(0, 1) ;;library	HashmapE 256 SimpleLib*
+        .end_cell();
+}
+
+slice calculate_bridge_pool_liquidity_account_address(cell state_init) inline {
+    return begin_cell()
+        .store_uint(2, 2) ;; addr_std$10
+        .store_uint(0, 1) ;; anycast:(Maybe Anycast)
+        .store_int(WORKCHAIN, 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell().begin_parse();
+}

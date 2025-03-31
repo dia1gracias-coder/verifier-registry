@@ -1,0 +1,97 @@
+
+;; messages from owner
+() handle_owner_messages(int op, int query_id, int my_balance, int msg_value, slice in_msg_body) impure inline {
+    if (op == init_code_upgrade) {
+        (int end_code, _, int end_owner, slice owner,int end_admin,slice admin) = unpack_temp_upgrade(storage::temp_upgrade);
+        throw_unless(INVALID_CALL, end_code == 0); ;; upgrade already in progress
+        storage::temp_upgrade = pack_temp_upgrade(now() + ONEDAY,  in_msg_body~load_ref(), end_owner, owner,end_admin,admin);
+        save_storage();
+        return ();
+    }
+
+    if (op == init_owner_upgrade) {
+        (int end_code, cell new_code, int end_owner, _,int end_admin,slice admin) = unpack_temp_upgrade(storage::temp_upgrade);
+        throw_unless(INVALID_CALL, end_owner == 0); ;; upgrade already in progress
+        storage::temp_upgrade = pack_temp_upgrade(end_code, new_code, now() + ONEDAY, in_msg_body~load_msg_addr(),end_admin,admin);
+        save_storage();
+        return ();
+    }
+
+    if (op == init_admin_upgrade) {
+        (int end_code, cell new_code,int end_owner,slice owner,int end_admin, _) = unpack_temp_upgrade(storage::temp_upgrade);
+        throw_unless(INVALID_CALL, end_admin == 0); ;; upgrade already in progress
+        storage::temp_upgrade = pack_temp_upgrade(end_code, new_code, end_owner, owner,now() + ONEDAY, in_msg_body~load_msg_addr());
+        save_storage();
+        return ();
+    }
+
+    if (op == cancel_owner_upgrade) {
+        (int end_code, cell code, int end_owner, _,int end_admin,slice admin) = unpack_temp_upgrade(storage::temp_upgrade);
+        throw_unless(INVALID_CALL, end_owner > 0);
+        storage::temp_upgrade = pack_temp_upgrade(end_code, code, 0, HOLE_ADDRESS,end_admin,admin);
+        save_storage();
+        return ();
+    }
+
+    if (op == cancel_code_upgrade) {
+        (int end_code, _, int end_owner, slice owner,int end_admin,slice admin) = unpack_temp_upgrade(storage::temp_upgrade);
+        throw_unless(INVALID_CALL, end_code > 0);
+        storage::temp_upgrade = pack_temp_upgrade(0, empty_cell(), end_owner, owner,end_admin,admin);
+        save_storage();
+        return ();
+    }
+    if (op == cancel_admin_upgrade) {
+        (int end_code, cell code, int end_owner, slice owner,int end_admin,_) = unpack_temp_upgrade(storage::temp_upgrade);
+        throw_unless(INVALID_CALL, end_admin > 0);
+        storage::temp_upgrade = pack_temp_upgrade(end_code, code, end_owner, owner, 0, HOLE_ADDRESS);
+        save_storage();
+        return ();
+    }
+    ;; valid for all upgrades
+    if (op == finalize_upgrades) {
+        (int end_code, cell new_code, int end_owner, slice new_owner, int end_admin, slice new_admin) = unpack_temp_upgrade(storage::temp_upgrade);
+        throw_unless(INVALID_CALL, (end_code + end_owner + end_admin) > 0); ;; make sure at least one upgrade process is in progress
+
+        if ((end_code > 0) & (now() >= end_code)) {
+            set_code(new_code);
+            emit_log_simple(CODE_UPGRADED,
+                begin_cell()
+                    .store_uint(end_code,64)
+                    .store_ref(new_code)
+                    .end_cell()
+                ,1);
+            end_code = 0;
+            new_code = empty_cell();
+        }
+
+        if ((end_owner > 0) & (now() >= end_owner)) {
+            storage::owner = new_owner;
+            emit_log_simple(OWNER_UPGRADED,
+                begin_cell()
+                    .store_uint(end_owner,64)
+                    .store_slice(new_owner)
+                    .end_cell()
+                ,1);
+            end_owner = 0;
+            new_owner = HOLE_ADDRESS;
+        }
+
+        if ((end_admin > 0) & (now() >= end_admin)) {
+            storage::admin = new_admin;
+            emit_log_simple(ADMIN_UPGRADED,
+                begin_cell()
+                    .store_uint(end_admin,64)
+                    .store_slice(new_admin)
+                    .end_cell()
+                ,1);
+            end_admin = 0;
+            new_admin = HOLE_ADDRESS;
+        }
+
+        storage::temp_upgrade = pack_temp_upgrade(end_code, new_code, end_owner, new_owner, end_admin, new_admin);
+        save_storage();
+        return ();
+    }
+
+    throw(WRONG_OP);
+}
