@@ -1,0 +1,45 @@
+
+
+(int) is_receipt_exist(slice key_slice) inline {
+    (slice value, int found) = dict_get?(storage::receipt_record_dic_bucket, RECEIPT_KEY_LENGTH, key_slice);
+    return found;
+}
+
+(int) record_receipt_buckets(int timestamp, int receipt_hash) inline {
+    cell key = begin_cell().store_uint(timestamp, 64).store_uint(receipt_hash, 256).end_cell();
+    slice dict_key = key.begin_parse();
+    int found = is_receipt_exist(dict_key);
+    if (found) {
+        return 0;
+    } else {
+        slice value = begin_cell().store_int(-1, 1).end_cell().begin_parse();
+        storage::receipt_record_dic_bucket = dict_set(storage::receipt_record_dic_bucket, RECEIPT_KEY_LENGTH, dict_key, value);
+    }
+    (slice key_slice, slice value, int flag) = dict_get_min?(storage::receipt_record_dic_bucket, RECEIPT_KEY_LENGTH);
+
+    while (flag) {
+        int timestamp_key = key_slice~load_uint(64);
+        if (timestamp_key + EXPIRE_TIME <= now()) {
+            int hash = key_slice~load_uint(256);
+            slice key_to_delete = begin_cell().store_uint(timestamp_key, 64).store_uint(hash, 256).end_cell().begin_parse();
+            (storage::receipt_record_dic_bucket,int deleted) = dict_delete?(storage::receipt_record_dic_bucket, RECEIPT_KEY_LENGTH, key_to_delete);
+            (key_slice, value, flag) = dict_get_next?(storage::receipt_record_dic_bucket, RECEIPT_KEY_LENGTH, key_to_delete);
+        } else {
+            flag = 0;
+        }
+    }
+    return -1;
+}
+
+(int) clear_failed_receipt_hash(int timestamp, int receipt_hash) {
+    cell key = begin_cell().store_uint(timestamp, 64).store_uint(receipt_hash, 256).end_cell();
+    slice dict_key = key.begin_parse();
+    (storage::receipt_record_dic_bucket,int deleted) = dict_delete?(storage::receipt_record_dic_bucket, RECEIPT_KEY_LENGTH, dict_key);
+    save_storage();
+    return deleted;
+}
+
+
+
+
+

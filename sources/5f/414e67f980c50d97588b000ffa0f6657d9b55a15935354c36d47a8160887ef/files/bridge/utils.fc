@@ -1,0 +1,11 @@
+
+(int) create_key(int target_chain_id, slice jetton_address) impure inline_ref {
+    (int wc, int jetton_address_hash) = parse_std_addr(jetton_address);
+    cell key_builder = begin_cell()
+        .store_uint(wc, 8)
+        .store_uint(target_chain_id, 32)
+        .store_uint(jetton_address_hash, 256)
+        .end_cell();
+    int key_hash = cell_hash(key_builder);
+    return key_hash;
+}

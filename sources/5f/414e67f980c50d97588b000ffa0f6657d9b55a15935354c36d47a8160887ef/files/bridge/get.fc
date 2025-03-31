@@ -1,0 +1,85 @@
+
+(slice) get_bridge_pool_address(slice jetton_address) method_id {
+    load_storage();
+    (slice jetton_pool_address, _) = storage::bridge_pool_address_dic.dict_get?(KEY_LENGTH, jetton_address);
+    return jetton_pool_address;
+}
+
+(int) get_is_jetton_support(int target_chain_id, slice jetton_address) method_id {
+    load_storage();
+    cell token_whitelist = storage::jetton_whitelist_dic;
+    int key_hash = create_key(target_chain_id, jetton_address);
+    (slice whitelist, int is_support) = udict_get?(token_whitelist, DEFAULT_KEY_LENGTH, key_hash);
+    return is_support;
+}
+
+(int) is_bridge_paused() method_id {
+    load_storage();
+    return storage::is_pause;
+}
+
+(slice) get_target_contract_address(int target_chain_id) method_id {
+    load_storage();
+    (slice target_contract, _) = storage::target_contract_dic.udict_get?(32, target_chain_id);
+    return target_contract;
+}
+
+(slice) get_oracle_address() method_id {
+    load_storage();
+    return storage::oracle_address;
+}
+
+(slice) get_owner() method_id {
+    load_storage();
+    return storage::owner;
+}
+
+(slice) get_admin() method_id {
+    load_storage();
+    return storage::admin;
+}
+
+(slice) get_pause_controller() method_id {
+    load_storage();
+    return storage::pause_controller;
+}
+
+
+(cell) get_upgrade_status() method_id {
+    load_storage();
+    return storage::temp_upgrade;
+}
+
+(slice) get_receipt_hash_min() method_id {
+    load_storage();
+    (slice key_slice, slice value, int flag) = dict_get_min?(storage::receipt_record_dic_bucket, RECEIPT_KEY_LENGTH);
+    return key_slice;
+}
+
+(int) is_receipt_hash_exist(int receipt_hash, int timestamp) method_id {
+    load_storage();
+    cell key = begin_cell().store_uint(timestamp, 64).store_uint(receipt_hash, 256).end_cell();
+    slice dict_key = key.begin_parse();
+    return is_receipt_exist(dict_key);
+}
+
+(int) get_estimate_create_receipt_fee() method_id {
+    return calculate_create_receipt_process_fee();
+}
+
+(int) get_estimate_lock_fwd_fee() method_id {
+    return calculate_transfer_lock_fwd_fee();
+}
+
+(int) get_estimate_release_jetton_fee() method_id {
+    return calculate_release_jetton_fee();
+}
+
+(int) get_estimate_create_native_fee() method_id {
+    return calculate_create_native_receipt_process_fee();
+}
+
+(int) get_estimate_release_native_fee() method_id {
+    return calculate_release_native_fee();
+}
+

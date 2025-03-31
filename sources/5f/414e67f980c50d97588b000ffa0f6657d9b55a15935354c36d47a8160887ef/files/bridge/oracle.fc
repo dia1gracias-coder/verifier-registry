@@ -1,0 +1,178 @@
+
+
+(int) calculate_leaf_hash(int receipt_index, int key_hash, int jetton_amount, slice target_address) impure inline {
+    int receipt_index_hash = string_hash(begin_cell().store_uint(receipt_index, 256).end_cell().begin_parse());
+    cell receipt_id = begin_cell().store_uint(key_hash, 256).store_uint(receipt_index_hash, 256).end_cell();
+    int receipt_hash = string_hash(receipt_id.begin_parse());
+    int amount_hash = string_hash(begin_cell().store_uint(jetton_amount, 256).end_cell().begin_parse());
+    int target_address_hash = string_hash(target_address);
+    cell leaf_cell = begin_cell()
+        .store_uint(receipt_hash, 256)
+        .store_uint(amount_hash, 256)
+        .store_uint(target_address_hash, 256)
+        .end_cell();
+    int leaf_hash = string_hash(leaf_cell.begin_parse());
+    return leaf_hash;
+}
+
+() resend_receipt_info(int message_id, int resend_time_span) impure inline_ref {
+    ;; resend_time_span is in seconds
+    int resend_minutes = ONEMINUTES; ;;1 minute
+    try {
+        if (resend_time_span >= ONEMINUTESFORSECONDS) {
+            resend_minutes = resend_time_span / ONEMINUTESFORSECONDS;
+        }
+    } catch (x, n) {
+        ;; consider the case of overflow
+        resend_minutes = TENMINUTES;
+    }
+
+    cell payload = begin_cell()
+        .store_uint(resend, 32)
+        .store_int(message_id, 128)
+        .store_int(0x01, 8)
+        .store_int(resend_minutes, 32)
+        .end_cell();
+    send_message_nobounce(TO_ORACLE_TON, storage::oracle_address, payload, SEND_MODE_REGULAR);
+}
+
+() encode_message_and_send_to_oracle(int target_chain_id, slice jetton_address, slice receipt_id, int jetton_amount, slice target_address) impure inline {
+    (int key_hash, int receipt_index) = (receipt_id~load_uint(256), receipt_id~load_uint(64));
+    ;;calculate the leaf hash
+    int leaf_hash = calculate_leaf_hash(receipt_index, key_hash, jetton_amount, target_address);
+
+    int slice_bits = 32 * 8 * 3;
+    int ref_slice_bits = 32 * 8 * 2;
+    cell data_part = begin_cell()
+        .store_uint(receipt_index, 256)
+        .store_uint(key_hash, 256)
+        .store_uint(jetton_amount, 256)
+        .end_cell();
+    cell data_part_other = begin_cell()
+        .store_slice(target_address)
+        .store_uint(leaf_hash, 256)
+        .end_cell();
+    cell message = begin_cell()
+        .store_uint(slice_bits, 16)
+        .store_slice(data_part.begin_parse()) ;; 32 * 8 * 3 = 768 bits
+        .store_uint(1, 8) ;; 1 ref
+        .store_ref(begin_cell()
+            .store_uint(ref_slice_bits, 16) ;; 32 * 8 * 2 = 512 bits
+            .store_slice(data_part_other.begin_parse())
+            .store_uint(0, 8) ;; 0 ref
+            .end_cell())
+        .end_cell();
+    (slice target_contract, _) = storage::target_contract_dic.udict_get?(32, target_chain_id);
+    cell tx = begin_cell()
+        .store_uint(send_bridge_info_to_oracle, 32)
+        .store_uint(target_chain_id, 32)
+        .store_ref(begin_cell()
+            .store_slice(target_contract)
+            .end_cell())
+        .store_ref(message)
+        .store_ref(begin_cell()
+            .store_uint(target_chain_id, 32)
+            .store_ref(begin_cell().store_slice(target_contract).end_cell())
+            .store_ref(begin_cell().store_slice(jetton_address).end_cell())
+            .store_uint(jetton_amount, 256)
+            .end_cell())
+        .end_cell();
+    send_simple_message(TO_ORACLE_TON, storage::oracle_address, tx, SEND_MODE_PAY_FEES_SEPARETELY);
+}
+
+(int, int, int, int, slice, int) decode_message_and_verification(slice message) impure inline {
+    ;; message_data : total bytes = 32 + 32 + 32 + 32 + 36 + 8 = 164 bytes = 172 bytes
+    int slice_bits = message~load_uint(16); ;; 32 bytes * 8 * 3 = 768 bits
+    throw_unless(MESSAGE_DATA_ERROR, slice_bits == 768);
+    slice data_part = message~load_bits(slice_bits); ;;32 bytes * 3 = 96 bytes * 8 = 768 bits
+    (int receipt_index, int key_hash, int receipt_amount) =
+    (data_part~load_uint(256), ;; 32 bytes
+        data_part~load_uint(256), ;; 32 bytes
+        data_part~load_uint(256)); ;; 32 bytes
+    int ref_num = message~load_uint(8); ;; remain_bytes = 32 + 36 + 8 = 72 bytes ref_num = 1 
+    throw_unless(MESSAGE_DATA_ERROR, ref_num == 1);
+    slice message_ref = message~load_ref().begin_parse();
+    int ref_slice_bits = message_ref~load_uint(16); ;;( 32 + 36 + 8 ) * 8 = 608 bits
+    throw_unless(MESSAGE_DATA_ERROR, ref_slice_bits == 608);
+    slice ref_data_part = message_ref~load_bits(ref_slice_bits);
+    int receive_leaf_hash = ref_data_part~load_uint(256); ;; 32 bytes
+    slice receipt_target_address = ref_data_part~load_bits(288); ;;ton address: 36bytes
+    int timestamp = ref_data_part~load_uint(64); ;; 8 bytes
+    throw_unless(INVALID_AMOUNT, receipt_amount > 0);
+    int leaf_hash = calculate_leaf_hash(receipt_index, key_hash, receipt_amount, receipt_target_address);
+    throw_unless(VERIFICATION_FAILED, leaf_hash == receive_leaf_hash);
+    receipt_target_address~load_bits(8); ;; ignore address flag
+    int wc = receipt_target_address~load_int(8);
+    int address_hash = receipt_target_address~load_uint(256);
+    slice target_address = create_address(wc, address_hash);
+    return (receipt_index, key_hash, receipt_amount, leaf_hash, target_address, timestamp);
+}
+
+() receive_from_oracle(slice in_msg_body) impure inline {
+    int message_id = in_msg_body~load_int(128);
+    if (storage::is_pause) {
+        resend_receipt_info(message_id, ONEHOURE);
+        return ();
+    }
+    cell origin_data = in_msg_body~load_ref();
+    slice data = origin_data.begin_parse();
+    (int source_chain_id, int target_chain_id) = (data~load_int(32), data~load_int(32));
+    throw_unless(INVALID_TARGET_CHAIN_ID, target_chain_id == CHAINID);
+    (slice target_contract, _) = storage::target_contract_dic.udict_get?(CHAIN_ID_KEY_LENGTH, source_chain_id);
+    (slice sender_slice, slice receiver_slice) = (data~load_ref().begin_parse(), data~load_ref().begin_parse());
+    slice sender = sender_slice~load_bits(256);
+    slice receiver = receiver_slice~load_bits(267);
+    throw_unless(INVALID_SOURCE_CHAIN_CONTRACT, equal_slices(sender, target_contract));
+    throw_unless(INVALID_RECEIVER_CHAIN_CONTRACT, equal_slices(receiver, my_address()));
+    slice message = data~load_ref().begin_parse();
+    cell convert_info = data~load_ref();
+    slice info = convert_info.begin_parse();
+    info~load_uint(32); ;;ignore it, beasue it is equal to target_chain_id
+    slice jetton_address = info~load_ref().begin_parse();
+    info~load_ref(); ;; ignore origin_token, beasue it is used by source chain.
+    info~load_uint(256); ;; ignore it, because it is used by oracle
+    cell swap_id_ref = info~load_ref();
+    if (cell_null?(swap_id_ref)) {
+        throw(SWAP_ID_REF_IS_NULL);
+    }
+    (int receipt_index, int key_hash, int receipt_amount, int leaf_hash, slice receipt_target_address, int timestamp) = decode_message_and_verification(message);
+
+    (slice jetton_bridge_pool_address, int found_pool) = dict_get?(storage::bridge_pool_address_dic, KEY_LENGTH, jetton_address);
+    if (~ found_pool) {
+        resend_receipt_info(message_id, TENMINUTESFORSECONDS * 2);
+        return ();
+    }
+    if (timestamp + EXPIRE_TIME < now()) {
+        ;; expired bridge message.
+        throw(EXPIRED_BRIDGE_MESSAGE);
+    }
+    int success = record_receipt_buckets(timestamp,leaf_hash);
+    if(~ success){
+        ;; exist leaf hash;
+        throw(ALREADY_RECORD);
+    }
+    save_storage();
+    cell payload = begin_cell()
+        .store_uint(release, 32)
+        .store_int(message_id, 128)
+        .store_ref(swap_id_ref)
+        .store_ref(begin_cell()
+            .store_ref(
+                begin_cell()
+                .store_uint(key_hash, 256)
+                .store_uint(receipt_index, 256)
+                .end_cell())
+            .store_uint(leaf_hash, 256)
+            .store_uint(timestamp, 64)
+            .store_slice(receipt_target_address)
+            .end_cell())
+        .store_coins(receipt_amount)
+        .end_cell();
+    int fee = 0;
+    if(equal_slices(jetton_address, HOLE_ADDRESS)){
+        fee = calculate_release_native_fee();
+    } else {
+        fee = calculate_release_jetton_fee();
+    }
+    send_simple_message(fee, jetton_bridge_pool_address, payload, SEND_MODE_PAY_FEES_SEPARETELY | SEND_MODE_BOUNCE_TRANSACTION);
+}

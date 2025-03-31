@@ -1,0 +1,54 @@
+
+
+() return_jetton_to_user(int query_id, int jetton_amount, slice transfer_to, slice response, slice message_to, int exit_code) impure inline_ref {
+    builder body = create_simple_transfer_body(query_id, jetton_amount, transfer_to, response, 0);
+    body = body.store_uint(exit_code, 32);
+    send_simple_message(0, message_to, body.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+}
+
+() handle_transfer_notification(slice sender_address, int query_id, int jetton_amount, slice from_sender, cell ref_cs, int fwd_fee, int msg_value) impure {
+    slice ref_ds = ref_cs.begin_parse();
+    throw_unless(INVALID_AMOUNT, jetton_amount > 0);
+    int transfer_op = ref_ds~load_uint(32);
+    if (storage::is_pause) {
+        return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, transfer_bounce_paused);
+        return ();
+    }
+
+    if (transfer_op == create_receipt) {
+        (int target_chain_id, slice target_address, slice jetton_address) = (ref_ds~load_uint(32), ref_ds~load_bits(256), ref_ds~load_msg_addr());
+        (int wc, int jetton_address_hash) = parse_std_addr(jetton_address);
+        cell key_builder = begin_cell()
+            .store_uint(wc, 8)
+            .store_uint(target_chain_id, 32)
+            .store_uint(jetton_address_hash, 256)
+            .end_cell();
+        int key_hash = cell_hash(key_builder);
+        (_, int is_support) = udict_get?(storage::jetton_whitelist_dic, DEFAULT_KEY_LENGTH, key_hash);
+        if (~ is_support) {
+            return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, transfer_bounce_token_not_support);
+            return ();
+        }
+
+        ;; Transfer to jetton pool
+        (slice jetton_pool_address, int found) = dict_get?(storage::bridge_pool_address_dic, KEY_LENGTH, jetton_address);
+        if (~ found) {
+            return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, transfer_bounce_token_pool_not_exist);
+            return ();
+        }
+        cell payload = begin_cell()
+            .store_uint(lock, 32)
+            .store_uint(target_chain_id, 32)
+            .store_slice(target_address)
+            .store_slice(from_sender)
+            .end_cell();
+        int fwd_amount = calculate_transfer_lock_fwd_fee();
+        builder body = create_with_payload_transfer_body(query_id, jetton_amount, jetton_pool_address, from_sender, fwd_amount, payload);
+        send_simple_message(0, sender_address, body.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        return ();
+    }
+    else {
+        return_jetton_to_user(query_id, jetton_amount, from_sender, from_sender, sender_address, not_support_transfer_notification_op);
+        return ();
+    }
+}
