@@ -1,0 +1,17 @@
+;; get methods
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    load_storage();
+    return (
+        storage::total_supply, 
+        FALSE, 
+        storage::admin, 
+        storage::content, 
+        storage::jetton_wallet_code
+    );
+}
+
+slice get_wallet_address(slice owner) method_id {
+    load_storage();
+    return calculate_user_jetton_wallet_address(owner, my_address(), storage::jetton_wallet_code);
+}
