@@ -1,0 +1,36 @@
+tuple get_prev_block() asm "PREVKEYBLOCK";
+
+(int, int) custom_randomize() impure inline {
+    int prev_root_hash = 0;
+    int prev_block_seqno = 0;
+    try {
+        tuple prev_block = get_prev_block(); ;; (int wc, int shard, int seqno, int root_hash, int file_hash)
+        prev_block_seqno = prev_block.at(2);
+        prev_root_hash = prev_block.at(3);
+    } catch (x, n) {
+        prev_block_seqno = min(67000, n);
+        prev_root_hash = 1;
+    }
+
+    return (prev_root_hash, prev_block_seqno);
+}
+
+() set_res_side(slice in_msg_body, int bets_count) impure inline {
+    if bets_count > 1 {
+        builder res_b = begin_cell();
+        repeat(bets_count){
+            int int_side = rand(2);
+            res_b = res_b.store_slice(int_side == 0 ? "h" : "t");
+        }
+        res_side = res_b.end_cell().begin_parse();
+        return ();
+    }
+
+    int is_revert_side = rand(3) < 1;
+    int rand_int = rand(2);
+    int int_side = is_revert_side ? rand_int : 1 - rand_int;
+
+    slice revert_side = equal_slices(in_msg_body, "h") ? "t" : "h";
+    res_side = int_side == 0 ? revert_side : in_msg_body;
+    return ();
+}
