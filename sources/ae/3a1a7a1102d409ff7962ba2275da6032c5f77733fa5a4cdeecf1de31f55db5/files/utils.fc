@@ -1,0 +1,55 @@
+;; utils.fc
+int is_resolvable?(slice addr) inline {
+    (int wc, _) = addr.parse_std_addr();
+    return wc == workchain();
+}
+
+;; Add the equal_slices function
+int equal_slices(slice a, slice b) inline {
+    ;; First, check lengths match
+    if (a.slice_bits() != b.slice_bits()) {
+        return false;
+    }
+    if (a.slice_refs() != b.slice_refs()) {
+        return false;
+    }
+    
+    ;; Compare bits
+    slice a_copy = a;
+    slice b_copy = b;
+    int bits = a.slice_bits();
+    
+    if (bits >= 256) {
+        ;; Compare in chunks of 256 bits
+        repeat(bits / 256) {
+            if (a_copy~load_uint(256) != b_copy~load_uint(256)) {
+                return false;
+            }
+        }
+        ;; Compare remaining bits
+        int remaining = bits % 256;
+        if (remaining > 0) {
+            if (a_copy~load_uint(remaining) != b_copy~load_uint(remaining)) {
+                return false;
+            }
+        }
+    }
+    if (bits > 0) {
+        ;; Compare all bits at once if less than 256
+        if (a_copy~load_uint(bits) != b_copy~load_uint(bits)) {
+            return false;
+        }
+    }
+    
+    ;; Compare references
+    int refs = a.slice_refs();
+    repeat(refs) {
+        cell a_ref = a_copy~load_ref();
+        cell b_ref = b_copy~load_ref();
+        if (a_ref.cell_hash() != b_ref.cell_hash()) {
+            return false;
+        }
+    }
+    
+    return true;
+}
