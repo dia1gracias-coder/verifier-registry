@@ -1,0 +1,30 @@
+;; =============== general consts =============================
+
+const ONE_TON = 1000000000; ;; 1 TON
+
+;; errors
+const ERROR::INSUFFICIENT_BALANCE = 103;
+
+const ERROR::NOT_BOUNCEABLE_OP = 200;
+
+const ERROR::INSUFFICIENT_MSG_VALUE = 709;
+
+
+;; =============== send msg utils =============================
+
+() send_msg(slice to_address, int amount, cell payload, int flags, int send_mode) impure inline {
+  int has_payload = ~ cell_null?(payload);
+
+  var msg = begin_cell()
+          .store_msg_flags_and_address_none(flags)
+          .store_slice(to_address)
+          .store_coins(amount)
+          .store_uint(has_payload ? MSG_BODY_IN_REF : 0, MSG_ONLY_BODY_SIZE);
+
+  if (has_payload) {
+    msg = msg.store_ref(payload);
+  }
+
+  send_raw_message(msg.end_cell(), send_mode);
+}
+
