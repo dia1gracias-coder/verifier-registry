@@ -1,0 +1,17 @@
+#include "precompiled_gas_const.fc";
+
+() check_balance_is_enough_to_unstake(int balance, cell forward_payload) impure inline {
+    int initial_gas = gas_consumed();
+    var (cells, bits,_) = compute_data_size(forward_payload, 8192);
+    int size_counting_gas = gas_consumed() - initial_gas;
+    var fwd_fee = get_forward_fee(BASECHAIN, cells,bits);
+
+    throw_unless(ERROR::NOT_ENOUGH_GAS,
+        balance >
+        ;; 2 messages: unstake_request->financial, financial->user
+        2 * fwd_fee +
+        get_compute_fee(BASECHAIN, UNSTAKE_REQUEST_GAS_CONSUMPTION + size_counting_gas) +
+        get_compute_fee(BASECHAIN, UNSTAKE_GAS_CONSUMPTION) +
+        calculate_financial_min_storage_fee()
+    );
+}
