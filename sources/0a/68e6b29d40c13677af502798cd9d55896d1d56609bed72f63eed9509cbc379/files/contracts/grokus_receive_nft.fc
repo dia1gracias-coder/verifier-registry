@@ -1,0 +1,160 @@
+#include "stdlib.fc";
+#include "grokus_storage.fc";
+#include "grokus_ops.fc";
+
+slice hash_pair(slice a, slice b) inline {
+    slice combined = begin_cell()
+        .store_slice(a)
+        .store_slice(b)
+        .end_cell()
+        .begin_parse();
+    return combined;
+}
+
+int verify_merkle(slice leaf, cell proof, slice root) {
+    slice h = leaf;
+    var cs = proof.begin_parse();
+    while (~ cs.slice_refs()) {
+        slice p = cs~load_ref().begin_parse();
+        if (slice_hash(h) < slice_hash(p)) {
+            h = hash_pair(h, p);
+        } else {
+            h = hash_pair(p, h);
+        }
+    }
+    return string_hash(h) == string_hash(root);
+}
+
+;; Вспомогательная функция для получения int из словаря с значением по умолчанию
+int get_int_or_default(cell dict, slice key) {
+    int key_hash = slice_hash(key); ;; Преобразуем адрес в хеш (256 бит)
+    var (value, found) = udict_get?(dict, 256, key_hash);
+    return found ? value~load_uint(64) : 0;
+}
+
+;; Вспомогательная функция для получения slice из словаря referrer_of
+slice get_slice_or_default(cell dict, slice key) {
+    int key_hash = slice_hash(key); ;; Преобразуем адрес в хеш
+    var (value, found) = udict_get?(dict, 256, key_hash);
+    return found ? value : begin_cell().end_cell().begin_parse();
+}
+
+() receive_nft(slice in_msg_body, slice sender_addr, int now) impure {
+    ;; 1. Load contract state
+    var (
+        claim_enabled, claim_fee, merkle_root,
+        unclaimed_allocations, referral_rewards_unclaimed,
+        referrer_of, referral_count, referral_earnings,
+        subscription_level, subscription_until,
+        last_used_day, used_today,
+        owner_address
+    ) = load_data();
+
+    ;; 2. Parse body
+    int multiplier_bps = in_msg_body~load_uint(16); ;; e.g. 1000 = x1.0
+    slice ref_address = in_msg_body~load_msg_addr(); ;; optional
+    cell merkle_proof = in_msg_body~load_ref(); ;; proof for (sender | multiplier_bps)
+
+    ;; 3. Check subscription and usage limit
+    int today = now / 86400;
+    int used = get_int_or_default(used_today, sender_addr);
+    int last_day = get_int_or_default(last_used_day, sender_addr);
+
+    int level = get_int_or_default(subscription_level, sender_addr);
+    int max_daily = 1;
+    if (level == 1) { max_daily = 3; }
+    if (level == 2) { max_daily = 5; }
+    if (level == 3) { max_daily = 10; }
+
+    ;; reset daily counter if day changed
+    if (last_day != today) {
+        used = 0;
+        int sender_hash = slice_hash(sender_addr);
+        last_used_day = udict_set_builder(
+            last_used_day,
+            256,
+            sender_hash,
+            begin_cell().store_uint(today, 32)
+        );
+    }
+
+    throw_unless(101, used < max_daily);
+    used += 1;
+    int sender_hash = slice_hash(sender_addr);
+    used_today = udict_set_builder(
+        used_today,
+        256,
+        sender_hash,
+        begin_cell().store_uint(used, 32)
+    );
+
+    ;; 4. Random base reward [1..10]
+    int base = (now % 10) + 1;
+
+    ;; 5. Merkle verification (реализовано корректно)
+    slice leaf = begin_cell()
+        .store_slice(sender_addr)
+        .store_uint(multiplier_bps, 16)
+        .end_cell()
+        .begin_parse();
+
+    int verified = verify_merkle(leaf, merkle_proof, merkle_root);
+    int reward = base * (verified ? multiplier_bps : 1000) / 1000;
+
+    ;; 6. Update unclaimed allocation
+    int prev = get_int_or_default(unclaimed_allocations, sender_addr);
+    unclaimed_allocations = udict_set_builder(
+        unclaimed_allocations,
+        256,
+        sender_hash,
+        begin_cell().store_uint(prev + reward, 64)
+    );
+
+    ;; 7. Set referrer if not yet set
+    slice maybe_ref = get_slice_or_default(referrer_of, sender_addr);
+    if (maybe_ref.preload_uint(2) == 0) { ;; addr_none
+        if (ref_address.preload_uint(2) != 0) { ;; not addr_none
+            int ref_hash = slice_hash(ref_address);
+            referrer_of = udict_set(
+                referrer_of,
+                256,
+                sender_hash,
+                ref_address
+            ); ;; Ключ: int, значение: slice
+
+            ;; ref count + bonus
+            int count = get_int_or_default(referral_count, ref_address);
+            referral_count = udict_set_builder(
+                referral_count,
+                256,
+                ref_hash,
+                begin_cell().store_uint(count + 1, 32)
+            );
+
+            int bonus = reward / 5; ;; 20%
+            int prev_ref = get_int_or_default(referral_rewards_unclaimed, ref_address);
+            referral_rewards_unclaimed = udict_set_builder(
+                referral_rewards_unclaimed,
+                256,
+                ref_hash,
+                begin_cell().store_uint(prev_ref + bonus, 64)
+            );
+
+            int earnings = get_int_or_default(referral_earnings, ref_address);
+            referral_earnings = udict_set_builder(
+                referral_earnings,
+                256,
+                ref_hash,
+                begin_cell().store_uint(earnings + bonus, 64)
+            );
+        }
+    }
+
+    ;; 8. Save state
+    save_data(claim_enabled, claim_fee, merkle_root,
+        unclaimed_allocations, referral_rewards_unclaimed,
+        referrer_of, referral_count, referral_earnings,
+        subscription_level, subscription_until,
+        last_used_day, used_today,
+        owner_address);
+}

@@ -1,0 +1,64 @@
+#include "stdlib.fc";
+#include "grokus_storage.fc";
+#include "grokus_ops.fc";
+#include "grokus_receive_nft.fc";
+#include "grokus_claim.fc";
+#include "grokus_subscription.fc";
+#include "grokus_admin.fc";
+#include "grokus_getters.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return (); ;; bounced
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dest
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extra currency
+    cs~load_coins(); ;; skip ihr_fee
+    cs~load_coins(); ;; skip fwd_fee
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    int now = now(); ;; current unix time
+
+    if (op == op_receive_nft) {
+        receive_nft(in_msg_body, sender_address, now);
+        return ();
+    }
+
+    if (op == op_claim_all) {
+        claim_all(sender_address, msg_value);
+        return ();
+    }
+
+    if (op == op_buy_subscription) {
+        int level = in_msg_body~load_uint(8);
+        buy_subscription(sender_address, msg_value, now, level);
+        return ();
+    }
+
+    if (op == op_set_claim_config) {
+        int enabled = in_msg_body~load_uint(1);
+        int fee = in_msg_body~load_coins();
+        set_claim_config(sender_address, enabled, fee);
+        return ();
+    }
+
+    if (op == op_withdraw) {
+        slice to = in_msg_body~load_msg_addr();
+        int amt = in_msg_body~load_coins();
+        withdraw(sender_address, to, amt);
+        return ();
+    }
+
+    throw(0xffff); ;; unknown op
+}

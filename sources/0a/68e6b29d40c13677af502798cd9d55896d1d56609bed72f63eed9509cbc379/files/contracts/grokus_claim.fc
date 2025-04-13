@@ -1,0 +1,72 @@
+#include "stdlib.fc";
+#include "grokus_storage.fc";
+#include "grokus_ops.fc";
+
+() claim_all(slice sender_addr, int msg_value) impure {
+    ;; 1. Load storage
+    var (
+        claim_enabled, claim_fee, merkle_root,
+        unclaimed_allocations, referral_rewards_unclaimed,
+        referrer_of, referral_count, referral_earnings,
+        subscription_level, subscription_until,
+        last_used_day, used_today,
+        owner_address
+    ) = load_data();
+
+    ;; 2. Check if claiming is allowed
+    throw_unless(201, claim_enabled);
+
+    ;; 3. Check payment
+    throw_unless(202, msg_value >= claim_fee);
+
+    ;; 4. Sum allocations
+    int user_key_hash = slice_hash(sender_addr); ;; Преобразуем адрес в хеш
+
+    ;; Извлекаем значение из unclaimed_allocations
+    var (maybe_allocation, found_allocation) = udict_get?(unclaimed_allocations, 256, user_key_hash);
+    int allocation = found_allocation ? maybe_allocation~load_uint(64) : 0;
+
+    ;; Извлекаем значение из referral_rewards_unclaimed
+    var (maybe_bonus, found_bonus) = udict_get?(referral_rewards_unclaimed, 256, user_key_hash);
+    int referral_bonus = found_bonus ? maybe_bonus~load_uint(64) : 0;
+
+    int total = allocation + referral_bonus;
+
+    throw_unless(203, total > 0);
+
+    ;; 5. Send mint_grokus(user, total)
+    slice grokus_minter = begin_cell().store_uint(0, 2).end_cell().begin_parse(); ;; addr_none (заглушка)
+    var body = begin_cell()
+        .store_uint(0x4D494E54, 32)   ;; op = 'MINT'
+        .store_uint(0, 64)            ;; query_id
+        .store_slice(sender_addr)     ;; recipient
+        .store_uint(total, 64)        ;; amount
+        .end_cell();
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6)          ;; internal message flags
+        .store_slice(grokus_minter)   ;; destination
+        .store_coins(0)               ;; amount
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; state_init, etc.
+        .store_ref(body)
+        .end_cell();
+
+    ;; 6. Reset allocations
+    var (new_unclaimed, deleted_unclaimed) = udict_delete?(unclaimed_allocations, 256, user_key_hash);
+    unclaimed_allocations = new_unclaimed;
+    var (new_rewards, deleted_rewards) = udict_delete?(referral_rewards_unclaimed, 256, user_key_hash);
+    referral_rewards_unclaimed = new_rewards;
+
+    ;; 7. Save state
+    save_data(claim_enabled, claim_fee, merkle_root,
+        unclaimed_allocations, referral_rewards_unclaimed,
+        referrer_of, referral_count, referral_earnings,
+        subscription_level, subscription_until,
+        last_used_day, used_today,
+        owner_address);
+
+    ;; 8. Send message
+    builder b = begin_cell();
+    b = b.store_ref(msg);
+    send_raw_message(b.end_cell(), 1); ;; mode = 1: pay fees, revert on error
+}

@@ -1,0 +1,48 @@
+#include "stdlib.fc";
+#include "grokus_storage.fc";
+#include "grokus_ops.fc";
+
+() set_claim_config(slice sender_addr, int enabled, int fee) impure {
+    ;; 1. Load state
+    var (
+        claim_enabled, claim_fee, merkle_root,
+        unclaimed_allocations, referral_rewards_unclaimed,
+        referrer_of, referral_count, referral_earnings,
+        subscription_level, subscription_until,
+        last_used_day, used_today,
+        owner_address
+    ) = load_data();
+
+    ;; 2. Only owner
+    throw_unless(401, slice_hash(sender_addr) == slice_hash(owner_address));
+
+    ;; 3. Update
+    claim_enabled = enabled;
+    claim_fee = fee;
+
+    ;; 4. Save
+    save_data(claim_enabled, claim_fee, merkle_root,
+        unclaimed_allocations, referral_rewards_unclaimed,
+        referrer_of, referral_count, referral_earnings,
+        subscription_level, subscription_until,
+        last_used_day, used_today,
+        owner_address);
+}
+
+() withdraw(slice sender_addr, slice to_address, int amount) impure {
+    ;; 1. Only owner
+    var (_, _, _, _, _, _, _, _, _, _, _, _, owner_address) = load_data();
+    throw_unless(402, slice_hash(sender_addr) == slice_hash(owner_address));
+
+    ;; 2. Create transfer
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; internal message flags
+        .store_slice(to_address)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; state_init, etc.
+        .end_cell();
+
+    builder b = begin_cell();
+    b = b.store_ref(msg);
+    send_raw_message(b.end_cell(), 1); ;; mode = 1: pay fees, revert if fail
+}

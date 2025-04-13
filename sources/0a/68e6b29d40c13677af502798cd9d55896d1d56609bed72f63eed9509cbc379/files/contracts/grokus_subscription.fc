@@ -1,0 +1,61 @@
+#include "stdlib.fc";
+#include "grokus_storage.fc";
+#include "grokus_ops.fc";
+
+() buy_subscription(slice sender_addr, int msg_value, int now, int level) impure {
+    ;; 1. Load storage
+    var (
+        claim_enabled, claim_fee, merkle_root,
+        unclaimed_allocations, referral_rewards_unclaimed,
+        referrer_of, referral_count, referral_earnings,
+        subscription_level, subscription_until,
+        last_used_day, used_today,
+        owner_address
+    ) = load_data();
+
+    ;; 2. Check level
+    throw_unless(301, level >= 1);
+    throw_unless(302, level <= 3);
+
+    ;; 3. Define prices
+    int price = 0;
+    if (level == 1) { 
+        price = 2000000000; ;; 2 TON
+    } else {
+        if (level == 2) { 
+            price = 4000000000; ;; 4 TON
+        } else {
+            price = 7000000000; ;; 7 TON
+        }
+    }
+
+    ;; 4. Check payment
+    throw_unless(303, msg_value >= price);
+
+    ;; 5. Extend 30 days (86400 * 30 = 2_592_000)
+    int now_until = get_int_or_default(subscription_until, sender_addr);
+    int new_until = (now_until > now ? now_until : now) + 2592000;
+
+    ;; Update dictionaries
+    int sender_hash = slice_hash(sender_addr);
+    subscription_level = udict_set_builder(
+        subscription_level,
+        256,
+        sender_hash,
+        begin_cell().store_uint(level, 32)
+    );
+    subscription_until = udict_set_builder(
+        subscription_until,
+        256,
+        sender_hash,
+        begin_cell().store_uint(new_until, 64)
+    );
+
+    ;; 6. Save state
+    save_data(claim_enabled, claim_fee, merkle_root,
+        unclaimed_allocations, referral_rewards_unclaimed,
+        referrer_of, referral_count, referral_earnings,
+        subscription_level, subscription_until,
+        last_used_day, used_today,
+        owner_address);
+}

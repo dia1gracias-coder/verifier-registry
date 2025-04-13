@@ -1,0 +1,68 @@
+;; File: contracts/grokus_storage.fc
+
+#include "stdlib.fc";
+
+;; ===============================
+;; GROKUS Storage Module
+;; ===============================
+
+;; Persistent state layout:
+;; - owner_address: slice
+;; - claim_enabled: int
+;; - claim_fee: int
+;; - merkle_root: slice
+;; - dicts (stored as cells):
+;;     unclaimed_allocations: int -> int
+;;     referral_rewards_unclaimed: int -> int
+;;     referrer_of: int -> int
+;;     referral_count: int -> int
+;;     referral_earnings: int -> int
+;;     subscription_level: int -> int
+;;     subscription_until: int -> int
+;;     last_used_day: int -> int
+;;     used_today: int -> int
+
+(int, int, slice, cell, cell, cell, cell, cell, cell, cell, cell, cell, slice) load_data() {
+    slice s = get_data().begin_parse();
+    int claim_enabled = s~load_uint(1);
+    int claim_fee = s~load_coins();
+    slice merkle_root = s~load_ref().begin_parse();
+    slice owner_address = s~load_msg_addr();
+
+    cell unclaimed_allocations = s~load_dict();
+    cell referral_rewards_unclaimed = s~load_dict();
+    cell referrer_of = s~load_dict();
+    cell referral_count = s~load_dict();
+    cell referral_earnings = s~load_dict();
+    cell subscription_level = s~load_dict();
+    cell subscription_until = s~load_dict();
+    cell last_used_day = s~load_dict();
+    cell used_today = s~load_dict();
+
+    return (claim_enabled, claim_fee, merkle_root, unclaimed_allocations, referral_rewards_unclaimed,
+            referrer_of, referral_count, referral_earnings, subscription_level, subscription_until,
+            last_used_day, used_today, owner_address);
+}
+
+() save_data(int claim_enabled, int claim_fee, slice merkle_root, cell unclaimed_allocations,
+             cell referral_rewards_unclaimed, cell referrer_of, cell referral_count, cell referral_earnings,
+             cell subscription_level, cell subscription_until, cell last_used_day, cell used_today,
+             slice owner_address) impure {
+    builder b = begin_cell();
+    b = b.store_uint(claim_enabled, 1);
+    b = b.store_coins(claim_fee);
+    b = b.store_ref(begin_cell().store_slice(merkle_root).end_cell());
+    b = b.store_slice(owner_address);
+
+    b = b.store_dict(unclaimed_allocations);
+    b = b.store_dict(referral_rewards_unclaimed);
+    b = b.store_dict(referrer_of);
+    b = b.store_dict(referral_count);
+    b = b.store_dict(referral_earnings);
+    b = b.store_dict(subscription_level);
+    b = b.store_dict(subscription_until);
+    b = b.store_dict(last_used_day);
+    b = b.store_dict(used_today);
+
+    set_data(b.end_cell());
+}

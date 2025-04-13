@@ -1,0 +1,50 @@
+#include "stdlib.fc";
+#include "grokus_storage.fc";
+#include "grokus_ops.fc";
+
+int get_allocation(slice user) method_id {
+    var (
+        _, _, _, unclaimed_allocations, referral_rewards_unclaimed,
+        _, _, _, _, _, _, _, _
+    ) = load_data();
+    int allocation = get_int_or_default(unclaimed_allocations, user);
+    int referral_bonus = get_int_or_default(referral_rewards_unclaimed, user);
+    return allocation + referral_bonus;
+}
+
+int get_referral_rewards(slice user) method_id {
+    var (_, _, _, _, referral_rewards_unclaimed, _, _, _, _, _, _, _, _) = load_data();
+    return get_int_or_default(referral_rewards_unclaimed, user);
+}
+
+(int, int) get_subscription(slice user) method_id {
+    var (
+        _, _, _, _, _, _, _, _, subscription_level, subscription_until, _, _, _
+    ) = load_data();
+    int level = get_int_or_default(subscription_level, user);
+    int end_time = get_int_or_default(subscription_until, user);
+    return (level, end_time);
+}
+
+(int, int) get_daily_status(slice user, int now) method_id {
+    var (
+        _, _, _, _, _, _, _, _, subscription_level, _, last_used_day, used_today, _
+    ) = load_data();
+    int today = now / 86400;
+    int used = get_int_or_default(used_today, user);
+    int last_day = get_int_or_default(last_used_day, user);
+    if (last_day != today) {
+        return (0, 1);
+    }
+    int level = get_int_or_default(subscription_level, user);
+    int max = 1;
+    if (level == 1) { max = 3; }
+    if (level == 2) { max = 5; }
+    if (level == 3) { max = 10; }
+    return (used, max);
+}
+
+slice get_merkle_root() method_id {
+    var (_, _, root, _, _, _, _, _, _, _, _, _, _) = load_data();
+    return root;
+}
