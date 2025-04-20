@@ -1,0 +1,25 @@
+;; workchain.fc - Functions related to workchain handling
+
+const int MY_WORKCHAIN = 0;
+
+;; Return the default workchain ID
+int workchain() {
+    return MY_WORKCHAIN;
+}
+
+;; Check if an address is in the same workchain
+int check_same_workchain(slice addr) {
+    (int wc, _) = parse_std_addr(addr);
+    return wc == workchain();
+}
+
+;; Get adjusted forward fee for a specific workchain
+int adjust_fwd_fee(int wc, int msg_fwd_fee) inline {
+    if (wc == 0) {
+        ;; Base workchain has standard fee
+        return msg_fwd_fee;
+    } else {
+        ;; Adjust fee for other workchains if needed
+        return msg_fwd_fee * 2; ;; Example adjustment
+    }
+}

@@ -1,0 +1,354 @@
+#include "stdlib.fc";
+#include "params.fc";
+#include "op-codes.fc";
+#include "metadata-utils.fc";
+#include "workchain.fc";
+
+;; Storage format
+;; storage#_ total_supply:Coins content:^Cell jetton_wallet_code:^Cell = Storage;
+int equal_slices(slice a, slice b) asm "SDEQ";
+
+(int, cell, cell) load_master_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_coins(), ;; total_supply
+        ds~load_ref(),   ;; content
+        ds~load_ref()    ;; jetton_wallet_code
+    );
+}
+
+() save_data(int total_supply, cell content, cell jetton_wallet_code) impure inline {
+    set_data(begin_cell()
+        .store_coins(total_supply)
+        .store_ref(content)
+        .store_ref(jetton_wallet_code)
+    .end_cell());
+}
+
+;; Get Jetton wallet address for owner
+slice calculate_owner_jetton_wallet_address(slice owner_address) {
+    (_, _, cell jetton_wallet_code) = load_master_data();
+    cell data = begin_cell()
+        .store_coins(0) ;; balance
+        .store_slice(my_address()) ;; jetton_master_address
+        .store_slice(owner_address) ;; owner_address
+    .end_cell();
+    
+    cell state_init = begin_cell()
+        .store_uint(0, 2) ;; split_depth:(Maybe (## 5))
+        .store_dict(jetton_wallet_code) ;; code:(Maybe ^Cell)
+        .store_dict(data) ;; data:(Maybe ^Cell)
+        .store_uint(0, 1) ;; library:(HashmapE 256 SimpleLib)
+    .end_cell();
+    
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(workchain(), 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}
+
+() mint_tokens(slice to_address, int amount, slice send_gas_to) impure {
+    throw_unless(error::invalid_amount, amount > 0);
+    (int total_supply, cell content, cell jetton_wallet_code) = load_master_data();
+    
+    slice jetton_wallet = calculate_owner_jetton_wallet_address(to_address);
+    
+    var mint_msg = begin_cell()
+        .store_uint(op::internal_transfer(), 32)
+        .store_uint(cur_lt(), 64)
+        .store_coins(amount)
+        .store_slice(my_address())
+        .store_slice(send_gas_to)
+        .store_coins(0)
+        .store_uint(0, 1);
+    
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(jetton_wallet)
+        .store_coins(JETTON_GAS_FEE)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(mint_msg.end_cell());
+    
+    send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately
+    save_data(total_supply + amount, content, jetton_wallet_code);
+}
+
+() burn_notification(int msg_value, slice in_msg_body, slice sender_address) impure {
+    throw_unless(error::unauthorized_access, equal_slices(sender_address, calculate_owner_jetton_wallet_address(in_msg_body~load_msg_addr())));
+    int query_id = in_msg_body~load_uint(64);
+    int jetton_amount = in_msg_body~load_coins();
+    slice from_address = in_msg_body~load_msg_addr();
+    
+    (int total_supply, cell content, cell jetton_wallet_code) = load_master_data();
+    save_data(total_supply - jetton_amount, content, jetton_wallet_code);
+    
+    if (in_msg_body~load_uint(1)) {
+        ;; Response requested
+        slice response_address = in_msg_body~load_msg_addr();
+        var msg = begin_cell()
+            .store_uint(0x10, 6) ;; nobounce
+            .store_slice(response_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::excesses(), 32)
+            .store_uint(query_id, 64);
+        send_raw_message(msg.end_cell(), 2 + 64);
+    }
+}
+
+() get_jetton_data(slice in_msg_body, slice sender_address, int msg_value, int fwd_fee) impure {
+    (int total_supply, cell content, cell jetton_wallet_code) = load_master_data();
+    
+    slice cs = content.begin_parse();
+    slice admin_address = null();
+    
+    if (cs~load_uint(8) == 1) { ;; Check if onchain format
+        cs~load_dict(); ;; Skip dictionary
+        admin_address = cs.preload_ref().begin_parse();
+    }
+    
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_uint(op::get_jetton_data() + 1, 32)
+        .store_uint(in_msg_body~load_uint(64), 64) ;; query_id
+        .store_coins(total_supply)
+        .store_ref(content)
+        .store_slice(admin_address)
+        .store_ref(jetton_wallet_code);
+    
+    send_raw_message(msg.end_cell(), 64);
+}
+
+() provide_wallet_address(slice in_msg_body, slice sender_address, int msg_value, int fwd_fee) impure method_id {
+    int query_id = in_msg_body~load_uint(64);
+    slice owner_address = in_msg_body~load_msg_addr();
+    int include_address? = in_msg_body~load_uint(1);
+    
+    slice jetton_wallet_address = calculate_owner_jetton_wallet_address(owner_address);
+    
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::take_wallet_address(), 32)
+        .store_uint(query_id, 64)
+        .store_slice(jetton_wallet_address);
+    
+    if (include_address?) {
+        msg = msg.store_uint(1, 1).store_slice(owner_address);
+    } else {
+        msg = msg.store_uint(0, 1);
+    }
+    
+    send_raw_message(msg.end_cell(), 64);
+}
+
+() change_content(slice in_msg_body, slice sender_address) impure {
+    (int total_supply, cell content, cell jetton_wallet_code) = load_master_data();
+    
+    ;; Check admin access
+    slice cs = content.begin_parse();
+    slice admin_address = null();
+    
+    if (cs~load_uint(8) == 1) { ;; Check if onchain format
+        cs~load_dict(); ;; Skip dictionary
+        admin_address = cs.preload_ref().begin_parse();
+    }
+    
+    throw_unless(error::unauthorized_access, equal_slices(sender_address, admin_address));
+    
+    cell new_content = in_msg_body~load_ref();
+    save_data(total_supply, new_content, jetton_wallet_code);
+}
+
+() upgrade_code(slice in_msg_body, slice sender_address) impure {
+    (int total_supply, cell content, cell jetton_wallet_code) = load_master_data();
+    
+    ;; Check admin access
+    slice cs = content.begin_parse();
+    slice admin_address = null();
+    
+    if (cs~load_uint(8) == 1) { ;; Check if onchain format
+        cs~load_dict(); ;; Skip dictionary
+        admin_address = cs.preload_ref().begin_parse();
+    }
+    
+    throw_unless(error::unauthorized_access, equal_slices(sender_address, admin_address));
+    
+    cell new_code = in_msg_body~load_ref();
+    
+    ;; Create a cell with update information preserving storage values
+    cell data = begin_cell()
+        .store_coins(total_supply)
+        .store_ref(content)
+        .store_ref(jetton_wallet_code)
+    .end_cell();
+    
+    ;; Perform the upgrade
+    set_code(new_code);
+    set_data(data);
+}
+
+() upgrade_wallet_code(slice in_msg_body, slice sender_address) impure {
+    (int total_supply, cell content, cell jetton_wallet_code) = load_master_data();
+    
+    ;; Check admin access
+    slice cs = content.begin_parse();
+    slice admin_address = null();
+    
+    if (cs~load_uint(8) == 1) { ;; Check if onchain format
+        cs~load_dict(); ;; Skip dictionary
+        admin_address = cs.preload_ref().begin_parse();
+    }
+    
+    throw_unless(error::unauthorized_access, equal_slices(sender_address, admin_address));
+    
+    cell new_wallet_code = in_msg_body~load_ref();
+    save_data(total_supply, content, new_wallet_code);
+}
+
+() process_airdrop(slice to_address, int query_id) impure {
+    ;; Implement the daily airdrop logic
+    (int total_supply, cell content, cell jetton_wallet_code) = load_master_data();
+    
+    ;; In a real implementation, you'd check if the user is eligible for airdrop
+    ;; For now, we just mint a fixed amount
+    mint_tokens(to_address, MAX_DAILY_AIRDROP / 10, to_address);
+    
+    ;; Send notification about successful airdrop
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(to_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::excesses(), 32)
+        .store_uint(query_id, 64);
+    send_raw_message(msg.end_cell(), 64);
+}
+
+() register_tap(slice in_msg_body, slice sender_address) impure {
+    ;; Process user tap and award tokens
+    int query_id = in_msg_body~load_uint(64);
+    
+    ;; In a full implementation, you'd track user taps and enforce limits
+    mint_tokens(sender_address, TAP_REWARD, sender_address);
+    
+    ;; Send notification about the tap registration
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; nobounce
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::excesses(), 32)
+        .store_uint(query_id, 64);
+    send_raw_message(msg.end_cell(), 64);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { 
+        return (); ;; Ignore empty messages
+    }
+    
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { 
+        return (); ;; Ignore bounced messages
+    }
+    
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for action estimation
+    
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    
+    (int total_supply, cell content, cell jetton_wallet_code) = load_master_data();
+    
+    if (op == op::mint()) {
+        ;; Check admin access
+        slice cs = content.begin_parse();
+        slice admin_address = null();
+        
+        if (cs~load_uint(8) == 1) { ;; Check if onchain format
+            cs~load_dict(); ;; Skip dictionary
+            admin_address = cs.preload_ref().begin_parse();
+        }
+        
+        throw_unless(error::unauthorized_access, equal_slices(sender_address, admin_address));
+        
+        slice to_address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        slice response_address = in_msg_body~load_msg_addr();
+        mint_tokens(to_address, amount, response_address);
+        return ();
+    }
+    
+    if (op == op::burn_notification()) {
+        burn_notification(msg_value, in_msg_body, sender_address);
+        return ();
+    }
+    
+    if (op == op::get_jetton_data()) {
+        get_jetton_data(in_msg_body, sender_address, msg_value, fwd_fee);
+        return ();
+    }
+    
+    if (op == op::provide_wallet_address()) {
+        provide_wallet_address(in_msg_body, sender_address, msg_value, fwd_fee);
+        return ();
+    }
+    
+    if (op == op::change_content()) {
+        change_content(in_msg_body, sender_address);
+        return ();
+    }
+    
+    if (op == op::upgrade_code()) {
+        upgrade_code(in_msg_body, sender_address);
+        return ();
+    }
+    
+    if (op == op::upgrade_code() + 1) { ;; Using a different op code for wallet code upgrade
+        upgrade_wallet_code(in_msg_body, sender_address);
+        return ();
+    }
+    
+    if (op == op::claim_airdrop()) {
+        process_airdrop(sender_address, query_id);
+        return ();
+    }
+    
+    if (op == op::register_tap()) {
+        register_tap(in_msg_body, sender_address);
+        return ();
+    }
+    
+    throw(0xffff); ;; If we get here, the message is not supported
+}
+
+;; Get methods
+(int, int, slice, cell, cell) get_jetton_data_static() method_id {
+    (int total_supply, cell content, cell jetton_wallet_code) = load_master_data();
+    
+    slice cs = content.begin_parse();
+    slice admin_address = null();
+    
+    if (cs~load_uint(8) == 1) { ;; Check if onchain format
+        cs~load_dict(); ;; Skip dictionary
+        admin_address = cs.preload_ref().begin_parse();
+    }
+    
+    return (total_supply, -1, admin_address, content, jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    return calculate_owner_jetton_wallet_address(owner_address);
+}

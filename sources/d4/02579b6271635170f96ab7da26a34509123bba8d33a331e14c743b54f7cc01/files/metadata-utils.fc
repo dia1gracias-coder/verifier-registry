@@ -1,0 +1,119 @@
+#include "stdlib.fc";
+
+;; Token metadata format (TEP-0064 standard)
+;; key:value pairs in a dictionary
+
+cell create_onchain_metadata(
+    slice name, 
+    slice symbol, 
+    int decimals, 
+    slice description,
+    slice image_uri,
+    slice website_uri
+) {
+    cell dict = new_dict();
+    
+    ;; Create key hashes properly
+    int name_key = string_hash("name");
+    int symbol_key = string_hash("symbol");
+    int decimals_key = string_hash("decimals");
+    
+    ;; Mandatory fields
+    dict~udict_set_ref(256, name_key, begin_cell().store_slice(name).end_cell());
+    dict~udict_set_ref(256, symbol_key, begin_cell().store_slice(symbol).end_cell());
+    dict~udict_set_ref(256, decimals_key, begin_cell().store_uint(decimals, 8).end_cell());
+    
+    ;; Optional fields (if provided)
+    if (~ description.null?()) {
+        int desc_key = string_hash("description");
+        dict~udict_set_ref(256, desc_key, begin_cell().store_slice(description).end_cell());
+    }
+    
+    if (~ image_uri.null?()) {
+        int image_key = string_hash("image");
+        dict~udict_set_ref(256, image_key, begin_cell().store_slice(image_uri).end_cell());
+    }
+    
+    if (~ website_uri.null?()) {
+        int website_key = string_hash("website");
+        dict~udict_set_ref(256, website_key, begin_cell().store_slice(website_uri).end_cell());
+    }
+    
+    return dict;
+}
+
+;; Create Offchain metadata with URI
+cell create_offchain_metadata(slice uri) {
+    return begin_cell()
+        .store_uint(0, 8) ;; Off-chain metadata marker
+        .store_slice(uri)
+    .end_cell();
+}
+
+;; Load value from content dictionary by key
+slice load_content_field(cell content, slice field) {
+    slice cs = content.begin_parse();
+    
+    ;; Check if content is onchain
+    if (cs.preload_uint(8) != 0) {
+        ;; Onchain format
+        cs~skip_bits(8);
+        cell dict = cs~load_dict();
+        (slice value, int success) = dict.udict_get?(256, string_hash(field));
+        if (success) {
+            return value;
+        }
+        return null();
+    } else {
+        ;; Offchain format - can't get individual fields
+        return null();
+    }
+}
+
+;; Helper to quickly create TapToken metadata
+cell create_tap_token_metadata(cell admin_address) {
+    ;; Create content cell with token information
+    cell content = begin_cell()
+        .store_uint(1, 8) ;; Onchain metadata marker
+        .store_dict(create_onchain_metadata(
+            "TapToken",           ;; name
+            "TAP",                ;; symbol
+            9,                    ;; decimals (9 is standard for TON tokens)
+            "Token for the Tap game airdrop economy",  ;; description
+            "https://i.postimg.cc/76BLZ9tH/mhwns1hz9nb21.png",       ;; image
+            "https://taptrump.io"                 ;; website
+        ))
+        .store_ref(admin_address)  ;; admin address in a separate cell
+    .end_cell();
+    
+    return content;
+}
+
+;; Function to update token metadata while preserving admin address
+cell update_token_metadata(
+    cell current_content, 
+    slice name, 
+    slice symbol, 
+    int decimals, 
+    slice description,
+    slice image_uri,
+    slice website_uri
+) {
+    slice cs = current_content.begin_parse();
+    if (cs.preload_uint(8) != 1) {
+        ;; Not an onchain format, can't update
+        return current_content;
+    }
+    
+    cs~skip_bits(8);
+    cs~load_dict(); ;; Skip old dictionary
+    cell admin_address = cs.preload_ref();
+    
+    return begin_cell()
+        .store_uint(1, 8) ;; Onchain metadata marker
+        .store_dict(create_onchain_metadata(
+            name, symbol, decimals, description, image_uri, website_uri
+        ))
+        .store_ref(admin_address)
+    .end_cell();
+}

@@ -1,0 +1,24 @@
+;; Standard Jetton op codes as per TEP-0074
+int op::transfer() asm "0xf8a7ea5 PUSHINT";               ;; transfer token
+int op::transfer_notification() asm "0x7362d09c PUSHINT"; ;; notify receiver about incoming transfer
+int op::internal_transfer() asm "0x178d4519 PUSHINT";     ;; internal transfer between jetton wallets
+int op::excesses() asm "0xd53276db PUSHINT";              ;; return excess funds
+int op::burn() asm "0x595f07bc PUSHINT";                  ;; burn tokens
+int op::burn_notification() asm "0x7bdd97de PUSHINT";     ;; notify master about burn
+
+;; Admin operations for master contract
+int op::mint() asm "0x1674b0a0 PUSHINT";                  ;; mint new tokens
+int op::change_admin() asm "0x4840664f PUSHINT";          ;; change admin address
+int op::claim_admin() asm "0x524c5a6e PUSHINT";           ;; claim admin role
+int op::upgrade_code() asm "0x34aea60c PUSHINT";          ;; upgrade smart contract code
+int op::change_content() asm "0x5530abce PUSHINT";        ;; update token metadata
+
+;; Wallet discovery and info
+int op::provide_wallet_address() asm "0x2c76b973 PUSHINT";  ;; get wallet address for owner
+int op::take_wallet_address() asm "0xd1735400 PUSHINT";     ;; response with wallet address
+int op::get_jetton_data() asm "0x26e0b568 PUSHINT";         ;; get token data
+int op::get_wallet_data() asm "0x4ddcbd95 PUSHINT";         ;; get wallet data
+
+;; Custom operations for TapToken
+int op::claim_airdrop() asm "0x68563e21 PUSHINT";         ;; claim daily airdrop
+int op::register_tap() asm "0x7a9ac57d PUSHINT";          ;; register a tap action
