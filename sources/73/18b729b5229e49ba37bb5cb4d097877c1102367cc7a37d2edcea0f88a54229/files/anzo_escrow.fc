@@ -1,0 +1,544 @@
+;; #include "imports/stdlib.fc";
+
+;; (int) load_data() inline {
+;;     var ds = get_data().begin_parse();
+;;     return (ds~load_uint(64));
+;; }
+
+;; () save_data(int counter) impure inline {
+;;     set_data(begin_cell()
+;;         .store_uint(counter, 64)
+;;         .end_cell());
+;; }
+
+;; ;; main entry point
+;; () recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+;;     if (in_msg_body.slice_empty?()){
+;;         return ();
+;;     }
+;;     int op = in_msg_body~load_uint(32);
+;;     var (counter) = load_data();
+;;     if (op == 1) {
+;;         save_data(counter + 1);
+;;     }
+;; }
+
+;; int counter() method_id {
+;;     var (counter) = load_data();
+;;     return counter;
+;; }
+
+
+#include "stdlib.fc";
+
+const op::assign_controller = "op::assign_controller"c;
+const op::create_maker = "op::init_maker"c;
+const op::create_taker = "op::init_taker"c;
+const op::create_sell_offer = "op::init_sell_offer"c;
+const op::create_buy_offer = "op::init_buy_offer"c;
+const op::create_buy_intent = "op::init_buy_intent"c;
+const op::create_sell_intent = "op::init_sell_intent"c;
+const op::confirm_intent = "op::confirm_intent"c;
+const op::cancel_intent = "op::cancel_intent"c;
+const op::withdraw_offer = "op::withdraw"c;
+
+;; Global variables
+global slice controller_address;
+;; All makers
+global cell makers_dict;
+;; All takers
+global cell takers_dict;
+;; All offers
+global cell offers_dict;
+;; All intents
+global cell intents_dict;
+;; ID counters
+global int next_offer_id;
+global int next_intent_id;
+
+;; TODO: check if this should be impure
+() save_data() impure {
+    set_data(begin_cell()
+        .store_slice(controller_address)
+        .store_dict(makers_dict)
+        .store_dict(takers_dict)
+        .store_dict(offers_dict)  ;; Add this line
+        .store_dict(intents_dict)
+        .store_uint(next_offer_id, 64)
+        .store_uint(next_intent_id, 64)
+        .end_cell());
+}
+() send_custom_message(slice to_address, int amount, slice message_body, int mode) impure {
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(to_address)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_slice(message_body)
+        .end_cell();
+    
+    send_raw_message(msg, mode);
+}
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    
+    if (ds.slice_bits() > 0) {  ;; Check if there's data to load
+        controller_address = ds~load_msg_addr();
+        makers_dict = ds~load_dict();
+        takers_dict = ds~load_dict();
+        offers_dict = ds~load_dict();  ;; This was missing from your save_data too
+        intents_dict = ds~load_dict();
+        next_offer_id = ds~load_uint(64);
+        next_intent_id = ds~load_uint(64);
+    } else {
+        ;; Initialize with empty values
+        controller_address = null();
+        makers_dict = new_dict();
+        takers_dict = new_dict();
+        offers_dict = new_dict();
+        intents_dict = new_dict();
+        next_offer_id = 0;
+        next_intent_id = 0;
+    }
+}
+int equal_slices(slice a, slice b) {
+    return slice_hash(a) == slice_hash(b);
+}
+
+;; Helper function to determine if an offer is a buy offer
+int is_buy_offer(int offer_id) method_id {
+    load_data();
+    (cell offer_cell, int found?) = udict_get_ref?(offers_dict, 64, offer_id);
+    
+    if (~ found?) {
+        return 0;
+    }
+    
+    slice offer_slice = offer_cell.begin_parse();
+    offer_slice~load_msg_addr(); ;; Skip maker address
+    offer_slice~load_coins();    ;; Skip amount
+    offer_slice~load_bits(256);  ;; Skip data
+    offer_slice~load_uint(1);    ;; Skip is_active
+    offer_slice~load_uint(64);   ;; Skip intent count
+    
+    return offer_slice~load_uint(1); ;; 1 for buy, 0 for sell
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) {
+    if (in_msg_body.slice_empty?()) { 
+        return (); ;; Ignore empty messages
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return (); ;; Ignore bounced messages
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    load_data();
+
+    ;; Operation handlers
+
+    ;; TODO: update dict data after test. Currently, address keys are the value types in the dict:
+    ;; 8 bits for the workchain ID
+    ;; 256 bits for the account hash
+
+
+    if (op == op::assign_controller) {
+        ;; Handle setting controller admin
+        if (equal_slices(controller_address, null())) {
+            controller_address = sender_address;
+            ;; persist the change in storage
+            save_data();
+        } else {
+            throw_unless(401, equal_slices(sender_address, controller_address));
+            ;; This extracts the new controller's address from the message body
+            slice new_controller = in_msg_body~load_msg_addr();
+            controller_address = new_controller;
+            save_data();
+        }
+        return();
+    }
+    if (op == op::create_maker) {
+        ;; Handle maker initalization 
+        throw_unless(401, equal_slices(sender_address, controller_address));
+        slice maker_address = in_msg_body~load_msg_addr(); 
+        ;; load maker attributes
+        slice data = in_msg_body~load_bits(256);
+        int key = slice_hash(maker_address);
+        makers_dict = udict_set_ref(makers_dict, 156, key, begin_cell().store_slice(data).end_cell());
+        save_data();
+        return ();
+    }
+
+    if (op == op::create_taker) {
+        ;; Handle taker initialization 
+        throw_unless(401, equal_slices(sender_address, controller_address));
+        slice taker_address = in_msg_body~load_msg_addr();
+        slice data = in_msg_body~load_bits(256);
+        takers_dict = dict_set(takers_dict, 267, taker_address, data);
+        save_data();
+        return ();
+    }
+
+    if (op == op::create_sell_offer) {
+        ;; Handle sell offer creation
+        slice data = in_msg_body~load_bits(256);
+        int amount = in_msg_body~load_uint(64);
+        ;; Check if sender is a registered maker
+        int key = slice_hash(sender_address);
+        (cell maker_data, int found?) = udict_get_ref?(makers_dict, 256, key);
+        throw_unless(404, found?);
+
+        ;; Verify they sent the correct amount with the message
+        throw_unless(402, msg_value >= amount);
+
+        ;; Create offer
+        cell offer_data = begin_cell()
+            .store_slice(sender_address)  ;; maker address
+            .store_coins(amount)          ;; offer amount
+            .store_slice(data)            ;; offer details
+            .store_uint(1, 1)             ;; is_active flag
+            .store_uint(0, 64)            ;; total intents (counter)
+            .store_uint(0, 1)             ;; offer type (0 for sell, 1 for buy)
+            .end_cell();
+
+        ;; TODO: transfer amount to contract
+        offers_dict = udict_set_ref(offers_dict, 64,next_offer_id, offer_data);
+
+        ;; Return excess funds if any
+        if (msg_value > amount) {
+            send_custom_message(sender_address, msg_value - amount, "Returning excess funds", 1);
+        }
+
+        ;; Update counter
+        next_offer_id += 1;
+        save_data();
+        return ();
+
+    }
+
+    if (op == op::create_buy_offer){
+        ;; Handle buy offer creation
+        slice data = in_msg_body~load_bits(256);
+        
+        ;; Check if sender is a registered maker
+        int key = slice_hash(sender_address);
+        (cell maker_data, int found?) = udict_get_ref?(makers_dict, 256, key);
+        throw_unless(404, found?);
+        ;; Create offer
+        cell offer_data = begin_cell()
+            .store_slice(sender_address)  ;; maker address
+            .store_coins(msg_value)       ;; Using message value as the offer amount
+            .store_slice(data)            ;; offer details
+            .store_uint(1, 1)             ;; is_active flag
+            .store_uint(0, 64)            ;; total intents (counter)
+            .store_uint(1, 1)             ;; offer type (0 for sell, 1 for buy)
+            .end_cell();
+        
+        offers_dict = udict_set_ref(offers_dict, 64, next_offer_id, offer_data);
+        ;; Update counter
+        next_offer_id += 1;
+        save_data();
+        return ();
+    }
+
+    if (op == op::create_buy_intent) {
+        ;; Handle buy intent creation
+        int offer_id = in_msg_body~load_uint(64);
+        int amount = in_msg_body~load_uint(64);
+        slice data = in_msg_body~load_bits(256);
+        ;; Check if sender is a registered taker
+        int key = slice_hash(sender_address);
+        (cell taker_data, int found?) = udict_get_ref?(takers_dict, 267, key);
+        throw_unless(404, found?);
+
+        ;; Verify offer exists and is active
+        (cell offer_cell, int offer_found?) = udict_get_ref?(offers_dict, 64, offer_id);
+        throw_unless(404, offer_found?);
+
+        slice offer_slice = offer_cell.begin_parse();
+        slice maker_address = offer_slice~load_msg_addr();
+        int offer_amount = offer_slice~load_coins();
+        slice offer_data = offer_slice~load_bits(256);
+        int is_active = offer_slice~load_uint(1);
+        int intent_count = offer_slice~load_uint(64);
+        throw_unless(403, is_active);
+
+        ;; Verify the offer has enough amount left for this intent
+        throw_unless(405, offer_amount >= amount);
+        ;; Verify they sent the correct amount of stablecoin with the message
+        throw_unless(402, msg_value >= amount); 
+
+        ;; Create intent
+        cell intent_data = begin_cell()
+            .store_uint(offer_id, 64)     ;; reference to offer
+            .store_slice(maker_address)   ;; maker address
+            .store_slice(sender_address)  ;; taker address
+            .store_coins(amount)          ;; intent amount
+            .store_slice(data)            ;; intent details
+            .store_uint(1, 1)             ;; is_active flag
+            .store_uint(0, 1)             ;; maker_confirmed
+            .store_uint(0, 1)             ;; taker_confirmed
+            .store_uint(0, 1)             ;; controller_confirmed
+            .end_cell();
+        intents_dict = udict_set_ref(intents_dict, 64,next_intent_id, intent_data);
+        
+        ;; Return excess funds if any
+        if (msg_value > amount) {
+            send_custom_message(sender_address, msg_value - amount, "Returning excess stablecoin", 1);
+        }
+
+        int updated_offer_amount = offer_amount - amount;
+        int updated_is_active = updated_offer_amount > 0 ? 1 : 0;
+
+        ;; Update offer with new amount and intent count
+        cell updated_offer = begin_cell()
+            .store_slice(maker_address)
+            .store_coins(updated_offer_amount)  ;; Decrease offer amount by intent amount
+            .store_slice(offer_data)
+            .store_uint(updated_is_active, 1)   ;; Set to inactive if amount becomes zero
+            .store_uint(intent_count + 1, 64)
+            .end_cell();
+    
+        offers_dict = udict_set_ref(offers_dict, 64,offer_id, updated_offer);
+    
+        ;; Update counter
+        next_intent_id += 1;
+        save_data();
+        return ();
+    }
+
+    if (op == op::create_sell_intent) {
+        ;; Handle sell intent creation
+        int offer_id = in_msg_body~load_uint(64);
+        int amount = in_msg_body~load_uint(64);
+        slice data = in_msg_body~load_bits(256);
+        
+        ;; Check if sender is registered taker
+        int key = slice_hash(sender_address);
+        (cell taker_data, int found?) = udict_get_ref?(takers_dict, 267, key);
+        throw_unless(404, found?);
+        
+        ;; Verify offer exists and is active
+        (cell offer_cell, int offer_found?) = udict_get_ref?(offers_dict, 64, offer_id);
+        throw_unless(404, offer_found?);
+        
+        slice offer_slice = offer_cell.begin_parse();
+        slice maker_address = offer_slice~load_msg_addr();
+        int offer_amount = offer_slice~load_coins();  ;; Fixed typo from offer_slice~load_coind()
+        slice offer_data = offer_slice~load_bits(256);
+        int is_active = offer_slice~load_uint(1);
+        int intent_count = offer_slice~load_uint(64);
+        
+        ;; Verify the offer is active
+        throw_unless(403, is_active);
+        
+        ;; Verify the offer has enough amount left for this intent
+        throw_unless(405, offer_amount >= amount);
+        
+        ;; For sell intent, the taker doesn't need to deposit stablecoin upfront
+        
+        ;; Create intent
+        cell intent_data = begin_cell()
+            .store_uint(offer_id, 64)     ;; reference to offer
+            .store_slice(maker_address)   ;; maker address
+            .store_slice(sender_address)  ;; taker address
+            .store_coins(amount)          ;; intent amount
+            .store_slice(data)            ;; intent details
+            .store_uint(1, 1)             ;; is_active flag
+            .store_uint(0, 1)             ;; maker_confirmed
+            .store_uint(0, 1)             ;; taker_confirmed
+            .store_uint(0, 1)             ;; controller_confirmed
+            .end_cell();
+        
+        intents_dict = udict_set_ref(intents_dict, 64, next_intent_id, intent_data);
+        
+        ;; Calculate remaining offer amount
+        int updated_offer_amount = offer_amount - amount;
+        
+        ;; Update is_active based on remaining amount
+        int updated_is_active = updated_offer_amount > 0 ? 1 : 0;
+        
+        ;; Update offer with new amount and intent count
+        cell updated_offer = begin_cell()
+            .store_slice(maker_address)
+            .store_coins(updated_offer_amount)  ;; Decrease offer amount by intent amount
+            .store_slice(offer_data)
+            .store_uint(updated_is_active, 1)   ;; Set to inactive if amount becomes zero
+            .store_uint(intent_count + 1, 64)
+            .end_cell();
+        
+        offers_dict = udict_set_ref(offers_dict, 64,offer_id, updated_offer);
+        
+        ;; Update counter
+        next_intent_id += 1;
+        save_data();
+        return ();
+    }
+
+    if (op == op::confirm_intent) {
+        ;; Handle intent confirmation 
+        int intent_id = in_msg_body~load_uint(64);
+
+        ;; Verify intent exists
+        (cell intent_cell, int intent_found?) = udict_get_ref?(intents_dict, 64, intent_id);
+        throw_unless(404, intent_found?);
+
+        slice intent_slice = intent_cell.begin_parse();
+        int offer_id = intent_slice~load_uint(64);
+        slice maker_address = intent_slice~load_msg_addr();
+        slice taker_address = intent_slice~load_msg_addr();
+        int intent_amount = intent_slice~load_coins();
+        slice intent_data = intent_slice~load_bits(256);
+        int is_active = intent_slice~load_uint(1);
+        int maker_confirmed = intent_slice~load_uint(1);
+        int taker_confirmed = intent_slice~load_uint(1);
+        int controller_confirmed = intent_slice~load_uint(1);
+        
+        ;; Check intent is still active
+        throw_unless(403, is_active);
+
+        ;; Verify sender is either maker, taker, or controller
+        int is_maker = equal_slices(sender_address, maker_address);
+        int is_taker = equal_slices(sender_address, taker_address);
+        int is_controller = equal_slices(sender_address, controller_address);
+        throw_unless(401, is_maker | is_taker | is_controller);
+
+        ;; Get offer details to determine if it's a buy or sell offer
+        (cell offer_cell, int offer_found?) = udict_get_ref?(offers_dict, 64, offer_id);
+        throw_unless(404, offer_found?);
+        
+        ;; Load confirmation status from intent data (if already in intent data)
+        ;; If not present in current data structure, we'll add it
+        int confirmation_count = maker_confirmed + taker_confirmed + controller_confirmed;
+
+        if (confirmation_count >= 2) {
+            throw(401);
+        }
+        
+        ;; Update confirmation status based on sender
+        if (is_maker) {
+            maker_confirmed = 1;
+        } 
+        if (is_taker) {
+            taker_confirmed = 1;
+        }
+        if (is_controller) {
+            controller_confirmed = 1;
+        }
+
+        confirmation_count = maker_confirmed + taker_confirmed + controller_confirmed;
+
+        ;; Get offer details
+        (cell offer_cell, int offer_found?) = udict_get_ref?(offers_dict, 64, offer_id);
+        throw_unless(404, offer_found?);
+    
+        
+        ;; Check if this is a new confirmation or a duplicate
+        if (confirmation_count >= 2) {
+            ;; We have enough confirmations (2 or more) - release funds
+            
+            cell updated_intent = begin_cell()
+            .store_uint(offer_id, 64)
+            .store_slice(maker_address)
+            .store_slice(taker_address)
+            .store_coins(intent_amount)
+            .store_slice(intent_data)
+            .store_uint(0, 1)  ;; Mark as inactive
+            .store_uint(maker_confirmed, 1)
+            .store_uint(taker_confirmed, 1)
+            .store_uint(controller_confirmed, 1)
+            .end_cell();
+        
+            intents_dict = udict_set_ref(intents_dict, 64,intent_id, updated_intent);
+            
+            ;; Send funds to appropriate party
+            if (is_buy_offer(offer_id)) {
+                ;; Buy offer: taker is selling stablecoin to maker
+                send_custom_message(maker_address, intent_amount, "Intent confirmed. Stablecoin transferred to maker.", 1);
+            } else {
+                ;; Sell offer: maker is selling stablecoin to taker
+                send_custom_message(taker_address, intent_amount, "Intent confirmed. Stablecoin transferred to taker.", 1);
+            }
+        } else {
+            ;; Not enough confirmations yet - update intent with new confirmation
+            cell updated_intent = begin_cell()
+                .store_uint(offer_id, 64)
+                .store_slice(maker_address)
+                .store_slice(taker_address)
+                .store_coins(intent_amount)
+                .store_slice(intent_data)
+                .store_uint(is_active, 1)
+                .store_uint(maker_confirmed, 1)
+                .store_uint(taker_confirmed, 1)
+                .store_uint(controller_confirmed, 1)
+                .end_cell();
+            
+            intents_dict = udict_set_ref(intents_dict, 64, intent_id, updated_intent);
+            
+            ;; Send notification about partial confirmation
+            send_custom_message(sender_address, 0, "Partial confirmation received. Waiting for additional confirmations.", 64);
+        }
+        
+        save_data();
+        return ();
+
+    }
+
+    if (op == op::cancel_intent){
+        ;; Handle intent cancellation
+    }
+
+    if (op == op::withdraw_offer){
+        ;; Handle offer withdrawal
+    }
+
+}
+
+
+;; GET methods for querying contract state
+(slice) get_controller() method_id {
+    load_data();
+    return controller_address;
+}
+
+(int) get_offer_count() method_id {
+    load_data();
+    return next_offer_id;
+}
+
+(int) get_intent_count() method_id {
+    load_data();
+    return next_intent_id;
+}
+(cell) get_offer(int offer_id) method_id {
+    load_data();
+    (cell offer_data, int found?) = udict_get_ref?(offers_dict, 64, offer_id);
+    return offer_data;
+}
+
+(cell) get_intent(int intent_id) method_id {
+    load_data();
+    (cell intent_data, int found?) = udict_get_ref?(intents_dict, 64, intent_id);
+    return intent_data;
+}
+
+(int) is_maker(slice address) method_id {
+    load_data();
+    int key = slice_hash(address);
+    (cell maker_data, int found?) = udict_get_ref?(makers_dict, 256, key);
+    return found?;
+}
+
+(int) is_taker(slice address) method_id {
+    load_data();
+    int key = slice_hash(address);
+    (cell taker_data, int found?) = udict_get_ref?(takers_dict, 256, key);
+    return found?;
+}
