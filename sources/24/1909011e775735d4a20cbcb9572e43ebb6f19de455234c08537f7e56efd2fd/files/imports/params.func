@@ -1,0 +1,15 @@
+#pragma version >=0.4.0;
+#include "stdlib.func";
+
+int workchain() asm "0 PUSHINT";
+
+() force_chain(slice addr) impure {
+    (int wc, _) = parse_std_addr(addr);
+    throw_unless(333, wc == workchain());
+}
+
+int is_resolvable?(slice addr) inline {
+    (int wc, _) = parse_std_addr(addr);
+
+    return wc == workchain();
+}

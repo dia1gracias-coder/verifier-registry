@@ -1,0 +1,425 @@
+#pragma version >=0.4.0;
+#include "imports/stdlib.func";
+#include "imports/params.func";
+#include "imports/jetton-utils.func";
+#include "imports/op-codes.func";
+
+;; storage scheme
+;; storage#_ total_supply:Coins
+;;         admin_address:MsgAddressInt
+;;         content:^Cell
+;;         jetton_wallet_code:^Cell
+;;         categories_data:^Cell
+;;         last_update:uint32
+;;         deploy_ts:uint32
+;;         burn_percent:uint16
+;;         = Storage;
+
+(int, slice, slice, cell, cell, cell, int,int, int) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_coins(),        ;; total_supply
+        ds~load_msg_addr(),     ;; admin_address
+        ds~load_msg_addr(),     ;; trusted_address
+        ds~load_ref(),          ;; content
+        ds~load_ref(),          ;; jetton_wallet_code
+        ds~load_ref(),          ;; categories_data (cell с 9 x uint32)
+        ds~load_uint(32),       ;; last_update_time
+        ds~load_uint(32),       ;; deploy_ts
+        ds~load_uint(16)        ;; burn_percent
+    );
+}
+
+() save_data(int total_supply, slice admin_address,slice trusted_address, cell content, cell jetton_wallet_code, cell categories_data, int last_update_time,int deploy_ts, int burn_percent) impure inline {
+    set_data(begin_cell()
+        .store_coins(total_supply)
+        .store_slice(admin_address)
+        .store_slice(trusted_address)
+        .store_ref(content)
+        .store_ref(jetton_wallet_code)
+        .store_ref(categories_data)
+        .store_uint(last_update_time, 32)
+        .store_uint(deploy_ts,32)
+        .store_uint(burn_percent, 16)
+        .end_cell()
+    );
+}
+
+(cell) pack_categories9(int team,int development,int community_rewards,int reserve_ecosystem,int play_to_earn,int private_sale_investors,
+int advisors,int liquidity,int marketing) inline {
+    return begin_cell()
+        .store_coins(team)
+        .store_coins(development)
+        .store_coins(community_rewards)
+        .store_coins(reserve_ecosystem)
+        .store_coins(play_to_earn)
+        .store_coins(private_sale_investors)
+        .store_coins(advisors)
+        .store_coins(liquidity)
+        .store_coins(marketing)
+        .end_cell();
+}
+
+(int,int,int,int,int,int,int,int,int) unpack_categories9(cell c) inline {
+    slice s = c.begin_parse();
+    return (
+        s~load_coins(), ;; team 1
+        s~load_coins(), ;; development 2
+        s~load_coins(), ;; community_rewards 3
+        s~load_coins(), ;; reserve_ecosystem 4
+        s~load_coins(), ;; play_to_earn 5
+        s~load_coins(), ;; private_sale_investors 6
+        s~load_coins(), ;; advisors 7
+        s~load_coins(), ;; liquidity 8
+        s~load_coins()  ;; marketing 9
+    );
+}
+
+;; Общая функция для проверки категорий
+(int) validate_category(int category) inline {
+    return (category >= 1) & (category <= 9);
+}
+
+;; Функция предварительного расчёта процентов в ppm
+;; Например, для 0,33% нужно передать 3300,
+;; результат вычисляется как: start_total_supply * ppm / 1000000.
+(int) calculate_percent(int ppm) inline {
+    int start_total_supply = 2000000000000000000; ;; 2_000_000_000 + 000_000_000
+    return start_total_supply * ppm / 1000000;
+}
+
+(int,int,int,int,int,int,int,int) updateAllCategory(int team,int development,int reserve_ecosystem,int play_to_earn,int private_sale_investors,int advisors,int marketing,int deploy_ts,int now_ts) inline {
+
+    ;; 30 дней в секундах = 2592000, умножаем на 3, 12 и 18 по-отдельности, дабы получить периоды клифа (3 месяца), вестинга для резервов (12 месяцев)
+    ;; и период окончания вестинга у плей ту еарн и прочих категорий (18 месяцев)
+    int deploy_plus_3m = deploy_ts + (7776000);
+    int deploy_plus_12m = deploy_ts + (31104000);
+    int deploy_plus_18m = deploy_ts + (46656000);
+
+    ;; team (1), development (2), private_sale_investors (6), проверка для advisors (7), marketing (9)
+    if ((now_ts >= deploy_plus_3m) & (now_ts < deploy_plus_18m)) {
+        ;; клиф период в три месяца прошёл
+        ;; вестинг период (15 месяцев + 3 клиф) ещё не прошел
+        team += calculate_percent(3300);           ;; прибавляем 0.33% от общего supply
+        development += calculate_percent(5330);      ;; прибавляем 0.533%
+        advisors += calculate_percent(1333);         ;; прибавляем 0.1333%
+        marketing += calculate_percent(6400);          ;; прибавляем 0.64%
+        private_sale_investors += calculate_percent(4666); ;; прибавляем 0.4666%
+    }
+
+    ;; Community rewards (3), liquidity (8) обновлять не нужно, он один навсегда
+
+    ;; проверка для reserve_ecosystem (4)
+    if (now_ts < deploy_plus_12m) {
+        ;; вестинг период (12 месяцев) ещё не прошел
+        reserve_ecosystem += calculate_percent(21600);  ;; прибавляем 2.16%
+    }
+
+    ;; проверка для play_to_earn (5)
+    if (now_ts < deploy_plus_18m) {
+        ;; вестинг период (18 месяцев) ещё не прошел
+        play_to_earn += calculate_percent(8330);  ;; прибавляем 0.833%
+    }
+
+    int lastTimeUpdate = now_ts;
+
+    return (lastTimeUpdate, team,development,reserve_ecosystem,play_to_earn,private_sale_investors,advisors,marketing);
+}
+
+() mint_tokens(slice to_address, cell jetton_wallet_code, int amount, cell master_msg) impure {
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(to_wallet_address)
+        .store_coins(amount)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(master_msg);
+    send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+(int, cell) transfer_from_pool(slice to_address, cell jetton_wallet_code, cell categories_data, int amount,int jetton_amount, int category,int deploy_ts,int lastTimeUpdate, cell master_msg) impure {
+    throw_unless(500, validate_category(category));
+
+    (int team,int development,int community_rewards,int reserve_ecosystem,int play_to_earn,int private_sale_investors,int advisors,int liquidity,int marketing) = unpack_categories9(categories_data);
+
+    int now_ts = now();
+    ;; 2592000 - 30 дней в секундах
+    if (now_ts > lastTimeUpdate + 2592000) {
+        ;; если время между сейчас прошло и прошло передпоследнем обновлением больше месяца - добавляем в нужные категории
+        (lastTimeUpdate,team,development,reserve_ecosystem,play_to_earn,private_sale_investors,advisors,marketing) = updateAllCategory(team, development, reserve_ecosystem, play_to_earn, private_sale_investors, advisors, marketing, deploy_ts,now_ts);
+        ;; тут сохраняем новый lastTimeUpdate
+    }
+
+    if (category == 1) {
+        throw_unless(505, team >= jetton_amount);
+        team -= jetton_amount;
+    }
+    elseif (category == 2) {
+        throw_unless(505, development >= jetton_amount);
+        development -= jetton_amount;
+    }
+    elseif (category == 3) {
+        throw_unless(505, community_rewards >= jetton_amount);
+        community_rewards -= jetton_amount;
+    }
+    elseif (category == 4) {
+        throw_unless(505, reserve_ecosystem >= jetton_amount);
+        reserve_ecosystem -= jetton_amount;
+    }
+    elseif (category == 5) {
+        throw_unless(505, play_to_earn >= jetton_amount);
+        play_to_earn -= jetton_amount;
+    }
+    elseif (category == 6) {
+        throw_unless(505, private_sale_investors >= jetton_amount);
+        private_sale_investors -= jetton_amount;
+    }
+    elseif (category == 7) {
+        throw_unless(505, advisors >= jetton_amount);
+        advisors -= jetton_amount;
+    }
+    elseif (category == 8) {
+        throw_unless(505, liquidity >= jetton_amount);
+        liquidity -= jetton_amount;
+    }
+    elseif (category == 9) {
+        throw_unless(505, marketing >= jetton_amount);
+        marketing -= jetton_amount;}
+
+    ;; Переупаковываем обновлённые данные категорий
+    cell new_categories_data = pack_categories9(team, development, community_rewards, reserve_ecosystem, play_to_earn, private_sale_investors, advisors, liquidity, marketing);
+
+    mint_tokens(to_address, jetton_wallet_code, amount, master_msg);
+
+    return(lastTimeUpdate, new_categories_data);
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of provide_wallet_address cost
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    (int total_supply, slice admin_address, slice trusted_address,cell content, cell jetton_wallet_code, cell categories_data, int last_update_time, int deploy_ts, int burn_percent) = load_data();
+
+    if (deploy_ts == 0) {
+        deploy_ts = now();
+    }
+
+    if (op == op::mint()) {
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        cell master_msg = in_msg_body~load_ref();
+        slice master_msg_cs = master_msg.begin_parse();
+        master_msg_cs~skip_bits(32 + 64); ;; op + query_id
+        int jetton_amount = master_msg_cs~load_coins();
+        throw_unless(740, jetton_amount > 0);
+        mint_tokens(to_address, jetton_wallet_code, amount, master_msg);
+        save_data((total_supply + jetton_amount), admin_address,trusted_address, content, jetton_wallet_code, categories_data, last_update_time, deploy_ts,burn_percent);
+        return ();
+    }
+
+    if (op == op::burn_notification()) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(74,
+            equal_slices(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+        );
+        if (equal_slices(sender_address, trusted_address)) {
+            (int team,int development,int community_rewards,int reserve_ecosystem,int play_to_earn,int private_sale_investors,int advisors,int liquidity,int marketing) = unpack_categories9(categories_data);
+            int toBurn = jetton_amount * burn_percent / 10000;
+            jetton_amount -= toBurn;
+            throw_unless(706,jetton_amount > 0);
+            play_to_earn += jetton_amount;
+            categories_data = pack_categories9(team, development, community_rewards, reserve_ecosystem, play_to_earn, private_sale_investors, advisors, liquidity, marketing);
+            save_data((total_supply) - toBurn, admin_address, trusted_address,content, jetton_wallet_code, categories_data, last_update_time, deploy_ts,burn_percent);
+        } else {
+            save_data((total_supply - jetton_amount), admin_address, trusted_address, content, jetton_wallet_code, categories_data, last_update_time, deploy_ts,burn_percent);
+        }
+        slice response_address = in_msg_body~load_msg_addr();
+        if (response_address.preload_uint(2) != 0) {
+            var msg = begin_cell()
+                .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+                .store_slice(response_address)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_uint(op::excesses(), 32)
+                .store_uint(query_id, 64);
+            send_raw_message(msg.end_cell(), 2 + 64);
+        }
+        return ();
+    }
+
+    if (op == op::transfer_from_pool()) {
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        cell master_msg = in_msg_body~load_ref();
+        slice master_msg_cs = master_msg.begin_parse();
+        master_msg_cs~skip_bits(32 + 64); ;; op + query_id
+        int jetton_amount = master_msg_cs~load_coins();
+        throw_unless(740, jetton_amount > 0);
+        int category = in_msg_body~load_uint(8);
+        (last_update_time, categories_data) = transfer_from_pool(to_address, jetton_wallet_code, categories_data, amount,jetton_amount, category, deploy_ts, last_update_time, master_msg);
+        save_data( total_supply, admin_address, trusted_address,content, jetton_wallet_code, categories_data, last_update_time, deploy_ts,burn_percent);
+        return();
+    }
+
+    if (op == op::change_burn_percent()) {
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        burn_percent = in_msg_body~load_uint(16);
+        throw_unless(800, (burn_percent >= 0) & (burn_percent <= 10000)); ;; 0% - 100%
+        save_data(total_supply, admin_address, trusted_address,content, jetton_wallet_code, categories_data, last_update_time, deploy_ts,burn_percent);
+        return();
+    }
+
+    if (op == op::change_trusted_address()) {
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        slice new_trusted_address = in_msg_body~load_msg_addr();
+        throw_if(808, equal_slices(new_trusted_address, trusted_address));
+        save_data(total_supply, admin_address, new_trusted_address,content, jetton_wallet_code, categories_data, last_update_time, deploy_ts,burn_percent);
+        return();
+    }
+
+    if (op == op::provide_wallet_address()) {
+        throw_unless(75, msg_value > fwd_fee + const::provide_address_gas_consumption());
+
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_uint(1);
+
+        cell included_address = include_address?
+        ? begin_cell().store_slice(owner_address).end_cell()
+        : null();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::take_wallet_address(), 32)
+            .store_uint(query_id, 64);
+
+        if (is_resolvable?(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code));
+        } else {
+            msg = msg.store_uint(0, 2); ;; addr_none
+        }
+        send_raw_message(msg.store_maybe_ref(included_address).end_cell(), 64);
+        return ();
+    }
+
+    if (op == 3) { ;; change admin
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        save_data(total_supply, new_admin_address,trusted_address, content, jetton_wallet_code, categories_data, last_update_time, deploy_ts,burn_percent);
+        return ();
+    }
+
+    if (op == 4) { ;; change content, delete this for immutable tokens
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        cell new_content = in_msg_body~load_ref();
+        save_data(total_supply, admin_address, trusted_address,new_content, jetton_wallet_code, categories_data, last_update_time, deploy_ts,burn_percent);
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    slice ds = get_data().begin_parse();
+    int total_supply =  ds~load_coins();       ;; total_supply
+    slice admin_address = ds~load_msg_addr();    ;; admin_address
+    ds~load_msg_addr();    ;; trusted_address
+    cell content = ds~load_ref();         ;; content
+    cell jetton_wallet_code = ds~load_ref();
+
+    return (total_supply, -1, admin_address, content, jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    slice ds = get_data().begin_parse();
+    ds~load_coins();       ;; total_supply
+    ds~load_msg_addr();    ;; admin_address
+    ds~load_msg_addr();    ;; trusted_address
+    ds~load_ref();         ;; content
+
+    cell state_init = calculate_jetton_wallet_state_init(owner_address, my_address(), ds~load_ref());
+    return calculate_jetton_wallet_address(state_init);
+}
+
+(slice) get_my_address() method_id {
+    return my_address();
+}
+
+int get_burn_percent() method_id {
+    (int total_supply, slice admin_address,slice trusted_address, cell content, cell jetton_wallet_code, cell categories_data, int last_update_time,int deploy_ts, int burn_percent) = load_data();
+    return burn_percent;
+}
+
+int get_last_update_time() method_id {
+    slice ds = get_data().begin_parse();
+    ds~load_coins();       ;; total_supply
+    ds~load_msg_addr();    ;; admin_address
+    ds~load_msg_addr();    ;; trusted_address
+    ds~load_ref();         ;; content
+    ds~load_ref();         ;; jetton_wallet_code
+    ds~load_ref();
+
+    return ds~load_uint(32);     ;; last_update_time
+}
+
+int get_total_supply() method_id {
+    slice ds = get_data().begin_parse();
+    return ds~load_coins();  ;; total_supply
+}
+
+(slice) get_trusted_address() method_id {
+    slice ds = get_data().begin_parse();
+    ds~load_coins();       ;; total_supply
+    ds~load_msg_addr();    ;; admin_address
+    return ds~load_msg_addr();    ;; trusted_address
+}
+
+int get_category_available(int category_id) method_id {
+    throw_unless(500, validate_category(category_id));
+
+    slice ds = get_data().begin_parse();
+    ds~load_coins();       ;; total_supply
+    ds~load_msg_addr();    ;; admin_address
+    ds~load_msg_addr();    ;; trusted_address
+    ds~load_ref();         ;; content
+    ds~load_ref();         ;; jetton_wallet_code
+
+    cell categories_data = ds~load_ref();
+    (int team,int development,int community_rewards,int reserve_ecosystem,int play_to_earn,int private_sale_investors,int advisors,int liquidity,int marketing) = unpack_categories9(categories_data);
+
+    int available = 0;
+    if (category_id == 1) { available = team; }
+    elseif (category_id == 2) { available = development; }
+    elseif (category_id == 3) { available = community_rewards; }
+    elseif (category_id == 4) { available = reserve_ecosystem; }
+    elseif (category_id == 5) { available = play_to_earn; }
+    elseif (category_id == 6) { available = private_sale_investors; }
+    elseif (category_id == 7) { available = advisors; }
+    elseif (category_id == 8) { available = liquidity; }
+    elseif (category_id == 9) { available = marketing; }
+
+    return available;
+}
