@@ -1,0 +1,155 @@
+#include "imports/error-codes.fc";
+#include "imports/op-codes.fc";
+#include "imports/stdlib.fc";
+#include "imports/utils.fc";
+
+const int ADDRESS_KEY_SIZE = 267;
+
+;; Coop users smart contract
+
+;; storage scheme
+;; storage#_ admin_address:MsgAddress active_wallets:Int total_wallets:Int supervisors:^Dict users:^Dict = Storage;
+
+(slice, int, int, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(), ;; admin_address
+        ds~load_int(32),    ;; active_wallets
+        ds~load_int(32),    ;; total_wallets
+        ds~load_dict(),     ;; supervisors
+        ds~load_dict()      ;; users
+    );
+}
+
+() save_data(slice admin_address, int active_wallets, int total_wallets, cell supervisors_dict, cell users_dict) impure {
+    set_data(
+        begin_cell()
+            .store_slice(admin_address)
+            .store_uint(active_wallets, 32)
+            .store_uint(total_wallets, 32)
+            .store_dict(supervisors_dict)
+            .store_dict(users_dict)
+            .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    int op = in_msg_body~load_op();
+
+    (slice admin_address, int active_wallets, int total_wallets, cell supervisors_dict, cell users_dict) = load_data();
+
+    throw_unless(error::unauthorized_admin_request, equal_slice_bits(sender_address, admin_address));
+
+    if (op == op::change_admin) {
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        save_data(new_admin_address, active_wallets, total_wallets, supervisors_dict, users_dict);
+        return ();
+    }
+
+    if (op == op::add_supervisor) {
+        slice user_address = in_msg_body~load_msg_addr();
+        supervisors_dict~dict_set_ref(ADDRESS_KEY_SIZE, user_address, begin_cell().end_cell());
+        save_data(admin_address, active_wallets, total_wallets, supervisors_dict, users_dict);
+        return ();
+    }
+
+    if (op == op::remove_supervisor) {
+        slice user_address = in_msg_body~load_msg_addr();
+        (int status) = supervisors_dict~dict_delete?(ADDRESS_KEY_SIZE, user_address);
+        throw_if(error::not_found_supervisor, status == 0);
+        save_data(admin_address, active_wallets, total_wallets, supervisors_dict, users_dict);
+        return ();
+    }
+
+    if (op == op::set_user) {
+        slice user_address = in_msg_body~load_msg_addr();
+        
+        int timestamp_enter = in_msg_body~load_int(32);
+        throw_if(error::invalid_timestamp_enter, timestamp_enter < 0); ;; Must be non-negative
+
+        int timestamp_leave = in_msg_body~load_int(32); ;; 0 means active
+        if (timestamp_leave != 0) { ;; If timestamp_leave is set (not active)
+            throw_if(error::invalid_timestamp_leave, timestamp_leave < 0); ;; Must be non-negative
+            throw_if(error::invalid_timestamp_order, timestamp_enter > timestamp_leave); ;; Must be >= timestamp_enter
+        }
+        
+        cell personal_data = in_msg_body~load_ref();
+
+        (slice user, int status) = users_dict.dict_get?(ADDRESS_KEY_SIZE, user_address);
+
+        users_dict~dict_set_ref(ADDRESS_KEY_SIZE, user_address, begin_cell()
+            .store_uint(timestamp_enter, 32)
+            .store_uint(timestamp_leave, 32)
+            .store_ref(personal_data)
+            .end_cell());
+
+        save_data(
+            admin_address,
+            active_wallets + (status == 0 ? 1 : timestamp_leave == 0 ? 0 : -1),
+            total_wallets + (status == 0 ? 1 : 0),
+            supervisors_dict,
+            users_dict
+        );
+
+        return ();
+    }
+
+    throw(error::unknown_action);
+}
+
+(slice, int, int, cell, cell) get_full_data() method_id {
+    return load_data();
+}
+
+(int) get_supervisor_access(slice address) method_id {
+    (slice admin_address, int active_wallets, int total_wallets, cell supervisors_dict, cell users_dict) = load_data();
+    (slice supervisor, int status) = supervisors_dict.dict_get?(ADDRESS_KEY_SIZE, address);
+    return status;
+}
+
+(int) get_user_access(slice address) method_id {
+    (slice admin_address, int active_wallets, int total_wallets, cell supervisors_dict, cell users_dict) = load_data();
+    (cell user, int status) = users_dict.dict_get_ref?(ADDRESS_KEY_SIZE, address);
+    throw_if(error::not_found_user, status == 0);
+    slice userData = user.begin_parse();
+    int timestamp_enter = userData~load_uint(32);
+    int timestamp_leave = userData~load_uint(32);
+    return timestamp_leave == 0 ? -1 : 0;
+}
+
+(int, int, cell) get_user_info(slice address) method_id {
+    (slice admin_address, int active_wallets, int total_wallets, cell supervisors_dict, cell users_dict) = load_data();
+
+    (cell user, int status) = users_dict.dict_get_ref?(ADDRESS_KEY_SIZE, address);
+    throw_if(error::not_found_user, status == 0);
+
+    slice userData = user.begin_parse();
+    
+    int timestamp_enter = userData~load_uint(32);
+    int timestamp_leave = userData~load_uint(32);
+    cell personal_data = userData~load_ref();
+
+    return (timestamp_enter, timestamp_leave, personal_data);
+}
+
+int get_active_wallets_count() method_id {
+    (slice admin_address, int active_wallets, int total_wallets, cell supervisors_dict, cell users_dict) = load_data();
+    return active_wallets;
+}
+
+int get_total_wallets_count() method_id {
+    (slice admin_address, int active_wallets, int total_wallets, cell supervisors_dict, cell users_dict) = load_data();
+    return total_wallets;
+}
