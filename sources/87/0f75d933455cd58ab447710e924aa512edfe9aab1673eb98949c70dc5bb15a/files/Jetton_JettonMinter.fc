@@ -1,0 +1,961 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; Jetton_JettonMinter.headers.fc
+;;
+;; Header files for JettonMinter
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_load_address_opt
+(slice, slice) __tact_load_address_opt(slice cs) inline;
+
+;; __tact_store_address_opt
+builder __tact_store_address_opt(builder b, slice address) inline;
+
+;; __tact_not_null
+forall X -> X __tact_not_null(X x) impure inline;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $JettonUpdateContent$_load_without_opcode
+(slice, ((int, cell))) $JettonUpdateContent$_load_without_opcode(slice sc_0) inline;
+
+;; $JettonTransferInternal$_store
+builder $JettonTransferInternal$_store(builder build_0, (int, int, slice, slice, int, slice) v) inline;
+
+;; $JettonTransferInternal$_store_cell
+cell $JettonTransferInternal$_store_cell((int, int, slice, slice, int, slice) v) inline;
+
+;; $JettonTransferInternal$_load
+(slice, ((int, int, slice, slice, int, slice))) $JettonTransferInternal$_load(slice sc_0) impure inline;
+
+;; $JettonTransferInternal$_load_bounced
+(slice, ((int, int))) $JettonTransferInternal$_load_bounced(slice sc_0) inline;
+
+;; $JettonBurnNotification$_load_without_opcode
+(slice, ((int, int, slice, slice))) $JettonBurnNotification$_load_without_opcode(slice sc_0) inline;
+
+;; $JettonExcesses$_store
+builder $JettonExcesses$_store(builder build_0, (int) v) inline;
+
+;; $JettonExcesses$_store_cell
+cell $JettonExcesses$_store_cell((int) v) inline;
+
+;; $ProvideWalletAddress$_load_without_opcode
+(slice, ((int, slice, int))) $ProvideWalletAddress$_load_without_opcode(slice sc_0) inline;
+
+;; $Mint$_load_without_opcode
+(slice, ((int, slice, int, (int, int, slice, slice, int, slice)))) $Mint$_load_without_opcode(slice sc_0) inline;
+
+;; $CloseMinting$_load_without_opcode
+(slice, (tuple)) $CloseMinting$_load_without_opcode(slice sc_0) inline;
+
+;; $ChangeOwner$_load_without_opcode
+(slice, ((int, slice))) $ChangeOwner$_load_without_opcode(slice sc_0) inline;
+
+;; $ClaimTON$_load_without_opcode
+(slice, ((slice))) $ClaimTON$_load_without_opcode(slice sc_0) inline;
+
+;; $JettonMinter$_store
+builder $JettonMinter$_store(builder build_0, (int, slice, cell, int) v) inline;
+
+;; $JettonMinter$_load
+(slice, ((int, slice, cell, int))) $JettonMinter$_load(slice sc_0) inline;
+
+;; $StdAddress$_get_workchain
+_ $StdAddress$_get_workchain((int, int) v) inline;
+
+;; $JettonMinterState$_to_external
+(int, int, slice, cell, cell) $JettonMinterState$_to_external(((int, int, slice, cell, cell)) v) inline;
+
+;; $JettonWallet$init$_store
+builder $JettonWallet$init$_store(builder build_0, (slice, slice, int) v) inline;
+
+;; $JettonMinter$_contract_load
+(int, slice, cell, int) $JettonMinter$_contract_load() impure inline;
+
+;; $JettonMinter$_contract_store
+() $JettonMinter$_contract_store((int, slice, cell, int) v) impure inline;
+
+;; $Cell$_fun_asSlice
+slice $Cell$_fun_asSlice(cell $self) impure inline;
+
+;; $global_newAddress
+slice $global_newAddress(int $chain, int $hash) impure inline;
+
+;; $global_contractAddressExt
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline;
+
+;; $global_contractAddress
+slice $global_contractAddress((cell, cell) $s) impure inline;
+
+;; $BasechainAddress$_constructor_hash
+((int)) $BasechainAddress$_constructor_hash(int $hash) inline;
+
+;; $global_emptyBasechainAddress
+(int) $global_emptyBasechainAddress() impure inline;
+
+;; $global_newBasechainAddress
+(int) $global_newBasechainAddress(int $hash) impure inline;
+
+;; $global_contractBasechainAddress
+(int) $global_contractBasechainAddress((cell, cell) $s) impure inline;
+
+;; $Builder$_fun_storeBasechainAddress
+builder $Builder$_fun_storeBasechainAddress(builder $self, (int) $address) impure inline;
+
+;; $global_makeTakeWalletAddressMsg
+cell $global_makeTakeWalletAddressMsg((int) $targetJettonWallet, (int, slice, int) $msg) impure inline;
+
+;; $JettonWallet$_init_child
+(cell, cell) $JettonWallet$_init_child(slice $owner, slice $minter, int $balance) inline;
+
+;; $global_getJettonWalletInit
+(cell, cell) $global_getJettonWalletInit(slice $address) impure inline;
+
+;; $global_getJettonWalletByOwner
+slice $global_getJettonWalletByOwner(slice $jettonWalletOwner) impure inline;
+
+;; $global_getJettonBasechainWalletByOwner
+(int) $global_getJettonBasechainWalletByOwner(slice $jettonWalletOwner) impure inline;
+
+;; $JettonWallet$_code_child
+cell $JettonWallet$_code_child() inline;
+
+;; $JettonMinterState$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode
+((int, int, slice, cell, cell)) $JettonMinterState$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode(int $totalSupply, int $mintable, slice $adminAddress, cell $jettonContent, cell $jettonWalletCode) inline;
+
+;; $JettonMinter$_fun_get_jetton_data
+((int, slice, cell, int), (int, int, slice, cell, cell)) $JettonMinter$_fun_get_jetton_data((int, slice, cell, int) $self) impure inline;
+
+;; $JettonMinter$_fun_get_wallet_address
+((int, slice, cell, int), slice) $JettonMinter$_fun_get_wallet_address((int, slice, cell, int) $self, slice $ownerAddress) impure inline;
+
+;; $DeployParameters$_constructor_value_bounce_mode_body_init
+((int, cell, int, int, (cell, cell))) $DeployParameters$_constructor_value_bounce_mode_body_init(int $value, int $bounce, int $mode, cell $body, (cell, cell) $init) inline;
+
+;; $MessageParameters$_constructor_body_to_value_mode
+((int, cell, int, slice, int)) $MessageParameters$_constructor_body_to_value_mode(cell $body, slice $to, int $value, int $mode) inline;
+
+;; $MessageParameters$_constructor_to_body_value_bounce_mode
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_body_value_bounce_mode(slice $to, cell $body, int $value, int $bounce, int $mode) inline;
+
+;; $JettonExcesses$_constructor_queryId
+((int)) $JettonExcesses$_constructor_queryId(int $queryId) inline;
+
+;; $MessageParameters$_constructor_bounce_to_value_mode
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode(int $bounce, slice $to, int $value, int $mode) inline;
+
+
+;; Jetton_JettonMinter.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(slice, slice) __tact_load_address_opt(slice cs) inline {
+    if (cs.preload_uint(2) != 0) {
+        slice raw = cs~load_msg_addr();
+        return (cs, raw);
+    } else {
+        cs~skip_bits(2);
+        return (cs, null());
+    }
+}
+
+builder __tact_store_addr_none(builder b) asm "b{00} STSLICECONST";
+
+builder __tact_store_address_opt(builder b, slice address) inline {
+    if (null?(address)) {
+        return __tact_store_addr_none(b);
+    } else {
+        return b.store_slice(address);
+    }
+}
+
+forall X -> X __tact_not_null(X x) impure inline {
+    throw_if(128, null?(x)); return x;
+}
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_contractHash(cell $code, cell $data) impure asm """
+    s0 PUSH HASHCU // `data` hash
+    s2 PUSH HASHCU // `code` hash
+    SWAP2
+    CDEPTH         // `data` depth
+    SWAP
+    CDEPTH         // `code` depth
+    131380 INT     // (2 << 16) | (1 << 8) | 0x34
+
+    // Group 2: Composition of the Builder
+    NEWC
+    24 STU  // store refs_descriptor | bits_descriptor | data
+    16 STU  // store depth_descriptor for `code`
+    16 STU  // store depth_descriptor for `data`
+    256 STU // store `code` hash
+    256 STU // store `data` hash
+
+    // Group 3: SHA256 hash of the resulting Builder
+    ONE HASHEXT_SHA256
+""";
+
+slice $Slice$_fun_asAddressUnsafe(slice $self) impure asm "NOP";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+slice $Cell$_fun_asSlice(cell $self) impure inline {
+    var ($self) = $self;
+    return $Cell$_fun_beginParse($self);
+}
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+slice $global_newAddress(int $chain, int $hash) impure inline {
+    return $Slice$_fun_asAddressUnsafe($Cell$_fun_asSlice($Builder$_fun_endCell(store_uint(store_int(store_uint($global_beginCell(), 4, 3), $chain, 8), $hash, 256))));
+}
+
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline {
+    int $hash = $global_contractHash($code, $data);
+    return $global_newAddress($chain, $hash);
+}
+
+slice $global_contractAddress((cell, cell) $s) impure inline {
+    var (($s'code, $s'data)) = $s;
+    return $global_contractAddressExt(0, $s'code, $s'data);
+}
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+int $global_getComputeFee(int $gasUsed, int $isMasterchain) impure asm """
+    GETGASFEE
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_deploy((int, cell, int, int, (cell, cell)) $params) impure asm """
+    4 1 BLKPUSH // pushes 2 copies of `init.code` and `init.data`
+    HASHCU // `init.data` hash
+    SWAP
+    HASHCU // `init.code` hash
+    SWAP2
+    CDEPTH // `init.data` depth
+    SWAP
+    CDEPTH // `init.code` depth
+
+    // Group 2: Calculating destination address
+    // For almost identical logic and instructions,
+    // see comments inside `contractHash()` function in contract.tact
+    131380 INT // (2 << 16) | (1 << 8) | 0x34
+    NEWC
+    24 STU
+    16 STU
+    16 STU
+    256 STU
+    256 STU
+    ONE HASHEXT_SHA256 // obtains hash part (account id) of the address
+    // → Stack state
+    // s0: destAddr(hash part)
+    // s1: `init.data`
+    // s2: `init.code`
+    // s3 and below: `bounce`, `value`, `body`, `mode`
+
+    // Group 3: Building a message (CommonMsgInfoRelaxed)
+    s3 XCHG0           // swaps `bounce` with destAddr(hash part)
+    NEWC
+    b{01} STSLICECONST // store tag = $0 and ihr_disabled = true
+    1 STI              // store `bounce`
+    s1 s2 XCHG         // swap `init.data` with `init.code`, placing code on s1
+    STREF              // store `init.code`
+    STREF              // store `init.data`
+    // Inline StateInit:
+    b{00010000000000} STSLICECONST
+    // 0 + 00 + 10 + 0 + 00000000
+    // 1) 0 - bounced = false
+    // 2) 00 - src = addr_none
+    // 3) 10 - tag of addr_std (part of dest)
+    // 4) 0 - Maybe Anycast = false
+    // 5) 00000000 - workchain_id (part of dest)
+    //
+    256 STU     // store destAddr(hash part)
+    SWAP        // Builder on top, `value` below
+    STGRAMS     // store `value`
+    105 PUSHINT // 1 + 4 + 4 + 64 + 32
+    STZEROES    // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+
+    // Group 4: Continue building a message (CommonMsgInfoRelaxed into MessageRelaxed)
+    // Remaining bits of MessageRelaxed:
+    b{1000110} STSLICECONST
+    // 10 + 0 + 0 + 1 + 1 + 0
+    // 10 - Maybe (Either StateInit ^StateInit) = true false
+    // 0 - split_depth:(Maybe (## 5)) = false
+    // 0 = special:(Maybe TickTock) = false
+    // 1 = code:(Maybe ^Cell) = true
+    // 1 = data:(Maybe ^Cell) = true
+    // 0 = library:(Maybe ^Cell) = false
+    //
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC   // finalize the message
+    // → Stack state
+    // s0: Cell
+    // s1: params.`mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_cashback(slice $to) impure asm """
+    NEWC
+    x{42_} STSLICECONST // .storeUint(0x10, 6)
+    STSLICE          // .storeAddress(to)
+    0 PUSHINT        // 0
+    111 STUR         // .storeUint(0, 111)
+                     // 4 zeros for coins and 107 zeros for lt, fees, etc.
+    ENDC
+    66 PUSHINT       // SendRemainingValue | SendIgnoreErrors
+    SENDRAWMSG
+""";
+
+(int, int) $global_parseStdAddress(slice $slice) impure asm """
+    REWRITESTDADDR
+""";
+
+(int) $global_emptyBasechainAddress() impure inline {
+    return $BasechainAddress$_constructor_hash(null());
+}
+
+(int) $global_newBasechainAddress(int $hash) impure inline {
+    return $BasechainAddress$_constructor_hash($hash);
+}
+
+(int) $global_contractBasechainAddress((cell, cell) $s) impure inline {
+    var (($s'code, $s'data)) = $s;
+    int $hash = $global_contractHash($s'code, $s'data);
+    return $global_newBasechainAddress($hash);
+}
+
+builder $Builder$_fun_storeMaybeRef(cell $cell, builder $self) impure asm """
+    STOPTREF
+""";
+
+builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
+    STSLICER
+""";
+
+builder $Builder$_fun_storeBasechainAddress(builder $self, (int) $address) impure inline {
+    var ($self) = $self;
+    var (($address'hash)) = $address;
+    if (null?($address'hash)) {
+        return store_uint($self, 0, 2);
+    }
+    return store_uint(store_uint($self, 1024, 11), __tact_not_null($address'hash), 256);
+}
+
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+int $Context$_fun_readForwardFee((int, slice, int, slice) $self) impure asm """
+    LDMSGADDR   // load dest:MsgAddressInt
+    LDGRAMS     // load value:CurrencyCollection
+    ONE
+    SDSKIPFIRST // skip extra currency collection
+    LDGRAMS     // load ihr_fee
+    LDGRAMS     // load fwd_fee, we'll be using this!
+    DROP        // drop remaining Slice (with created_lt and created_at)
+
+    // There are 7 entries on the stack — first 3 fields of Context plus 4 loaded ones.
+    // The topmost is fwd_fee, which is the only one we're after, so let's drop 6 entries below:
+    6 1 BLKDROP2 // drop the loaded values as well as the first 3 fields of Context
+
+    ZERO              // not masterchain
+    GETORIGINALFWDFEE // floor(fwd_fee * 2^16 / (2^16 - first_frac)), where
+                      // first_frac is a value listed in config param 25
+                      // of the blockchain: https://tonviewer.com/config#25
+                      // this instruction effectively multiplies the fwd_fee by 1.5,
+                      // at least for the current value of first_frac, which is 21845
+""";
+
+;; Jetton_JettonMinter.storage.fc
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_body_to_value_mode(cell $body, slice $to, int $value, int $mode) inline {
+    return ($mode, $body, $value, $to, true);
+}
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_body_value_bounce_mode(slice $to, cell $body, int $value, int $bounce, int $mode) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode(int $bounce, slice $to, int $value, int $mode) inline {
+    return ($mode, null(), $value, $to, $bounce);
+}
+
+;;
+;; Type: DeployParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 bounce:bool init:StateInit{code:^cell,data:^cell} = DeployParameters
+;;
+
+((int, cell, int, int, (cell, cell))) $DeployParameters$_constructor_value_bounce_mode_body_init(int $value, int $bounce, int $mode, cell $body, (cell, cell) $init) inline {
+    return ($mode, $body, $value, $bounce, $init);
+}
+
+;;
+;; Type: StdAddress
+;; TLB: _ workchain:int8 address:uint256 = StdAddress
+;;
+
+_ $StdAddress$_get_workchain((int, int) v) inline {
+    var (v'workchain, v'address) = v;
+    return v'workchain;
+}
+
+;;
+;; Type: BasechainAddress
+;; TLB: _ hash:Maybe int257 = BasechainAddress
+;;
+
+((int)) $BasechainAddress$_constructor_hash(int $hash) inline {
+    return ($hash);
+}
+
+;;
+;; Type: JettonUpdateContent
+;; Header: 0x00000004
+;; TLB: jetton_update_content#00000004 queryId:uint64 content:^cell = JettonUpdateContent
+;;
+
+(slice, ((int, cell))) $JettonUpdateContent$_load_without_opcode(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'content = sc_0~load_ref();
+    return (sc_0, (v'queryId, v'content));
+}
+
+;;
+;; Type: JettonTransferInternal
+;; Header: 0x178d4519
+;; TLB: jetton_transfer_internal#178d4519 queryId:uint64 amount:coins sender:address responseDestination:address forwardTonAmount:coins forwardPayload:remainder<slice> = JettonTransferInternal
+;;
+
+builder $JettonTransferInternal$_store(builder build_0, (int, int, slice, slice, int, slice) v) inline {
+    var (v'queryId, v'amount, v'sender, v'responseDestination, v'forwardTonAmount, v'forwardPayload) = v;
+    build_0 = store_uint(build_0, 395134233, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    build_0 = build_0.store_varuint16(v'amount);
+    build_0 = build_0.store_slice(v'sender);
+    build_0 = __tact_store_address_opt(build_0, v'responseDestination);
+    build_0 = build_0.store_varuint16(v'forwardTonAmount);
+    build_0 = build_0.store_slice(v'forwardPayload);
+    return build_0;
+}
+
+cell $JettonTransferInternal$_store_cell((int, int, slice, slice, int, slice) v) inline {
+    return $JettonTransferInternal$_store(begin_cell(), v).end_cell();
+}
+
+(slice, ((int, int, slice, slice, int, slice))) $JettonTransferInternal$_load(slice sc_0) impure inline {
+    throw_unless(129, sc_0~load_uint(32) == 395134233);
+    var v'queryId = sc_0~load_uint(64);
+    var v'amount = sc_0~load_varuint16();
+    var v'sender = sc_0~load_msg_addr();
+    var v'responseDestination = sc_0~__tact_load_address_opt();
+    var v'forwardTonAmount = sc_0~load_varuint16();
+    var v'forwardPayload = sc_0;
+    return (sc_0, (v'queryId, v'amount, v'sender, v'responseDestination, v'forwardTonAmount, v'forwardPayload));
+}
+
+(slice, ((int, int))) $JettonTransferInternal$_load_bounced(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'amount = sc_0~load_varuint16();
+    return (sc_0, (v'queryId, v'amount));
+}
+
+;;
+;; Type: JettonBurnNotification
+;; Header: 0x7bdd97de
+;; TLB: jetton_burn_notification#7bdd97de queryId:uint64 amount:coins sender:address responseDestination:address = JettonBurnNotification
+;;
+
+(slice, ((int, int, slice, slice))) $JettonBurnNotification$_load_without_opcode(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'amount = sc_0~load_varuint16();
+    var v'sender = sc_0~load_msg_addr();
+    var v'responseDestination = sc_0~__tact_load_address_opt();
+    return (sc_0, (v'queryId, v'amount, v'sender, v'responseDestination));
+}
+
+;;
+;; Type: JettonExcesses
+;; Header: 0xd53276db
+;; TLB: jetton_excesses#d53276db queryId:uint64 = JettonExcesses
+;;
+
+builder $JettonExcesses$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 3576854235, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $JettonExcesses$_store_cell((int) v) inline {
+    return $JettonExcesses$_store(begin_cell(), v).end_cell();
+}
+
+((int)) $JettonExcesses$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: ProvideWalletAddress
+;; Header: 0x2c76b973
+;; TLB: provide_wallet_address#2c76b973 queryId:uint64 ownerAddress:address includeAddress:bool = ProvideWalletAddress
+;;
+
+(slice, ((int, slice, int))) $ProvideWalletAddress$_load_without_opcode(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'ownerAddress = sc_0~load_msg_addr();
+    var v'includeAddress = sc_0~load_int(1);
+    return (sc_0, (v'queryId, v'ownerAddress, v'includeAddress));
+}
+
+;;
+;; Type: Mint
+;; Header: 0x00000015
+;; TLB: mint#00000015 queryId:uint64 receiver:address tonAmount:coins mintMessage:JettonTransferInternal{queryId:uint64,amount:coins,sender:address,responseDestination:address,forwardTonAmount:coins,forwardPayload:remainder<slice>} = Mint
+;;
+
+(slice, ((int, slice, int, (int, int, slice, slice, int, slice)))) $Mint$_load_without_opcode(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'receiver = sc_0~load_msg_addr();
+    var v'tonAmount = sc_0~load_varuint16();
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'mintMessage = sc_1~$JettonTransferInternal$_load();
+    return (sc_0, (v'queryId, v'receiver, v'tonAmount, v'mintMessage));
+}
+
+;;
+;; Type: CloseMinting
+;; Header: 0x00000016
+;; TLB: close_minting#00000016  = CloseMinting
+;;
+
+(slice, (tuple)) $CloseMinting$_load_without_opcode(slice sc_0) inline {
+    return (sc_0, null());
+}
+
+;;
+;; Type: ChangeOwner
+;; Header: 0x00000003
+;; TLB: change_owner#00000003 queryId:uint64 newOwner:address = ChangeOwner
+;;
+
+(slice, ((int, slice))) $ChangeOwner$_load_without_opcode(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'newOwner = sc_0~load_msg_addr();
+    return (sc_0, (v'queryId, v'newOwner));
+}
+
+;;
+;; Type: ClaimTON
+;; Header: 0x0393b1ce
+;; TLB: claim_ton#0393b1ce receiver:address = ClaimTON
+;;
+
+(slice, ((slice))) $ClaimTON$_load_without_opcode(slice sc_0) inline {
+    var v'receiver = sc_0~load_msg_addr();
+    return (sc_0, (v'receiver));
+}
+
+;;
+;; Type: JettonMinterState
+;; TLB: _ totalSupply:coins mintable:bool adminAddress:address jettonContent:^cell jettonWalletCode:^cell = JettonMinterState
+;;
+
+(int, int, slice, cell, cell) $JettonMinterState$_to_external(((int, int, slice, cell, cell)) v) inline {
+    var (v'totalSupply, v'mintable, v'adminAddress, v'jettonContent, v'jettonWalletCode) = v; 
+    return (v'totalSupply, v'mintable, v'adminAddress, v'jettonContent, v'jettonWalletCode);
+}
+
+((int, int, slice, cell, cell)) $JettonMinterState$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode(int $totalSupply, int $mintable, slice $adminAddress, cell $jettonContent, cell $jettonWalletCode) inline {
+    return ($totalSupply, $mintable, $adminAddress, $jettonContent, $jettonWalletCode);
+}
+
+;;
+;; Type: JettonWallet
+;; TLB: _ owner:address minter:address balance:coins = JettonWallet
+;;
+
+builder $JettonWallet$init$_store(builder build_0, (slice, slice, int) v) inline {
+    var (v'owner, v'minter, v'balance) = v;
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_slice(v'minter);
+    build_0 = build_0.store_varuint16(v'balance);
+    return build_0;
+}
+
+cell $JettonWallet$_child_get_code() impure asm """
+    B{b5ee9c72010211010004d500022cff008e88f4a413f4bcf2c80bed53208e8130e1ed43d901020033a65ec0bb51343e903e903e8015481b04fe0a95185014901b0d20049401d072d721d200d200fa4021103450666f04f86102f862ed44d0fa40fa40fa0055206c1304e30202d70d1ff2e0822182100f8a7ea5bae302218210178d4519bae3022182107ac8d559ba0304050600b2028020d7217021d749c21f9430d31f01de208210178d4519ba8e1930d33ffa00596c2113a0c855205acf1658cf1601fa02c9ed54e082107bdd97deba8e18d33ffa00596c2113a0c855205acf1658cf1601fa02c9ed54e05f0401fe31d33ffa00fa4020d70b01c30093fa40019472d7216de201f404fa0051661615144330323622fa4430f2d08a8123fff8425280c705f2f45183a181093e21c2fff2f428f404016e913091d1e2f8416f2429b8a4541432817d7106fa40fa0071d721fa00fa00306c6170f83a12a85280a081290470f836aa008208989680a0a00701f831d33ffa00fa4020d70b01c30093fa40019472d7216de201fa00515515144330365183a0532770f82ac855215acf1658cf1601fa02c9f842fa44315920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400206ef2d08001ba9a8123fff84229c705f2f4dff8416f2421f8276f1021a12ec2000a02fe8e6331fa40d200596d339931f82a4330126f0301926c22e259c8598210ca77fdc25003cb1f01fa02216eb38e137f01ca0001206ef2d0806f235acf1658cf16cc947032ca00e2c90170804043137fc8cf8580ca00cf8440ce01fa02806acf40f400c901fb00e0218210595f07bcbae302333302820b93b1cebae3025bf2c0820e0f02febcf2f450437080407f294813509cc855508210178d45195007cb1f15cb3f5003fa0201cf1601206e9430cf848092cf16e201fa0201cf16c9543167f82ac855215acf1658cf1601fa02c9105810381045102410235f41f90001f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f9040003c8cf8580ca0012cccc890809000310020048cf16cbff01fa028069cf40cf8634f400c901fb0002c855205acf1658cf1601fa02c9ed5403fa8e5c5531fa40fa0071d721fa00fa00306c6170f83a52b0a012a17170284813507ac8553082107362d09c5005cb1f13cb3f01fa0201cf1601cf16c92804103b4655441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0006503396107e106b6c82e28208989680b60972fb02256eb39320c2009170e2e30f020b0c0d007205206ef2d0808100827003c8018210d53276db58cb1fcb3fc9102410374170441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0000045b33001ec855205acf1658cf1601fa02c9ed5401c831d33ffa0020d70b01c30093fa40019472d7216de201f404553030338123fff8425250c705f2f45155a181093e21c2fff2f4f8416f2443305230fa40fa0071d721fa00fa00306c6170f83a817d71811a2c70f836aa0012a012bcf2f47080405413757f0610006cfa4001318123fff84213c70512f2f482089896808010fb027083066d40037fc8cf8580ca00cf8440ce01fa02806acf40f400c901fb0000a0c8553082107bdd97de5005cb1f13cb3f01fa0201cf1601206e9430cf848092cf16e2c9254744441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002c855205acf1658cf1601fa02c9ed54} B>boc PUSHREF
+""";
+
+(cell, cell) $JettonWallet$_init_child(slice $owner, slice $minter, int $balance) inline {
+    ;; Build init code cell
+
+    ;; Contract Code: JettonWallet
+    cell init_code = $JettonWallet$_child_get_code();
+
+
+    builder b = begin_cell();
+    b = $JettonWallet$init$_store(b, ($owner, $minter, $balance));
+    return (init_code, b.end_cell());
+}
+
+cell $JettonWallet$_code_child() inline {
+    return $JettonWallet$_child_get_code();
+}
+
+;;
+;; Type: JettonMinter
+;; TLB: _ totalSupply:coins owner:address jettonContent:^cell mintable:bool = JettonMinter
+;;
+
+builder $JettonMinter$_store(builder build_0, (int, slice, cell, int) v) inline {
+    var (v'totalSupply, v'owner, v'jettonContent, v'mintable) = v;
+    build_0 = build_0.store_varuint16(v'totalSupply);
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_ref(v'jettonContent);
+    build_0 = build_0.store_int(v'mintable, 1);
+    return build_0;
+}
+
+(slice, ((int, slice, cell, int))) $JettonMinter$_load(slice sc_0) inline {
+    var v'totalSupply = sc_0~load_varuint16();
+    var v'owner = sc_0~load_msg_addr();
+    var v'jettonContent = sc_0~load_ref();
+    var v'mintable = sc_0~load_int(1);
+    return (sc_0, (v'totalSupply, v'owner, v'jettonContent, v'mintable));
+}
+
+(int, slice, cell, int) $JettonMinter$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    return $sc~$JettonMinter$_load();
+}
+
+() $JettonMinter$_contract_store((int, slice, cell, int) v) impure inline {
+    builder b = begin_cell();
+    b = $JettonMinter$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract JettonMinter functions
+;;
+
+() $global_checkEitherForwardPayload(slice $forwardPayload) impure asm """
+    LDDICT // Throws 9 if Either bit = 1 and ref is not present
+    SWAP
+    ISNULL
+    <{
+        DROP
+    }> PUSHCONT
+    <{
+        ENDS // Also throws 9 if slice is not empty
+    }> PUSHCONT
+    IFELSE
+""";
+
+cell $global_makeTakeWalletAddressMsg((int) $targetJettonWallet, (int, slice, int) $msg) impure inline {
+    var (($targetJettonWallet'hash)) = $targetJettonWallet;
+    var (($msg'queryId, $msg'ownerAddress, $msg'includeAddress)) = $msg;
+    return $Builder$_fun_endCell($Builder$_fun_storeMaybeRef(($msg'includeAddress ? $Builder$_fun_endCell($Builder$_fun_storeAddress($global_beginCell(), $msg'ownerAddress)) : null()), $Builder$_fun_storeBasechainAddress(store_uint(store_uint($global_beginCell(), 3513996288, 32), $msg'queryId, 64), ($targetJettonWallet'hash))));
+}
+
+(cell, cell) $global_getJettonWalletInit(slice $address) impure inline {
+    return $JettonWallet$_init_child($address, $global_myAddress(), 0);
+}
+
+slice $global_getJettonWalletByOwner(slice $jettonWalletOwner) impure inline {
+    return $global_contractAddress($global_getJettonWalletInit($jettonWalletOwner));
+}
+
+(int) $global_getJettonBasechainWalletByOwner(slice $jettonWalletOwner) impure inline {
+    return $global_contractBasechainAddress($global_getJettonWalletInit($jettonWalletOwner));
+}
+
+((int, slice, cell, int), (int, int, slice, cell, cell)) $JettonMinter$_fun_get_jetton_data((int, slice, cell, int) $self) impure inline {
+    var (($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable)) = $self;
+    var $fresh$ret_4 = $JettonMinterState$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode($self'totalSupply, $self'mintable, $self'owner, $self'jettonContent, $JettonWallet$_code_child());
+    return (($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable), $fresh$ret_4);
+}
+
+((int, slice, cell, int), slice) $JettonMinter$_fun_get_wallet_address((int, slice, cell, int) $self, slice $ownerAddress) impure inline {
+    var (($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable)) = $self;
+    var $fresh$ret_5 = $global_getJettonWalletByOwner($ownerAddress);
+    return (($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable), $fresh$ret_5);
+}
+
+;;
+;; Get methods of a Contract JettonMinter
+;;
+
+_ %get_jetton_data() method_id(106029) {
+    var self = $JettonMinter$_contract_load();
+    var res = self~$JettonMinter$_fun_get_jetton_data();
+    return $JettonMinterState$_to_external(res);
+}
+
+_ %get_wallet_address(slice $ownerAddress) method_id(103289) {
+    slice $ownerAddress = $ownerAddress;
+    var self = $JettonMinter$_contract_load();
+    var res = self~$JettonMinter$_fun_get_wallet_address($ownerAddress);
+    return res;
+}
+
+;;
+;; Routing of a Contract JettonMinter
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable) = $JettonMinter$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) {
+        ;; Skip 0xFFFFFFFF prefix of a bounced message
+        in_msg~skip_bits(32);
+        int op = 0;
+        if (slice_bits(in_msg) >= 32) {
+            op = in_msg~load_uint(32);
+        }
+        ;; Bounced handler for JettonTransferInternal message
+        if (op == 0x178d4519) {
+            var ($msg'queryId, $msg'amount) = in_msg~$JettonTransferInternal$_load_bounced();
+            $self'totalSupply = $self'totalSupply - $msg'amount;
+            $JettonMinter$_contract_store(($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable));
+            return ();
+        }
+        
+        return ();
+    }
+    var op = in_msg~load_opcode_internal();
+    ;; Receive Mint message
+    if (op == 21) {
+        var ($msg'queryId, $msg'receiver, $msg'tonAmount, ($msg'mintMessage'queryId, $msg'mintMessage'amount, $msg'mintMessage'sender, $msg'mintMessage'responseDestination, $msg'mintMessage'forwardTonAmount, $msg'mintMessage'forwardPayload)) = in_msg~$Mint$_load_without_opcode();
+        throw_unless(9215, ( equal_slices_bits($self'owner, __tact_context_get_sender()) ));
+        throw_unless(51950, $self'mintable);
+        $global_checkEitherForwardPayload($msg'mintMessage'forwardPayload);
+        var ($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw) = __tact_context_get();
+        throw_unless(37629, ($ctx'value > (((10000000 + $msg'mintMessage'forwardTonAmount) + $Context$_fun_readForwardFee(($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw))) + (2 * $global_getComputeFee(10500, false)))));
+        $self'totalSupply = $self'totalSupply + $msg'mintMessage'amount;
+        $global_deploy($DeployParameters$_constructor_value_bounce_mode_body_init(0, true, 80, $JettonTransferInternal$_store_cell(($msg'mintMessage'queryId, $msg'mintMessage'amount, $msg'mintMessage'sender, $msg'mintMessage'responseDestination, $msg'mintMessage'forwardTonAmount, $msg'mintMessage'forwardPayload)), $global_getJettonWalletInit($msg'receiver)));
+        $JettonMinter$_contract_store(($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable));
+        return ();
+    }
+    
+    ;; Receive ProvideWalletAddress message
+    if (op == 0x2c76b973) {
+        var ($msg'queryId, $msg'ownerAddress, $msg'includeAddress) = in_msg~$ProvideWalletAddress$_load_without_opcode();
+        int $ownerWorkchain = $StdAddress$_get_workchain($global_parseStdAddress($Address$_fun_asSlice($msg'ownerAddress)));
+        var ($targetJettonWallet'hash) = (($ownerWorkchain == 0) ? $global_contractBasechainAddress($global_getJettonWalletInit($msg'ownerAddress)) : $global_emptyBasechainAddress());
+        $global_message($MessageParameters$_constructor_body_to_value_mode($global_makeTakeWalletAddressMsg(($targetJettonWallet'hash), ($msg'queryId, $msg'ownerAddress, $msg'includeAddress)), __tact_context_get_sender(), 0, 64));
+        
+        return ();
+    }
+    
+    ;; Receive JettonBurnNotification message
+    if (op == 0x7bdd97de) {
+        var ($msg'queryId, $msg'amount, $msg'sender, $msg'responseDestination) = in_msg~$JettonBurnNotification$_load_without_opcode();
+        var ($sender'workchain, $sender'address) = $global_parseStdAddress($Address$_fun_asSlice(__tact_context_get_sender()));
+        var ($wallet'hash) = $global_getJettonBasechainWalletByOwner($msg'sender);
+        throw_unless(10363, ( (($sender'workchain == 0)) ? (($sender'address == __tact_not_null($wallet'hash))) : (false) ));
+        $self'totalSupply = $self'totalSupply - $msg'amount;
+        if ((~ null?($msg'responseDestination))) {
+            $global_message($MessageParameters$_constructor_to_body_value_bounce_mode(__tact_not_null($msg'responseDestination), $JettonExcesses$_store_cell($JettonExcesses$_constructor_queryId($msg'queryId)), 0, false, 66));
+        }
+        $JettonMinter$_contract_store(($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable));
+        return ();
+    }
+    
+    ;; Receive JettonUpdateContent message
+    if (op == 4) {
+        var ($msg'queryId, $msg'content) = in_msg~$JettonUpdateContent$_load_without_opcode();
+        throw_unless(9215, ( equal_slices_bits($self'owner, __tact_context_get_sender()) ));
+        $self'jettonContent = $msg'content;
+        $JettonMinter$_contract_store(($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable));
+        return ();
+    }
+    
+    ;; Receive ChangeOwner message
+    if (op == 3) {
+        var ($msg'queryId, $msg'newOwner) = in_msg~$ChangeOwner$_load_without_opcode();
+        throw_unless(9215, ( equal_slices_bits($self'owner, __tact_context_get_sender()) ));
+        $self'owner = $msg'newOwner;
+        $JettonMinter$_contract_store(($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable));
+        return ();
+    }
+    
+    ;; Receive CloseMinting message
+    if (op == 22) {
+        var $msg = in_msg~$CloseMinting$_load_without_opcode();
+        throw_unless(9215, ( equal_slices_bits($self'owner, __tact_context_get_sender()) ));
+        $self'mintable = false;
+        $global_cashback(__tact_context_get_sender());
+        $JettonMinter$_contract_store(($self'totalSupply, $self'owner, $self'jettonContent, $self'mintable));
+        return ();
+    }
+    
+    ;; Receive ClaimTON message
+    if (op == 0x393b1ce) {
+        var ($msg'receiver) = in_msg~$ClaimTON$_load_without_opcode();
+        throw_unless(9215, ( equal_slices_bits($self'owner, __tact_context_get_sender()) ));
+        $global_nativeReserve(10000000, 16);
+        $global_message($MessageParameters$_constructor_bounce_to_value_mode(true, $msg'receiver, 0, 128));
+        
+        return ();
+    }
+    
+    ;; Throw if not handled
+    throw(130);
+}
+
+
+() __tact_selector_hack_asm() impure asm """
+@atend @ 1 {
+        execute current@ context@ current!
+        {
+            // The core idea of this function is to save gas by avoiding unnecessary dict jump, when recv_internal/recv_external is called
+            // We want to extract recv_internal/recv_external from the dict and select needed function
+            // not by jumping to the needed function by it's index, but by using usual IF statements.
+
+            }END> b> // Close previous builder, now we have a cell of previous code on top of the stack
+
+            <{ // Start of the new code builder
+                SETCP0
+                // Swap the new code builder with the previous code, now we have previous code on top of the stack
+                swap
+                // Transform cell to slice and load first ref from the previous code, now we have the dict on top of the stack
+                <s ref@
+
+                // Extract the recv_internal from the dict
+                dup 0 swap @procdictkeylen idict@ { "internal shortcut error" abort } ifnot
+                swap
+
+                // Delete the recv_internal from the dict
+                0 swap @procdictkeylen idict- drop
+                // Delete the recv_external from the dict (it's okay if it's not there)
+                -1 swap @procdictkeylen idict- drop
+                // Delete the __tact_selector_hack from the dict
+                65535 swap @procdictkeylen idict- drop
+
+                // Bring the code builder from the bottom of the stack
+                // because if recv_external extraction is optional, and the number of elements on the stack is not fixed
+                depth 1- roll
+                // Swap with the dict from which we extracted recv_internal and (maybe) recv_external
+                swap
+
+                // Check if the dict is empty
+                dup null?
+                // Store a copy of this flag in the bottom of the stack
+                dup depth 1- -roll
+                {
+                    // If the dict is empty, just drop it (it will be null if it's empty)
+                    drop
+                }
+                {
+                    // If the dict is not empty, prepare continuation to be stored in c3
+                    <{
+                        // Save this dict as first ref in this continuation, it will be pushed in runtime by DICTPUSHCONST
+                        swap @procdictkeylen DICTPUSHCONST
+                        // Jump to the needed function by it's index
+                        DICTIGETJMPZ
+                        // If such key is not found, throw 11 along with the key as an argument
+                        11 THROWARG
+                    }> PUSHCONT
+                    // Store the continuation in c3
+                    c3 POP
+                } cond
+
+                // Function id is on top of the (runtime) stack
+                DUP IFNOTJMP:<{
+                    // place recv_internal here
+                    DROP swap @addop
+                }>
+
+                // Bring back the flag, indicating if the dict is empty or not from the bottom of the stack
+                depth 1- roll
+                {
+                    // If the dict is empty, throw 11
+                    11 THROWARG
+                }
+                {
+                    // If the dict is not empty, jump to continuation from c3
+                    c3 PUSH JMPX
+                } cond
+            }> b>
+        } : }END>c
+        current@ context! current!
+    } does @atend !
+""";
+
+() __tact_selector_hack() method_id(65535) {
+    return __tact_selector_hack_asm();
+}
