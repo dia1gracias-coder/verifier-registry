@@ -1,0 +1,96 @@
+#include "imports/stdlib.fc";
+#include "imports/math.fc";
+#include "imports/utils.fc";
+
+const int ONE_TON = 1000000000;
+
+(cell, int, int, int) load_data() impure {
+    slice data = get_data().begin_parse();
+
+    cell address_list = data~load_maybe_ref();
+    int time_last_paid = data~load_uint(32);
+    int time_offset = data~load_uint(32);
+    int total_paid = data~load_coins();
+
+    data.end_parse();
+
+    return (address_list, time_last_paid, time_offset, total_paid);
+}
+
+() save_data(cell address_list, int time_last_paid, int time_offset, int total_paid) impure {
+    set_data(begin_cell()
+        .store_maybe_ref(address_list)
+        .store_uint(time_last_paid, 32)
+        .store_uint(time_offset, 32)
+        .store_coins(total_paid)
+        .end_cell()
+    );
+}
+
+int send_salary(slice to_address, int total_balance, int percent) impure {
+    int salary_amount = math::get_percent(total_balance, percent, 100);
+    builder salary_msg = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(to_address)
+    .store_coins(salary_amount)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(0, 32)
+    .store_slice(msg::salary_msg());
+
+    send_raw_message(salary_msg.end_cell(), 3);
+    return salary_amount;
+}
+
+() recv_internal(int my_ton_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr();
+    cs~load_coins();
+    cs~skip_bits(1);
+    cs~load_coins();
+    int fwd_fee = muldiv(cs~load_coins(), 3, 2);
+
+    msg_value = msg_value + fwd_fee;
+
+    check_same_workchain(sender_address);
+
+    if (in_msg_body.slice_bits() < 32) {
+        ;; ignore simple transfers
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+
+    (cell address_list, int time_last_paid, int time_offset, int total_paid) = load_data();
+    cell address_list_copy = address_list;
+
+    if (op == 0) {
+        throw_if(100, (time_last_paid + time_offset) > now());
+        throw_if(101, msg_value < ONE_TON);
+        int total_balance = my_ton_balance - msg_value;
+
+        int counter = 0;
+        do {
+            var (_, data, f?) = address_list_copy~udict::delete_get_min(64);
+            if (f?) {
+                counter += 1;
+                if (counter >= 250) {
+                    throw(103);
+                }
+
+                int salary_amount = send_salary(data~load_msg_addr(), total_balance, data~load_uint(8));
+                total_paid = total_paid + salary_amount;
+            }
+        } until ( ~ f?);
+
+        save_data(address_list, now(), time_offset, total_paid);
+        return ();
+    }
+
+    throw(0xffff);
+}

@@ -1,0 +1,12 @@
+slice msg::salary_msg()       asm "<b 124 word Split Salary| $, b> <s PUSHSLICE";
+
+const MY_WORKCHAIN = 0;
+
+int is_same_workchain(slice addr) inline {
+    (int wc, _) = parse_std_addr(addr);
+    return wc == MY_WORKCHAIN;
+}
+
+() check_same_workchain(slice addr) impure inline {
+    throw_unless(102, is_same_workchain(addr));
+}
