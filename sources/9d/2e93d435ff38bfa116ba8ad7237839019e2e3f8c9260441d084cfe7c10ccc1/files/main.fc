@@ -1,0 +1,54 @@
+;; #include "stdlib.fc";
+
+;; () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+
+;; }
+#include "stdlib.fc";
+
+() recv_internal(int msg_value, cell in_msg, slice sender) impure {
+    slice ds = get_data().begin_parse();
+    slice server_wallet = ds~load_msg_addr();  ;; Your server wallet address
+
+    ;; Forward received TON to server wallet
+    send_raw_message(
+        begin_cell()
+            .store_uint(0x18, 6)  ;; No bounce
+            .store_slice(server_wallet)
+            .store_coins(msg_value)
+            .store_uint(0, 107)  ;; 1+4+4+64+32+1 = 107 bits
+            ;; Include sender address in message body
+            .store_slice(sender)
+        .end_cell(),
+        0
+    );
+}
+
+() recv_external(slice in_msg) impure {
+    ;; Only allow initialization from the deployer
+    slice sender = in_msg~load_msg_addr();
+    slice ds = get_data().begin_parse();
+    slice owner = ds~load_msg_addr();
+    
+    ;; Compare addresses by comparing their workchain and address parts
+    int sender_wc = sender~load_uint(8);
+    int owner_wc = owner~load_uint(8);
+    if (sender_wc != owner_wc) {
+        throw(100);  ;; Unauthorized
+    }
+    
+    int sender_addr = sender~load_uint(256);
+    int owner_addr = owner~load_uint(256);
+    if (sender_addr != owner_addr) {
+        throw(100);  ;; Unauthorized
+    }
+
+    ;; Load the server wallet address from the message
+    slice server_wallet = in_msg~load_msg_addr();
+
+    ;; Store the server wallet address in contract data
+    set_data(
+        begin_cell()
+            .store_slice(server_wallet)
+        .end_cell()
+    );
+}
