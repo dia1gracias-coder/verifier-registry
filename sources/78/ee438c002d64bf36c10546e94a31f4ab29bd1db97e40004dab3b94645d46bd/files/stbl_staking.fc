@@ -1,0 +1,484 @@
+;; Staking Main Smart Contract
+
+#pragma version ^0.4.0;
+
+#include "imports/stdlib.fc";
+#include "imports/delib.fc";
+#include "./utils/consts.fc";
+#include "./utils/helpers.fc";
+#include "./utils/context.fc";
+
+global int      self::init?;
+global slice    self::initializer; ;; deployer
+global int      self::jetton_a_wall_set?;
+global int      self::jetton_b_wall_set?;
+global int      self::apr;              ;; % of yield per year; with 2 decimals (125 = 1.25%)
+global int      self::reward_period;  ;; total time until reward
+
+global slice    self::jetton_a_minter;  ;; jetton minter address
+global slice    self::jetton_b_minter;  ;; jetton minter address
+
+global slice    self::jetton_a_wall;    ;; jetton A wallet address 
+global slice    self::jetton_b_wall;    ;; jetton B wallet address
+
+global int      self::jetton_b_balance; ;;  balance of rewards jetton
+global int      self::jetton_b_allocated;  ;; jettons allocated for rewards
+global int      self::jetton_a_staked;  ;;  current total stake amount
+
+global int      self::jetton_a_maximum_stake; ;; maximum jetton A amount in the pool
+global int      self::jetton_a_minimum_stake; ;; minimum amount that can be staked 
+
+global cell     self::escrow_contract_code;     
+global slice    self::nft_collection_address;   
+global cell     self::nft_content;         
+
+() load_data() impure inline_ref {
+    slice data = get_data().begin_parse();
+
+    int inited? = data~load_int(1);
+    throw_unless(ERR::CONSRTUCTOR, inited?);
+
+    self::init?           = inited?;
+    self::initializer       = data~load_msg_addr();
+    self::jetton_a_wall_set? = data~load_int(1);
+    self::jetton_b_wall_set? = data~load_int(1);
+    self::apr                  = data~load_uint(32);  
+    self::reward_period   = data~load_int(256); 
+
+    slice jettons = data~load_ref().begin_parse();
+    self::jetton_a_minter = jettons~load_msg_addr();
+    self::jetton_b_minter = jettons~load_msg_addr();
+    slice wallets = jettons~load_ref().begin_parse();
+    self::jetton_a_wall = wallets~load_msg_addr();
+    self::jetton_b_wall = wallets~load_msg_addr();
+
+    slice balances = data~load_ref().begin_parse();
+    self::jetton_b_balance = balances~load_coins();
+    self::jetton_b_allocated  = balances~load_coins();
+    self::jetton_a_staked  = balances~load_coins();
+    self::jetton_a_maximum_stake = balances~load_coins();
+    self::jetton_a_minimum_stake = balances~load_coins();
+
+    cell self::escrow_contract_code = data~load_ref();
+    slice nft_data = data~load_ref().begin_parse();
+    slice self::nft_collection_address = nft_data~load_msg_addr();
+    cell self::nft_content   = nft_data~load_ref();
+}
+
+() save_data() impure inline_ref {
+    builder data = begin_cell()
+        .store_int(self::init?, 1)
+        .store_slice(self::initializer)
+        .store_int(self::jetton_a_wall_set?, 1)
+        .store_int(self::jetton_b_wall_set?, 1)
+        .store_uint(self::apr, 32)
+        .store_int(self::reward_period,256);
+
+    builder jettons = begin_cell()
+        .store_slice(self::jetton_a_minter)
+        .store_slice(self::jetton_b_minter)
+        .store_ref(begin_cell()
+            .store_slice(self::jetton_a_wall)
+            .store_slice(self::jetton_b_wall)
+        .end_cell());
+
+    builder balances = begin_cell()
+        .store_coins(self::jetton_b_balance)
+        .store_coins(self::jetton_b_allocated)
+        .store_coins(self::jetton_a_staked)
+        .store_coins(self::jetton_a_maximum_stake)
+        .store_coins(self::jetton_a_minimum_stake);
+
+    data = data.store_ref(jettons.end_cell());
+    data = data.store_ref(balances.end_cell());
+    data = data.store_ref(self::escrow_contract_code);
+
+    data = data.store_ref(begin_cell()
+        .store_slice(self::nft_collection_address)
+        .store_ref(self::nft_content)
+        .end_cell());
+
+    set_data(data.end_cell());
+}
+
+cell jetton_transfer(int amount, slice to_address, slice response_address,
+                    slice jetton_wall, int ton_amount) inline {
+
+    cell body = pack_simple_jetton_transfer(msg::query_id, amount, to_address,
+                                            response_address, CONF::JETTON_FWD_AMOUNT);
+
+    return delib::int_msg(jetton_wall, false, ton_amount, body, null());
+}
+
+() throw_jettons_128(slice to, slice jetton_wall, int amount) impure inline {
+    cell msg = jetton_transfer(amount, to, to, jetton_wall, 0);
+    send_raw_message(msg, MSG::ALL_NOT_RESERVED + MSG::IGNORE_ERRORS);
+
+    commit();
+    throw(ERR::NOT_ENOUGH);
+}
+
+(slice, cell) calc_escrow_contract(slice staker_address) inline {
+    cell contract_data = pack_escrow_data(my_address(), staker_address);
+    cell contract_init = delib::basic_state_init(self::escrow_contract_code, contract_data);
+    return (delib::addrstd_by_state(CONF::WC, contract_init), contract_init);
+}
+
+() auth_by_escrow_contract(slice staker_address) impure inline {
+    (slice escrow_address, _) = calc_escrow_contract(staker_address);
+    throw_unless(ERR::ACCESS, equal_slice_bits(msg::sender, escrow_address));
+}
+
+;; contract constructor (can be called only once)
+() constructor(slice msg_body) impure inline_ref {
+    slice ds = get_data().begin_parse();
+
+    throw_if(ERR::CONSRTUCTOR, ds~load_int(1));
+    throw_unless(ERR::ACCESS, equal_slice_bits(msg::sender, ds~load_msg_addr()));
+
+    ;; --------------------------------------------------------------------------
+    ;; this |--(provide_wallet)-> minter_a  -(set_wallet)-> this -?(excesses)-> initializer
+    ;;      |--(provide_wallet)-> minter_b  -(set_wallet)-> this -?(excesses)-> initializer
+    ;;      |-?(excesses)-> initializer
+    ;; --------------------------------------------------------------------------
+    throw_unless(ERR::NOT_ENOUGH, msg::value > MAIN::TARGET +
+                (msg::fwd_fee * 4) + (CONF::MAX_GAS * 5));  ;; currently > 0.5 + X * 4 + 0.25 TON
+
+    (slice jetton_a, slice jetton_b, int apr, int reward_period, 
+    int maximum_stake, int minimum_stake, 
+    cell escrow_contract_code, slice nft_collection_address, cell nft_content) = msg_body.unpack_constructor(); ;; non-modifying method
+
+    delib::force_addr(jetton_a, CONF::WC, false, ERR::ADDR_FORMAT);
+    delib::force_addr(jetton_b, CONF::WC, false, ERR::ADDR_FORMAT);
+
+    int  transfer_val = CONF::MAX_GAS + msg::fwd_fee;
+    cell body = pack_provide_wallet(msg::query_id, my_address());
+
+    send_raw_message(delib::int_msg(jetton_a, false, transfer_val, body, null()), MSG::SENDER_PAYS_FEES);
+    ;; only in case jetton A and B are different 
+    if(~ equal_slices(jetton_a, jetton_b)){
+        send_raw_message(delib::int_msg(jetton_b, false, transfer_val, body, null()), MSG::SENDER_PAYS_FEES);
+    }
+
+    self::init?           = true;
+    self::initializer       = msg::sender;  ;; deployer
+    self::jetton_a_wall_set? = false;
+    self::jetton_b_wall_set? = false;
+    self::apr = apr; 
+    self::reward_period   = reward_period;
+
+    self::jetton_a_minter = jetton_a;
+    self::jetton_b_minter = jetton_b;
+
+    self::jetton_a_wall = delib::addr_none();
+    self::jetton_b_wall = delib::addr_none();
+
+    self::jetton_b_balance = 0;
+    self::jetton_b_allocated  = 0;
+    self::jetton_a_staked  = 0;
+
+    self::jetton_a_maximum_stake = maximum_stake;
+    self::jetton_a_minimum_stake = minimum_stake;
+
+    self::escrow_contract_code = escrow_contract_code;
+    self::nft_collection_address = nft_collection_address;
+    self::nft_content = nft_content;
+
+    ctx::send_excesses(self::initializer, MSG::ALL_NOT_RESERVED + MSG::IGNORE_ERRORS);
+}
+
+;; function that sets addresses of jetton wallets, owned by this contract
+() set_wallet(slice msg_body) impure inline_ref {
+    int ok? = false;
+
+    if (equal_slice_bits(msg::sender, self::jetton_a_minter)) {  ;; jetton minter?
+        self::jetton_a_wall = msg_body~load_msg_addr();
+        self::jetton_a_wall_set? = true;
+        if (equal_slice_bits(self::jetton_b_minter, self::jetton_a_minter)){
+            self::jetton_b_wall = self::jetton_a_wall;
+            self::jetton_b_wall_set? = true;
+        }
+        ok? = true;
+    }
+
+    if (equal_slice_bits(msg::sender, self::jetton_b_minter) & (~ equal_slice_bits(self::jetton_b_minter, self::jetton_a_minter))) {
+        self::jetton_b_wall = msg_body~load_msg_addr();
+        self::jetton_b_wall_set? = true;
+        ok? = true;
+    }
+
+    throw_unless(ERR::ACCESS, ok?);
+    ctx::send_excesses(self::initializer, MSG::ALL_NOT_RESERVED + MSG::IGNORE_ERRORS);
+}
+
+;; function that accepts incoming jetton transfer
+() accept_jettons(slice msg_body) impure inline_ref {
+    int jetton_a? = equal_slice_bits(msg::sender, self::jetton_a_wall);
+    int jetton_b? = equal_slice_bits(msg::sender, self::jetton_b_wall);
+    throw_unless(ERR::ACCESS, jetton_a? | jetton_b?);
+
+    (int amount, slice sender) = (msg_body~load_coins(), msg_body~load_msg_addr());
+
+    ;; accept stake request
+    if (jetton_a? & (~ equal_slices(sender, self::initializer))) { 
+        ;; this -(get_escrow_data)-> escrow -(take_recv_data)-> this -(handle_stake_callback)->
+        ;; -> escrow -(end_stake)-> this -?(excesses)-> initializer
+        if (msg::value < ((CONF::MAX_GAS * 5) + (msg::fwd_fee * 4)) + CONF::NFT_MINT_AMOUNT) {  ;; 0.25 + X * 4 + 0.018
+            throw_jettons_128(sender, self::jetton_a_wall, amount);
+        }
+
+        ;; if minimum stake amount not reached
+        if(amount < self::jetton_a_minimum_stake) {
+            cell return_msg = jetton_transfer(amount, sender, sender, self::jetton_a_wall, 0);
+            send_raw_message(return_msg, MSG::REMAINING_GAS + MSG::IGNORE_ERRORS);
+            return ();
+        }
+
+        ;; if maximum stake amount reached 
+        if (self::jetton_a_staked + amount > self::jetton_a_maximum_stake ) {
+            int excess = self::jetton_a_staked + amount - self::jetton_a_maximum_stake;
+            amount -= excess;
+            cell excess_msg = jetton_transfer(excess, sender, sender, self::jetton_a_wall, CONF::MAX_GAS);
+            send_raw_message(excess_msg, MSG::SENDER_PAYS_FEES + MSG::IGNORE_ERRORS);
+        }
+
+        self::jetton_a_staked += amount;
+
+        (slice escrow_address, cell escrow_init) = calc_escrow_contract(sender);
+        ;; sends op::escrow::get_escrow_data message
+        cell body = pack_get_escrow_data(msg::query_id, callback::escrow::stake,
+                                        begin_cell().store_coins(amount));
+
+        cell msg  = delib::int_msg(escrow_address, false, 0, body, escrow_init);
+        send_raw_message(msg, MSG::ALL_NOT_RESERVED);
+    }
+
+    ;; just top up the pool balance with b jettons
+    if (jetton_b? & equal_slices(sender, self::initializer)) { 
+        self::jetton_b_balance += amount;
+        ctx::send_excesses(sender, MSG::ALL_NOT_RESERVED + MSG::IGNORE_ERRORS);
+    }
+}
+
+;; handle_stake_callback 
+() handle_stake_callback(slice msg_body) impure inline_ref {
+    slice staker_address = msg_body~load_msg_addr();
+    ;; check that staker_address is right
+    auth_by_escrow_contract(staker_address);
+
+    ;; get info about user's stake received from escrow
+    (int staker::stake_timestamp, int staker::staked_a, int staker::reward)
+    = unpack_staker_info(msg_body~load_ref().begin_parse()); ;; modifying method
+
+    int to_stake = msg_body~load_coins();  ;;  amount of deposited jettons
+
+    staker::reward += self::apr.muldiv(to_stake.muldiv(self::reward_period, TIME::YEAR), 10000); 
+    ;; apr * stake amount * reward period in sec / sec per year / (100 * apr decimals (=100))
+
+    ;; if hasn't staked before
+    if (staker::staked_a == 0) {
+        cell item_message = begin_cell()
+            .store_slice(staker_address)            ;; item owner
+            .store_ref(self::nft_content)   ;; item content
+            .store_slice(self::initializer) ;; editor
+        .end_cell();
+        cell nft_body = pack_nft_mint_message(msg::query_id, CONF::NFT_ITEM_AMOUNT, item_message);
+        cell nft_mint_msg = delib::int_msg(self::nft_collection_address, false, CONF::NFT_MINT_AMOUNT, nft_body, null());
+        send_raw_message(nft_mint_msg, MSG::SENDER_PAYS_FEES);
+    }
+
+    ;; update staker info 
+    staker::staked_a += to_stake;
+    staker::stake_timestamp = now();  ;; change stake timestamp
+    self::jetton_b_allocated += staker::reward;
+
+    cell info = pack_staker_info(staker::stake_timestamp, staker::staked_a, staker::reward);
+    builder fwd = begin_cell().store_slice(staker_address);
+    cell body = pack_store_execution_data(msg::query_id, info, callback::escrow::end_stake_or_unstake_op, fwd);
+
+    ;; send msg back to the escrow
+    cell msg = delib::int_msg(msg::sender, false, 0, body, null());
+    send_raw_message(msg, MSG::ALL_NOT_RESERVED);
+}
+
+;; end_stake_or_unstake_op handler
+() end_stake_or_unstake(slice msg_body) impure inline_ref {
+    slice staker_address = msg_body~load_msg_addr();  ;; modifying method 
+    auth_by_escrow_contract(staker_address);
+
+    ;; sending excess message to staker 
+    ctx::send_excesses(msg_body~load_msg_addr(), MSG::ALL_NOT_RESERVED + MSG::IGNORE_ERRORS);
+}
+
+() unstake(slice msg_body) impure inline_ref {
+    ;; this -(get_escrow_data)-> escrow -(take_recv_data)-> this -(handle_unstake_callback)->
+    ;; |-> escrow -(end_stake)-> this -?(excesses)-> initializer
+    ;; |-> ({transfer_fee} * 2)
+    int basic_fee = (CONF::MAX_GAS * 5) + (msg::fwd_fee * 4);  ;; 0.05 ton * 5 + x * 4 
+    int transfer_fee = CONF::JETTON_FWD_AMOUNT + (msg::fwd_fee * 3) + (CONF::MAX_GAS * 2); ;; 10^-9 + x * 3 +  0.05 * 2
+    throw_unless(ERR::NOT_ENOUGH, msg::value > basic_fee + (transfer_fee * 2));  ;; 0.25 + 7 x + 0.1 ton 
+
+    int unstake_amount = msg_body~load_coins(); ;; kept for sanity check 
+
+    (slice escrow_address, _) = calc_escrow_contract(msg::sender);
+    builder fwd_body = begin_cell().store_coins(unstake_amount).store_coins(transfer_fee);  ;; fwd payload being set 
+    cell body = pack_get_escrow_data(msg::query_id, callback::escrow::unstake, fwd_body);
+
+    cell msg  = delib::int_msg(escrow_address, false, 0, body, null());
+    send_raw_message(msg, MSG::ALL_NOT_RESERVED);
+}
+
+() handle_unstake_callback(slice msg_body) impure inline_ref {
+    slice staker = msg_body~load_msg_addr();
+    auth_by_escrow_contract(staker);
+
+    ;; get stake info 
+    (int staker::stake_timestamp, int staker::staked_a, int staker::reward)
+    = unpack_staker_info(msg_body~load_ref().begin_parse());
+
+    (int uamount, int transfer_fee) = (msg_body~load_coins(), msg_body~load_coins());
+    throw_unless(ERR::NOT_ENOUGH_STAKE, staker::staked_a >= uamount); ;; sanity check 
+    throw_unless(ERR::STAKE_PERIOD, staker::stake_timestamp + self::reward_period <= now());
+
+    self::jetton_b_balance -= staker::reward;
+
+    ;; need to keep, to check maximum stake 
+    ;; self::jetton_a_staked -= uamount;
+
+    ;; send all A jettons back to staker
+    cell bodya = jetton_transfer(staker::staked_a, staker, staker, self::jetton_a_wall, transfer_fee);
+    ;; send all rewards back to staker
+    cell bodyb = jetton_transfer(staker::reward, staker, staker, self::jetton_b_wall, transfer_fee);
+    send_raw_message(bodya, MSG::SENDER_PAYS_FEES);
+    send_raw_message(bodyb, MSG::SENDER_PAYS_FEES);
+
+    staker::stake_timestamp = -1; 
+    staker::staked_a = 0;
+    staker::reward = 0;
+
+    ;; prepare message to escrow
+    builder fwd = begin_cell().store_slice(staker);
+    cell info = pack_staker_info(staker::stake_timestamp, staker::staked_a, staker::reward);
+    cell body = pack_store_execution_data(msg::query_id, info, callback::escrow::end_stake_or_unstake_op, fwd);
+    
+    ;; send msg to escrow
+    cell msg = delib::int_msg(msg::sender, false, 0, body, null());
+    send_raw_message(msg, MSG::ALL_NOT_RESERVED);
+}
+
+() set_apr(slice msg_body) impure inline_ref {
+    int apr = msg_body~load_uint(32);
+    throw_unless(ERR::ACCESS, equal_slices(msg::sender, self::initializer));
+    throw_unless(ERR::APR, (apr > 0) & (apr <= 100000)); ;; 1000 %
+    self::apr = apr;
+    ctx::send_excesses(msg::sender, MSG::ALL_NOT_RESERVED + MSG::IGNORE_ERRORS);
+}  
+
+() set_initializer(slice msg_body) impure inline_ref {
+    slice new_initializer = msg_body~load_msg_addr();
+    throw_unless(ERR::ACCESS, equal_slice_bits(msg::sender, self::initializer));
+    delib::force_addr(new_initializer, CONF::WC, false, ERR::ADDR_FORMAT);
+    self::initializer = new_initializer;
+    ctx::send_excesses(msg::sender, MSG::ALL_NOT_RESERVED + MSG::IGNORE_ERRORS);
+}  
+
+;; function selector by msg::op
+() callselector(slice msg_body) impure inline_ref {
+    throw_if(0, msg::op == 0 | msg::bounced?); ;; ignore simple transfers or bounced
+    ;; deploy the contract
+    if (msg::op == op::main::constructor) { return constructor(msg_body); }
+
+    load_data();
+
+    ;; deposit notification
+    if (msg::op == op::general::transfer_notification) { return accept_jettons(msg_body); }
+
+    ;; set jetton wallets controlled by this contract
+    if (msg::op == op::minter::set_wallet_address) { return set_wallet(msg_body); }
+
+    ;; receive callback message from escrow after stake
+    if (msg::op == callback::escrow::stake) { return handle_stake_callback(msg_body); }
+
+    ;; receive unstake msg
+    if (msg::op == op::main::unstake) { return unstake(msg_body); }
+
+    ;; 
+    if (msg::op == callback::escrow::unstake) { return handle_unstake_callback(msg_body); }
+
+    ;; return excess to the sender (staker) after opertions finished
+    if (msg::op == callback::escrow::end_stake_or_unstake_op) { return end_stake_or_unstake(msg_body); }
+
+    
+    ;; change apr 
+    if (msg::op == op::admin::set_apr) { return set_apr(msg_body); }
+    
+    ;; set initiliser
+    if (msg::op == op::admin::set_initializer) { return set_initializer(msg_body); }
+
+    throw(0xffff); ;; not found
+}
+
+;; internal message entry point
+() recv_internal(int balance, int value, cell msg, slice msg_body) impure {
+    ;; check the message size
+    throw_if(0, msg_body.slice_empty?() | msg_body.slice_bits() < 32 + 64);
+
+    ;; load the message: op, sender, contract balance, msg value, fwd fee
+    msg_body~ctx::load(msg, balance, value); ;; modifying method
+    ;; check address (workchain, etc)
+    delib::force_addr(msg::sender, CONF::WC, false, ERR::ADDR_FORMAT);
+
+    ;; reserve jettons (target or balance - msg.value)
+    ctx::reserve(MAIN::TARGET);
+    ;; selector for operations 
+    callselector(msg_body);
+    ;; saves updated data
+    save_data();
+}
+
+(int, int, int, int, int, int, int, int) get_pool_info() method_id {
+    load_data();
+    int actual_jetton_b_shared = self::jetton_a_staked > 0
+        ? self::jetton_b_allocated : 0;  ;; 0 if jetton_a_staked == 0 
+
+    return (self::init? & self::jetton_a_wall_set? & self::jetton_b_wall_set?,
+            self::apr,
+            self::reward_period,   ;; 
+            self::jetton_b_balance, 
+            self::jetton_b_allocated,   
+            self::jetton_a_staked,
+            self::jetton_a_maximum_stake,
+            self::jetton_a_minimum_stake
+            );
+}
+
+([slice, slice], [slice, slice]) get_jetton_addresses() method_id {
+    load_data();
+    return ([self::jetton_a_minter, self::jetton_a_wall],
+            [self::jetton_b_minter, self::jetton_b_wall]);
+}
+
+(slice) get_escrow_by_staker(slice staker_address) method_id {
+    load_data();
+    (slice escrow_address, _) = calc_escrow_contract(staker_address);
+    return escrow_address;
+}
+
+(int, int, int) parse_staker_info(slice info) method_id {
+    return unpack_staker_info(info); ;; (timestamp, staked_a, reward)
+}
+
+(slice) get_nft_collection_address() method_id {
+    load_data();
+    return self::nft_collection_address;
+}
+
+(cell) get_nft_content() method_id {
+    load_data();
+    return self::nft_content;
+}
+
+(slice) get_initializer() method_id {
+    load_data();
+    return self::initializer;
+}
