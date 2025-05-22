@@ -1,0 +1,23 @@
+;; Basic parameters for Jetton smart contracts
+
+;; Constants related to gas and fees
+const int DECIMALS = 1000000000;  ;; 10^9 (9 decimal places for USDT)
+const int MIN_TONS_FOR_STORAGE = 10000000; ;; 0.01 TON
+const int GAS_CONSUMPTION = 10000000; ;; 0.01 TON
+
+;; Error codes
+const int error::invalid_sender = 100;
+const int error::not_enough_tons = 101;
+const int error::not_enough_tokens = 102;
+const int error::not_owner = 103;
+const int error::invalid_op = 0xffff;
+
+;; Helper function to convert from units to nanoTokens
+int to_nano(int units, int decimals) inline {
+  return muldiv(units, decimals, 1);
+}
+
+;; Helper function to convert from nanoTokens to units
+int from_nano(int nano, int decimals) inline {
+  return muldiv(nano, 1, decimals);
+}

@@ -1,0 +1,29 @@
+;; Utility functions for TON smart contracts
+
+;; Compare two slices for equality
+int equal_slices(slice a, slice b) {
+    return slice_hash(a) == slice_hash(b);
+}
+
+;; Compare two cells for equality
+int equal_cells(cell a, cell b) {
+    return cell_hash(a) == cell_hash(b);
+}
+
+;; Get workchain_id from an address
+int get_workchain(slice addr) {
+    (int wc, _) = parse_std_addr(addr);
+    return wc;
+}
+
+;; Convenience function for throwing if condition is false
+() throw_if_not(int condition, int err_code) impure {
+    if (~ condition) {
+        throw(err_code);
+    }
+}
+
+;; Helper to make sure address is non-zero
+int is_null_addr(slice addr) {
+    return equal_slices(addr, begin_cell().store_uint(0, 2).end_cell().begin_parse());
+}
