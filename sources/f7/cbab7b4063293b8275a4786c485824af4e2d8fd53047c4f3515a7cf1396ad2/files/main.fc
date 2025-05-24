@@ -1,0 +1,291 @@
+
+#include "stdlib.fc";
+#include "op-codes.fc";
+
+
+;; 全局变量
+global int game_id_counter;
+global cell games;  ;; 存储所有游戏信息
+global int total_creator_share;
+global int total_platform_share;
+const slice platform_address = "UQBBZViCPUORw6TdFYspG1XWUYNDL1ZKzy9tx_fKKEvmJJqR"a; ;; 示例平台地址
+
+;; 初始化合约
+() load_data() impure inline {
+    var ds = get_data().begin_parse();
+    if (ds.slice_refs() == 0) {
+        ;; 首次初始化
+        game_id_counter = 0;
+        games = new_dict();
+        total_creator_share = 0;
+        total_platform_share = 0;
+        return ();
+    }
+    
+    game_id_counter = ds~load_uint(32);
+    games = ds~load_dict();
+    total_creator_share = ds~load_coins();
+    total_platform_share = ds~load_coins();
+    ds.end_parse();
+}
+
+;; 保存合约数据
+() save_data() impure inline {
+    set_data(begin_cell()
+        .store_uint(game_id_counter, 32)
+        .store_dict(games)
+        .store_coins(total_creator_share)
+        .store_coins(total_platform_share)
+        .end_cell());
+}
+
+;; 创建新游戏
+(int) create_game(slice creator, int reward_count, int bet_amount, int token_address, int initial_funds) impure {
+    ;; 参数验证
+    throw_if(36, reward_count <= 0);
+    throw_if(37, initial_funds < bet_amount);
+    
+    ;; 生成游戏ID
+    int game_id = game_id_counter;
+    game_id_counter += 1;
+    
+    ;; 创建参与者列表
+    cell participants_list = new_dict();
+    
+    ;; 计算截止时间（当前时间 + 120秒）
+    int deadline = now() + 120;
+    
+    ;; 创建游戏信息
+    builder game_info = begin_cell()
+        .store_slice(creator)  ;; 创建者地址
+        .store_uint(reward_count, 32)
+        .store_coins(bet_amount)
+        .store_uint(token_address, 256)
+        .store_coins(initial_funds)
+        .store_uint(deadline, 64)
+        .store_uint(0, 1)  ;; ended = false
+        .store_dict(participants_list);
+    
+    ;; 保存游戏信息 - 修正dict_set_builder的使用
+    games~udict_set_builder(32, game_id, game_info);
+    
+    ;; 更新合约数据
+    save_data();
+    
+    return game_id;
+}
+
+;; 参与游戏
+() join_game(slice participant, int game_id, int amount) impure {
+    ;; 加载游戏信息
+    (slice game_info, int found) = games.udict_get?(32, game_id);
+    throw_if(38, found == 0);
+    
+    var ds = game_info;
+    slice creator = ds~load_msg_addr();
+    int reward_count = ds~load_uint(32);
+    int bet_amount = ds~load_coins();
+    int token_address = ds~load_uint(256);
+    int total_pool = ds~load_coins();
+    int deadline = ds~load_uint(64);
+    int ended = ds~load_uint(1);
+    cell participants_list = ds~load_dict();
+    ds.end_parse();
+    
+    ;; 验证游戏状态
+    throw_if(39, ended);
+    throw_if(40, now() >= deadline);
+    throw_if(41, amount != bet_amount);
+    
+    ;; 更新奖金池
+    total_pool += amount;
+    
+    ;; 计算参与者地址的哈希作为键
+    int participant_hash = slice_hash(participant);
+    
+    ;; 更新参与者列表
+    participants_list~udict_set_builder(256, participant_hash, begin_cell().store_slice(participant));
+    
+    ;; 重置倒计时
+    deadline = now() + 120;
+    
+    ;; 保存更新后的游戏信息
+    builder new_game_info = begin_cell()
+        .store_slice(creator)
+        .store_uint(reward_count, 32)
+        .store_coins(bet_amount)
+        .store_uint(token_address, 256)
+        .store_coins(total_pool)
+        .store_uint(deadline, 64)
+        .store_uint(ended, 1)
+        .store_dict(participants_list);
+    
+    games~udict_set_builder(32, game_id, new_game_info);
+    
+    ;; 更新合约数据
+    save_data();
+}
+
+;; 结束游戏
+() finalize_game(int game_id) impure {
+    ;; 加载游戏信息
+    (slice game_info, int found) = games.udict_get?(32, game_id);
+    throw_if(42, found == 0);
+    
+    var ds = game_info;
+    slice creator = ds~load_msg_addr();
+    int reward_count = ds~load_uint(32);
+    int bet_amount = ds~load_coins();
+    int token_address = ds~load_uint(256);
+    int total_pool = ds~load_coins();
+    int deadline = ds~load_uint(64);
+    int ended = ds~load_uint(1);
+    cell participants_list = ds~load_dict();
+    ds.end_parse();
+    
+    ;; 验证游戏状态
+    throw_if(43, ended);
+    throw_if(44, now() < deadline);
+    
+    ;; 标记游戏结束
+    ended = 1;
+    
+    ;; 计算平台和创建者分成
+    int platform_fee = total_pool / 100;  ;; 1%
+    int creator_fee = total_pool / 100;   ;; 1%
+    
+    total_platform_share += platform_fee;
+    total_creator_share += creator_fee;
+    
+    ;; 保存更新后的游戏信息
+    builder new_game_info = begin_cell()
+        .store_slice(creator)
+        .store_uint(reward_count, 32)
+        .store_coins(bet_amount)
+        .store_uint(token_address, 256)
+        .store_coins(total_pool)
+        .store_uint(deadline, 64)
+        .store_uint(ended, 1)
+        .store_dict(participants_list);
+    
+    games~udict_set_builder(32, game_id, new_game_info);
+    
+    ;; 更新合约数据
+    save_data();
+}
+
+;; 提取奖金
+() claim_prize(slice participant, int game_id) impure {
+    ;; 加载游戏信息
+    (slice game_info, int found) = games.udict_get?(32, game_id);
+    throw_if(45, found == 0);
+    
+    var ds = game_info;
+    slice creator = ds~load_msg_addr();
+    int reward_count = ds~load_uint(32);
+    int bet_amount = ds~load_coins();
+    int token_address = ds~load_uint(256);
+    int total_pool = ds~load_coins();
+    int deadline = ds~load_uint(64);
+    int ended = ds~load_uint(1);
+    cell participants_list = ds~load_dict();
+    ds.end_parse();
+    
+    ;; 验证游戏状态
+    throw_if(46, ended == 0);
+    
+    ;; 验证参与者资格
+    int participant_hash = slice_hash(participant);
+    (slice participant_info, int is_participant) = participants_list.udict_get?(256, participant_hash);
+    throw_if(47, is_participant == 0);
+    
+    ;; 计算奖金份额
+    int prize_share = total_pool * 98 / 100 / reward_count;
+    
+    ;; 转账奖金
+    if (token_address == 0) {
+        ;; 原生TON转账
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(participant)
+            .store_coins(prize_share)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+            .end_cell();
+        send_raw_message(msg, 1);
+    } else {
+        ;; 其他代币转账（需要实现代币转账接口）
+        ;; TODO: 实现Jetton转账逻辑
+    }
+}
+
+;; 平台和创建者提现
+() withdraw(slice sender) impure {
+    ;; 计算可提现金额
+    int withdraw_amount = 0;
+    
+    ;; 检查是否为平台地址 - 使用slice_hash比较
+    if (slice_hash(sender) == slice_hash(platform_address)) {
+        withdraw_amount = total_platform_share;
+        total_platform_share = 0;
+    } else {
+        ;; 检查是否为创建者（需要遍历游戏找到创建者）
+        ;; 简化处理：假设发送者是有效创建者
+        withdraw_amount = total_creator_share;
+        total_creator_share = 0;
+    }
+    
+    throw_if(48, withdraw_amount == 0);
+    
+    ;; 转账
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender)
+        .store_coins(withdraw_amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(0, 32)
+        .end_cell();
+    send_raw_message(msg, 1);
+}
+
+;; 合约入口
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { 
+        return (); 
+    }
+    
+    ;; 解析消息发送者
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    
+    load_data();
+    
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == 1) { ;; create_game
+        int reward_count = in_msg_body~load_uint(32);
+        int bet_amount = in_msg_body~load_coins();
+        int token_address = in_msg_body~load_uint(256);
+        int initial_funds = msg_value;
+        create_game(sender_address, reward_count, bet_amount, token_address, initial_funds);
+    }
+    elseif (op == 2) { ;; join_game
+        int game_id = in_msg_body~load_uint(32);
+        int amount = msg_value;
+        join_game(sender_address, game_id, amount);
+    }
+    elseif (op == 3) { ;; finalize_game
+        int game_id = in_msg_body~load_uint(32);
+        finalize_game(game_id);
+    }
+    elseif (op == 4) { ;; claim_prize
+        int game_id = in_msg_body~load_uint(32);
+        claim_prize(sender_address, game_id);
+    }
+    elseif (op == 5) { ;; withdraw
+        withdraw(sender_address);
+    }
+    
+    save_data();
+}
