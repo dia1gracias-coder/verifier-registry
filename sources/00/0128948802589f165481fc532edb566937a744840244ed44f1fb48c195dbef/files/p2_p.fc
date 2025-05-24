@@ -1,0 +1,432 @@
+#include "imports/stdlib.fc";
+
+const int op_create_deal = 1;
+const int op_resolve_deal = 2;
+const int op_refund_unknown = 3;
+const int op_withdraw_commissions = 4;
+const int op_fund_deal = 5;
+
+const int COMMISSION_PERCENT = 3;
+const int MIN_CREATE_FEE = 3000000;
+const int MIN_CP_FOR_ADMIN = 3000000;
+const int CP_RESERVE_GAS = 500000000;
+const int UF_MAX_RECORDS = 10000;
+const int UF_REC_TESTNET = 10000;
+
+int equal_slice_bits(slice a, slice b) asm "SDEQ";
+
+(cell, int, cell) add_to_unknown_funds(cell uf, slice sender, int amount, int next_uf_key, cell uf_free_stack) impure inline {
+    int key = next_uf_key;
+    int stack_empty = 1;
+    
+    (int free_key, _, int found) = uf_free_stack.udict_get_min?(32);
+    if (found) {
+        key = free_key;
+        (uf_free_stack, _) = uf_free_stack.udict_delete?(32, free_key);
+        stack_empty = 0;
+    } else {
+        throw_if(152, next_uf_key >= UF_MAX_RECORDS);
+        next_uf_key += 1;
+    }
+
+    cell rec = begin_cell()
+        .store_slice(sender)
+        .store_uint(amount, 128)  
+        .end_cell();
+
+    uf~udict_set_ref(32, key, rec);
+    return (uf, next_uf_key, uf_free_stack);
+}
+
+() send_transfer(slice dest, int grams) impure inline {
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(dest)
+        .store_coins(grams)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+    send_raw_message(msg, 3);
+}
+
+() require_moderator(slice sender, slice moderator_address) impure inline {
+    if (equal_slice_bits(sender, moderator_address) == 0) {
+        throw(999);
+    }
+}
+
+(int, cell, cell, cell, slice, int, int, cell) load_data() impure {
+    cell data = get_data();
+    if (cell_null?(data)) {
+        return (0, new_dict(), new_dict(), new_dict(), null(), 0, 0, new_dict());
+    }
+    slice ds = data.begin_parse();
+    if (slice_empty?(ds)) {
+        return (0, new_dict(), new_dict(), new_dict(), null(), 0, 0, new_dict());
+    }
+    int deals_counter = ds~load_uint(32);
+    cell deals_dict = ds~load_dict();
+    cell memo_map = ds~load_dict();
+    cell unknown_funds = ds~load_dict();
+    slice moderator_address = null();
+    
+    if (~ ds.slice_empty?()) {
+        moderator_address = ds~load_msg_addr();
+    }
+    
+    int commissions_pool = 0;
+    if (~ ds.slice_empty?()) {
+        commissions_pool = ds~load_uint(128);
+    }
+    
+    int next_uf_key = 0;
+    if (~ ds.slice_empty?()) {
+        next_uf_key = ds~load_uint(32);
+    }
+    
+    cell uf_free_stack = new_dict();
+    if (~ ds.slice_empty?()) {
+        uf_free_stack = ds~load_dict();
+    }
+    
+    return (deals_counter, deals_dict, memo_map, unknown_funds, moderator_address, commissions_pool, next_uf_key, uf_free_stack);
+}
+
+() save_data(int dc, cell dd, cell mm, cell uf, slice ma, int cp, int next_uf_key, cell uf_free_stack) impure {
+    cell data_cell = begin_cell()
+            .store_uint(dc, 32)
+            .store_dict(dd)
+            .store_dict(mm)
+            .store_dict(uf)
+            .store_slice(ma)
+            .store_uint(cp, 128)
+            .store_uint(next_uf_key, 32)
+            .store_dict(uf_free_stack)
+        .end_cell();
+    set_data(data_cell);
+}
+
+() recv_external(slice _) impure {
+    throw(998);
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    accept_message();
+
+    var (dc, dd, mm, uf, ma, cp, next_uf_key, uf_free_stack) = load_data();
+    slice msg_slice = in_msg_full.begin_parse();
+    int flags = msg_slice~load_uint(4);
+    slice sender = msg_slice~load_msg_addr();
+    slice cs = in_msg_body;
+
+    if (cs.slice_bits() < 32) {
+        throw_if(150, msg_value < 100000000);
+        int fee = (msg_value * COMMISSION_PERCENT) / 100;
+        int net_value = msg_value - fee;
+        cp += fee;
+        (uf, next_uf_key, uf_free_stack) = add_to_unknown_funds(uf, sender, net_value, next_uf_key, uf_free_stack);
+        save_data(dc, dd, mm, uf, ma, cp, next_uf_key, uf_free_stack);
+        return ();
+    }
+
+    int op = cs~load_uint(32);
+
+    if (op == op_create_deal) {
+        throw_if(301, msg_value < MIN_CREATE_FEE);
+        cp += MIN_CREATE_FEE;
+        
+        int query_id = cs~load_uint(64);
+        slice s = cs~load_msg_addr();
+        slice b = cs~load_msg_addr();
+        int a = cs~load_coins();
+        cell m = cs~load_ref();
+        int mh = cell_hash(m);
+
+        var (_, f) = mm.udict_get?(256, mh);
+        throw_if(100, f);
+
+        cell d = begin_cell()
+            .store_slice(s)
+            .store_slice(b)
+            .store_coins(a)
+            .store_uint(0, 1)
+            .store_coins(0)
+            .end_cell();
+
+        int id = dc;
+        dc = dc + 1;
+
+        dd~udict_set_ref(32, id, d);
+        mm~udict_set(
+            256,
+            mh,
+            begin_cell().store_uint(id, 32).end_cell().begin_parse()
+        );
+
+        save_data(dc, dd, mm, uf, ma, cp, next_uf_key, uf_free_stack);
+        return ();
+    }
+
+if (op == op_fund_deal) {
+    int query_id = cs~load_uint(64);
+    cell m = cs~load_ref();
+    int mh = cell_hash(m);
+
+    var (dslice, f) = mm.udict_get?(256, mh);
+    throw_unless(130, f);
+    int id = dslice~load_uint(32);
+
+    (cell c2, int found) = dd.udict_get_ref?(32, id);
+    throw_unless(140, found);
+
+    slice d2 = c2.begin_parse();
+    slice s = d2~load_msg_addr();
+    slice b = d2~load_msg_addr();
+    int amt = d2~load_coins();
+    int funded = d2~load_uint(1);
+
+    throw_if(131, funded);
+
+    int funded_amount = 0;
+    if (~ d2.slice_empty?()) {
+        funded_amount = d2~load_coins();
+    }
+
+    funded_amount += msg_value;
+
+    int new_funded = 0;
+    int overpay = 0;
+    
+    if (funded_amount >= amt) {
+        new_funded = 1;
+        overpay = funded_amount - amt;
+        if (overpay > 0) {
+            (uf, next_uf_key, uf_free_stack) = add_to_unknown_funds(uf, sender, overpay, next_uf_key, uf_free_stack);
+            funded_amount = amt;
+        }
+    }
+
+    cell nd = begin_cell()
+        .store_slice(s)
+        .store_slice(b)
+        .store_coins(amt)
+        .store_uint(new_funded, 1)
+        .store_coins(funded_amount)
+        .end_cell();
+
+    dd~udict_set_ref(32, id, nd);
+
+    save_data(dc, dd, mm, uf, ma, cp, next_uf_key, uf_free_stack);
+    return ();
+}
+
+
+    if (op == op_resolve_deal) {
+        require_moderator(sender, ma);
+        throw_if(401, cp < MIN_CP_FOR_ADMIN);
+
+        int query_id = cs~load_uint(64);
+        cell m = cs~load_ref();
+        int verdict = cs~load_uint(1);
+
+        int mh = cell_hash(m);
+
+        var (dslice, f) = mm.udict_get?(256, mh);
+        throw_unless(110, f);
+        int id = dslice~load_uint(32);
+
+        (cell c, int found) = dd.udict_get_ref?(32, id);
+        throw_unless(140, found);
+
+        slice d2 = c.begin_parse();
+        slice s = d2~load_msg_addr();
+        slice b = d2~load_msg_addr();
+        int amt = d2~load_coins();
+        int funded = d2~load_uint(1);
+
+        int funded_amount = 0;
+        if (~ d2.slice_empty?()) {
+            funded_amount = d2~load_coins();
+        }
+
+        if (verdict == 1) {
+            throw_unless(111, funded);
+            int fee = (amt * COMMISSION_PERCENT) / 100;
+            cp += fee;
+            send_transfer(s, amt - fee);
+        } else {
+            send_transfer(b, funded_amount);
+        }
+
+        save_data(dc, dd, mm, uf, ma, cp, next_uf_key, uf_free_stack);
+        return ();
+    }
+
+    if (op == op_refund_unknown) {
+        require_moderator(sender, ma);
+        throw_if(401, cp < MIN_CP_FOR_ADMIN);
+
+        int query_id = cs~load_uint(64);
+        int k = cs~load_uint(32);
+
+        (cell c, int f) = uf.udict_get_ref?(32, k);
+        throw_unless(120, f);
+
+        slice us = c.begin_parse();
+        slice orig = us~load_msg_addr();
+        int val = us~load_uint(128);
+
+        (uf, _) = uf.udict_delete?(32, k);
+
+        uf_free_stack = uf_free_stack.udict_set(
+                    32,
+                    k,
+                    begin_cell().store_uint(k, 32).end_cell().begin_parse()
+                );
+
+        send_transfer(orig, val);
+
+        save_data(dc, dd, mm, uf, ma, cp, next_uf_key, uf_free_stack);
+        return ();
+    }
+
+    if (op == op_withdraw_commissions) {
+        require_moderator(sender, ma);
+        throw_if(401, cp < MIN_CP_FOR_ADMIN);
+
+        int query_id = cs~load_uint(64);
+
+        int payout = 0;
+        if (cp > CP_RESERVE_GAS) {
+            payout = cp - CP_RESERVE_GAS;
+            send_transfer(sender, payout);
+            cp = CP_RESERVE_GAS;
+        }
+
+        save_data(dc, dd, mm, uf, ma, cp, next_uf_key, uf_free_stack);
+        return ();
+    }
+
+    throw_if(150, msg_value < 100000000);
+    int fee = (msg_value * COMMISSION_PERCENT) / 100;
+    int net_value = msg_value - fee;
+    cp += fee;
+    (uf, next_uf_key, uf_free_stack) = add_to_unknown_funds(uf, sender, net_value, next_uf_key, uf_free_stack);
+    save_data(dc, dd, mm, uf, ma, cp, next_uf_key, uf_free_stack);
+}
+(int, int, int) get_deal_info(int deal_id) method_id {
+    var (dc, dd, mm, uf, ma, cp, _, _) = load_data();
+    (cell c, int found) = dd.udict_get_ref?(32, deal_id);
+    if (found == 0) {
+        return (0, 0, 0);
+    }
+    slice d2 = c.begin_parse();
+    d2~load_msg_addr();
+    d2~load_msg_addr();
+    int amt = d2~load_coins();
+    int f = d2~load_uint(1);
+    int funded_amount = 0;
+    if (~ d2.slice_empty?()) {
+        funded_amount = d2~load_coins();
+    }
+    return (amt, f, funded_amount);
+}
+
+int get_deal_counter() method_id {
+    var (dc, dd, mm, uf, ma, cp, _, _) = load_data();
+    return dc;
+}
+
+(slice, slice, int, int, int) debug_get_deal(int deal_id) method_id {
+    var (dc, dd, mm, uf, ma, cp, _, _) = load_data();
+    (cell c, int found) = dd.udict_get_ref?(32, deal_id);
+    if (found == 0) {
+        return (null(), null(), 0, 0, 0);
+    }
+    slice d2 = c.begin_parse();
+    slice seller = d2~load_msg_addr();
+    slice buyer = d2~load_msg_addr();
+    int amt = d2~load_coins();
+    int f = d2~load_uint(1);
+    int funded_amount = 0;
+    if (~ d2.slice_empty?()) {
+        funded_amount = d2~load_coins();
+    }
+    return (seller, buyer, amt, f, funded_amount);
+}
+
+slice get_moderator() method_id {
+    var (dc, dd, mm, uf, ma, cp, _, _) = load_data();
+    return ma;
+}
+
+(int, int, slice, int, int, int) debug_get_contract_data() method_id {
+    var (dc, dd, mm, uf, ma, cp, next_uf_key, uf_free_stack) = load_data();
+    int uf_live_count = 0;
+    cell uf_copy = uf;
+    (_, _, int uf_has_items) = uf_copy.udict_get_min?(32);
+    while (uf_has_items) {
+        uf_live_count += 1;
+        (int key, _, _) = uf_copy.udict_get_min?(32);
+        (uf_copy, _) = uf_copy.udict_delete?(32, key);
+        (_, _, uf_has_items) = uf_copy.udict_get_min?(32);
+    }
+    int uf_free_count = 0;
+    cell uf_free_stack_copy = uf_free_stack;
+    (_, _, int free_has_items) = uf_free_stack_copy.udict_get_min?(32);
+    while (free_has_items) {
+        uf_free_count += 1;
+        (int key, _, _) = uf_free_stack_copy.udict_get_min?(32);
+        (uf_free_stack_copy, _) = uf_free_stack_copy.udict_delete?(32, key);
+        (_, _, free_has_items) = uf_free_stack_copy.udict_get_min?(32);
+    }
+    return (dc, cp, ma, next_uf_key, uf_live_count, uf_free_count);
+}
+
+int debug_deal_exists(int deal_id) method_id {
+    var (dc, dd, mm, uf, ma, cp, _, _) = load_data();
+    (_, int found) = dd.udict_get_ref?(32, deal_id);
+    return found;
+}
+
+int get_unknown_fund(int key) method_id {
+    var (_, _, _, uf, _, _, _, _) = load_data();
+    (cell c, int found) = uf.udict_get_ref?(32, key);
+    if (found == 0) {
+        return 0;
+    }
+    slice s = c.begin_parse();
+    s~load_msg_addr();
+    int val = s~load_uint(128);
+    return val;
+}
+
+int get_commission_pool() method_id {
+    var (_, _, _, _, _, cp, _, _) = load_data();
+    return cp;
+}
+
+(slice, slice, int, int, int) get_deal_info_by_memo(slice memo_content_slice) method_id {
+    var (_, dd, mm, _, _, _, _, _) = load_data();
+    cell memo_cell_for_hashing = begin_cell().store_slice(memo_content_slice).end_cell();
+    int mh = cell_hash(memo_cell_for_hashing);
+    (slice id_value_as_slice, int found_in_memo_map) = mm.udict_get?(256, mh);
+    if (found_in_memo_map == 0) {
+        return (null(), null(), 0, 0, 0);
+    }
+    int deal_id = id_value_as_slice~load_uint(32);
+    (cell deal_data_cell, int deal_found_in_deals_dict) = dd.udict_get_ref?(32, deal_id);
+    if (deal_found_in_deals_dict == 0) {
+        return (null(), null(), 0, 0, 0);
+    }
+    slice deal_slice = deal_data_cell.begin_parse();
+    slice seller = deal_slice~load_msg_addr();
+    slice buyer = deal_slice~load_msg_addr();
+    int amt = deal_slice~load_coins();
+    int funded = deal_slice~load_uint(1);
+    int funded_amount = 0;
+    if (~ deal_slice.slice_empty?()) {
+        funded_amount = deal_slice~load_coins();
+    }
+
+    return (seller, buyer, amt, funded, funded_amount);
+}
