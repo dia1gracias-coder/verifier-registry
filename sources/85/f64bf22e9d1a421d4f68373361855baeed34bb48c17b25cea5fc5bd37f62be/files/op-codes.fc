@@ -1,0 +1,198 @@
+;; op-codes.fc
+;; 游戏合约操作码定义文件
+
+;; ===============================
+;; 游戏操作相关操作码
+;; ===============================
+
+;; 创建新游戏
+;; 参数: reward_count(32), bet_amount(coins), token_address(256)
+const int op::create_game = 1;
+
+;; 参与游戏
+;; 参数: game_id(32)
+;; 注意: 投注金额通过msg_value传递
+const int op::join_game = 2;
+
+;; 结束游戏（倒计时结束后调用）
+;; 参数: game_id(32)
+const int op::finalize_game = 3;
+
+;; 领取奖金
+;; 参数: game_id(32)
+const int op::claim_prize = 4;
+
+;; 提现（平台或创建者）
+;; 参数: 无
+const int op::withdraw = 5;
+
+;; 添加支持的代币（仅平台管理员）
+;; 参数: token_address(256)
+const int op::add_supported_token = 6;
+
+;; ===============================
+;; 查询操作码（GET方法）
+;; ===============================
+
+;; 获取游戏信息
+const int op::get_game_info = 101;
+
+;; 获取参与者列表
+const int op::get_participants = 102;
+
+;; 获取合约统计信息
+const int op::get_contract_stats = 103;
+
+;; 检查代币是否支持
+const int op::is_token_supported = 104;
+
+;; 获取用户参与的游戏列表
+const int op::get_user_games = 105;
+
+;; ===============================
+;; Jetton相关操作码
+;; ===============================
+
+;; Jetton转账操作码（标准）
+const int jetton_op::transfer = 0xf8a7ea5;
+
+;; Jetton转账通知操作码（标准）
+const int jetton_op::transfer_notification = 0x7362d09c;
+
+;; Jetton内部转账操作码（标准）
+const int jetton_op::internal_transfer = 0x178d4519;
+
+;; Jetton余额查询操作码（标准）
+const int jetton_op::get_wallet_data = 0x2c76b973;
+
+;; ===============================
+;; 错误码定义
+;; ===============================
+
+;; 游戏相关错误
+const int error::invalid_reward_count = 36;        ;; 奖励数量无效
+const int error::insufficient_funds = 37;          ;; 资金不足
+const int error::game_not_found = 38;              ;; 游戏不存在
+const int error::game_ended = 39;                  ;; 游戏已结束
+const int error::game_expired = 40;                ;; 游戏已过期
+const int error::invalid_bet_amount = 41;          ;; 投注金额错误
+const int error::game_not_ended = 42;              ;; 游戏未结束
+const int error::game_already_ended = 43;          ;; 游戏已经结束
+const int error::deadline_not_reached = 44;        ;; 截止时间未到
+const int error::game_info_not_found = 45;         ;; 游戏信息未找到
+const int error::game_not_finalized = 46;          ;; 游戏未完成
+const int error::not_participant = 47;             ;; 非参与者
+const int error::no_withdraw_amount = 48;          ;; 无可提现金额
+const int error::token_not_supported = 49;         ;; 代币不支持
+const int error::already_joined = 50;              ;; 已经参与过
+const int error::already_claimed = 51;             ;; 已经领取过
+
+;; 权限相关错误
+const int error::unauthorized = 60;                ;; 未授权
+const int error::invalid_sender = 61;              ;; 无效发送者
+const int error::admin_only = 62;                  ;; 仅管理员
+
+;; 通用错误
+const int error::invalid_op = 70;                  ;; 无效操作码
+const int error::invalid_data = 71;                ;; 无效数据
+const int error::insufficient_gas = 72;            ;; Gas不足
+const int error::slice_empty = 73;                 ;; 切片为空
+
+;; ===============================
+;; 游戏状态常量
+;; ===============================
+
+;; 游戏状态
+const int game_status::active = 0;                 ;; 游戏进行中
+const int game_status::ended = 1;                  ;; 游戏已结束
+
+;; 参与者状态
+const int participant_status::not_claimed = 0;     ;; 未领取奖金
+const int participant_status::claimed = 1;         ;; 已领取奖金
+
+;; ===============================
+;; 时间相关常量
+;; ===============================
+
+;; 游戏倒计时（秒）
+const int game_config::countdown_duration = 120;   ;; 2分钟
+
+;; 最小投注金额（nanotons）
+const int game_config::min_bet_amount = 1000000000; ;; 1 TON
+
+;; 最大投注金额（nanotons）
+const int game_config::max_bet_amount = 100000000000; ;; 100 TON
+
+;; ===============================
+;; 费用相关常量
+;; ===============================
+
+;; 平台费率（基点，1% = 100）
+const int fee_config::platform_fee_bp = 100;       ;; 1%
+
+;; 创建者费率（基点，1% = 100）  
+const int fee_config::creator_fee_bp = 100;        ;; 1%
+
+;; Gas费用（nanotons）
+const int gas_config::jetton_transfer_gas = 50000000;   ;; 0.05 TON
+const int gas_config::ton_transfer_gas = 10000000;      ;; 0.01 TON
+const int gas_config::forward_ton_amount = 1;           ;; 1 nanoton
+
+;; ===============================
+;; 代币相关常量
+;; ===============================
+
+;; TON代币地址（用0表示原生TON）
+const int token::native_ton = 0;
+
+;; 支持的代币标志
+const int token::supported = 1;
+const int token::not_supported = 0;
+
+;; ===============================
+;; 消息模式
+;; ===============================
+
+;; 发送消息模式
+const int send_mode::normal = 0;                   ;; 普通模式
+const int send_mode::pay_gas_separately = 1;       ;; 单独支付gas
+const int send_mode::ignore_errors = 2;            ;; 忽略错误
+const int send_mode::destroy_if_zero = 32;         ;; 余额为0时销毁
+const int send_mode::carry_remaining_gas = 64;     ;; 携带剩余gas
+const int send_mode::carry_remaining_balance = 128; ;; 携带剩余余额
+
+;; ===============================
+;; 辅助宏定义
+;; ===============================
+
+;; 检查操作码是否有效
+int is_valid_game_op(int op) inline {
+    return (op >= op::create_game) & (op <= op::add_supported_token);
+}
+
+;; 检查是否为查询操作码
+int is_query_op(int op) inline {
+    return (op >= op::get_game_info) & (op <= op::get_user_games);
+}
+
+;; 检查是否为Jetton操作码
+int is_jetton_op(int op) inline {
+    return (op == jetton_op::transfer) | 
+           (op == jetton_op::transfer_notification) | 
+           (op == jetton_op::internal_transfer);
+}
+
+;; 计算基点费用
+int calculate_fee(int amount, int basis_points) inline {
+    return (amount * basis_points) / 10000;
+}
+
+;; 计算平台费用
+int calculate_platform_fee(int total_pool) inline {
+    return calculate_fee(total_pool, fee_config::platform_fee_bp);
+}
+
+;; 计算创建者费用
+int calculate_creator_fee(int total_pool) inline {
+    return calculate_fee(total_pool, fee_config::creator_fee_bp);
+}
