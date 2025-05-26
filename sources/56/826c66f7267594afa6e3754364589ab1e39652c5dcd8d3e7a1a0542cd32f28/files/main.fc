@@ -1,0 +1,170 @@
+#include "stdlib.fc";
+
+;; 操作码
+const op::batch_transfer = 0x12345678;
+const op::withdraw_fees = 0x87654321;
+
+;; 错误码
+const error::unauthorized = 403;
+const error::insufficient_funds = 404;
+const error::invalid_op = 0xffff;
+
+;; 存储结构: owner_address fee_rate:uint8
+global slice g_owner;
+global int g_fee_rate;
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    g_owner = ds~load_msg_addr();
+    g_fee_rate = ds~load_uint(8);
+}
+
+() save_data() impure {
+    set_data(begin_cell()
+        .store_slice(g_owner)
+        .store_uint(g_fee_rate, 8)
+        .end_cell()
+    );
+}
+
+;; 计算手续费 (2%)
+int calculate_fee(int amount) inline {
+    return (amount * g_fee_rate) / 100;
+}
+
+;; 发送TON转账
+() send_ton(slice dest_addr, int amount, slice comment) impure {
+    ;; 构建消息体
+    builder msg_body = begin_cell()
+        .store_uint(0, 32);  ;; op = 0 for simple transfer
+    
+    if (~ slice_empty?(comment)) {
+        msg_body = msg_body.store_slice(comment);
+    }
+    
+    ;; 构建消息
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)  ;; flags: bounce=1, bounced=0, src=00
+        .store_slice(dest_addr)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)  ;; default message headers
+        .store_ref(msg_body.end_cell())
+        .end_cell();
+    
+    send_raw_message(msg, 1);  ;; mode 1: pay fees separately
+}
+
+;; 处理批量转账
+() handle_batch_transfer(slice in_msg_body, int msg_value) impure {
+    ;; 解析转账数据
+    cell transfers_ref = in_msg_body~load_ref();
+    slice transfers = transfers_ref.begin_parse();
+    
+    int transfer_count = transfers~load_uint(8);
+    int total_amount = 0;
+    int total_fees = 0;
+    
+    ;; 第一次遍历：计算总金额和手续费
+    slice temp_transfers = transfers;
+    repeat (transfer_count) {
+        temp_transfers~skip_bits(267);  ;; skip address (267 bits)
+        int amount = temp_transfers~load_coins();
+        total_amount += amount;
+        total_fees += calculate_fee(amount);
+        
+        ;; 跳过备注部分
+        int has_comment = temp_transfers~load_uint(1);
+        if (has_comment) {
+            temp_transfers~load_ref();  ;; skip comment ref
+        }
+    }
+    
+    ;; 检查余额是否足够 (消息价值 - gas费用)
+    int available_balance = msg_value - 50000000;  ;; 预留 0.05 TON gas费用
+    throw_unless(error::insufficient_funds, available_balance >= total_amount);
+    
+    ;; 第二次遍历：执行转账
+    repeat (transfer_count) {
+        slice dest_addr = transfers~load_msg_addr();
+        int amount = transfers~load_coins();
+        
+        ;; 处理备注
+        slice comment = "";
+        int has_comment = transfers~load_uint(1);
+        if (has_comment) {
+            comment = transfers~load_ref().begin_parse();
+        }
+        
+        ;; 计算扣除手续费后的实际转账金额
+        int fee = calculate_fee(amount);
+        int net_amount = amount - fee;
+        
+        ;; 执行转账
+        send_ton(dest_addr, net_amount, comment);
+    }
+}
+
+;; 提取手续费 (仅限合约拥有者)
+() handle_withdraw_fees(slice sender_addr, int my_balance, int msg_value) impure {
+    throw_unless(error::unauthorized, equal_slice_bits(sender_addr, g_owner));
+    
+    ;; 计算可提取余额 (总余额 - 消息价值 - 预留gas)
+    int available_balance = my_balance - msg_value - 10000000;  ;; 预留 0.01 TON
+    
+    if (available_balance > 0) {
+        send_ton(g_owner, available_balance, "Fee withdrawal");
+    }
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; 忽略空消息
+    if (slice_empty?(in_msg_body)) {
+        return ();
+    }
+    
+    ;; 解析消息头
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    ;; 忽略bounced消息
+    if (flags & 1) {
+        return ();
+    }
+    
+    slice sender_addr = cs~load_msg_addr();
+    
+    ;; 加载合约数据
+    load_data();
+    
+    ;; 解析操作码
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    
+    if (op == op::batch_transfer) {
+        handle_batch_transfer(in_msg_body, msg_value);
+        return ();
+    }
+    
+    if (op == op::withdraw_fees) {
+        handle_withdraw_fees(sender_addr, my_balance, msg_value);
+        return ();
+    }
+    
+    throw(error::invalid_op);
+}
+
+;; Get方法
+slice get_owner() method_id {
+    load_data();
+    return g_owner;
+}
+
+int get_fee_rate() method_id {
+    load_data();
+    return g_fee_rate;
+}
+
+int get_contract_balance() method_id {
+    [int balance, cell state] = get_balance();
+    return balance;
+}
