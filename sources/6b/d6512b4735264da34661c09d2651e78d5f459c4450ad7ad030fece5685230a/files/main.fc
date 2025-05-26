@@ -1,0 +1,243 @@
+;; TON链批量转账智能合约
+;; 功能：用户存入TON -> 批量转账 -> 2%手续费给开发者 -> 推广标签
+
+#include "stdlib.fc";
+
+;; 操作码定义
+const int op::deposit = 0x01;
+const int op::batch_send = 0x02;
+const int op::withdraw_fees = 0x03;
+const int op::get_balance = 0x04;
+
+;; 常量定义
+const int fee_rate = 2; ;; 2% 手续费率
+const int min_ton_amount = 100000000; ;; 0.1 TON 最小存款
+const int min_gas_amount = 50000000; ;; 0.05 TON 最小gas费
+
+;; 全局变量
+global slice developer_address;
+global int fee_pool;
+global cell user_balances;
+
+;; 加载合约数据
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    developer_address = ds~load_msg_addr();
+    fee_pool = ds~load_grams();
+    user_balances = ds~load_dict();
+}
+
+;; 保存合约数据
+() save_data() impure {
+    set_data(begin_cell()
+        .store_slice(developer_address)
+        .store_grams(fee_pool)
+        .store_dict(user_balances)
+        .end_cell());
+}
+
+;; 获取用户余额
+int get_user_balance(slice user_addr) {
+    load_data();
+    int user_addr_hash = slice_hash(user_addr);
+    (slice balance_slice, int found) = user_balances.udict_get?(256, user_addr_hash);
+    if (found) {
+        return balance_slice~load_grams();
+    }
+    return 0;
+}
+
+;; 设置用户余额
+() set_user_balance(slice user_addr, int new_balance) impure {
+    load_data();
+    int user_addr_hash = slice_hash(user_addr);
+    if (new_balance > 0) {
+        user_balances~udict_set(256, user_addr_hash, begin_cell().store_grams(new_balance).end_cell().begin_parse());
+    } else {
+        user_balances~udict_delete?(256, user_addr_hash);
+    }
+    save_data();
+}
+
+;; 比较两个地址是否相等
+int address_equal?(slice addr1, slice addr2) {
+    return slice_hash(addr1) == slice_hash(addr2);
+}
+
+;; 处理用户存款
+() handle_deposit(slice sender_address, int msg_value, slice in_msg_body) impure {
+    ;; 检查最小存款金额
+    throw_unless(100, msg_value >= min_ton_amount);
+    
+    ;; 预留gas费用
+    int gas_reserve = min_gas_amount;
+    int available_amount = msg_value - gas_reserve;
+    throw_unless(101, available_amount > 0);
+    
+    ;; 计算手续费 (2%)
+    int fee_amount = (available_amount * fee_rate) / 100;
+    int user_amount = available_amount - fee_amount;
+    
+    ;; 获取当前用户余额
+    int current_balance = get_user_balance(sender_address);
+    int new_balance = current_balance + user_amount;
+    
+    ;; 更新用户余额
+    set_user_balance(sender_address, new_balance);
+    
+    ;; 增加手续费池
+    load_data();
+    fee_pool += fee_amount;
+    save_data();
+    
+    ;; 发送确认消息给用户
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender_address)
+        .store_grams(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(0x01, 32) ;; deposit confirm
+        .store_grams(new_balance)
+        .store_grams(fee_amount);
+    send_raw_message(msg.end_cell(), 64);
+}
+
+;; 处理批量转账
+() handle_batch_send(slice sender_address, slice in_msg_body) impure {
+    ;; 解析批量转账参数
+    int recipients_count = in_msg_body~load_uint(8);
+    throw_unless(201, recipients_count > 0);
+    throw_unless(202, recipients_count <= 100); ;; 最多100个接收者
+    
+    int amount_per_recipient = in_msg_body~load_grams();
+    throw_unless(203, amount_per_recipient > 0);
+    
+    ;; 检查推广标签
+    slice promo_tag = in_msg_body~load_ref().begin_parse();
+    
+    ;; 计算总需要金额
+    int total_needed = recipients_count * amount_per_recipient;
+    
+    ;; 检查用户余额
+    int user_balance = get_user_balance(sender_address);
+    throw_unless(204, user_balance >= total_needed);
+    
+    ;; 执行批量转账
+    int i = 0;
+    while (i < recipients_count) {
+        slice recipient_addr = in_msg_body~load_msg_addr();
+        
+        ;; 发送TON给接收者，并附带推广标签
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(recipient_addr)
+            .store_grams(amount_per_recipient)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0x99, 32) ;; 推广消息标识
+            .store_slice(promo_tag)
+            .store_slice(sender_address); ;; 推广者地址
+        send_raw_message(msg.end_cell(), 1);
+        
+        i += 1;
+    }
+    
+    ;; 扣除用户余额
+    int new_balance = user_balance - total_needed;
+    set_user_balance(sender_address, new_balance);
+    
+    ;; 发送批量转账完成确认
+    var confirm_msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender_address)
+        .store_grams(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(0x02, 32) ;; batch send confirm
+        .store_uint(recipients_count, 8)
+        .store_grams(total_needed)
+        .store_grams(new_balance);
+    send_raw_message(confirm_msg.end_cell(), 64);
+}
+
+;; 开发者提取手续费
+() handle_withdraw_fees(slice sender_address) impure {
+    load_data();
+    throw_unless(301, address_equal?(sender_address, developer_address));
+    throw_unless(302, fee_pool > 0);
+    
+    ;; 发送手续费给开发者
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(developer_address)
+        .store_grams(fee_pool)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(0x03, 32) ;; withdraw confirm
+        .store_grams(fee_pool);
+    send_raw_message(msg.end_cell(), 1);
+    
+    ;; 清空手续费池
+    fee_pool = 0;
+    save_data();
+}
+
+;; 主接收函数
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; 解析消息头
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    
+    ;; 如果消息体为空，当作存款处理
+    if (in_msg_body.slice_empty?()) {
+        handle_deposit(sender_address, msg_value, in_msg_body);
+        return ();
+    }
+    
+    ;; 解析操作码
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == op::deposit) {
+        handle_deposit(sender_address, msg_value, in_msg_body);
+    } elseif (op == op::batch_send) {
+        handle_batch_send(sender_address, in_msg_body);
+    } elseif (op == op::withdraw_fees) {
+        handle_withdraw_fees(sender_address);
+    } else {
+        throw(0xffff); ;; 未知操作
+    }
+}
+
+;; 外部消息处理 (部署时初始化)
+() recv_external(slice in_msg) impure {
+    accept_message();
+    slice ds = in_msg;
+    slice dev_addr = ds~load_msg_addr();
+    
+    set_data(begin_cell()
+        .store_slice(dev_addr)
+        .store_grams(0) ;; fee_pool
+        .store_dict(new_dict()) ;; user_balances
+        .end_cell());
+}
+
+;; Get方法 - 查询用户余额
+int get_user_balance_by_address(slice user_addr) method_id {
+    return get_user_balance(user_addr);
+}
+
+;; Get方法 - 查询手续费池
+int get_fee_pool() method_id {
+    load_data();
+    return fee_pool;
+}
+
+;; Get方法 - 查询开发者地址
+slice get_developer_address() method_id {
+    load_data();
+    return developer_address;
+}
+
+;; Get方法 - 查询合约信息
+(slice, int, int) get_contract_info() method_id {
+    load_data();
+    return (developer_address, fee_pool, fee_rate);
+}
