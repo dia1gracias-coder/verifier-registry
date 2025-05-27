@@ -1,0 +1,118 @@
+;; Include standard library
+#include "stdlib.fc";
+
+;; Constants
+const op::batch_send = 0x12345678; ;; Operation code for batch sending
+const ERROR::INVALID_OP_CODE = 101;
+const ERROR::NOT_ENOUGH_FUNDS = 102;
+const ERROR::MALFORMED_DATA = 103;
+const ERROR::TOO_MANY_DESTINATIONS = 104;
+
+;; Helper function to send TONs
+() send_simple_message(slice to_address, int amount, int mode, cell body) impure {
+  var msg = begin_cell()
+    .store_uint(0x18, 6) ;; flags: ihr_disabled=true, bounce=true, bounced=false
+    .store_slice(to_address)
+    .store_coins(amount)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; store_uint(0, 1) for empty Maybe (ExtraCurrencyArray)
+                                               ;; store_grams(0) for ihr_fee
+                                               ;; store_grams(0) for fwd_fee
+                                               ;; store_uint(0,1) for empty Maybe (StateInit)
+                                               ;; store_uint(0,1) for empty Maybe (body ref)
+    .store_maybe_ref(body);
+  send_raw_message(msg.end_cell(), mode);
+}
+
+;; Main entry point for internal messages
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  ;; 1. Check if incoming message body is empty (e.g. simple top-up)
+  if (in_msg_body.slice_empty?()) {
+    return (); ;; Do nothing, just accept funds
+  }
+
+  ;; 2. Parse operation code and query_id
+  slice cs = in_msg_body;
+  int op_code = cs~load_uint(32);
+  int query_id = cs~load_uint(64);
+
+  ;; 3. Handle batch send operation
+  if (op_code == op::batch_send) {
+    int num_destinations = cs~load_uint(8); ;; Max 255 destinations (can be increased by using more bits)
+
+    if (num_destinations == 0) {
+      throw(ERROR::MALFORMED_DATA);
+    }
+    if (num_destinations > 250) { ;; Practical limit to avoid excessive gas
+        throw(ERROR::TOO_MANY_DESTINATIONS);
+    }
+
+    int total_amount_to_send = 0;
+    cell destinations_data = cs~load_ref(); ;; Assuming destinations are packed in a referenced cell
+    slice ds = destinations_data.begin_parse();
+
+    ;; Temporary storage for addresses and amounts (to iterate twice if needed, or just for processing)
+    ;; In this optimized version, we calculate total and then send.
+
+    ;; First pass: calculate total amount needed
+    slice temp_ds = ds; ;; Create a temporary slice for the first pass
+    int i = 0;
+    while (i < num_destinations) {
+      throw_unless(ERROR::MALFORMED_DATA, temp_ds.slice_bits() >= 267 + 128); ;; Min bits for addr + coins
+      slice dest_addr = temp_ds~load_msg_addr();
+      int amount = temp_ds~load_coins();
+      throw_if(ERROR::MALFORMED_DATA, amount <= 0); ;; Amounts must be positive
+      total_amount_to_send += amount;
+      i += 1;
+    }
+
+    ;; Gas consideration:
+    ;; Each outgoing message costs gas. This is a simplification.
+    ;; Real gas costs depend on message size, if the destination account exists, etc.
+    ;; Let's assume a rough fixed gas fee per message (e.g., 0.01 TON).
+    ;; Plus the contract's own execution cost.
+    int gas_per_message = 10000000; ;; 0.01 TON in nanotoncoins
+    int total_gas_needed = num_destinations * gas_per_message;
+    int total_required_value = total_amount_to_send + total_gas_needed;
+
+    ;; Check if the incoming message value is enough to cover all sends and gas
+    ;; `msg_value` is the TONs received with this specific message.
+    ;; `my_balance` is the total balance of the contract AFTER receiving `msg_value`.
+    throw_unless(ERROR::NOT_ENOUGH_FUNDS, msg_value >= total_required_value);
+
+    ;; Second pass: send the actual messages
+    i = 0;
+    while (i < num_destinations) {
+      slice dest_addr = ds~load_msg_addr();
+      int amount_to_send = ds~load_coins();
+
+      ;; Create a simple body for the outgoing message (optional)
+      cell msg_body = begin_cell()
+        .store_uint(0, 32) ;; Optional: 0 as a text comment precursor
+        .store_slice("Batch payment")
+        .end_cell();
+
+      ;; Send mode: 1 (Pay gas separately, send rest of value).
+      ;; This means the contract pays the forwarding fees from its balance (covered by `total_gas_needed`).
+      ;; The `amount_to_send` is what the recipient will get.
+      send_simple_message(dest_addr, amount_to_send, 1, msg_body);
+      i += 1;
+    }
+
+    ;; Optional: Send a confirmation message back to the original sender (or `in_msg_sender`)
+    ;; containing the query_id. This is good practice.
+    ;; For simplicity, this part is omitted here.
+
+    return ();
+  }
+
+  ;; 4. If op_code is not recognized
+  throw(ERROR::INVALID_OP_CODE);
+}
+
+;; Get methods (optional, if you need to read something from storage)
+;; This contract is stateless beyond its code and balance, so no complex get methods needed for this functionality.
+;; Example:
+;; int get_total_sent_count() method_id {
+;;   load_data();
+;;   return total_sent_count;
+;; }
