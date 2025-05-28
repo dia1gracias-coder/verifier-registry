@@ -1,0 +1,107 @@
+#include "stdlib.fc";
+
+;; 批量代币转账合约
+;; 一笔Gas费用批量发送多笔代币转账
+
+;; 消息操作码
+const int op::transfer = 0xf8a7ea5;
+const int op::excesses = 0xd53276db;
+
+;; 接收外部消息进行批量代币转账
+() recv_external(slice in_msg) impure {
+    ;; 接受消息
+    accept_message();
+    
+    ;; 解析批量转账数据
+    ;; 格式: from_wallet:256 recipients_count:8 [to_addr:256 amount:64 forward_ton:64]*
+    slice from_wallet = in_msg~load_msg_addr();        ;; 发送方钱包地址
+    int recipients_count = in_msg~load_uint(8);        ;; 接收者数量
+    
+    throw_unless(101, recipients_count > 0);
+    throw_unless(102, recipients_count <= 50); ;; 限制批量数量
+    
+    ;; 为每个接收者发送代币转账消息
+    int i = 0;
+    while (i < recipients_count) {
+        slice to_address = in_msg~load_msg_addr();
+        int amount = in_msg~load_uint(64);
+        int forward_ton = in_msg~load_uint(64);        ;; 每笔转账的TON费用
+        
+        throw_unless(103, amount > 0);
+        throw_unless(104, forward_ton >= 1000000);     ;; 最少0.001 TON
+        
+        ;; 构建Jetton转账消息体
+        cell transfer_body = begin_cell()
+            .store_uint(op::transfer, 32)              ;; 转账操作码
+            .store_uint(now(), 64)                     ;; query_id (使用时间戳)
+            .store_coins(amount)                       ;; jetton数量
+            .store_slice(to_address)                   ;; 目标地址
+            .store_slice(to_address)                   ;; 响应地址(接收excesses)
+            .store_uint(0, 1)                          ;; custom_payload为空
+            .store_coins(forward_ton)                  ;; forward_ton_amount
+            .store_uint(0, 1)                          ;; forward_payload为空
+            .end_cell();
+        
+        ;; 发送给from_wallet的消息
+        cell msg = begin_cell()
+            .store_uint(0x18, 6)                       ;; 内部消息标志
+            .store_slice(from_wallet)                  ;; 发送给用户的jetton钱包
+            .store_coins(forward_ton + 20000000)       ;; TON费用 + 0.02处理费
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_slice(transfer_body.begin_parse())
+            .end_cell();
+            
+        ;; 发送消息，使用模式64+1 (携带剩余余额 + 忽略错误)
+        send_raw_message(msg, 65);
+        
+        i += 1;
+    }
+}
+
+;; 接收内部消息（处理失败回调和excess返还）
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; 解析消息头
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    ;; 跳过弹回消息
+    if (flags & 1) {
+        return ();
+    }
+    
+    slice sender = cs~load_msg_addr();
+    
+    ;; 检查消息体是否为空
+    if (in_msg_body.slice_empty?()) {
+        return (); ;; 纯TON消息，直接接受
+    }
+    
+    ;; 解析操作码
+    int op = in_msg_body~load_uint(32);
+    
+    ;; 处理excess返还 (多余Gas自动退回)
+    if (op == op::excesses) {
+        ;; 多余的TON会自动退还给响应地址
+        ;; 这里不需要特殊处理，TON协议会自动处理
+        return ();
+    }
+    
+    ;; 处理其他回调消息
+    ;; 如果是转账失败，代币会自动退回到from_wallet
+    ;; Jetton标准协议会自动处理失败情况
+}
+
+;; Get方法：检查合约状态
+int get_contract_state() method_id {
+    return -1; ;; 合约正常运行
+}
+
+;; Get方法：获取最大批量数量
+int get_max_batch_size() method_id {
+    return 50;
+}
+
+;; Get方法：计算单笔转账最小TON需求
+int get_min_ton_per_transfer() method_id {
+    return 21000000; ;; 0.021 TON (0.001转账费 + 0.02处理费)
+}
