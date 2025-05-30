@@ -1,0 +1,89 @@
+#include "stdlib.fc";
+
+;; 批量TON转账合约
+;; 一笔Gas费用批量发送多笔TON转账
+
+;; 消息操作码
+const int op::batch_transfer = 0x12345678;
+const int op::excesses = 0xd53276db;
+
+;; 接收外部消息进行批量TON转账
+() recv_external(slice in_msg) impure {
+    ;; 接受消息
+    accept_message();
+    
+    ;; 解析批量转账数据
+    ;; 格式: from_wallet:256 recipients_count:8 [to_addr:256 amount:64]*
+    slice from_wallet = in_msg~load_msg_addr();        ;; 发送方钱包地址
+    int recipients_count = in_msg~load_uint(8);        ;; 接收者数量
+    
+    throw_unless(101, recipients_count > 0);
+    throw_unless(102, recipients_count <= 50); ;; 限制批量数量
+    
+    ;; 为每个接收者发送TON转账消息
+    int i = 0;
+    while (i < recipients_count) {
+        slice to_address = in_msg~load_msg_addr();
+        int amount = in_msg~load_uint(64);
+        
+        throw_unless(103, amount > 0);
+        
+        ;; 构建TON转账消息体
+        cell msg = begin_cell()
+            .store_uint(0x18, 6)                       ;; 内部消息标志
+            .store_slice(to_address)                   ;; 目标地址
+            .store_coins(amount)                       ;; TON数量
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; 默认消息头
+            .store_uint(0, 1)                          ;; 无消息体
+            .end_cell();
+            
+        ;; 发送消息，使用模式64+1 (携带剩余余额 + 忽略错误)
+        send_raw_message(msg, 65);
+        
+        i += 1;
+    }
+}
+
+;; 接收内部消息（处理失败回调和excess返还）
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; 解析消息头
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    ;; 跳过弹回消息
+    if (flags & 1) {
+        return ();
+    }
+    
+    slice sender = cs~load_msg_addr();
+    
+    ;; 检查消息体是否为空
+    if (in_msg_body.slice_empty?()) {
+        return (); ;; 纯TON消息，直接接受
+    }
+    
+    ;; 解析操作码
+    int op = in_msg_body~load_uint(32);
+    
+    ;; 处理excess返还 (多余Gas自动退回)
+    if (op == op::excesses) {
+        ;; 多余的TON会自动退还给响应地址
+        ;; 这里不需要特殊处理，TON协议会自动处理
+        return ();
+    }
+}
+
+;; Get方法：检查合约状态
+int get_contract_state() method_id {
+    return -1; ;; 合约正常运行
+}
+
+;; Get方法：获取最大批量数量
+int get_max_batch_size() method_id {
+    return 50;
+}
+
+;; Get方法：计算单笔转账最小TON需求
+int get_min_ton_per_transfer() method_id {
+    return 10000000; ;; 0.01 TON (最小转账金额)
+}
