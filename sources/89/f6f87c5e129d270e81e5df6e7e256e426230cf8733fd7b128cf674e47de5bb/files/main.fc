@@ -1,0 +1,237 @@
+;; ============================================
+;; TON开放式批量转账智能合约
+;; 任何人都可以调用，完全去中心化
+;; ============================================
+
+#include "stdlib.fc";
+
+;; 操作码定义
+const int op::batch_transfer = 0x7362d09c;
+
+;; 错误码定义  
+const int error::invalid_op = 400;
+const int error::insufficient_funds = 401;
+const int error::invalid_recipients = 402;
+const int error::empty_recipients = 403;
+
+;; Gas费用常量
+const int gas_consumption = 10000000; ;; 每笔转账消耗的Gas (0.01 TON)
+const int base_gas_fee = 50000000;    ;; 基础Gas费用 (0.05 TON)
+
+;; ============================================
+;; 主要消息处理函数
+;; ============================================
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; 忽略空消息
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    ;; 解析消息头
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    ;; 忽略所有弹回的消息
+    if (flags & 1) {
+        return ();
+    }
+    
+    ;; 获取发送者地址
+    slice sender_address = cs~load_msg_addr();
+    
+    ;; 解析消息体
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    
+    ;; 处理批量转账操作
+    if (op == op::batch_transfer) {
+        handle_batch_transfer(sender_address, msg_value, in_msg_body, query_id);
+        return ();
+    }
+    
+    ;; 未知操作，抛出错误
+    throw(error::invalid_op);
+}
+
+;; ============================================
+;; 批量转账处理函数
+;; ============================================
+() handle_batch_transfer(slice sender_address, int msg_value, slice in_msg_body, int query_id) impure {
+    ;; 解析接收者字典
+    cell recipients_dict = in_msg_body~load_dict();
+    
+    ;; 检查是否有接收者
+    throw_unless(error::empty_recipients, ~ recipients_dict.dict_empty?());
+    
+    ;; 计算总转账金额和接收者数量
+    (int total_amount, int recipient_count) = calculate_total_and_count(recipients_dict);
+    
+    ;; 计算所需的总Gas费用
+    int required_gas = base_gas_fee + (recipient_count * gas_consumption);
+    int required_total = total_amount + required_gas;
+    
+    ;; 检查发送的金额是否足够
+    throw_unless(error::insufficient_funds, msg_value >= required_total);
+    
+    ;; 执行批量转账
+    execute_batch_transfers(recipients_dict);
+    
+    ;; 如果有剩余金额，退还给发送者
+    int remaining = msg_value - required_total;
+    if (remaining > 0) {
+        send_remaining_funds(sender_address, remaining);
+    }
+}
+
+;; ============================================
+;; 计算总金额和接收者数量
+;; ============================================
+(int, int) calculate_total_and_count(cell recipients_dict) {
+    int total_amount = 0;
+    int count = 0;
+    int index = -1;
+    
+    do {
+        (index, slice recipient_data, int found) = recipients_dict.udict_get_next?(32, index);
+        if (found) {
+            ;; 解析接收者数据
+            slice recipient_addr = recipient_data~load_msg_addr();
+            int amount = recipient_data~load_coins();
+            
+            ;; 验证金额大于0
+            throw_unless(error::invalid_recipients, amount > 0);
+            
+            total_amount += amount;
+            count += 1;
+        }
+    } until (~ found);
+    
+    return (total_amount, count);
+}
+
+;; ============================================
+;; 执行批量转账
+;; ============================================
+() execute_batch_transfers(cell recipients_dict) impure {
+    int index = -1;
+    
+    do {
+        (index, slice recipient_data, int found) = recipients_dict.udict_get_next?(32, index);
+        if (found) {
+            ;; 解析接收者信息
+            slice recipient_addr = recipient_data~load_msg_addr();
+            int amount = recipient_data~load_coins();
+            
+            ;; 检查是否有备注消息
+            cell message_cell = begin_cell().end_cell(); ;; 默认空消息
+            if (~ recipient_data.slice_empty?()) {
+                message_cell = recipient_data~load_ref();
+            }
+            
+            ;; 发送转账
+            send_transfer(recipient_addr, amount, message_cell);
+        }
+    } until (~ found);
+}
+
+;; ============================================
+;; 发送单笔转账
+;; ============================================
+() send_transfer(slice recipient_addr, int amount, cell message_cell) impure {
+    ;; 构建转账消息
+    var msg_body = message_cell; ;; 直接使用消息体
+    
+    ;; 构建并发送消息
+    var msg = begin_cell()
+        .store_uint(0x18, 6)                    ;; 消息标志
+        .store_slice(recipient_addr)            ;; 目标地址
+        .store_coins(amount)                    ;; 转账金额
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; 其他字段
+        .store_ref(msg_body)                    ;; 消息体
+        .end_cell();
+    
+    ;; 发送消息，使用模式1（支付转账费用但不支付Gas费用）
+    send_raw_message(msg, 1);
+}
+
+;; ============================================
+;; 退还剩余资金
+;; ============================================
+() send_remaining_funds(slice sender_address, int amount) impure {
+    ;; 构建退款消息
+    var msg = begin_cell()
+        .store_uint(0x18, 6)                    ;; 消息标志
+        .store_slice(sender_address)            ;; 发送者地址
+        .store_coins(amount)                    ;; 退款金额
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; 其他字段
+        .store_ref(
+            begin_cell()
+                .store_uint(0, 32)              ;; 文本消息操作码
+                .store_slice("Batch transfer change") ;; 退款备注
+                .end_cell()
+        )
+        .end_cell();
+    
+    ;; 发送退款
+    send_raw_message(msg, 1);
+}
+
+;; ============================================
+;; Get方法 - 查询合约信息
+;; ============================================
+
+;; 获取合约版本
+int get_version() method_id {
+    return 100; ;; 版本 1.0.0
+}
+
+;; 获取基础Gas费用
+int get_base_gas_fee() method_id {
+    return base_gas_fee;
+}
+
+;; 获取每笔转账Gas消耗
+int get_gas_per_transfer() method_id {
+    return gas_consumption;
+}
+
+;; 计算批量转账所需费用
+int calculate_batch_fee(int recipient_count, int total_amount) method_id {
+    int gas_fee = base_gas_fee + (recipient_count * gas_consumption);
+    return total_amount + gas_fee;
+}
+
+;; ============================================
+;; 使用说明
+;; ============================================
+
+{-
+使用方法：
+
+1. 消息格式：
+   - op: 0x7362d09c (batch_transfer)
+   - query_id: 任意64位数字
+   - recipients_dict: 包含接收者信息的字典
+   
+2. 接收者字典格式：
+   Key: uint32 (索引)
+   Value: Cell包含:
+     - recipient_address: MsgAddress
+     - amount: Coins  
+     - message: Cell? (可选备注)
+
+3. 费用计算：
+   总费用 = 转账总金额 + 基础Gas费 + (接收者数量 * 单笔Gas费)
+
+4. 安全特性：
+   - 只能转出调用者发送的资金
+   - 自动验证金额充足性
+   - 多余资金自动退还
+   - 完全去中心化，无权限控制
+
+5. 错误处理：
+   - 400: 无效操作码
+   - 401: 资金不足
+   - 402: 无效接收者数据
+   - 403: 接收者列表为空
+-}
