@@ -1,0 +1,269 @@
+#include "imports/stdlib.fc";
+
+;; Constants for operation codes (32-bit identifiers for incoming messages)
+const int OP_LOG_IN         = 1;  ;; Operation to log daily login for caller
+const int OP_GET_USER       = 2;  ;; Operation to retrieve a user's login data
+const int OP_GET_TODAY_CNT  = 3;  ;; Operation to get today's login count
+const int OP_GET_TODAY_ADDR = 4;  ;; Operation to get an address by index from today's list
+
+;; Error codes
+const int ERR_EXTERNAL       = 100;  ;; Reject external calls
+const int ERR_ALREADY_LOGGED = 101;  ;; User has already logged in today
+const int ERR_INVALID_ADDR   = 102;  ;; Address parsing error
+
+const int DAY_SECONDS = 86400;  ;; Number of seconds in a day (24*3600) for day calculations
+
+;; Helper function: Calculate the unique dictionary key for a user address.
+;; It parses a MsgAddress slice and returns a 264-bit integer key (8 bits of workchain + 256 bits of address).
+slice parse_sender_address(cell in_msg_full) inline {   ;; (from TON docs example) get sender address slice:contentReference[oaicite:7]{index=7}
+    var cs = in_msg_full.begin_parse();
+    cs~load_uint(4);                    ;; Skip 4-bit header (message flags)
+    return cs~load_msg_addr();          ;; Load the sender's address as a slice
+}
+
+int make_user_key(slice addr_slice) inline {
+    ;; This function converts an address slice to a 264-bit integer key for dictionary use.
+    var s = addr_slice;                       ;; copy of the slice for parsing
+    int tag = s~load_uint(2);                 ;; Read address tag (internal=2, external=0, none=3)
+    throw_if(ERR_INVALID_ADDR, tag != 2);     ;; Only internal addresses are expected for users:contentReference[oaicite:8]{index=8}
+    int anycast = s~load_uint(1);             ;; Anycast presence flag (usually 0 for user accounts)
+    if (anycast == 1) { 
+        int depth = s~load_uint(5); 
+        s~skip_bits(depth);                  ;; Skip anycast prefix bits if present
+    }
+    int wc = s~load_int(8);                  ;; Workchain ID (signed 8-bit)
+    int addr_bits = s~load_uint(256);        ;; 256-bit account address
+    ;; Normalize workchain to unsigned and combine with address bits:
+    int wc_norm = wc + 128;                  ;; Shift range [-128,127] to [0,255]
+    return (wc_norm << 256) + addr_bits;     ;; 264-bit composite key = [workchain(8) | address(256)]
+}
+
+;; Functions to load and save persistent state (persistent data is stored in a cell).
+(int, int, cell, cell) load_state() inline {
+    ;; Parses the persistent data cell into components: currentDay, todayCount, userDict, todayListDict.
+    var ds = get_data().begin_parse();
+    int current_day   = ds~load_uint(32);     ;; stored current day index (day count since epoch)
+    int today_count   = ds~load_uint(32);     ;; number of logins recorded today
+    ;; Load user data dictionary (addresses → user info)
+    int user_flag = ds~load_uint(1);
+    cell user_dict = null();
+    if (user_flag == 1) {
+        user_dict = ds~load_ref();           ;; user_dict stored as reference if not empty
+    }
+    ;; Load today's login list dictionary (index → address)
+    int list_flag = ds~load_uint(1);
+    cell list_dict = null();
+    if (list_flag == 1) {
+        list_dict = ds~load_ref();
+    }
+    return (current_day, today_count, user_dict, list_dict);
+}
+
+() save_state(int current_day, int today_count, cell user_dict, cell list_dict) impure inline {
+    ;; Stores the given state variables back into the persistent data cell.
+    set_data(
+        begin_cell()
+        .store_uint(current_day, 32)
+        .store_uint(today_count, 32)
+        .store_dict(user_dict)    ;; store_dict writes a 1-bit and ref if dict non-null, or 0-bit if null:contentReference[oaicite:9]{index=9}:contentReference[oaicite:10]{index=10}
+        .store_dict(list_dict)
+        .end_cell()
+    );
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) {  ;; Entry-point for internal inbound messages:contentReference[oaicite:11]{index=11}
+    ;; Parse incoming message operation code and optional parameters
+    int op      = in_msg_body~load_uint(32);
+    int queryId = in_msg_body~load_uint(64);
+    var sender_slice = parse_sender_address(in_msg_full);   ;; Sender's address (as slice):contentReference[oaicite:12]{index=12}
+    ;; Determine the action based on op code
+    if (op == OP_LOG_IN) { 
+        ;; **Daily Login Operation** – Log the caller's daily login.
+        ;; Calculate current day index (Unix timestamp // 86400) for daily reset logic
+        int now_ts   = now(); 
+        int today_idx = now_ts / DAY_SECONDS;               ;; current day number (UTC-based):contentReference[oaicite:13]{index=13}
+        ;; Load current state
+        var (stored_day, count, user_dict, list_dict) = load_state();
+        if (today_idx != stored_day) {
+            ;; A new day has started – reset today's login list
+            stored_day = today_idx;
+            count = 0;
+            list_dict = null();   ;; clear the daily list by resetting dictionary to null (empty)
+        }
+        ;; Compute the user's dictionary key
+        int user_key = make_user_key(sender_slice);
+        ;; Check if the user has already logged in today
+        if (cell_null?(user_dict) == 0) { 
+            var (oldDataSlice, found) = udict_get?(user_dict, 264, user_key);
+            if (found != 0) { 
+                ;; If user data exists, compare last login day with current day
+                int last_ts   = oldDataSlice~load_uint(64);
+                int last_day  = last_ts / DAY_SECONDS;
+                throw_if(ERR_ALREADY_LOGGED, last_day == stored_day);  ;; Already logged in on this day
+            }
+        }
+        ;; Prepare new user data
+        int new_total = 1;
+        int new_streak = 1;
+        int last_login_ts = now_ts;
+        if (cell_null?(user_dict) == 0) {
+            ;; If user had previous data, update total and streak accordingly
+            var (valSlice, found) = udict_get?(user_dict, 264, user_key);
+            if (found != 0) {
+                int prev_last_ts = valSlice~load_uint(64);
+                int prev_total   = valSlice~load_uint(32);
+                int prev_streak  = valSlice~load_uint(32);
+                int prev_day = prev_last_ts / DAY_SECONDS;
+                new_total = prev_total + 1;
+                if (prev_day == stored_day - 1) {
+                    new_streak = prev_streak + 1;   ;; continued streak if last login was yesterday
+                } else {
+                    new_streak = 1;                 ;; reset streak if a day was missed
+                }
+            }
+        }
+        ;; Store updated user data into the dictionary
+        slice newUserVal = begin_cell()
+                             .store_uint(last_login_ts, 64)
+                             .store_uint(new_total, 32)
+                             .store_uint(new_streak, 32)
+                             .end_cell()
+                             .begin_parse();
+        user_dict = udict_set(user_dict, 264, user_key, newUserVal);    ;; update (or create) entry in user dictionary:contentReference[oaicite:14]{index=14}
+        ;; Add the user to today's login list (at index = current count)
+        slice addr_val = sender_slice;   ;; the address slice to store as value
+        list_dict = udict_set(list_dict, 32, count, addr_val);
+        count += 1;  ;; increment today's count
+        ;; Persist the updated state
+        save_state(stored_day, count, user_dict, list_dict);
+        ;; (Optional) Emit a log message/event for the login action (if supported by TON architecture)
+        ;; TON allows emitting "external" outbound messages as logs:contentReference[oaicite:15]{index=15}. This is commented out by default.
+        ;; var logMsg = begin_cell().store_uint(0xDEADBA, 24).store_slice(sender_slice).end_cell();
+        ;; send_raw_message(logMsg, 64);  ;; send a small external outbound message as an event (no recipient)
+        return ();  ;; function ends successfully
+    } elseif (op == OP_GET_USER) {
+        ;; **Get User Data** – return the user’s login stats (last timestamp, total logins, streak).
+        slice target_addr = in_msg_body~load_msg_addr();   ;; address to query
+        int target_key = make_user_key(target_addr);
+        var (stored_day, count, user_dict, list_dict) = load_state();
+        int resp_last = 0;
+        int resp_total = 0;
+        int resp_streak = 0;
+        if (cell_null?(user_dict) == 0) {
+            var (valSlice, found) = udict_get?(user_dict, 264, target_key);
+            if (found != 0) {
+                resp_last   = valSlice~load_uint(64);
+                resp_total  = valSlice~load_uint(32);
+                resp_streak = valSlice~load_uint(32);
+            }
+        }
+        ;; Build a response message to the sender with the requested data
+        var resp = begin_cell()
+            .store_uint(0x10, 6)                ;; internal message, no fees from contract (mode bits)
+            .store_slice(sender_slice)          ;; destination: the original sender
+            .store_grams(0)                     ;; no value attached in response
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)  ;; empty StateInit (skip)
+            .store_uint(3, 32)                  ;; op code for response (use 3 as an arbitrary response code)
+            .store_uint(queryId, 64)            ;; include the queryId to correlate response
+            .store_uint(resp_last, 64)
+            .store_uint(resp_total, 32)
+            .store_uint(resp_streak, 32)
+            .end_cell();
+        send_raw_message(resp, 64);  ;; send the response back to caller
+        return ();
+    } elseif (op == OP_GET_TODAY_CNT) {
+        ;; **Get Today's Login Count** – return how many logins have been recorded today.
+        var (stored_day, count, user_dict, list_dict) = load_state();
+        ;; Build response message with the count
+        var resp = begin_cell()
+            .store_uint(0x10, 6).store_slice(sender_slice).store_grams(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(4, 32)                  ;; op code 4 for count response (arbitrary)
+            .store_uint(queryId, 64)
+            .store_uint(count, 32)
+            .end_cell();
+        send_raw_message(resp, 64);
+        return ();
+    } elseif (op == OP_GET_TODAY_ADDR) {
+        ;; **Get Address by Index** – return the address at a given index in today's login list.
+        int req_index = in_msg_body~load_uint(32);
+        var (stored_day, count, user_dict, list_dict) = load_state();
+        slice addr_slice = begin_cell().store_uint(3, 2).end_cell().begin_parse();  ;; default to AddrNone (tag 11) as not found
+        if (cell_null?(list_dict) == 0) {
+            var (valSlice, found) = udict_get?(list_dict, 32, req_index);
+            if (found != 0) {
+                addr_slice = valSlice;  ;; address found at that index
+            }
+        }
+        ;; Build response message with the address
+        var resp = begin_cell()
+            .store_uint(0x10, 6).store_slice(sender_slice).store_grams(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(5, 32)                  ;; op code 5 for address response
+            .store_uint(queryId, 64)
+            .store_slice(addr_slice)            ;; include the address slice in response
+            .end_cell();
+        send_raw_message(resp, 64);
+        return ();
+    } else {
+        ;; Unknown op-code: do nothing or throw
+        throw(0);  ;; Unrecognized function call
+    }
+}
+
+() recv_external(slice in_msg_body) {
+    ;; Reject any external (non-contract) calls for security – only internal wallet messages are expected.
+    throw(ERR_EXTERNAL);
+}
+
+;; **Get Methods (Read-Only)**  
+;; These allow off-chain queries of the contract state without gas fees:contentReference[oaicite:16]{index=16}. 
+int get_today_count() method_id {
+    ;; Returns the number of logins recorded today.
+    var cs = get_data().begin_parse();
+    cs~load_uint(32);              ;; skip current_day
+    return cs~load_uint(32);       ;; read today_count (32-bit)
+}
+
+slice get_today_address(int index) method_id {
+    ;; Returns the address at the given index in today's login list, or an empty (None) address if out of range.
+    var ds = get_data().begin_parse();
+    ds~skip_bits(64);              ;; skip current_day and today_count (2*32 bits)
+    ;; Skip to list_dict reference
+    int user_flag = ds~load_uint(1);
+    if (user_flag == 1) { 
+        ds~load_ref();             ;; skip user_dict ref
+    }
+    int list_flag = ds~load_uint(1);
+    if (list_flag == 0) {
+        ;; No addresses logged today
+        return begin_cell().store_uint(3, 2).end_cell().begin_parse();  ;; return AddrNone (no address)
+    }
+    cell list_dict = ds~load_ref();
+    var (valSlice, found) = udict_get?(list_dict, 32, index);
+    if (found == 0) {
+        ;; index not found, return None address
+        return begin_cell().store_uint(3, 2).end_cell().begin_parse();
+    }
+    return valSlice;  ;; return the address slice at the given index
+}
+
+(int, int, int) get_user_data(slice user_addr) method_id {
+    ;; Returns (last_login_timestamp, total_logins, current_streak) for the given user address.
+    int key = make_user_key(user_addr);
+    var ds = get_data().begin_parse();
+    ds~skip_bits(64);                  ;; skip current_day and today_count
+    int user_flag = ds~load_uint(1);
+    if (user_flag == 0) {
+        return (0, 0, 0);              ;; No user data dictionary, so no data
+    }
+    cell user_dict = ds~load_ref();
+    var (valSlice, found) = udict_get?(user_dict, 264, key);
+    if (found == 0) {
+        return (0, 0, 0);              ;; User not found, return zeros
+    }
+    int last_ts   = valSlice~load_uint(64);
+    int total     = valSlice~load_uint(32);
+    int streak    = valSlice~load_uint(32);
+    return (last_ts, total, streak);
+}
