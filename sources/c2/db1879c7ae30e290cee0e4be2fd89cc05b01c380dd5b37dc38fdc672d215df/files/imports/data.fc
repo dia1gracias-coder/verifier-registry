@@ -1,0 +1,18 @@
+(int, slice, slice) load_data() inline {
+  slice data = get_data().begin_parse();
+  
+  int counter = data~load_uint(32);
+  slice recent_sender = data~load_msg_addr();
+  slice owner = data~load_msg_addr();
+  return (counter, recent_sender, owner);
+}
+
+() save_data(int counter, slice recent_sender, slice owner) impure inline {
+  set_data(
+    begin_cell()
+    .store_uint(counter, 32)
+    .store_slice(recent_sender)
+    .store_slice(owner)
+    .end_cell()
+  );
+}

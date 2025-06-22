@@ -1,0 +1,45 @@
+#include "imports/stdlib.fc";
+#include "imports/data.fc";
+const const::min_balance = 10000000;
+
+() recv_internal(int balance, int msg_value, cell in_msg, slice in_msg_body) impure {
+  slice content = in_msg.begin_parse();
+  int flags = content~load_uint(4);
+  slice new_sender = content~load_msg_addr();
+
+  int op = in_msg_body~load_uint(32);
+  if (op == 0) {
+    throw(0);
+  }
+  
+  (int counter, slice recent_sender, slice owner) = load_data();
+
+  if(op == 1) {
+    save_data(counter + 1, new_sender, owner);
+  } elseif(op == 2) {
+    save_data(counter - 1, new_sender, owner); 
+  } elseif(op == 3) { 
+    throw_unless(103, equal_slice_bits(new_sender, owner));
+    int withdraw_amount = in_msg_body~load_coins();
+    throw_unless(104, withdraw_amount <= balance);
+    int return_value = min(withdraw_amount, balance - const::min_balance);
+    cell body = begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(owner)
+      .store_coins(return_value)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .end_cell();
+    send_raw_message(body, 1);
+  } else {
+    throw(777);
+  }
+}
+
+(int, slice, slice) get_the_last_sender() method_id {
+  return load_data();
+}
+
+int current_balance() method_id {
+  var [balance, _] = get_balance();
+  return balance;
+}
