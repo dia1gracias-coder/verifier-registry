@@ -1,0 +1,34 @@
+#include "asserts.func";
+
+
+const int SUDOER_QUARANTINE = 2 * 24 * 3600 ;
+
+() process_sudo_request(slice sender, slice in_msg, slice sudoer, int sudoer_set_at) impure inline_ref {
+    assert_sender!(sender, sudoer);
+    throw_unless(sudoer::quarantine, now() > sudoer_set_at + SUDOER_QUARANTINE);
+    int mode = in_msg~load_uint(8);
+    cell message  = in_msg~load_ref();
+    send_raw_message(message, mode);
+    in_msg.end_parse();
+}
+
+
+() execute(cont c) impure asm "EXECUTE";
+() process_sudo_upgrade_request(slice sender, slice in_msg, slice sudoer, int sudoer_set_at) impure inline_ref {
+    assert_sender!(sender, sudoer);
+    throw_unless(sudoer::quarantine, now() > sudoer_set_at + SUDOER_QUARANTINE);
+    cell data = in_msg~load_maybe_ref();
+    cell code = in_msg~load_maybe_ref();
+    cell after_upgrade = in_msg~load_maybe_ref();
+    in_msg.end_parse();
+    ifnot(data.null?()) {
+      set_data(data);
+    }
+    ifnot(code.null?()) {
+      set_code(code);
+    }
+    ifnot(after_upgrade.null?()) {
+      execute(after_upgrade.begin_parse().bless());
+    }
+    throw(1);
+}
