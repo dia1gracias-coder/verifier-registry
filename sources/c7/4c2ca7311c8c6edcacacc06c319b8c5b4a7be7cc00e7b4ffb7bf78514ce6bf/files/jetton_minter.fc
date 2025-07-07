@@ -1,0 +1,263 @@
+#include "imports/ccl_utils.fc";
+#include "imports/jetton_utils.fc";
+#include "imports/jetton_gas.fc";
+#include "imports/messages.fc";
+#include "imports/stdlib.fc";
+#include "imports/utils.fc";
+
+;; =============== CONSTS =============================
+
+;; admin ops
+
+const int ADMIN_OP::MINT = 0xd7b9c06e;
+const int ADMIN_OP::CHANGE_ADMIN_ADDRESS = 0x581879bc;
+const int ADMIN_OP::CHANGE_CONTENT = 0x23f78ab7;
+const int ADMIN_OP::WITHDRAW_EXTRA_TON = 0x1754ab63;
+const int ADMIN_OP::CANCEL_CHANGING_ADMIN_ADDRESS = 0x60094a1b;
+
+const int NEW_ADMIN_OP::CONFIRM_CHANGING_ADMIN_ADDRESS = 0x6a4fbe34;
+
+;; jetton wallet ops
+const int JETTON_WALLET_OP::BURN_NOTIFICATION = 0x7bdd97de;
+const int JETTON_WALLET_OP::INTERNAL_TRANSFER = 0x178d4519;
+
+;; jetton minter ops
+const int JETTON_MINTER::EXCESSES = 0xd53276db;
+
+;; cross chain layer ops
+const int CCL_OP::TVM_MSG_TO_EVM = 0x6c582059;
+const int CCL_OP::ERROR_NOTIFICATION = 0xae7df95b;
+
+;; operations
+const int OPERATION::JETTON_BURN = 0xb0afa74d;
+
+;; errors
+
+const int ERROR::NOT_FROM_ADMIN = 73;
+const int ERROR::NOT_FROM_JETTON_WALLET = 74;
+const int ERROR::NOT_FROM_NEW_ADMIN = 75;
+
+const ERROR::NEW_ADMIN_ADDRESS_IS_NONE = 80;
+
+const int ERROR::WRONG_OP = 700;
+
+
+;; global
+global int total_supply;
+global slice admin_address;
+global slice new_admin_address;
+global cell content;
+global cell jetton_wallet_code;
+global slice evm_token_address;
+
+
+;; =============== STORAGE =============================
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    total_supply = ds~load_coins();
+    admin_address = ds~load_msg_addr();
+    new_admin_address = ds~load_msg_addr();
+    content = ds~load_ref();
+    jetton_wallet_code = ds~load_ref();
+    evm_token_address = ds;
+}
+
+() save_data() impure inline {
+    set_data(begin_cell()
+        .store_coins(total_supply)
+        .store_slice(admin_address)
+        .store_slice(new_admin_address)
+        .store_ref(content)
+        .store_ref(jetton_wallet_code)
+        .store_slice(evm_token_address)
+        .end_cell()
+    );
+}
+
+;; =============== UTILS ============================
+
+() mint_tokens(
+slice to_address,
+int query_id,
+int jetton_amount,
+slice response_address,
+int forward_ton_amount,
+cell forward_payload
+) impure {
+    builder master_msg = begin_cell()
+        .store_op_and_query_id(JETTON_WALLET_OP::INTERNAL_TRANSFER, query_id)
+        .store_coins(jetton_amount)
+        .store_slice(my_address())
+        .store_slice(response_address)
+        .store_coins(forward_ton_amount)
+        .store_maybe_ref(forward_payload);
+
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_address_by_state_init(BASECHAIN, state_init);
+    send_message_with_state_init_and_body(
+        to_wallet_address,
+        0,
+        state_init,
+        master_msg,
+        FLAGS::BOUNCEABLE,
+        SEND_MODE::CARRY_ALL_BALANCE | SEND_MODE::BOUNCE_ON_ACTION_FAIL
+    );
+}
+
+
+;; =============== RECV =============================
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_msg_flags();
+    if (is_bounced(flags)) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+
+    ;; calculate storage fees
+    int ton_balance_before_msg = my_balance - msg_value;
+    int min_storage_fee = calculate_jetton_minter_min_storage_fee();
+    int storage_fee = min_storage_fee - min(ton_balance_before_msg, min_storage_fee);
+    msg_value -= storage_fee;
+
+    raw_reserve(storage_fee, RESERVE_MODE::BOUNCE_ON_ACTION_FAIL | RESERVE_MODE::REGULAR | RESERVE_MODE::INCREASE_BY_BALANCE_BEFORE_COMPUTE);
+
+    load_data();
+
+    if (op == CCL_OP::ERROR_NOTIFICATION) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        in_msg_body~skip_bits(32);
+        slice owner_address = in_msg_body~load_msg_addr();
+        int jetton_amount = in_msg_body~load_coins();
+        mint_tokens(owner_address, query_id, jetton_amount, owner_address, 0, null());
+        total_supply += jetton_amount;
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::MINT) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        int jetton_amount = in_msg_body~load_coins();
+        slice response_address = in_msg_body~load_msg_addr();
+        int forward_ton_amount = in_msg_body~load_coins();
+        cell forward_payload = in_msg_body~load_maybe_ref();
+        mint_tokens(to_address, query_id, jetton_amount, response_address, forward_ton_amount, forward_payload);
+        total_supply += jetton_amount;
+        cell maybe_new_content = in_msg_body~load_maybe_ref();
+        if (~ cell_null?(maybe_new_content)) {
+            content = maybe_new_content;
+        }
+        save_data();
+        return ();
+    }
+
+    if (op == JETTON_WALLET_OP::BURN_NOTIFICATION) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(ERROR::NOT_FROM_JETTON_WALLET,
+            equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+        );
+        total_supply -= jetton_amount;
+        save_data();
+
+        (slice response_address, int crosschain_ton_amount , cell fee_data, cell crosschain_payload) = in_msg_body~load_ccl_data();
+
+        int to_ccl? = equal_slices_bits(response_address, admin_address);
+
+        builder msg_body = to_ccl?
+        ? begin_cell()
+        .store_ccl_data(query_id, OPERATION::JETTON_BURN, crosschain_ton_amount, from_address, fee_data)
+        .store_slice(from_address) ;; jettons owner address for logs
+        .store_coins(jetton_amount)
+        .store_maybe_ref(crosschain_payload)
+        : begin_cell()
+        .store_op_and_query_id(JETTON_MINTER::EXCESSES, query_id)
+        .store_maybe_ref(crosschain_payload);
+
+        send_message_with_only_body(
+            response_address,
+            0,
+            msg_body,
+            to_ccl? ? FLAGS::BOUNCEABLE : FLAGS::NON_BOUNCEABLE,
+            to_ccl? ? SEND_MODE::BOUNCE_ON_ACTION_FAIL | SEND_MODE::CARRY_ALL_BALANCE : SEND_MODE::IGNORE_ERRORS | SEND_MODE::CARRY_ALL_BALANCE
+        );
+        return ();
+    }
+
+    if (op == ADMIN_OP::CHANGE_ADMIN_ADDRESS) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        new_admin_address = in_msg_body~load_msg_addr();
+        throw_if(ERROR::NEW_ADMIN_ADDRESS_IS_NONE, equal_slices_bits(new_admin_address, address_none()));
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::CANCEL_CHANGING_ADMIN_ADDRESS) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        new_admin_address = address_none();
+        save_data();
+        return ();
+    }
+
+    if (op == NEW_ADMIN_OP::CONFIRM_CHANGING_ADMIN_ADDRESS) {
+        throw_unless(ERROR::NOT_FROM_NEW_ADMIN, equal_slices_bits(sender_address, new_admin_address));
+        admin_address = new_admin_address;
+        new_admin_address = address_none();
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::CHANGE_CONTENT) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        content = in_msg_body~load_ref();
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::WITHDRAW_EXTRA_TON) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        send_msg(sender_address, 0, null(), FLAGS::BOUNCEABLE, SEND_MODE::CARRY_ALL_BALANCE);
+        return ();
+    }
+
+    throw(ERROR::UNKNOWN_OP);
+}
+
+
+;; =============== GETTERS =============================
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    load_data();
+    return (total_supply, TRUE, admin_address, content, jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    load_data();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code);
+}
+
+slice get_evm_token_address() method_id {
+    load_data();
+    return evm_token_address;
+}
+
+(_) get_full_data() method_id {
+    load_data();
+    return (
+        total_supply,
+        admin_address,
+        new_admin_address,
+        content,
+        jetton_wallet_code,
+        evm_token_address
+    );
+}
