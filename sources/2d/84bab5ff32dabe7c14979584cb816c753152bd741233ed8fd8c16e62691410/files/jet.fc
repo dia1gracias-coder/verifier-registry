@@ -1,0 +1,723 @@
+#include "imports/stdlib.fc";
+#include "imports/functions.fc";
+
+;; Jackpot is paid automatically; no admin trigger exists.
+;; USDT and TON withdrawals use timelock (op 6/7 & 11/12).
+
+int JACKPOT_PRIZE() inline { return 10000; } ;; 10,000 tokens
+int MAJOR_PRIZE() inline { return 1800; }    ;; 1,800 tokens
+int HIGH_PRIZE() inline { return 700; }      ;; 700 tokens
+int MID_PRIZE() inline { return 180; }       ;; 180 tokens
+int LOW_MID_PRIZE() inline { return 50; }    ;; 50 tokens
+int LOW_PRIZE() inline { return 25; }        ;; 25 tokens
+int MINI_PRIZE() inline { return 10; }       ;; 10 tokens
+
+const int OP_SCHEDULE_USDT = 6;
+const int OP_EXEC_USDT     = 7;
+const int OP_SCHEDULE_ADMIN = 8;
+const int OP_EXEC_ADMIN     = 9;
+const int OP_CANCEL_ADMIN   = 10;
+const int OP_SCHEDULE_TON = 11;
+const int OP_EXEC_TON     = 12;
+
+(
+    cell, ;; counters
+    cell, ;; admin transfer data
+    int, ;; next_ticket_index
+    slice, ;; collection_address
+    slice, ;; owner address
+    int, ;; ticket_price (jettons)
+    int, ;; ref_percent
+    slice, ;; token_wallet_address
+    int,   ;; jp_amount
+    int,   ;; locked_jp_tokens
+    int,   ;; jackpot_locked_once
+    int,   ;; token_balance
+    int,   ;; tl_usdt_amount
+    int,   ;; tl_usdt_until
+    int,   ;; tl_delay
+    int,   ;; tl_ton_amount
+    int    ;; tl_ton_until
+) load_data() inline {
+    var ds = get_data().begin_parse();
+    cell counters_ref = ds~load_ref();
+    cell admin_transfer_ref = ds~load_ref();
+    int next_ticket_index = ds~load_uint(64);
+    slice collection_address = ds~load_msg_addr();
+    slice admin_address = ds~load_msg_addr();
+    int price = ds~load_coins(); ;; ticket_price in jettons
+    int ref_percent = ds~load_uint(8);
+    slice wallet_ref = ds~load_ref().begin_parse();
+    slice token_wallet_address = wallet_ref~load_msg_addr();
+    end_parse(wallet_ref);
+
+    slice extra_ref = ds~load_ref().begin_parse();
+    int jp_amount = extra_ref~load_coins();
+    int locked_jp_tokens = extra_ref~load_coins();
+    int jackpot_locked_once = extra_ref~load_uint(1);
+    int token_balance = extra_ref~load_coins();
+    int tl_usdt_amount = extra_ref~load_coins();
+    int tl_usdt_until = extra_ref~load_uint(64);
+    int tl_delay = extra_ref~load_uint(64);
+    int tl_ton_amount = extra_ref~load_coins();
+    int tl_ton_until = extra_ref~load_uint(64);
+    end_parse(extra_ref);
+
+    end_parse(ds);
+    return (
+        counters_ref,
+        admin_transfer_ref,
+        next_ticket_index,
+        collection_address,
+        admin_address,
+        price,
+        ref_percent,
+        token_wallet_address,
+        jp_amount,
+        locked_jp_tokens,
+        jackpot_locked_once,
+        token_balance,
+        tl_usdt_amount,
+        tl_usdt_until,
+        tl_delay,
+        tl_ton_amount,
+        tl_ton_until
+    );
+}
+
+() store_data(
+cell counters_ref,
+cell admin_transfer_ref,
+int next_ticket_index,
+slice collection_address,
+slice admin_address,
+int price,
+int ref_percent,
+slice token_wallet_address,
+int jp_amount,
+int locked_jp_tokens,
+int jackpot_locked_once,
+    int token_balance,
+    int tl_usdt_amount,
+    int tl_usdt_until,
+    int tl_delay,
+    int tl_ton_amount,
+    int tl_ton_until
+) impure inline {
+    cell extra = begin_cell()
+        .store_coins(jp_amount)
+        .store_coins(locked_jp_tokens)
+        .store_uint(jackpot_locked_once, 1)
+        .store_coins(token_balance)
+        .store_coins(tl_usdt_amount)
+        .store_uint(tl_usdt_until, 64)
+        .store_uint(tl_delay, 64)
+        .store_coins(tl_ton_amount)
+        .store_uint(tl_ton_until, 64)
+        .end_cell();
+
+    set_data(
+        begin_cell()
+            .store_ref(counters_ref)
+            .store_ref(admin_transfer_ref)
+            .store_uint(next_ticket_index, 64)
+            .store_slice(collection_address)
+            .store_slice(admin_address)
+            .store_coins(price)
+            .store_uint(ref_percent, 8)
+            .store_ref(
+                begin_cell()
+                    .store_slice(token_wallet_address)
+                    .end_cell()
+            )
+            .store_ref(extra)
+            .end_cell()
+    );
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        return();
+    }
+
+    ;; some wallets may send a body shorter than 32 bits which would cause
+    ;; an underflow when reading the operation code. Ignore those messages.
+    if (slice_bits(in_msg_body) < 32) {
+        return();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    var (
+        cell counters_ref,
+        cell admin_transfer_ref,
+        int next_ticket_index,
+        slice collection_address,
+        slice admin_address,
+        int price,
+        int ref_percent,
+        slice token_wallet_address,
+        int jp_amount,
+        int locked_jp_tokens,
+        int jackpot_locked_once,
+        int token_balance,
+        int tl_usdt_amount,
+        int tl_usdt_until,
+        int tl_delay,
+        int tl_ton_amount,
+        int tl_ton_until
+    ) = load_data();
+
+    int op = in_msg_body.preload_uint(32);
+
+    if (op == op::jetton_transfer_notification()) { ;; jetton transfer notification
+        slice orig_body = in_msg_body; ;; keep for refunds
+        try {
+            ;; guard against spoofed senders (exit-code 401)
+            throw_unless(401, equal_slices(sender_address, token_wallet_address));
+            in_msg_body~load_uint(32); ;; op
+            int qid = in_msg_body~load_uint(64); ;; query_id
+            int amount = in_msg_body~load_coins();
+            slice sender_wallet = in_msg_body~load_msg_addr();
+
+            int is_cell = in_msg_body~load_uint(1);
+            slice fwd_payload = begin_cell().end_cell().begin_parse();
+            if (is_cell == 0) {
+                fwd_payload = in_msg_body;
+            } else {
+                fwd_payload = in_msg_body~load_ref().begin_parse();
+            }
+            int deposit = 0;
+            if (slice_bits(fwd_payload) == 32) {
+                if (fwd_payload.preload_uint(32) == op::admin_deposit()) {
+                    deposit = 1;
+                }
+            }
+            if (deposit == 0) {
+                throw_unless(400, msg_value >= min_ticket_value());
+                            throw_unless(400, amount    >= price);
+            }
+            token_balance += amount;
+            ;; jp_amount is stored in whole tokens, convert to microtokens
+            if (jackpot_locked_once == 0) {
+                locked_jp_tokens = jp_amount * jetton_decimals();
+                jackpot_locked_once = 1;
+            }
+
+        if (deposit == 1) {
+                store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address,
+                           admin_address, price, ref_percent,
+                           token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once,
+                           token_balance, tl_usdt_amount, tl_usdt_until, tl_delay,
+                           tl_ton_amount, tl_ton_until);
+                return();
+        }
+
+        int excess = amount - price;
+        if (excess > 0) {
+            var refund_transfer = begin_cell()
+                .store_uint(op::jetton_transfer(), 32)
+                .store_uint(qid, 64)
+                .store_coins(excess)
+                .store_slice(sender_wallet)
+                ;; excess gas and notifications back to initiator
+                .store_slice(sender_wallet)
+                .store_maybe_ref(null())
+                ;; provide gas for the player's wallet
+                .store_coins(forward_fee())
+                .store_uint(0, 1)
+                .end_cell();
+
+            var refund_msg = begin_cell()
+                .store_uint(flag::bounce(), 6)
+                .store_slice(token_wallet_address)
+                ;; supply Jetton wallet with forwarding gas
+                .store_coins(outer_fee())
+                ;; payload stored in a reference -> body_ref flag must be 1
+                .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_ref(refund_transfer)
+                .end_cell();
+            send_raw_message(refund_msg, 1);
+            token_balance = token_balance - excess;
+        }
+
+        slice player_address = sender_wallet;
+        slice ref_addr = null_addr();
+        int has_ref = 0;
+
+        if (slice_bits(fwd_payload) == 534) {
+            player_address = fwd_payload~load_msg_addr();
+            ref_addr = fwd_payload~load_msg_addr();
+            has_ref = 1;
+        } else {
+            if (slice_bits(fwd_payload) == 267) {
+                ref_addr = fwd_payload~load_msg_addr();
+                has_ref = 1;
+            }
+        }
+        ;; ensure payload has no extra bits
+        end_parse(fwd_payload);
+
+        if (has_ref) {
+            var ui_pl = begin_cell()
+                .store_uint(op::send_reff(), 32)
+                .store_uint(ref_percent, 8)
+                .end_cell();
+
+            int referral_amount = price * ref_percent / 100;
+
+            if (referral_amount > 0) {
+                    var ref_transfer = begin_cell()
+                        .store_uint(op::jetton_transfer(), 32)
+                        .store_uint(qid, 64)
+                        .store_coins(referral_amount)
+                        .store_slice(ref_addr)
+                        ;; send excess gas to the player
+                        .store_slice(sender_wallet)
+                        .store_uint(0, 1)
+                        .store_coins(forward_fee())
+                        .store_uint(1, 1)
+                        .store_ref(ui_pl)
+                        .end_cell();
+
+                    var ref_msg = begin_cell()
+                        .store_uint(flag::bounce(), 6)
+                        .store_slice(token_wallet_address)
+                        .store_coins(outer_fee())
+                        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                        .store_ref(ref_transfer)
+                        .end_cell();
+
+                    send_raw_message(ref_msg, 1);
+                    token_balance = token_balance - referral_amount;
+                }
+        }
+
+
+        randomize_lt();
+        var x = rand(12000); ;; random number 0..11999
+
+        slice counters_slice = counters_ref.begin_parse();
+
+        int jp = counters_slice~load_uint(16);
+        int major = counters_slice~load_uint(16);
+        int high = counters_slice~load_uint(16);
+        int mid = counters_slice~load_uint(16);
+        int low_mid = counters_slice~load_uint(16);
+        int low = counters_slice~load_uint(16);
+        int mini = counters_slice~load_uint(16);
+        end_parse(counters_slice);
+
+
+
+        if (x == 0) { ;; Jackpot 1/12000
+            if (jp == 0) {
+                ;; balance guard
+                throw_unless(402, token_balance >= locked_jp_tokens);
+
+                ;; automatic payout to ticket sender
+                send_winning(jp_amount, qid, player_address, 0, collection_address, 0, token_wallet_address);
+
+                token_balance = token_balance - (jp_amount * jetton_decimals());
+                locked_jp_tokens = 0;      ;; reserve released
+                jp               = 1;      ;; jackpot claimed
+            }
+            next_ticket_index += 1;
+
+            ;; persist state
+            cell new_ref = begin_cell()
+                .store_uint(jp, 16)
+                .store_uint(major, 16)
+                .store_uint(high, 16)
+                .store_uint(mid, 16)
+                .store_uint(low_mid, 16)
+                .store_uint(low, 16)
+                .store_uint(mini, 16)
+                .end_cell();
+            store_data(new_ref, admin_transfer_ref, next_ticket_index, collection_address,
+                       admin_address, price, ref_percent,
+                       token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once,
+                       token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+            return ();
+        }
+
+        ;; Major: 3 prizes (x = 1..3)
+        if (x < 4) {
+            if (major < 3) {        ;; max 3 Major
+                major += 1;
+                next_ticket_index += 1;
+                send_winning(MAJOR_PRIZE(), qid, player_address, 1, collection_address, 1, token_wallet_address);
+                token_balance = token_balance - (MAJOR_PRIZE() * jetton_decimals());
+                cell new_ref = begin_cell()
+                    .store_uint(jp, 16)
+                    .store_uint(major, 16)
+                    .store_uint(high, 16)
+                    .store_uint(mid, 16)
+                    .store_uint(low_mid, 16)
+                    .store_uint(low, 16)
+                    .store_uint(mini, 16)
+                    .end_cell();
+                store_data(new_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+                return();
+            }
+        }
+
+        ;; High: 10 prizes (x = 4..13)
+        if (x < 14) {
+            if (high < 10) { ;; max 10 High prizes
+                next_ticket_index += 1;
+                high += 1;
+
+                send_winning(HIGH_PRIZE(), qid, player_address, 2, collection_address, 2, token_wallet_address);
+                token_balance = token_balance - (HIGH_PRIZE() * jetton_decimals());
+
+                cell new_ref = begin_cell()
+                    .store_uint(jp, 16)
+                    .store_uint(major, 16)
+                    .store_uint(high, 16)
+                    .store_uint(mid, 16)
+                    .store_uint(low_mid, 16)
+                    .store_uint(low, 16)
+                    .store_uint(mini, 16)
+                    .end_cell();
+                store_data(new_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+                return();
+            }
+        }
+
+        ;; Mid: 50 prizes (x = 14..63)
+        if (x < 64) {
+            if (mid < 50) { ;; max 50 Mid prizes
+                next_ticket_index += 1;
+                mid += 1;
+
+                send_winning(MID_PRIZE(), qid, player_address, 3, collection_address, 3, token_wallet_address);
+                token_balance = token_balance - (MID_PRIZE() * jetton_decimals());
+
+                cell new_ref = begin_cell()
+                    .store_uint(jp, 16)
+                    .store_uint(major, 16)
+                    .store_uint(high, 16)
+                    .store_uint(mid, 16)
+                    .store_uint(low_mid, 16)
+                    .store_uint(low, 16)
+                    .store_uint(mini, 16)
+                    .end_cell();
+                store_data(new_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+                return();
+            }
+        }
+
+        ;; Low-Mid: 150 prizes (x = 64..213)
+        if (x < 214) {
+            if (low_mid < 150) { ;; max 150 Low Mid prizes
+                next_ticket_index += 1;
+                low_mid += 1;
+
+                send_winning(LOW_MID_PRIZE(), qid, player_address, 4, collection_address, 4, token_wallet_address);
+                token_balance = token_balance - (LOW_MID_PRIZE() * jetton_decimals());
+
+                cell new_ref = begin_cell()
+                    .store_uint(jp, 16)
+                    .store_uint(major, 16)
+                    .store_uint(high, 16)
+                    .store_uint(mid, 16)
+                    .store_uint(low_mid, 16)
+                    .store_uint(low, 16)
+                    .store_uint(mini, 16)
+                    .end_cell();
+                store_data(new_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+                return();
+            }
+        }
+
+        ;; Low: 300 prizes (x = 214..513)
+        if (x < 514) {
+            if (low < 300) { ;; max 300 Low prizes
+                next_ticket_index += 1;
+                low += 1;
+
+                send_winning(LOW_PRIZE(), qid, player_address, 5, collection_address, 5, token_wallet_address);
+                token_balance = token_balance - (LOW_PRIZE() * jetton_decimals());
+
+                cell new_ref = begin_cell()
+                    .store_uint(jp, 16)
+                    .store_uint(major, 16)
+                    .store_uint(high, 16)
+                    .store_uint(mid, 16)
+                    .store_uint(low_mid, 16)
+                    .store_uint(low, 16)
+                    .store_uint(mini, 16)
+                    .end_cell();
+                store_data(new_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+                return();
+            }
+        }
+
+        ;; Mini: 1190 prizes (x = 514..1703)
+        if (x < 1704) {
+            if (mini < 1190) { ;; max 1190 Mini prizes
+                next_ticket_index += 1;
+                mini += 1;
+
+                send_winning(MINI_PRIZE(), qid, player_address, 6, collection_address, 6, token_wallet_address);
+                token_balance = token_balance - (MINI_PRIZE() * jetton_decimals());
+
+                cell new_ref = begin_cell()
+                    .store_uint(jp, 16)
+                    .store_uint(major, 16)
+                    .store_uint(high, 16)
+                    .store_uint(mid, 16)
+                    .store_uint(low_mid, 16)
+                    .store_uint(low, 16)
+                    .store_uint(mini, 16)
+                    .end_cell();
+                store_data(new_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+                return();
+            }
+        }
+
+        next_ticket_index += 1;
+
+        send_winning(0, qid, player_address, 7, collection_address, 7, token_wallet_address);
+
+        store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+
+        return();
+        }
+        catch (_) {
+            int ramount = 0;
+            slice rbody = orig_body;
+            int rqid = 0;
+            slice rsender = null_addr();
+            try {
+                rbody~load_uint(32);
+                rqid = rbody~load_uint(64);
+                ramount = rbody~load_coins();
+                rsender = rbody~load_msg_addr();
+            } catch (_) {
+            }
+            refund_tokens(ramount / jetton_decimals(), rqid, rsender, sender_address);
+            store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address,
+                       admin_address, price, ref_percent,
+                       token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once,
+                       token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+            return();
+        }
+    }
+
+    ;; parse op and query_id for admin operations
+    in_msg_body~load_uint(32);
+    int qid = in_msg_body~load_uint(64);
+
+    if (op == OP_SCHEDULE_USDT) {
+        throw_unless(401, equal_slices(sender_address, admin_address));
+
+        int freeTokens = token_balance - locked_jp_tokens;
+        int req        = in_msg_body~load_uint(128);
+
+        throw_unless(403, req * jetton_decimals() <= freeTokens);
+
+        if (req == 0) {
+            tl_usdt_amount = 0;
+            tl_usdt_until  = 0;
+        } else {
+            tl_usdt_amount = req;
+            tl_usdt_until  = now() + tl_delay;
+        }
+
+        store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address,
+                   admin_address, price, ref_percent,
+                   token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once,
+                   token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+        return ();
+    }
+
+    if (op == OP_EXEC_USDT) {
+        throw_unless(401, equal_slices(sender_address, admin_address));
+        throw_unless(403, now()  >= tl_usdt_until);
+        throw_unless(403, tl_usdt_amount > 0);
+
+        int freeTokens = token_balance - locked_jp_tokens;
+        throw_unless(402, tl_usdt_amount * jetton_decimals() <= freeTokens);
+
+        send_usdt(tl_usdt_amount, qid, admin_address, token_wallet_address);
+        token_balance = token_balance - tl_usdt_amount * jetton_decimals();
+        tl_usdt_amount  = 0;
+        tl_usdt_until   = 0;
+
+        store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address,
+                   admin_address, price, ref_percent,
+                   token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once,
+                   token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+        return ();
+    }
+
+    if (op == OP_SCHEDULE_TON) {
+        throw_unless(401, equal_slices(sender_address, admin_address));
+        int freeTon = my_balance - 50000000;
+        int req     = in_msg_body~load_uint(64);
+        throw_unless(403, req <= freeTon);
+
+        tl_ton_amount = req;
+        tl_ton_until  = (req == 0) ? 0 : now() + tl_delay;
+        store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address,
+                   admin_address, price, ref_percent,
+                   token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once,
+                   token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+        return ();
+    }
+
+    if (op == OP_EXEC_TON) {
+        throw_unless(401, equal_slices(sender_address, admin_address));
+        throw_unless(403, tl_ton_amount > 0);
+        throw_unless(403, now() >= tl_ton_until);
+
+        int freeTon = my_balance - 50000000;
+        throw_unless(402, tl_ton_amount <= freeTon);
+
+        var msg = begin_cell()
+            .store_uint(flag::bounce(), 6)
+            .store_slice(admin_address)
+            .store_coins(tl_ton_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+            .store_slice("timelocked TON withdraw")
+            .end_cell();
+        send_raw_message(msg, 1);
+
+        tl_ton_amount = 0;
+        tl_ton_until  = 0;
+        store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address,
+                   admin_address, price, ref_percent,
+                   token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once,
+                   token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+        return ();
+    }
+
+
+    if (op == OP_SCHEDULE_ADMIN) {
+        throw_unless(401, equal_slices(sender_address, admin_address));
+        slice new_admin = in_msg_body~load_msg_addr();
+
+        admin_transfer_ref = begin_cell()
+            .store_slice(new_admin)
+            .store_uint(now() + tl_delay, 64)
+            .end_cell();
+
+        store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+        return();
+    }
+
+    if (op == OP_EXEC_ADMIN) {
+        slice admin_slice = admin_transfer_ref.begin_parse();
+        slice pending_admin = admin_slice~load_msg_addr();
+        int pending_until = admin_slice~load_uint(64);
+        end_parse(admin_slice);
+
+        throw_unless(403, now() >= pending_until);
+        throw_unless(403, pending_until > 0);
+        ;; ensure new admin confirms transfer
+        throw_unless(401, equal_slices(sender_address, pending_admin));
+
+        admin_transfer_ref = begin_cell()
+            .store_slice(null_addr())
+            .store_uint(0, 64)
+            .end_cell();
+
+        store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address, pending_admin, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+        return();
+    }
+
+    if (op == OP_CANCEL_ADMIN) {
+        throw_unless(401, equal_slices(sender_address, admin_address));
+
+        admin_transfer_ref = begin_cell()
+            .store_slice(null_addr())
+            .store_uint(0, 64)
+            .end_cell();
+
+        store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, token_wallet_address, jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+        return();
+    }
+
+
+    if (op == 5) { ;; set token_wallet_address
+    throw_unless(401, equal_slices(sender_address, admin_address));
+    store_data(counters_ref, admin_transfer_ref, next_ticket_index, collection_address, admin_address, price, ref_percent, in_msg_body~load_msg_addr(), jp_amount, locked_jp_tokens, jackpot_locked_once, token_balance, tl_usdt_amount, tl_usdt_until, tl_delay, tl_ton_amount, tl_ton_until);
+    return();
+    }
+
+    throw(0xffff);
+}
+
+(int, int, int, int, int, int, int) get_counters() method_id {
+(cell counters_ref, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) = load_data();
+
+    slice counters_slice = counters_ref.begin_parse();
+    int jp = counters_slice~load_uint(16);
+    int major = counters_slice~load_uint(16);
+    int high = counters_slice~load_uint(16);
+    int mid = counters_slice~load_uint(16);
+    int low_mid = counters_slice~load_uint(16);
+    int low = counters_slice~load_uint(16);
+    int mini = counters_slice~load_uint(16);
+    end_parse(counters_slice);
+    return (
+        jp,
+        major,
+        high,
+        mid,
+        low_mid,
+        low,
+        mini
+    );
+}
+
+
+
+(cell, cell, int, slice, slice, int, int, slice, int, int, int, int, int, int, int, int, int) get_full_data() method_id {
+    var (
+        cell counters_ref,
+        cell admin_transfer_ref,
+        int next_ticket_index,
+        slice collection_address,
+        slice admin_address,
+        int price,
+        int ref_percent,
+        slice token_wallet_address,
+        int jp_amount,
+        int locked_jp_tokens,
+        int jackpot_locked_once,
+        int token_balance,
+        int tl_usdt_amount,
+        int tl_usdt_until,
+        int tl_delay,
+        int tl_ton_amount,
+        int tl_ton_until
+    ) = load_data();
+
+    return (
+        counters_ref,
+        admin_transfer_ref,
+        next_ticket_index,
+        collection_address,
+        admin_address,
+        price,
+        ref_percent,
+        token_wallet_address,
+        jp_amount,
+        locked_jp_tokens,
+        jackpot_locked_once,
+        token_balance,
+        tl_usdt_amount,
+        tl_usdt_until,
+        tl_delay,
+        tl_ton_amount,
+        tl_ton_until
+    );
+}
+

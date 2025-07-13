@@ -1,0 +1,153 @@
+#include "params.fc";
+#include "op-codes.fc";
+
+cell generate_nft_content(int value, slice owner) {
+    builder result = begin_cell();
+
+    throw_unless(400, value >= 0);
+
+    int divisor = 1;
+    while (value / divisor >= 10) { divisor *= 10; }
+
+    do {
+        (int digit, value) = divmod(value, divisor);
+        divisor /= 10;
+        int char = 48 + digit;
+        result = result.store_uint(char, 8);
+    } until (divisor == 0);
+
+    return begin_cell().store_slice(owner).store_ref(result.store_slice(".json").end_cell()).end_cell();
+}
+
+() send_winning(
+int   prize,            ;; prize amount in jettons
+int   query_id,         ;; query id for tracking
+slice player,           ;; player address
+int   prize_code,       ;; 0..7
+slice collection_addr,  ;; NFT-collection
+int   content_id,       ;; non-negative ID (can use next_ticket)
+slice token_wallet      ;; contract's Jetton wallet
+) impure inline {
+
+    ;; 1. NFT content
+    cell nft_content = generate_nft_content(content_id, player);
+
+    ;; body for the collection: op=1, query, mint_fee, ref
+    var mint_body = begin_cell()
+        .store_uint(1, 32)          ;; op = 1
+        .store_uint(query_id, 64)   ;; query_id
+        .store_coins(mint_fee())    ;; minting fee
+        .store_ref(nft_content)     ;; individual JSON
+        .end_cell();
+
+    ;; internal message to the collection
+    var nft_msg = begin_cell()
+        .store_uint(flag::bounce(), 6)             ;; int_msg_info: ihr_disabled=1, bounce=1
+        .store_slice(collection_addr)
+        .store_coins(storage_coins() + transfer_fee())    ;; about 0.07 TON for gas/storage
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)  ;; body-ref = 1
+        .store_ref(mint_body)
+        .end_cell();
+
+    ;; 3. Jetton transfer to the player (TEP-74)
+    if (prize != 0) {
+        ;; 2. "prize sent" payload (for UI)
+        var ui_pl = begin_cell()
+            .store_uint(op::send_prize(), 32)
+            .store_uint(prize_code, 8)
+            .end_cell();
+
+        var jet_body = begin_cell()
+            .store_uint(op::jetton_transfer(), 32)
+            .store_uint(query_id, 64)
+            .store_coins(prize * jetton_decimals())
+            .store_slice(player)
+            ;; return gas to the initiator
+            .store_slice(player)
+            .store_uint(0, 1)
+            .store_coins(forward_fee())   ;; 0.05 TON
+            .store_uint(1, 1)
+            .store_ref(ui_pl)
+            .end_cell();
+
+        var jet_msg = begin_cell()
+            .store_uint(flag::bounce(), 6)
+            .store_slice(token_wallet)
+            .store_coins(outer_fee())     ;; 0.15 TON
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(jet_body)
+            .end_cell();
+
+        send_raw_message(jet_msg, 1);   ;; Jetton → player
+    }
+
+    ;; 4. send NFT
+    send_raw_message(nft_msg, 1);       ;; NFT   → player
+}
+
+() send_usdt(
+int   amount,       ;; amount in jettons
+int   query_id,     ;; query id for tracking
+slice recipient,    ;; recipient address
+slice token_wallet  ;; contract's Jetton wallet
+) impure inline {
+
+    var ui_pl = begin_cell()
+        .store_uint(op::send_usdt(), 32)
+        .end_cell();
+
+    var jet_body = begin_cell()
+        .store_uint(op::jetton_transfer(), 32)
+        .store_uint(query_id, 64)
+        .store_coins(amount * jetton_decimals())
+        .store_slice(recipient)
+        ;; forward excess gas to sender
+        .store_slice(recipient)
+        .store_uint(0, 1)
+        .store_coins(forward_fee())
+        .store_uint(1, 1)
+        .store_ref(ui_pl)
+        .end_cell();
+
+    var jet_msg = begin_cell()
+        .store_uint(flag::bounce(), 6)
+        .store_slice(token_wallet)
+        ;; Jetton wallet already has TON for gas
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(jet_body)
+        .end_cell();
+
+    send_raw_message(jet_msg, 64);
+}
+
+() refund_tokens(
+int   amount,       ;; amount in jettons
+int   query_id,     ;; query id for tracking
+slice recipient,    ;; player wallet
+slice token_wallet  ;; contract's Jetton wallet
+) impure inline {
+    var refund_body = begin_cell()
+        .store_uint(op::jetton_transfer(), 32)
+        .store_uint(query_id, 64)
+        .store_coins(amount * jetton_decimals())
+        .store_slice(recipient)
+        ;; excess gas and notifications back to initiator
+        .store_slice(recipient)
+        .store_maybe_ref(null())
+        ;; enough TON for the player's wallet to process transfer
+        .store_coins(forward_fee())
+        .store_uint(0, 1)
+        .end_cell();
+
+    var refund_msg = begin_cell()
+        .store_uint(flag::bounce(), 6)
+        .store_slice(token_wallet)
+        ;; provide gas for Jetton wallet forwarding
+        .store_coins(outer_fee())
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(refund_body)
+        .end_cell();
+
+    send_raw_message(refund_msg, 1);
+}
