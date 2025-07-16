@@ -1,0 +1,18 @@
+;; =============== executor utils =============================
+cell pack_executor_data(slice ccl_address, int is_spended, cell payload) inline {
+    return begin_cell()
+    .store_slice(ccl_address)
+    .store_slice(address_none())
+    .store_int(is_spended, 1)
+    .store_ref(payload)
+    .end_cell();
+}
+
+cell calculate_executor_state_init(slice ccl_address, cell payload, cell executor_code) inline {
+    return begin_cell()
+    .store_uint(0, 2)
+    .store_dict(executor_code)
+    .store_dict(pack_executor_data(ccl_address, false, payload))
+    .store_uint(0, 1)
+    .end_cell();
+}

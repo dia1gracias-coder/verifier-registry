@@ -1,0 +1,38 @@
+#include "../stdlib.fc";
+#include "./jetton_gas_utils.fc";
+
+const int MIN_CCL_STORAGE_DURATION = 365 * 24 * 3600; ;; 1 year
+
+;;# Precompiled constants
+;;
+;;All of the contents are result of contract emulation tests
+;;
+const int CCL_BITS = 34254; ;;[/tests/CrossChainLayer.spec.ts#CCL-1.2]
+const int CCL_CELLS = 85; ;;[/tests/CrossChainLayer.spec.ts#CCL-1.2]
+
+;;## Gas
+;;
+;;Gas constants are calculated in the main test suite.
+;;First the related transaction is found, and then it's
+;;resulting gas consumption is printed to the console.
+const TVM_MSG_TO_EVM_GAS_CONSUMPTION = 13130; ;;[/tests/CrossChainLayer.spec.ts#CCL-2.6]
+const ADD_FEE_GAS_CONSUMPTION = 6036; ;;[/tests/CrossChainLayer.spec.ts#CCL-5.2]
+const FEE_MINTER_GAS_CONSUMPTION = 9148; ;; [/tests/JettonMinter.spec.ts#JM-2.2]
+
+int calculate_ccl_min_storage_fee() inline {
+  return get_storage_fee(BASECHAIN, MIN_CCL_STORAGE_DURATION, CCL_BITS, CCL_CELLS);
+}
+
+int calculate_emit_tvm_msg_to_evm_fee(int fwd_fee) inline {
+  ;; 1 message: CrossChainLayer > log
+  return fwd_fee +
+  get_compute_fee(BASECHAIN, TVM_MSG_TO_EVM_GAS_CONSUMPTION);
+}
+
+int calculate_executor_mint_fee(int fwd_fee) inline {
+    ;; 3 messages after ccl: CrossChainLayer > minter > wallet > excess 
+    return 2 * fwd_fee +
+          get_compute_fee(BASECHAIN, FEE_MINTER_GAS_CONSUMPTION + SEND_TRANSFER_GAS_CONSUMPTION) +
+          calculate_jetton_wallet_min_storage_fee() +
+          calculate_jetton_minter_min_storage_fee();
+}

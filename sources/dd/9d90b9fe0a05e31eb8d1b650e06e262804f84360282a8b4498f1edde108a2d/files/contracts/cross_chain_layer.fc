@@ -1,0 +1,625 @@
+;; =============== CrossChainLayer Master Contract =====================
+
+#include "imports/ccl_utils.fc";
+#include "imports/stdlib.fc";
+#include "imports/utils.fc";
+#include "imports/executor_utils.fc";
+#include "imports/messages.fc";
+#include "imports/precompiled_gas_const/ccl_gas_utils.fc";
+#include "imports/fee_utils.fc";
+
+#pragma version >=0.4.0;
+
+
+;; =============== CONSTS =============================
+const ENTRIES_DICT_KEY_SIZE = 256;
+
+;; anyone ops
+const ANYONE_OP::TVM_MSG_TO_EVM = 0x6c582059;
+const ANYONE_OP::ERROR_NOTIFICATION = 0xae7df95b;
+const ANYONE_OP::EXCESSES = 0xd53276db;
+const ANYONE_OP::ADD_PROTOCOL_FEE = 0x48e660b5;
+const ANYONE_OP::COLLECT_PROTOCOL_FEE = 0x1f95f86c;
+const ANYONE_OP::COLLECT_PROTOCOL_FEE_NOTIFICATION = 0xf358b6d0;
+
+;; executor ops
+const EXECUTOR_OP::EVM_MSG_TO_TVM = 0x0e50d313;
+const EXECUTOR_OP::ERROR_NOTIFICATION = 0xcf6a5da4;
+
+;; admin ops
+const ADMIN_OP::CHANGE_ADMIN_ADDRESS = 0x581879bc;
+const ADMIN_OP::CANCEL_CHANGING_ADMIN_ADDRESS = 0x60094a1b;
+const ADMIN_OP::UPDATE_TON_PROTOCOL_FEE = 0x063199b7;
+const ADMIN_OP::UPDATE_TAC_PROTOCOL_FEE = 0x3531465c;
+const ADMIN_OP::UPDATE_CODE = 0x20faec53;
+const ADMIN_OP::UPDATE_EXECUTOR_CODE = 0x7ee5a6d0;
+const ADMIN_OP::UPDATE_EPOCH_DELAY = 0xe97250b7;
+
+const NEW_ADMIN_OP::CONFIRM_CHANGING_ADMIN_ADDRESS = 0x6a4fbe34;
+
+;; sequencer multisig ops
+const SEQUENCER_MULTISIG_OP::CHANGE_SEQUENCER_MULTISIG_ADDRESS = 0x5cec6be0;
+const SEQUENCER_MULTISIG_OP::UPDATE_MERKLE_ROOT = 0x23b05641;
+
+;; jetton
+const int JETTON::MINT = 0xd7b9c06e;
+
+;; errors
+const ERROR::NOT_FROM_ADMIN = 70;
+const ERROR::NOT_FROM_EXECUTOR = 71;
+const ERROR::NOT_FROM_SEQUENCER_MULTISIG = 72;
+const ERROR::NOT_FROM_NEW_ADMIN = 73;
+
+const ERROR::NEW_ADMIN_ADDRESS_IS_NONE = 80;
+
+const ERROR::ZERO_PROTOCOL_FEE_SUPPLY = 200;
+const ERROR::INVALID_PROOF = 201;
+const ERROR::VOTING_NOT_ACTIVE = 202;
+const ERROR::MESSAGE_COLLECT_END_TIME_LOW = 203;
+const ERROR::NOT_ENOUGH_PROTOCOL_FEE = 204;
+
+;; global
+global slice admin_address;
+global slice new_admin_address;
+global slice sequencer_multisig_address;
+
+global int max_roots_size;
+global cell merkle_roots;
+global int prev_epoch;
+global int curr_epoch;
+global int message_collect_end_time;
+global int next_voting_time;
+global int epoch_delay;
+
+global int ton_protocol_fee;
+global int tac_protocol_fee;
+
+global int protocol_fee_supply;
+
+global cell executor_code;
+
+
+;; =============== STORAGE =============================
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+
+    admin_address = ds~load_msg_addr();
+    new_admin_address = ds~load_msg_addr();
+    sequencer_multisig_address = ds~load_msg_addr();
+
+    cell fees = ds~load_ref();
+    slice fees_ds = fees.begin_parse();
+    tac_protocol_fee = fees_ds~load_coins();
+    ton_protocol_fee = fees_ds~load_coins();
+    protocol_fee_supply = fees_ds~load_coins();
+
+    executor_code = ds~load_ref();
+    cell epoch = ds~load_ref();
+    slice epoch_ds = epoch.begin_parse();
+    epoch_delay = epoch_ds~load_timestamp();
+    prev_epoch = epoch_ds~load_timestamp();
+    curr_epoch = epoch_ds~load_timestamp();
+    message_collect_end_time = epoch_ds~load_timestamp();
+    next_voting_time = epoch_ds~load_timestamp();
+    max_roots_size = epoch_ds~load_uint(4);
+    merkle_roots = epoch_ds~load_dict();
+}
+
+() save_data() impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(admin_address)
+            .store_slice(new_admin_address)
+            .store_slice(sequencer_multisig_address)
+            .store_ref(
+                begin_cell()
+                    .store_coins(tac_protocol_fee)
+                    .store_coins(ton_protocol_fee)
+                    .store_coins(protocol_fee_supply)
+                    .end_cell()
+            )
+            .store_ref(executor_code)
+            .store_ref(
+                begin_cell()
+                    .store_timestamp(epoch_delay)
+                    .store_timestamp(prev_epoch)
+                    .store_timestamp(curr_epoch)
+                    .store_timestamp(message_collect_end_time)
+                    .store_timestamp(next_voting_time)
+                    .store_uint(max_roots_size, 4)
+                    .store_dict(merkle_roots)
+                    .end_cell())
+            .end_cell()
+    );
+}
+
+
+;; =============== UTILS =============================
+
+(cell) create_fee_msg(
+int query_id,
+slice executor_fee_token,
+int executor_fee_amount,
+slice fee_to_address,
+int fwd_fee
+) inline {
+    ;; TON fee
+    if is_address_none(executor_fee_token) {
+        builder msg = begin_cell()
+            .store_ref(
+                begin_cell()
+                    .store_hash(0)  ;; operation_id - not in use
+                    .store_slice(fee_to_address)
+                    .store_coins(executor_fee_amount)
+                    .store_ref(
+                        begin_cell()
+                            .store_bool(true)
+                            .store_ref(begin_cell().end_cell())
+                            .store_uint(0, 1)  ;; no maybe_state_init
+                            .end_cell())
+                    .end_cell());
+
+        return msg.end_cell();
+    }
+    ;; TAC fee
+    else {
+        int fee_msg_value = calculate_executor_mint_fee(fwd_fee);
+
+        cell payload = begin_cell()
+            .store_op_and_query_id(JETTON::MINT, query_id)
+            .store_slice(fee_to_address)
+            .store_coins(executor_fee_amount)
+            .store_slice(fee_to_address)
+            .store_coins(0)      ;; forward_amount
+            .store_uint(0, 1)    ;; no forward_payload
+            .store_uint(0, 1)    ;; no new_content
+            .end_cell();
+
+        builder msg = begin_cell()
+            .store_ref(
+                begin_cell()
+                    .store_hash(0)  ;; operation_id - not in use
+                    .store_slice(executor_fee_token)
+                    .store_coins(fee_msg_value)
+                    .store_ref(
+                        begin_cell()
+                            .store_bool(false) ;; no need to unlock ton
+                            .store_ref(payload)
+                            .store_uint(0, 1)  ;; no jetton_master maybe_state_init
+                            .end_cell())
+                    .end_cell());
+
+        return msg.end_cell();
+    }
+}
+
+(int, int) handle_executor_messages(cell entries_dict) impure inline {
+    int total_value_to_send = 0;
+    int total_unlock_value = 0;
+    int index = -1;
+
+    do {
+        (index, slice msg, int found?) = entries_dict.udict_get_next?(ENTRIES_DICT_KEY_SIZE, index);
+        if (found?) {
+            var msg_s = (msg~load_ref()).begin_parse();
+            int operation_id = msg_s~load_hash();
+            slice destination_address = msg_s~load_msg_addr();
+            int destination_msg_value = msg_s~load_coins();
+            slice data = (msg_s~load_ref()).begin_parse();
+            int need_to_unlock_ton = data~load_bool();
+            cell payload = data~load_ref();
+            cell maybe_state_init = data~load_maybe_ref();
+            if (null?(maybe_state_init)) {
+                send_msg(
+                    destination_address,
+                    destination_msg_value,
+                    payload,
+                    FLAGS::NON_BOUNCEABLE,
+                    SEND_MODE::PAY_FEES_SEPARATELY | SEND_MODE::BOUNCE_ON_ACTION_FAIL
+                );
+            } else {
+                send_message_with_state_init_and_body(
+                    destination_address,
+                    destination_msg_value,
+                    maybe_state_init,
+                    begin_cell().store_slice(payload.begin_parse()),
+                    FLAGS::NON_BOUNCEABLE,
+                    SEND_MODE::PAY_FEES_SEPARATELY | SEND_MODE::BOUNCE_ON_ACTION_FAIL
+                );
+            }
+
+            if (need_to_unlock_ton) {
+                total_unlock_value += destination_msg_value;
+            } else {
+                total_value_to_send += destination_msg_value;
+            }
+        }
+    } until (~ found?);
+
+    return (total_value_to_send, total_unlock_value);
+}
+
+(_) cleanup_merkle_roots() impure inline {
+    int valid_time = now() - max_roots_size * epoch_delay;
+
+    (int root, slice value, int found) = merkle_roots.udict_get_min?(HASH_SIZE);
+    while (found) {
+        int merkle_root_time = value~load_timestamp();
+        if (merkle_root_time <= valid_time) {
+            merkle_roots~udict_delete?(HASH_SIZE, root);
+        }
+
+        (root, value, found) = merkle_roots.udict_get_next?(HASH_SIZE, root);
+    }
+}
+
+(int) get_last_merkle_root() inline {
+    int max_time = 0;
+    int last_merkle_root = 0;
+
+    (int root, slice value, int found) = merkle_roots.udict_get_min?(HASH_SIZE);
+    while (found) {
+        int merkle_root_time = value~load_timestamp();
+        if (merkle_root_time > max_time) {
+            max_time = merkle_root_time;
+            last_merkle_root = root;
+        }
+
+        (root, value, found) = merkle_roots.udict_get_next?(HASH_SIZE, root);
+    }
+
+    return last_merkle_root;
+}
+
+
+;; =============== RECV =============================
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_msg_flags();
+
+    if (is_bounced(flags)) {
+        ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    int fwd_fee_from_in_msg = cs~retrieve_fwd_fee();
+    int fwd_fee = get_original_fwd_fee(BASECHAIN, fwd_fee_from_in_msg); ;; we use message fwd_fee for estimation of emit_log costs
+
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+
+    ;; calculate storage fees
+    int ton_balance_before_msg = my_balance - msg_value;
+    int min_storage_fee = calculate_ccl_min_storage_fee();
+    int storage_fee = min_storage_fee - min(ton_balance_before_msg, min_storage_fee);
+    msg_value -= storage_fee;
+
+    load_data();
+
+    if (op == ANYONE_OP::ADD_PROTOCOL_FEE) {
+        int gas_fee = get_compute_fee(BASECHAIN, ADD_FEE_GAS_CONSUMPTION);
+        throw_unless(ERROR::NOT_ENOUGH_TON, msg_value > gas_fee);
+        protocol_fee_supply += (msg_value - gas_fee);
+        save_data();
+        return ();
+    }
+
+    if (op == ANYONE_OP::TVM_MSG_TO_EVM) {
+        (int operation_type, int crosschain_ton_amount, cell fee_data, slice response_address) = in_msg_body~load_tvm_to_evm_data();
+
+        (int is_round_trip, int protocol_fee, int tac_executors_fee, int ton_executors_fee) = parse_fee_data(fee_data);
+
+        int enough_protocol_fee = TRUE;
+        if ((cell_null?(fee_data) == FALSE) & (protocol_fee < tac_protocol_fee + ton_protocol_fee * is_round_trip)) {
+            enough_protocol_fee = FALSE;
+        }
+
+        if (enough_protocol_fee & (msg_value >= (protocol_fee + ton_executors_fee + tac_executors_fee + crosschain_ton_amount + calculate_emit_tvm_msg_to_evm_fee(fwd_fee)))) {
+            raw_reserve(protocol_fee + tac_executors_fee + ton_executors_fee + storage_fee + crosschain_ton_amount, RESERVE_MODE::BOUNCE_ON_ACTION_FAIL | RESERVE_MODE::REGULAR | RESERVE_MODE::INCREASE_BY_BALANCE_BEFORE_COMPUTE);
+
+            protocol_fee_supply += protocol_fee;
+
+            save_data();
+
+            cell payload = begin_cell()
+                .store_uint(operation_type, 32)
+                .store_query_id(query_id)
+                .store_slice(sender_address)
+                .store_coins(crosschain_ton_amount)
+                .store_maybe_ref(cell_null?(fee_data) == FALSE ?
+                begin_cell()
+                    .store_maybe_ref(fee_data)
+                    .store_coins(tac_protocol_fee)
+                    .store_coins(ton_protocol_fee)
+                    .end_cell()
+                : null())
+                .store_slice(in_msg_body)
+                .end_cell();
+
+            emit_log(ANYONE_OP::TVM_MSG_TO_EVM, payload, true);
+
+            if (~ is_address_none(response_address)) {
+                cell excesses_body = begin_cell()
+                    .store_op_and_query_id(ANYONE_OP::EXCESSES, query_id)
+                    .end_cell();
+                send_msg(response_address, 0, excesses_body, FLAGS::NON_BOUNCEABLE, SEND_MODE::IGNORE_ERRORS + SEND_MODE::CARRY_ALL_BALANCE);
+            }
+            return ();
+        } else {
+            cell msg_body = begin_cell()
+                .store_op_and_query_id(ANYONE_OP::ERROR_NOTIFICATION, query_id)
+                .store_uint(operation_type, 32)
+                .store_slice(in_msg_body)
+                .end_cell();
+            send_msg(sender_address, 0, msg_body, FLAGS::NON_BOUNCEABLE, SEND_MODE::IGNORE_ERRORS + SEND_MODE::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+            commit();
+
+            throw(enough_protocol_fee == FALSE ? ERROR::NOT_ENOUGH_PROTOCOL_FEE : ERROR::NOT_ENOUGH_TON);
+        }
+    }
+
+    if (op == EXECUTOR_OP::EVM_MSG_TO_TVM) {
+        slice fee_to_address = in_msg_body~load_msg_addr();
+
+        cell proof = in_msg_body~load_ref();
+
+        cell payload = in_msg_body~load_ref();
+
+        cell state_init = calculate_executor_state_init(my_address(), payload, executor_code);
+        slice executor_address = calculate_basechain_address_by_state_init(state_init);
+        throw_unless(ERROR::NOT_FROM_EXECUTOR, equal_slices_bits(executor_address, sender_address));
+
+        (slice proof_slice, _) = proof.begin_parse_exotic();
+        proof_slice~skip_bits(8);
+        int received_proof = proof_slice~load_hash();
+        (_, int found) = merkle_roots.udict_get?(HASH_SIZE, received_proof);
+        throw_unless(ERROR::INVALID_PROOF, found);
+
+        slice payload_slice = payload.begin_parse();
+
+        cell entries_dict = payload_slice~load_dict();
+
+        payload_slice~skip_dict();
+
+        slice executor_fee_token = payload_slice~load_msg_addr();
+        int executor_fee_amount = payload_slice~load_coins();
+
+        if (executor_fee_amount != 0) {
+            cell fee_entry = create_fee_msg(query_id, executor_fee_token, executor_fee_amount, fee_to_address, fwd_fee);
+            (int max_key, _, int found?) = entries_dict.udict_get_max?(ENTRIES_DICT_KEY_SIZE);
+            int new_key = found? ? max_key + 1 : 0;
+            entries_dict~udict_set(ENTRIES_DICT_KEY_SIZE, new_key, fee_entry.begin_parse());
+        }
+
+        (int total_value_to_send, int total_unlock_value) = handle_executor_messages(entries_dict);
+        throw_unless(ERROR::NOT_ENOUGH_TON, (msg_value - total_value_to_send) > 0);
+
+        save_data();
+
+        emit_log(EXECUTOR_OP::EVM_MSG_TO_TVM, payload, true);
+
+        int reserve_amount = my_balance - msg_value - total_unlock_value;
+        throw_unless(ERROR::INSUFFICIENT_BALANCE, reserve_amount >= protocol_fee_supply);
+        raw_reserve(reserve_amount, RESERVE_MODE::BOUNCE_ON_ACTION_FAIL | RESERVE_MODE::REGULAR);
+
+        slice response_address = in_msg_body~load_msg_addr();
+        if (~ is_address_none(response_address)) {
+            cell excesses_body = begin_cell()
+                .store_op_and_query_id(ANYONE_OP::EXCESSES, query_id)
+                .end_cell();
+            send_msg(response_address, 0, excesses_body, FLAGS::NON_BOUNCEABLE, SEND_MODE::IGNORE_ERRORS + SEND_MODE::CARRY_ALL_BALANCE);
+        }
+        return ();
+    }
+
+    if (op == EXECUTOR_OP::ERROR_NOTIFICATION) {
+        cell payload = in_msg_body~load_ref();
+        cell state_init = calculate_executor_state_init(my_address(), payload, executor_code);
+        slice executor_address = calculate_basechain_address_by_state_init(state_init);
+        throw_unless(ERROR::NOT_FROM_EXECUTOR, equal_slices_bits(executor_address, sender_address));
+
+        slice response_address = in_msg_body~load_msg_addr();
+
+        emit_log(EXECUTOR_OP::ERROR_NOTIFICATION, payload, true);
+        if (~ is_address_none(response_address)) {
+            cell excesses_body = begin_cell()
+                .store_op_and_query_id(ANYONE_OP::ERROR_NOTIFICATION, query_id)
+                .end_cell();
+            send_msg(response_address, 0, excesses_body, FLAGS::NON_BOUNCEABLE, SEND_MODE::IGNORE_ERRORS + SEND_MODE::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        }
+        save_data();
+        return ();
+    }
+
+    if (op == SEQUENCER_MULTISIG_OP::UPDATE_MERKLE_ROOT) {
+        throw_unless(ERROR::NOT_FROM_SEQUENCER_MULTISIG, equal_slices_bits(sender_address, sequencer_multisig_address));
+        throw_unless(ERROR::VOTING_NOT_ACTIVE, now() >= next_voting_time);
+        var new_merkle_root = in_msg_body~load_hash();
+        var prev_message_collect_end_time = message_collect_end_time;
+        message_collect_end_time = in_msg_body~load_timestamp();
+        throw_unless(ERROR::MESSAGE_COLLECT_END_TIME_LOW, message_collect_end_time >= next_voting_time);
+
+        prev_epoch = curr_epoch;
+        curr_epoch = now();
+
+        next_voting_time = curr_epoch + epoch_delay;
+
+        cleanup_merkle_roots();
+
+        merkle_roots~udict_set(HASH_SIZE, new_merkle_root, begin_cell().store_timestamp(next_voting_time).end_cell().begin_parse());
+
+        raw_reserve(0, RESERVE_MODE::BOUNCE_ON_ACTION_FAIL | RESERVE_MODE::REGULAR | RESERVE_MODE::INCREASE_BY_BALANCE_BEFORE_COMPUTE);
+
+        save_data();
+
+        cell merkle_root_event = begin_cell()
+            .store_hash(new_merkle_root)
+            .store_timestamp(prev_message_collect_end_time)
+            .store_timestamp(message_collect_end_time)
+            .store_timestamp(prev_epoch)
+            .store_timestamp(curr_epoch)
+            .store_timestamp(next_voting_time)
+            .end_cell();
+
+        emit_log(SEQUENCER_MULTISIG_OP::UPDATE_MERKLE_ROOT, merkle_root_event, true);
+
+        cell excesses_body = begin_cell()
+            .store_op_and_query_id(ANYONE_OP::EXCESSES, query_id)
+            .end_cell();
+        send_msg(sender_address, 0, excesses_body, FLAGS::NON_BOUNCEABLE, SEND_MODE::IGNORE_ERRORS + SEND_MODE::CARRY_ALL_BALANCE);
+
+        return ();
+    }
+
+    if (op == ANYONE_OP::COLLECT_PROTOCOL_FEE) {
+        throw_unless(ERROR::ZERO_PROTOCOL_FEE_SUPPLY, protocol_fee_supply != 0);
+
+        cell msg_body = begin_cell()
+            .store_op_and_query_id(ANYONE_OP::COLLECT_PROTOCOL_FEE_NOTIFICATION, query_id)
+            .store_coins(protocol_fee_supply)
+            .end_cell();
+
+        send_msg(admin_address, protocol_fee_supply, msg_body, FLAGS::NON_BOUNCEABLE, SEND_MODE::REGULAR + SEND_MODE::IGNORE_ERRORS);
+        protocol_fee_supply = 0;
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::UPDATE_TON_PROTOCOL_FEE) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        ton_protocol_fee = in_msg_body~load_coins();
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::UPDATE_TAC_PROTOCOL_FEE) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        tac_protocol_fee = in_msg_body~load_coins();
+        save_data();
+        return ();
+    }
+
+    if (op == SEQUENCER_MULTISIG_OP::CHANGE_SEQUENCER_MULTISIG_ADDRESS) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        sequencer_multisig_address = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::CHANGE_ADMIN_ADDRESS) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        new_admin_address = in_msg_body~load_msg_addr();
+        throw_if(ERROR::NEW_ADMIN_ADDRESS_IS_NONE, equal_slices_bits(new_admin_address, address_none()));
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::CANCEL_CHANGING_ADMIN_ADDRESS) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        new_admin_address = address_none();
+        save_data();
+        return ();
+    }
+
+    if (op == NEW_ADMIN_OP::CONFIRM_CHANGING_ADMIN_ADDRESS) {
+        throw_unless(ERROR::NOT_FROM_NEW_ADMIN, equal_slices_bits(sender_address, new_admin_address));
+        admin_address = new_admin_address;
+        new_admin_address = address_none();
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::UPDATE_CODE) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        var new_code = in_msg_body~load_ref();
+        set_code(new_code);
+        set_c3(new_code.begin_parse().bless());
+        var new_data = in_msg_body~load_ref();
+        set_data(new_data);
+        return ();
+    }
+
+    if (op == ADMIN_OP::UPDATE_EXECUTOR_CODE) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        executor_code = in_msg_body~load_ref();
+        merkle_roots = new_dict();
+
+
+        emit_log(ADMIN_OP::UPDATE_EXECUTOR_CODE, begin_cell().end_cell(), false);
+
+        save_data();
+        return ();
+    }
+
+    if (op == ADMIN_OP::UPDATE_EPOCH_DELAY) {
+        throw_unless(ERROR::NOT_FROM_ADMIN, equal_slices_bits(sender_address, admin_address));
+        epoch_delay = in_msg_body~load_timestamp();
+        save_data();
+        return ();
+    }
+
+    if (op == ANYONE_OP::EXCESSES) {
+        return ();
+    }
+
+    throw(ERROR::UNKNOWN_OP);
+}
+
+
+;; =============== GETTERS =============================
+
+(_) get_full_data() method_id {
+    load_data();
+    return (
+        admin_address,
+        new_admin_address,
+        sequencer_multisig_address,
+        max_roots_size,
+        merkle_roots,
+        prev_epoch,
+        curr_epoch,
+        message_collect_end_time,
+        epoch_delay,
+        next_voting_time,
+        tac_protocol_fee,
+        ton_protocol_fee,
+        protocol_fee_supply,
+        executor_code
+    );
+}
+
+(_) get_current_epoch_info() method_id {
+    load_data();
+    int last_merkle_root = get_last_merkle_root();
+    return (
+        last_merkle_root,
+        prev_epoch,
+        curr_epoch,
+        message_collect_end_time,
+        next_voting_time,
+        epoch_delay,
+        max_roots_size
+    );
+}
+
+(_) get_executor_address(cell payload) method_id {
+    load_data();
+    cell state_init = calculate_executor_state_init(my_address(), payload, executor_code);
+    return calculate_basechain_address_by_state_init(state_init);
+}
+
+(_) get_executor_data(cell payload) method_id {
+    load_data();
+    cell state_init = calculate_executor_state_init(my_address(), payload, executor_code);
+    return (
+        calculate_basechain_address_by_state_init(state_init),
+        state_init
+    );
+}
