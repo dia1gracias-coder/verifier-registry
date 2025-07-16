@@ -1,0 +1,30 @@
+#include "precompiled_gas_const/jetton_gas_utils.fc";
+#include "precompiled_gas_const/ccl_gas_utils.fc";
+#include "utils.fc";
+
+
+() check_amount_is_enough_to_transfer(int msg_value, int forward_ton_amount, int fwd_fee) impure inline {
+    throw_unless(ERROR::NOT_ENOUGH_GAS,msg_value > calculate_jetton_transfer_fee(forward_ton_amount, fwd_fee));
+}
+
+() check_amount_is_enough_to_burn(int msg_value, int fdw_fee, int crosschain_ton_amount) impure inline {
+    int jetton_wallet_gas_consumption = get_precompiled_gas_consumption();
+    int burn_gas_consumption = null?(jetton_wallet_gas_consumption) ? BURN_GAS_CONSUMPTION : jetton_wallet_gas_consumption;
+    int receive_transfer_gas_consumption = null?(jetton_wallet_gas_consumption) ? RECEIVE_TRANSFER_GAS_CONSUMPTION : jetton_wallet_gas_consumption;
+
+    throw_unless(ERROR::NOT_ENOUGH_GAS,
+        msg_value >
+        ;; jetton wallet > minter > CrossChainLayer > log
+        ;; OR
+        ;; jetton wallet > minter > CrossChainLayer > minter > jetton wallet
+        crosschain_ton_amount +
+        4 * fdw_fee +
+        get_compute_fee(BASECHAIN, burn_gas_consumption) +
+        get_compute_fee(BASECHAIN, BURN_NOTIFICATION_GAS_CONSUMPTION) +
+        get_compute_fee(BASECHAIN, TVM_MSG_TO_EVM_GAS_CONSUMPTION) +
+        get_compute_fee(BASECHAIN, MINT_AFTER_ERROR_GAS_CONSUMPTION) +
+        get_compute_fee(BASECHAIN, receive_transfer_gas_consumption) +
+        calculate_ccl_min_storage_fee() +
+        calculate_jetton_minter_min_storage_fee()
+    );
+}

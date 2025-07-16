@@ -1,0 +1,66 @@
+#include "../stdlib.fc";
+
+const MIN_JETTON_WALLET_STORAGE_DURATION = 5 * 365 * 24 * 3600; ;; 5 years
+const MIN_JETTON_MINTER_STORAGE_DURATION = 365 * 24 * 3600; ;; 1 year
+
+;;# Precompiled constants
+;;
+;;All of the contents are result of contract emulation tests
+;;
+
+;;## Storage
+;;
+
+const JETTON_WALLET_BITS = 949; ;;[/tests/JettonMinter.spec.ts#JM-1.2]
+const JETTON_WALLET_CELLS = 3; ;;[/tests/JettonMinter.spec.ts#JM-1.2]
+
+;; difference in JETTON_WALLET_BITS/JETTON_WALLET_INITSTATE_BITS is difference in
+;; StateInit and AccountStorage (https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb)
+;; we count bits as if balances are max possible
+const JETTON_WALLET_INITSTATE_BITS = 847; ;;[/tests/JettonMinter.spec.ts#JM-1.2]
+const JETTON_WALLET_INITSTATE_CELLS = 3; ;;[/tests/JettonMinter.spec.ts#JM-1.2]
+
+const JETTON_MINTER_BITS = 10208; ;;[/tests/JettonMinter.spec.ts#JM-1.1]
+const JETTON_MINTER_CELLS = 28; ;;[/tests/JettonMinter.spec.ts#JM-1.1]
+
+;;## Gas
+;;
+;;Gas constants are calculated in the main test suite.
+;;First the related transaction is found, and then it's
+;;resulting gas consumption is printed to the console.
+
+const BURN_GAS_CONSUMPTION = 8653; ;;[/tests/JettonWallet.spec.ts#JW-3.5]
+const SEND_TRANSFER_GAS_CONSUMPTION = 10669; ;;[/tests/JettonWallet.spec.ts#JW-4.4]
+const RECEIVE_TRANSFER_GAS_CONSUMPTION = 11427; ;;[/tests/JettonWallet.spec.ts#JW-4.4]
+
+const BURN_NOTIFICATION_GAS_CONSUMPTION = 10357; ;;[/tests/JettonMinter.spec.ts#JM-3.3]
+const MINT_AFTER_ERROR_GAS_CONSUMPTION = 9654; ;;[/tests/JettonMinter.spec.ts#JM-8.2]
+
+int calculate_jetton_wallet_min_storage_fee() inline {
+    return get_storage_fee(BASECHAIN, MIN_JETTON_WALLET_STORAGE_DURATION, JETTON_WALLET_BITS, JETTON_WALLET_CELLS);
+}
+
+int jetton_wallet_forward_init_state_overhead() inline {
+    return get_simple_forward_fee(BASECHAIN, JETTON_WALLET_INITSTATE_BITS, JETTON_WALLET_INITSTATE_CELLS);
+}
+
+int calculate_jetton_minter_min_storage_fee() inline {
+    return get_storage_fee(BASECHAIN, MIN_JETTON_MINTER_STORAGE_DURATION, JETTON_MINTER_BITS, JETTON_MINTER_CELLS);
+}
+
+int calculate_jetton_transfer_fee(int forward_ton_amount, int fwd_fee) inline {
+    int fwd_count = forward_ton_amount ? 2 : 1; ;; second sending (forward) will be cheaper than first
+
+    int jetton_wallet_gas_consumption = get_precompiled_gas_consumption();
+    int send_transfer_gas_consumption = null?(jetton_wallet_gas_consumption) ? SEND_TRANSFER_GAS_CONSUMPTION : jetton_wallet_gas_consumption;
+    int receive_transfer_gas_consumption = null?(jetton_wallet_gas_consumption) ? RECEIVE_TRANSFER_GAS_CONSUMPTION : jetton_wallet_gas_consumption;
+
+    return forward_ton_amount +
+    ;; 3 messages: wal1->wal2, wal2->owner, wal2->response
+    ;; but last one is optional (it is ok if it fails)
+    fwd_count * fwd_fee +
+    jetton_wallet_forward_init_state_overhead() + ;; additional fwd fees related to initstate in internal_transfer
+    get_compute_fee(BASECHAIN, send_transfer_gas_consumption) +
+    get_compute_fee(BASECHAIN, receive_transfer_gas_consumption) +
+    calculate_jetton_wallet_min_storage_fee();
+}
