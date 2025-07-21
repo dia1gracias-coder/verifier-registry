@@ -1,0 +1,30 @@
+(int, int, int, int) parse_fee_data(cell fee_data) impure inline {
+    int is_round_trip = 0;
+    int protocol_fee = 0;
+    int tac_executors_fee = 0;
+    int ton_executors_fee = 0;
+    if (null?(fee_data) == 0) {
+        slice fee_data_slice = fee_data.begin_parse();
+        is_round_trip = fee_data_slice~load_uint(1);
+        protocol_fee = fee_data_slice~load_coins();
+        tac_executors_fee = fee_data_slice~load_coins();
+        if (is_round_trip) {
+            ton_executors_fee = fee_data_slice~load_coins();
+        }
+    }
+
+    return (is_round_trip, protocol_fee, tac_executors_fee, ton_executors_fee);
+}
+
+cell build_fee_data(int is_round_trip, int protocol_fee, int tac_executors_fee, int ton_executors_fee) impure inline {
+    builder fee_data = begin_cell()
+        .store_uint(is_round_trip, 1)
+        .store_coins(protocol_fee)
+        .store_coins(tac_executors_fee);
+
+    if (is_round_trip) {
+        fee_data = fee_data.store_coins(ton_executors_fee);
+    }
+    
+    return fee_data.end_cell();
+}

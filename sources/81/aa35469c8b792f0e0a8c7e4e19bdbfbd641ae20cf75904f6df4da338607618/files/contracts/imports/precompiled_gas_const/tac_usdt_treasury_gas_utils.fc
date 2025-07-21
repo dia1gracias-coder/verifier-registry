@@ -1,0 +1,13 @@
+#include "../../../external/l1_tvm_ton/contracts/imports/stdlib.fc";
+
+const MIN_USDT_TREASURY_STORAGE_DURATION = 5 * 365 * 24 * 3600; ;; 5 years
+
+;;## Storage
+;;
+
+const USDT_TREASURY_BITS = 6018; ;;[/tests/TacUsdtTreasury.spec.ts#TAC-UT-1.1]
+const USDT_TREASURY_CELLS = 14; ;;[/tests/TacUsdtTreasury.spec.ts#TAC-UT-1.1]
+
+int calculate_usdt_treasury_min_storage_fee() inline {
+    return get_storage_fee(BASECHAIN, MIN_USDT_TREASURY_STORAGE_DURATION, USDT_TREASURY_BITS, USDT_TREASURY_CELLS);
+}
