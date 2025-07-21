@@ -1,0 +1,13 @@
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+const MIN_ETH_USDT_TREASURY_STORAGE_DURATION = 5 * 365 * 24 * 3600; ;; 5 years
+
+;;## Storage
+;;
+
+const ETH_USDT_TREASURY_BITS = 29700; ;;[/tests/EthUsdtTreasury.spec.ts#ETH-UT-1.1]
+const ETH_USDT_TREASURY_CELLS = 121; ;;[/tests/EthUsdtTreasury.spec.ts#ETH-UT-1.1]
+
+int calculate_eth_usdt_treasury_min_storage_fee() inline {
+    return get_storage_fee(BASECHAIN, MIN_ETH_USDT_TREASURY_STORAGE_DURATION, ETH_USDT_TREASURY_BITS, ETH_USDT_TREASURY_CELLS);
+}

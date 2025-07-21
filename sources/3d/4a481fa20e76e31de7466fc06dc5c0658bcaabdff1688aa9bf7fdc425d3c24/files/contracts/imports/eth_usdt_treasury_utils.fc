@@ -1,0 +1,84 @@
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+const int OFTSend::NAME = "OFTSend"u;
+
+const int OFTSend::dstEid = 0;
+const int OFTSend::to = 1;
+;; the minimum amount of tokens you expect to receive on the other side
+;; corresponds to the max slippage you're willing to accept
+const int OFTSend::minAmount = 2;
+const int OFTSend::nativeFee = 3;
+const int OFTSend::zroFee = 4;
+const int OFTSend::extraOptions = 5;
+const int OFTSend::composeMessage = 6;
+
+cell OFTSend::New(
+    int dstEid,
+    int to,
+    int minAmount,
+    int nativeFee,
+    int zroFee,
+    cell $extraOptions,
+    cell $composeMessage
+) inline method_id {
+    return cl::declare(
+        OFTSend::NAME,
+        unsafeTuple([
+            [cl::t::uint32, dstEid],            ;; OFTSend::dstEid
+            [cl::t::address, to],               ;; OFTSend::to
+            [cl::t::coins, minAmount],          ;; OFTSend::minAmount
+            [cl::t::coins, nativeFee],          ;; OFTSend::nativeFee
+            [cl::t::coins, zroFee],             ;; OFTSend::zroFee
+            [cl::t::objRef, $extraOptions],     ;; OFTSend::extraOptions
+            [cl::t::cellRef, $composeMessage]   ;; OFTSend::composeMessage
+        ])
+    );
+}
+
+const int OFTSend::_dstEidOffset = _HEADER_WIDTH;
+const int OFTSend::_toOffset = OFTSend::_dstEidOffset + 32;
+const int OFTSend::_minAmountOffset = OFTSend::_toOffset + 256;
+const int OFTSend::_nativeFeeOffset = OFTSend::_minAmountOffset + 128;
+const int OFTSend::_zroFeeOffset = OFTSend::_nativeFeeOffset + 128;
+
+;; (dstEid, to, minAmount, nativeFee, zroFee, extraOptions)
+(int, int, int, int, int, cell) OFTSend::getLzSendInfo(cell $self) impure inline {
+    slice selfSlice = $self.begin_parse();
+    return (
+        selfSlice.preloadUint32At(OFTSend::_dstEidOffset),
+        selfSlice.preloadAddressAt(OFTSend::_toOffset),
+        selfSlice.preloadCoinsAt(OFTSend::_minAmountOffset),
+        selfSlice.preloadCoinsAt(OFTSend::_nativeFeeOffset),
+        selfSlice.preloadCoinsAt(OFTSend::_zroFeeOffset),
+        selfSlice.preloadRefAt(0)
+    );
+}
+
+;; (dstEid, nativeFee, extraOptions)
+(int, int, cell) OFTSend::getDstEidAndNativeFeeAndExtraOptions(cell $self) impure inline {
+    slice selfSlice = $self.begin_parse();
+    return (
+        selfSlice.preloadUint32At(OFTSend::_dstEidOffset),
+        selfSlice.preloadCoinsAt(OFTSend::_nativeFeeOffset),
+        selfSlice.preloadRefAt(0)
+    );
+}
+
+;; (dstEid, minAmount)
+(int, int) OFTSend::getDstEidAndMinAmount(cell $self) impure inline {
+    slice selfSlice = $self.begin_parse();
+    return (
+        selfSlice.preloadUint32At(OFTSend::_dstEidOffset),
+        selfSlice.preloadCoinsAt(OFTSend::_minAmountOffset)
+    );
+}
+
+;; (dstEid, minAmount, nativeFee)
+(int, int, int) OFTSend::getDstEidAndMinAmountAndNativeFee(cell $self) impure inline {
+    slice selfSlice = $self.begin_parse();
+    return (
+        selfSlice.preloadUint32At(OFTSend::_dstEidOffset),
+        selfSlice.preloadCoinsAt(OFTSend::_minAmountOffset),
+        selfSlice.preloadCoinsAt(OFTSend::_nativeFeeOffset)
+    );
+}
