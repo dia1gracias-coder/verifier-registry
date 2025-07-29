@@ -1,0 +1,46 @@
+{-
+    reserves.fc
+
+    This library wraps around common modes in raw_reserve calls.
+
+    Usage: raw_reserve(specified_value | 0, mode); 
+    Modes available:
+    - RESERVE_EXACTLY                                                              = specified_value
+    - RESERVE_ALL_EXCEPT                                                           = remaining_balance - specified_value
+    - RESERVE_AT_MOST                                                              = min(specified_value, remaining_balance)
+    - RESERVE_AT_MOST + RESERVE_ALL_EXCEPT                                         = remaining_balance - min(specified_value, remaining_balance)
+    - BALANCE_INCREASED                                                            = original_balance + specified_value
+    - BALANCE_INCREASED + RESERVE_ALL_EXCEPT                                       = remaining_balance - (original_balance + specified_value)
+    - BALANCE_INCREASED + RESERVE_AT_MOST                                          = min(original_balance + specified_value, remaining_balance) = remaining_balance
+    - BALANCE_INCREASED + RESERVE_AT_MOST + RESERVE_ALL_EXCEPT                     = remaining_balance - min(original_balance + specified_value, remaining_balance)
+    - BALANCE_DECREASED + BALANCE_INCREASED                                        = original_balance - specified_value
+    - BALANCE_DECREASED + BALANCE_INCREASED + RESERVE_ALL_EXCEPT                   = remaining_balance - (original_balance - specified_value)
+    - BALANCE_DECREASED + BALANCE_INCREASED + RESERVE_AT_MOST                      = min(original_balance - specified_value, remaining_balance)
+    - BALANCE_DECREASED + BALANCE_INCREASED + RESERVE_AT_MOST + RESERVE_ALL_EXCEPT = remaining_balance - min(original_balance - specified_value, remaining_balance)
+-}
+
+() reserves::max_balance(int _balance) impure inline {
+    raw_reserve(
+        ;; user is supposed to pay storage fees, so we sum it here
+        ;; if this isn't the intended, use reserves::max_balance_nostorage
+        max((ctx.at(BALANCE) + storage_fees()) - ctx.at(MSG_VALUE), 
+            _balance
+        ), RESERVE_EXACTLY
+    );
+}
+
+() reserves::max_balance_nostorage(int _balance) impure inline {
+    raw_reserve(
+        max((ctx.at(BALANCE)) - ctx.at(MSG_VALUE), 
+            _balance
+        ), RESERVE_EXACTLY
+    );
+}
+
+() reserves::exact(int _balance) impure inline {
+    raw_reserve(_balance, RESERVE_EXACTLY);
+}
+
+() reserves::before_tx() impure inline {
+    raw_reserve(0, BALANCE_INCREASED);
+}
