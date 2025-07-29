@@ -1,0 +1,274 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TonBridgeMulti.fc  –  multi-token HTLC / escrow for Fusion+ on TON
+;;  ─ supports an arbitrary number of Jetton wallets in one contract
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#include "imports/stdlib.fc";
+#include "imports/error-codes.fc";
+#include "imports/helpers.fc";
+
+;; ───────────────────────────────────────────────────────────────────
+;;  Storage layout (root data-cell)
+;;
+;;      +---------------------------------------+
+;;      | dict tokens   : wallet-hash ➜ Token   |
+;;      | dict hashMap  : hashLock   ➜ HashRec  |
+;;      +---------------------------------------+
+;;
+;;  Token   = counter:uint64  • swaps:dict • hmap:dict
+;;  HashRec = wallet-hash • swapId:uint256
+;;
+;;  Each Jetton wallet therefore has its own independent
+;;  swap-counter and dictionaries, but everything lives in
+;;  ONE deployed contract.
+;; ───────────────────────────────────────────────────────────────────
+
+;; ----- helpers for token-data -------------------------------------
+builder buildTokenData(int counter, cell swaps, cell hmap) inline {
+    return begin_cell()
+        .store_uint(counter, 64)
+        .store_dict(swaps)
+        .store_dict(hmap);
+}
+
+(int, cell, cell) parseTokenData(slice s) inline {
+    return (
+        s~load_uint(64),   ;; counter
+        s~load_dict(),     ;; swaps
+        s~load_dict()      ;; hashlock-map
+    );
+}
+
+;; ----- root-cell load / save --------------------------------------
+(cell, cell) load_contract_data() inline {
+    slice ds = get_data().begin_parse();
+    if (ds.slice_empty?()) {
+        return (new_dict(), new_dict());        ;; tokens, globalHashMap
+    }
+    return (ds~load_dict(), ds~load_dict());
+}
+
+() save_contract_data(cell tokens, cell hmap) impure inline {
+    set_data(begin_cell().store_dict(tokens).store_dict(hmap).end_cell());
+}
+
+;; ----- helper to convert address to hash for dict key -------------
+int addr_hash(slice addr) inline {
+    return slice_hash(addr);
+}
+
+;; ------------------------------------------------------------------
+;; 1.  initialise (create token entry if not present)
+;; ------------------------------------------------------------------
+() initialize_storage(slice b) impure {
+    slice wallet = b~load_msg_addr();
+
+    var (tokens, hmap) = load_contract_data();
+
+    int wallet_hash = addr_hash(wallet);
+    var (_, exists) = tokens.udict_get?(256, wallet_hash);    ;; 256-bit hash key
+    if (~ exists) {
+        cell t = buildTokenData(0, new_dict(), new_dict()).end_cell();
+        tokens~udict_set(256, wallet_hash, t.begin_parse());
+        save_contract_data(tokens, hmap);
+    }
+}
+
+;; ------------------------------------------------------------------
+;; 2.  public getters
+;; ------------------------------------------------------------------
+int get_swap_counter(slice wallet) method_id {
+    var (tokens, _) = load_contract_data();
+    int wallet_hash = addr_hash(wallet);
+    var (tokSlice, ok) = tokens.udict_get?(256, wallet_hash);
+    return ok ? (tokSlice.preload_uint(64)) : 0;
+}
+
+(int, slice, slice, int, int, int, int) get_swap(slice wallet, int id) method_id {
+    var (tokens, _) = load_contract_data();
+    int wallet_hash = addr_hash(wallet);
+    var (tokSlice, ok) = tokens.udict_get?(256, wallet_hash);
+    throw_unless(ERR_SWAP_NOT_FOUND, ok);
+
+    var (cnt, swaps, _) = parseTokenData(tokSlice);
+    var (s, ok2) = swaps.udict_get?(256, id);
+    throw_unless(ERR_SWAP_NOT_FOUND, ok2);
+
+    var (init, recip, amt, h, tl, done) = parseSwap(s);
+    return (id, init, recip, amt, h, tl, done);
+}
+
+(int, slice, slice, int, int, int, int) get_swap_by_hashlock(int h) method_id {
+    var (tokens, hmap) = load_contract_data();
+    var (rec, ok) = hmap.udict_get?(256, h);
+    throw_unless(ERR_SWAP_NOT_FOUND, ok);
+
+    int wallet_hash = rec~load_uint(256);
+    int id = rec~load_uint(256);
+
+    var (tokSlice, ok2) = tokens.udict_get?(256, wallet_hash);
+    throw_unless(ERR_SWAP_NOT_FOUND, ok2);
+
+    var (cnt, swaps, _) = parseTokenData(tokSlice);
+    var (s, ok3) = swaps.udict_get?(256, id);
+    throw_unless(ERR_SWAP_NOT_FOUND, ok3);
+
+    var (init, recip, amt, hl, tl, done) = parseSwap(s);
+    return (id, init, recip, amt, hl, tl, done);
+}
+
+;; ------------------------------------------------------------------
+;; 3.  internal utility – store new swap
+;; ------------------------------------------------------------------
+() storeSwapMulti(
+        cell tokens, cell hmap,
+        slice wallet,
+        slice init, slice recip,
+        int amt, int hLock, int tLock
+) impure inline {
+
+    int wallet_hash = addr_hash(wallet);
+    ;; fetch or create token-entry
+    var (tokSlice, exists) = tokens.udict_get?(256, wallet_hash);
+
+    int counter = 0;
+    cell swaps  = new_dict();
+    cell hm     = new_dict();
+
+    if (exists) {
+        var (c,s1,h1) = parseTokenData(tokSlice);
+        counter = c; swaps = s1; hm = h1;
+    }
+
+    ;; write swap
+    builder sb = buildSwap(init, recip, amt, hLock, tLock, 0);
+    swaps~udict_set(256, counter, sb.end_cell().begin_parse());
+
+    ;; update per-token hash-map
+    hm~udict_set(256, hLock, begin_cell().store_uint(counter,256).end_cell().begin_parse());
+
+    ;; update global hash-map (store wallet_hash and counter)
+    hmap~udict_set(256, hLock,
+        begin_cell().store_uint(wallet_hash,256).store_uint(counter,256).end_cell().begin_parse());
+
+    ;; save token-data
+    cell newTok = buildTokenData(counter + 1, swaps, hm).end_cell();
+    tokens~udict_set(256, wallet_hash, newTok.begin_parse());
+}
+
+;; ------------------------------------------------------------------
+;; 4.  deposit notification (from Jetton wallet)
+;; ------------------------------------------------------------------
+() depositNotification(slice wallet, slice fp, int amt) impure {
+    var (tokens, hmap) = load_contract_data();
+
+    int declared = fp~load_uint(128);
+    throw_unless(ERR_INVALID_AMOUNT, declared == amt);
+
+    slice init = fp~load_msg_addr();
+    cell t = fp~load_ref();
+    slice recip_slice = t.begin_parse();
+    slice recip = recip_slice~load_msg_addr();
+
+    cell locks = fp~load_ref();
+    slice ls = locks.begin_parse();
+    int hLock = ls~load_uint(256);
+    int tLock = ls~load_uint(64);
+
+    storeSwapMulti(tokens, hmap, wallet, init, recip, amt, hLock, tLock);
+    save_contract_data(tokens, hmap);
+}
+
+;; ------------------------------------------------------------------
+;; 5.  complete swap
+;; ------------------------------------------------------------------
+() completeSwap(slice body, int msg_val, slice claimer) impure {
+    var (tokens, hmap) = load_contract_data();
+    slice wallet = body~load_msg_addr();   ;; first param = wallet
+    int   id     = body~load_uint(256);
+    int   preimg = body~load_uint(256);
+
+    int wallet_hash = addr_hash(wallet);
+    var (tokSlice, ok) = tokens.udict_get?(256, wallet_hash);
+    throw_unless(ERR_SWAP_NOT_FOUND, ok);
+
+    var (cnt, swaps, hm) = parseTokenData(tokSlice);
+    var (s, ok2) = swaps.udict_get?(256, id);
+    throw_unless(ERR_SWAP_NOT_FOUND, ok2);
+
+    var (init, recip, amt, hLock, tLock, done) = parseSwap(s);
+    throw_if(ERR_SWAP_COMPLETED, done);
+    throw_unless(ERR_INVALID_PREIMAGE, sha256_int256(preimg) == hLock);
+    throw_if(ERR_TIMELOCK_EXPIRED, now() >= tLock);
+
+    swaps~udict_set(256, id,
+        buildSwap(init, recip, amt, hLock, tLock, 1).end_cell().begin_parse());
+
+    ;; update token data
+    cell newTok = buildTokenData(cnt, swaps, hm).end_cell();
+    tokens~udict_set(256, wallet_hash, newTok.begin_parse());
+
+    sendJettonTransfer(wallet, claimer, amt, msg_val);
+    save_contract_data(tokens, hmap);
+}
+
+;; ------------------------------------------------------------------
+;; 6.  refund swap
+;; ------------------------------------------------------------------
+() refundSwap(slice body, int msg_val) impure {
+    var (tokens, hmap) = load_contract_data();
+    slice wallet = body~load_msg_addr();
+    int   id     = body~load_uint(256);
+
+    int wallet_hash = addr_hash(wallet);
+    var (tokSlice, ok) = tokens.udict_get?(256, wallet_hash);
+    throw_unless(ERR_SWAP_NOT_FOUND, ok);
+
+    var (cnt, swaps, hm) = parseTokenData(tokSlice);
+    var (s, ok2) = swaps.udict_get?(256, id);
+    throw_unless(ERR_SWAP_NOT_FOUND, ok2);
+
+    var (init, recip, amt, hLock, tLock, done) = parseSwap(s);
+    throw_if(ERR_SWAP_ALREADY_COMPLETED_REFUND, done);
+    throw_if(ERR_TIMELOCK_NOT_EXPIRED, now() < tLock);
+
+    swaps~udict_set(256, id,
+        buildSwap(init, recip, amt, hLock, tLock, 1).end_cell().begin_parse());
+
+    cell newTok = buildTokenData(cnt, swaps, hm).end_cell();
+    tokens~udict_set(256, wallet_hash, newTok.begin_parse());
+
+    sendJettonTransfer(wallet, init, amt, msg_val);
+    save_contract_data(tokens, hmap);
+}
+
+;; ------------------------------------------------------------------
+;; 7.  main entry
+;; ------------------------------------------------------------------
+() recv_internal(int msg_val, cell full, slice body) impure {
+    slice hdr = full.begin_parse();
+    _ = hdr~load_uint(4);
+    slice sender = hdr~load_msg_addr();
+
+    if (body.slice_empty?()) { return (); }
+
+    int op = body~load_uint(32);
+
+    if (op == OP_INITIALIZE)        { initialize_storage(body); return (); }
+    if (op == OP_COMPLETE_SWAP)     { completeSwap(body, msg_val, sender); return (); }
+    if (op == OP_REFUND_SWAP)       { refundSwap(body, msg_val); return (); }
+
+    if (op == 0x7362d09c) { ;; JETTON_TRANSFER_NOTIFICATION
+        int  _qid = body~load_uint(64);
+        int  amt  = body~load_coins();
+        slice wallet = body~load_msg_addr();    ;; sender Jetton wallet
+        _ = body~load_msg_addr();               ;; response addr (ignored)
+        cell fwd = body~load_ref();
+        slice fp = fwd.begin_parse();
+        int fop = fp~load_uint(32);
+        if (fop == OP_DEPOSIT_NOTIFICATION) {
+            depositNotification(wallet, fp, amt);
+        }
+        return ();
+    }
+}
