@@ -1,0 +1,309 @@
+#include "stdlib.fc";
+#include "error-codes.fc";
+#include "helpers.fc";
+
+
+;; -----------------------------------------------------------------
+;; GETTERS (for off-chain calls)
+;; -----------------------------------------------------------------
+int get_swap_counter() method_id {
+    var (_, swapCounter, _, _) = load_data();
+    return swapCounter;
+}
+
+slice get_jetton_wallet() method_id {
+    var (jettonWallet, _, _, _) = load_data();
+    return jettonWallet;
+}
+
+
+int has_swap(int swapId) method_id {
+    var (_, _, swaps, _) = load_data();
+    var (_, found) = swaps.udict_get?(256, swapId);
+    return found ? 1 : 0;
+}
+
+(slice, slice, int, int, int, int) get_swap(int swapId) method_id {
+    var (_, _, swaps, _) = load_data();
+    var (swapData, found) = swaps.udict_get?(256, swapId);
+    throw_unless(ERR_SWAP_NOT_FOUND, found);
+    return parseSwap(swapData);
+}
+
+(int, slice, slice, int, int, int, int) get_swap_by_hashlock(int hashlock) method_id {
+    var (_, _, swaps, hashlock_map) = load_data();
+    
+    var (swapId_cs, found) = hashlock_map.udict_get?(256, hashlock);
+    throw_unless(ERR_SWAP_NOT_FOUND, found);
+    
+    int swapId = swapId_cs.preload_uint(256);
+    
+    var (swapData, swap_found) = swaps.udict_get?(256, swapId);
+    throw_unless(ERR_SWAP_NOT_FOUND, swap_found);
+    
+    var (initiator, recipient, tokenAmount, current_hashlock, timeLock, isCompleted) = parseSwap(swapData);
+    return (swapId, initiator, recipient, tokenAmount, current_hashlock, timeLock, isCompleted);
+}
+
+;; refundSwap: Refunds a swap if the timelock has expired.
+() refundSwap(slice in_msg_body, int msg_value) impure {
+    var (jettonWallet, swapCounter, swaps, hashlock_map) = load_data();
+    
+    int swapId = in_msg_body~load_uint(256);
+
+    var (swapData, found) = swaps.udict_get?(256, swapId);
+
+    throw_unless(ERR_SWAP_NOT_FOUND, found);
+    
+    var (initiator, recipient, tokenAmount, hashLock, timeLock, isCompleted) = parseSwap(swapData);
+   
+  
+
+    throw_if(ERR_SWAP_ALREADY_COMPLETED_REFUND, isCompleted);
+    
+    int current_timestamp = now();
+
+    throw_if(ERR_TIMELOCK_NOT_EXPIRED, current_timestamp < timeLock);
+    
+    builder newSwap = buildSwap(initiator, recipient, tokenAmount, hashLock, timeLock, 1);
+    swaps~udict_set(256, swapId, newSwap.end_cell().begin_parse());
+    
+    sendJettonTransfer(jettonWallet, initiator, tokenAmount, msg_value);
+
+    save_data(jettonWallet, swapCounter, swaps, hashlock_map);
+}
+
+
+() depositNotification(slice sender_address, slice in_msg_body, int amount) impure {
+    var (jettonWallet, swapCounter, swaps, hashlock_map) = load_data();
+    
+    int depositAmount = 0;
+    try {
+        depositAmount = in_msg_body~load_uint(128);
+    } catch (_, _) {
+        return ();
+    }
+
+    throw_unless(ERR_INVALID_AMOUNT, depositAmount == amount);
+    
+    slice depositor = null();
+    try {
+        depositor = in_msg_body~load_msg_addr();
+    } catch (_, _) {
+        return ();
+    }
+    
+    if (in_msg_body.slice_refs() < 2) {
+        return ();
+    }
+    
+    slice recipient = null();
+    try {
+        cell recipientRef = in_msg_body~load_ref();
+        slice recipientSlice = recipientRef.begin_parse();
+        recipient = recipientSlice~load_msg_addr();
+    } catch (_, _) {
+        return ();
+    }
+    
+    int hashLock = 0;
+    int timeLock = 0;
+    try {
+        cell locksRef = in_msg_body~load_ref();
+        slice locksSlice = locksRef.begin_parse();
+        hashLock = locksSlice~load_uint(256);
+        timeLock = locksSlice~load_uint(64);
+    } catch (_, _) {
+        return ();
+    }
+    
+    try {
+        storeSwap(
+            jettonWallet,
+            swapCounter,
+            swaps,
+            hashlock_map,
+            depositor,
+            recipient,
+            depositAmount,
+            hashLock,
+            timeLock
+        );
+    } catch (_, _) {
+        throw(ERR_FAILED_DEPOSIT_NOTIFICATION);
+    }
+}
+
+;; completeSwap: Completes a swap if a valid preimage is provided.
+() completeSwap(slice in_msg_body, int msg_value) impure {
+
+
+    var (jettonWallet, swapCounter, swaps, hashlock_map) = load_data();
+    
+    int swapId = in_msg_body~load_uint(256);
+    int preimage = in_msg_body~load_uint(256);
+    
+    var (swapData, found) = swaps.udict_get?(256, swapId);
+    throw_unless(ERR_SWAP_NOT_FOUND, found);
+    
+    var (initiator, recipient, tokenAmount, hashLock, timeLock, isCompleted) = parseSwap(swapData);
+
+    var jettonWalletFluida = recipient;
+    
+    throw_if(ERR_SWAP_COMPLETED, isCompleted);
+    
+    int calculatedHash = sha256_int256(preimage);
+    throw_unless(ERR_INVALID_PREIMAGE, calculatedHash == hashLock);
+    
+    throw_if(ERR_TIMELOCK_EXPIRED, now() >= timeLock);
+    
+    builder newSwap = buildSwap(initiator, recipient, tokenAmount, hashLock, timeLock, 1);
+    swaps~udict_set(256, swapId, newSwap.end_cell().begin_parse());
+    
+    sendJettonTransfer(jettonWalletFluida, initiator, tokenAmount, msg_value);
+    save_data(jettonWalletFluida, swapCounter, swaps, hashlock_map);
+}
+
+;; -----------------------------------------------------------------
+;; The main entry point
+;; -----------------------------------------------------------------
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+    
+    int op = in_msg_body~load_uint(32);
+
+
+
+    
+    if (op == OP_COMPLETE_SWAP) {
+        completeSwap(in_msg_body, msg_value);
+        return ();
+    }
+    
+    if (op == OP_REFUND_SWAP) {
+        refundSwap(in_msg_body, msg_value);
+        return ();
+    }
+   
+
+
+    if (op == 0x7362d09c) { ;; JETTON_TRANSFER_NOTIFICATION
+        int queryId = in_msg_body~load_uint(64);
+        int tokenAmount = in_msg_body~load_coins();
+
+        try {
+            throw_if(ERR_INVALID_FROM_ADDRESS, in_msg_body.slice_data_empty?());
+        } catch (err) {
+            throw(242422424);
+        }
+    
+        slice from_address = null();
+        try {
+            from_address = in_msg_body~load_msg_addr();
+        } catch (err) {
+            throw(ERR_FAILED_LOAD_MSG_ADDR);
+        }
+    
+        try {
+            throw_if(ERR_INVALID_FROM_ADDRESS, from_address.slice_empty?());
+        } catch (err) {
+            throw(ERR_FAILED_CHECKING_SLICE_EMPTY);
+        }
+    
+        try {
+            throw_if(ERR_INVALID_AMOUNT_TRANSFER, in_msg_body.slice_data_empty?());
+        } catch (err) {
+            throw(ERR_FAILED_CHECKING_SLICE_DATA_EMPTY);
+        }
+    
+        try {
+            throw_if(ERR_INVALID_RESPONSE_ADDRESS, in_msg_body.slice_data_empty?());
+        } catch (err) {
+            throw(ERR_FAILED_CHECKING_SLICE_DATA_EMPTY);
+        }
+    
+        slice response_address = sender_address;
+    
+        int slice_refs_count = 0;
+        try {
+            slice_refs_count = in_msg_body.slice_refs();
+        } catch (err) {
+            throw(ERR_FAILED_SLICE_REFS_COUNT);
+        }
+    
+        throw_if(ERR_NO_REFS, slice_refs_count == 0);
+    
+        if (slice_refs_count > 0) {
+            try {
+                throw_if(ERR_INVALID_FORWARD_PAYLOAD, in_msg_body.slice_refs_empty?());
+            } catch (err) {
+                throw(ERR_FAILED_CHECKING_REFS_EMPTY);
+            }
+        
+            cell forward_payload = null();
+            try {
+                forward_payload = in_msg_body~load_ref();
+            } catch (err) {
+                throw(ERR_FAILED_LOAD_REF);
+            }
+        
+            slice forward_payload_slice = null();
+            try {
+                forward_payload_slice = forward_payload.begin_parse();
+            } catch (err) {
+                throw(ERR_FAILED_PARSE_FORWARD_PAYLOAD);
+            }
+        
+            try {
+                throw_if(ERR_INVALID_FORWARD_PAYLOAD, forward_payload_slice.slice_empty?());
+            } catch (err) {
+                throw(ERR_FAILED_CHECKING_SLICE_EMPTY);
+            }
+        
+            slice forward_slice = null();
+            try {
+                forward_slice = forward_payload.begin_parse();
+            } catch (err) {
+                throw(ERR_FAILED_PARSE_FORWARD_SLICE);
+            }
+        
+            try {
+                throw_if(ERR_INVALID_FORWARD_SLICE, forward_slice.slice_empty?());
+            } catch (err) {
+                throw(ERR_FAILED_CHECKING_SLICE_EMPTY);
+            }
+        
+            int forward_slice_bits = 0;
+            try {
+                forward_slice_bits = forward_slice.slice_bits();
+            } catch (err) {
+                throw(ERR_FAILED_GET_SLICE_BITS);
+            }
+        
+            throw_if(ERR_INSUFFICIENT_BITS, forward_slice_bits < 32);
+        
+            if (forward_slice_bits >= 32) {
+                int forward_op = 0;
+                try {
+                    forward_op = forward_slice~load_uint(32);
+                } catch (err) {
+                    throw(ERR_FAILED_LOAD_UINT);
+                }
+            
+                throw_if(ERR_INVALID_FORWARD_OP, forward_op <= 0);
+            
+                if (forward_op == OP_DEPOSIT_NOTIFICATION) {
+                    depositNotification(sender_address, forward_slice, tokenAmount);
+                    return ();
+                }
+            }
+        }
+        return ();
+    }
+}
