@@ -1,0 +1,29 @@
+;; Jetton parameters and constants
+
+;; Gas consumption constants
+int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
+int gas_consumption() asm "15000000 PUSHINT"; ;; 0.015 TON
+
+;; Workchain
+int workchain() asm "0 PUSHINT";
+
+;; Address constants
+slice null_addr() asm "b{00} PUSHSLICE";
+
+;; Jetton constants
+int jetton_wallet_code_hash() asm "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef PUSHINT"; ;; placeholder
+
+;; Error codes
+int error::unknown_op() asm "0xffff PUSHINT";
+int error::wrong_op() asm "0xffff PUSHINT";
+int error::not_owner() asm "705 PUSHINT";
+int error::not_enough_ton() asm "706 PUSHINT";
+int error::not_enough_gas() asm "707 PUSHINT";
+int error::not_valid_wallet() asm "708 PUSHINT";
+int error::wrong_workchain() asm "333 PUSHINT";
+int error::balance_error() asm "47 PUSHINT";
+int error::not_enough_jettons() asm "706 PUSHINT";
+int error::discovery_fee_not_matched() asm "75 PUSHINT";
+int error::wrong_signature() asm "35 PUSHINT";
+int error::malformed_forward_payload() asm "708 PUSHINT";
+int error::not_enough_tons_to_send() asm "709 PUSHINT";
