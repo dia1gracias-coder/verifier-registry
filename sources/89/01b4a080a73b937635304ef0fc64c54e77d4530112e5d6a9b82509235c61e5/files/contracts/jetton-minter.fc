@@ -1,0 +1,435 @@
+#include "imports/stdlib.fc";
+
+;; Jetton opcodes
+const int op::mint = 0x642b7d07;
+const int op::burn_notification = 0x7bdd97de;
+const int op::change_admin = 0x6368616e;
+const int op::change_metadata = 0x6d657461;
+const int op::set_team_flag = 0x5365544d; ;; "SeTM" - set team whitelist flag
+const int op::unlock_tokens = 0x556e6c6b; ;; passthrough from timelock
+
+;; MCDK specific opcodes
+const int op::set_status = 0x50537461; ;; "Sta" - set user status
+const int op::set_purchase_limit = 0x50754c6d; ;; "PuL" - set purchase limit
+const int op::game_mint = 0x476d696e; ;; "Gmin" - mint game tokens
+const int op::activate_account = 0x41637469; ;; "Acti" - activate account
+
+;; Constants
+const int MIN_BURN_STOP_SUPPLY = 10000000000000000000; ;; 10B tokens (with 9 decimals)
+const int TOTAL_EMISSION = 30000000000000000000; ;; 30B tokens (with 9 decimals)
+const int PRIZE_FUND = 11050000000000000; ;; 11.05M tokens for prizes (with 9 decimals)
+
+;; Tokenomics distribution
+const int SALE_ALLOCATION = 22500000000000000000; ;; 75% of emission (22.5B tokens)
+const int TEAM_ALLOCATION = 7500000000000000000; ;; 25% of emission (7.5B tokens)
+
+;; Team fund distribution (25% of emission)
+const int DEVELOPMENT_FUND = 3000000000000000000; ;; 40% of team allocation (3B tokens)
+const int MARKETING_FUND = 2250000000000000000; ;; 30% of team allocation (2.25B tokens)  
+const int TEAM_FUND = 1500000000000000000; ;; 20% of team allocation (1.5B tokens)
+const int RESERVE_FUND = 750000000000000000; ;; 10% of team allocation (0.75B tokens)
+
+;; Game constants
+const int FULL_BLOCK_DAYS = 105;
+const int TRADING_OPEN_DAY = 106;
+
+;; User status constants  
+const int STATUS_PENDING = 0;
+const int STATUS_ACTIVE = 1;
+const int STATUS_FINALIZING = 2;
+const int STATUS_TRADING = 3;
+const int STATUS_BLOCKED = 4;
+
+;; Enhanced storage: total_supply:Coins admin_address:MsgAddress next_admin_address:MsgAddress jetton_wallet_code:^Cell content:^Cell total_burned:Coins current_game_day:uint16 is_burning_stopped:uint1 sale_minted:Coins team_minted:Coins prize_minted:Coins team_whitelist:^Cell timelock_addr:MsgAddress
+
+(int, slice, slice, cell, cell, int, int, int, int, int, int, cell, slice) load_minter_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_coins(), ;; total_supply
+        ds~load_msg_addr(), ;; admin_address  
+        ds~load_msg_addr(), ;; next_admin_address
+        ds~load_ref(), ;; jetton_wallet_code
+        ds~load_ref(), ;; content
+        ds~load_coins(), ;; total_burned
+        ds~load_uint(16), ;; current_game_day
+        ds~load_uint(1), ;; is_burning_stopped
+        ds~load_coins(), ;; sale_minted
+        ds~load_coins(), ;; team_minted
+        ds~load_coins(), ;; prize_minted
+        ds~load_ref(),   ;; team_whitelist (dict 267 -> 1)
+        ds~load_msg_addr() ;; timelock_addr
+    );
+}
+
+() save_minter_data(int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell content, int total_burned, int current_game_day, int is_burning_stopped, int sale_minted, int team_minted, int prize_minted, cell team_whitelist, slice timelock_addr) impure inline {
+    set_data(begin_cell()
+        .store_coins(total_supply)
+        .store_slice(admin_address)
+        .store_slice(next_admin_address)
+        .store_ref(jetton_wallet_code)
+        .store_ref(content)
+        .store_coins(total_burned)
+        .store_uint(current_game_day, 16)
+        .store_uint(is_burning_stopped, 1)
+        .store_coins(sale_minted)
+        .store_coins(team_minted)
+        .store_coins(prize_minted)
+        .store_ref(team_whitelist)
+        .store_slice(timelock_addr)
+        .end_cell()
+    );
+}
+
+;; Calculate wallet address with enhanced data
+slice calculate_user_wallet_address(slice owner_address, cell jetton_wallet_code, slice my_address, int current_game_day) inline {
+    cell state_init = begin_cell()
+        .store_uint(0, 2)
+        .store_dict(jetton_wallet_code)
+        .store_dict(begin_cell()
+            .store_coins(0) ;; balance
+            .store_slice(owner_address) ;; owner_address
+            .store_slice(my_address) ;; jetton_master_address
+            .store_ref(jetton_wallet_code) ;; jetton_wallet_code
+            .store_uint(STATUS_ACTIVE, 8) ;; user_status
+            .store_coins(0) ;; purchased_amount
+            .store_uint(0, 1) ;; is_activated
+            .store_uint(current_game_day, 16) ;; current_day
+            .store_uint(0, 1) ;; is_team
+            .store_uint(0, 1) ;; is_burning_stopped
+            .store_uint(0, 32) ;; total_usd_cents
+            .end_cell())
+        .store_uint(0, 1)
+        .end_cell();
+        
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(0, 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell().begin_parse();
+}
+
+;; Send message to user wallet to set status/day
+() update_wallet_status(slice wallet_address, int new_status, int new_day, int is_team, int is_burning_stopped, int query_id) impure {
+    var msg_body = begin_cell()
+        .store_uint(op::set_status, 32)
+        .store_uint(query_id, 64)
+        .store_uint(new_status, 8)
+        .store_uint(new_day, 16)
+        .store_uint(is_team, 1)
+        .store_uint(is_burning_stopped, 1)
+        .end_cell();
+        
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(wallet_address)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body);
+    
+    send_raw_message(msg.end_cell(), 64);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    
+    slice sender_address = cs~load_msg_addr();
+    
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell content, int total_burned, int current_game_day, int is_burning_stopped, int sale_minted, int team_minted, int prize_minted, cell team_whitelist, slice timelock_addr) = load_minter_data();
+    
+    ;; Handle mint operations (both regular and game mints)
+    if ((op == 21) | (op == op::mint) | (op == op::game_mint)) {
+        throw_unless(73, equal_slices_bits(sender_address, admin_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        int amount = in_msg_body~load_coins();
+        int mint_channel = in_msg_body.slice_bits() ? in_msg_body~load_uint(8) : 0; ;; 0=general,1=sale,2=team,3=prize
+
+        ;; Emission caps enforcement
+        throw_unless(80, (total_supply + amount) <= TOTAL_EMISSION);
+        if (mint_channel == 1) {
+            throw_unless(81, (sale_minted + amount) <= SALE_ALLOCATION);
+            sale_minted += amount;
+        }
+        if (mint_channel == 2) {
+            throw_unless(82, (team_minted + amount) <= TEAM_ALLOCATION);
+            team_minted += amount;
+        }
+        if (mint_channel == 3) {
+            throw_unless(83, (prize_minted + amount) <= PRIZE_FUND);
+            prize_minted += amount;
+        }
+        
+        ;; For game mints, check if recipient is activated (if required)
+        if (op == op::game_mint) {
+            ;; Additional validation for game mints can be added here
+            int requires_activation = in_msg_body~load_uint(1);
+            if (requires_activation) {
+                ;; Send to wallet with activation check
+                slice wallet_address = calculate_user_wallet_address(to_address, jetton_wallet_code, my_address(), current_game_day);
+                ;; Implementation would check if wallet is activated
+            }
+        }
+        
+        ;; Build mint message
+        cell mint_msg = begin_cell()
+            .store_uint(0x178d4519, 32) ;; internal_transfer
+            .store_uint(query_id, 64)
+            .store_coins(amount)
+            .store_slice(admin_address) ;; from_address
+            .store_slice(sender_address) ;; response_address
+            .store_coins(0) ;; forward_ton_amount
+            .store_uint(0, 1) ;; no forward_payload
+            .end_cell();
+            
+        ;; Calculate wallet address
+        slice wallet_address = calculate_user_wallet_address(to_address, jetton_wallet_code, my_address(), current_game_day);
+        
+        ;; Create wallet state init
+        cell state_init = begin_cell()
+            .store_uint(0, 2)
+            .store_dict(jetton_wallet_code)
+            .store_dict(begin_cell()
+                .store_coins(0) ;; balance
+                .store_slice(to_address) ;; owner_address
+                .store_slice(my_address()) ;; jetton_master_address
+                .store_ref(jetton_wallet_code) ;; jetton_wallet_code
+                .store_uint(STATUS_ACTIVE, 8) ;; user_status
+                .store_coins(0) ;; purchased_amount
+                .store_uint(0, 1) ;; is_activated
+                .store_uint(current_game_day, 16) ;; current_day
+                .store_uint(0, 1) ;; is_team
+                .store_uint(0, 1) ;; is_burning_stopped (do not affect address derivation)
+                .store_uint(0, 32) ;; total_usd_cents
+                .end_cell())
+            .store_uint(0, 1)
+            .end_cell();
+            
+        ;; Send message to wallet
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(wallet_address)
+            .store_coins(msg_value / 2)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(state_init)
+            .store_ref(mint_msg);
+        send_raw_message(msg.end_cell(), 1);
+        
+        save_minter_data(total_supply + amount, admin_address, next_admin_address, jetton_wallet_code, content, total_burned, current_game_day, is_burning_stopped, sale_minted, team_minted, prize_minted, team_whitelist, timelock_addr);
+        return ();
+    }
+    
+    ;; Handle burn notifications from wallets
+    if (op == op::burn_notification) {
+        int burn_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        
+        ;; Verify sender is a valid wallet
+        slice expected_wallet = calculate_user_wallet_address(from_address, jetton_wallet_code, my_address(), current_game_day);
+        throw_unless(74, equal_slices_bits(sender_address, expected_wallet));
+        
+        ;; Update total supply and burned amount
+        total_supply -= burn_amount;
+        total_burned += burn_amount;
+        
+        ;; Check if burning should be stopped (10B tokens remaining)
+        if ((total_supply <= MIN_BURN_STOP_SUPPLY) & (is_burning_stopped == 0)) {
+            is_burning_stopped = 1;
+
+            ;; Broadcast stop-burn flag to wallet (from_address)
+            slice wallet_address = calculate_user_wallet_address(from_address, jetton_wallet_code, my_address(), current_game_day);
+            update_wallet_status(wallet_address, STATUS_ACTIVE, current_game_day, 0, 1, query_id);
+        }
+
+        save_minter_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, content, total_burned, current_game_day, is_burning_stopped, sale_minted, team_minted, prize_minted, team_whitelist, timelock_addr);
+        return ();
+    }
+    
+    ;; Admin function to change admin
+    if (op == op::change_admin) {
+        throw_unless(73, equal_slices_bits(sender_address, admin_address));
+        slice new_admin = in_msg_body~load_msg_addr();
+        save_minter_data(total_supply, new_admin, new_admin, jetton_wallet_code, content, total_burned, current_game_day, is_burning_stopped, sale_minted, team_minted, prize_minted, team_whitelist, timelock_addr);
+        return ();
+    }
+    
+    ;; Admin function to update game day and user statuses
+    if (op == op::set_status) {
+        throw_unless(73, equal_slices_bits(sender_address, admin_address));
+        int new_game_day = in_msg_body~load_uint(16);
+        slice target_user = in_msg_body~load_msg_addr();
+        int new_status = in_msg_body~load_uint(8);
+        int is_team_flag = in_msg_body.slice_bits() ? in_msg_body~load_uint(1) : 0;
+
+        ;; Update global game day
+        current_game_day = new_game_day;
+        
+        ;; Send status update to specific user wallet if provided
+        if (target_user.preload_uint(2) != 0) {
+            slice wallet_address = calculate_user_wallet_address(target_user, jetton_wallet_code, my_address(), current_game_day);
+            update_wallet_status(wallet_address, new_status, new_game_day, is_team_flag, is_burning_stopped, query_id);
+        }
+        
+        save_minter_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, content, total_burned, current_game_day, is_burning_stopped, sale_minted, team_minted, prize_minted, team_whitelist, timelock_addr);
+        return ();
+    }
+    
+    ;; Handle purchase notifications (track limits and activation)
+    if (op == op::set_purchase_limit) {
+        throw_unless(73, equal_slices_bits(sender_address, admin_address));
+        slice user_address = in_msg_body~load_msg_addr();
+        int purchase_amount = in_msg_body~load_coins();
+        int usd_amount = in_msg_body~load_coins();
+        
+        ;; Send purchase info to user wallet
+        slice wallet_address = calculate_user_wallet_address(user_address, jetton_wallet_code, my_address(), current_game_day);
+        
+        var msg_body = begin_cell()
+            .store_uint(op::set_purchase_limit, 32)
+            .store_uint(query_id, 64)
+            .store_coins(purchase_amount)
+            .store_coins(usd_amount)
+            .end_cell();
+            
+        var msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(wallet_address)
+            .store_coins(0)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body);
+        
+        send_raw_message(msg.end_cell(), 64);
+
+        ;; Lock purchased tokens during blocking period using timelock if set
+        if ((current_game_day <= FULL_BLOCK_DAYS) & (timelock_addr.preload_uint(2) != 0)) {
+            var lock_body = begin_cell()
+                .store_uint(0x4c6f636b, 32) ;; lock_tokens
+                .store_uint(query_id, 64)
+                .store_slice(user_address)
+                .store_coins(purchase_amount)
+                .store_uint(current_game_day, 16)
+                .end_cell();
+            var lock_msg = begin_cell()
+                .store_uint(0x10, 6)
+                .store_slice(timelock_addr)
+                .store_coins(0)
+                .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_ref(lock_body);
+            send_raw_message(lock_msg.end_cell(), 64);
+        }
+        return ();
+    }
+
+    ;; Admin can set team whitelist flag for address
+    if (op == op::set_team_flag) {
+        throw_unless(73, equal_slices_bits(sender_address, admin_address));
+        slice user_address = in_msg_body~load_msg_addr();
+        int is_team_flag = in_msg_body~load_uint(1);
+
+        ;; Update whitelist dictionary (store 1-bit flag)  
+        int key_hash = user_address.slice_hash();
+        if (is_team_flag) {
+            team_whitelist~udict_set_builder(256, key_hash, begin_cell().store_uint(1, 1));
+        } else {
+            (team_whitelist, int success) = udict_delete?(team_whitelist, 256, key_hash);
+        }
+
+        ;; Push flag to wallet
+        slice wallet_address = calculate_user_wallet_address(user_address, jetton_wallet_code, my_address(), current_game_day);
+        update_wallet_status(wallet_address, STATUS_ACTIVE, current_game_day, is_team_flag, is_burning_stopped, query_id);
+
+        save_minter_data(total_supply, admin_address, next_admin_address, jetton_wallet_code, content, total_burned, current_game_day, is_burning_stopped, sale_minted, team_minted, prize_minted, team_whitelist, timelock_addr);
+        return ();
+    }
+
+    ;; Handle unlock from timelock: mint unlocked amount to user (counts to sale allocation)
+    if (op == op::unlock_tokens) {
+        throw_unless(73, timelock_addr.preload_uint(2) != 0);
+        slice user_address = in_msg_body~load_msg_addr();
+        int unlock_amount = in_msg_body~load_coins();
+
+        throw_unless(84, (total_supply + unlock_amount) <= TOTAL_EMISSION);
+        throw_unless(85, (sale_minted + unlock_amount) <= SALE_ALLOCATION);
+        sale_minted += unlock_amount;
+
+        cell mint_msg2 = begin_cell()
+            .store_uint(0x178d4519, 32)
+            .store_uint(query_id, 64)
+            .store_coins(unlock_amount)
+            .store_slice(admin_address)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1)
+            .end_cell();
+
+        slice wallet_address2 = calculate_user_wallet_address(user_address, jetton_wallet_code, my_address(), current_game_day);
+
+        cell state_init2 = begin_cell()
+            .store_uint(0, 2)
+            .store_dict(jetton_wallet_code)
+            .store_dict(begin_cell()
+                .store_coins(0)
+                .store_slice(user_address)
+                .store_slice(my_address())
+                .store_ref(jetton_wallet_code)
+                .store_uint(STATUS_ACTIVE, 8)
+                .store_coins(0)
+                .store_uint(0, 1)
+                .store_uint(current_game_day, 16)
+                .store_uint(0, 1)
+                .store_uint(is_burning_stopped, 1)
+                .store_uint(0, 32)
+                .end_cell())
+            .store_uint(0, 1)
+            .end_cell();
+
+        var msg2 = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(wallet_address2)
+            .store_coins(msg_value / 2)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(state_init2)
+            .store_ref(mint_msg2);
+        send_raw_message(msg2.end_cell(), 1);
+
+        save_minter_data(total_supply + unlock_amount, admin_address, next_admin_address, jetton_wallet_code, content, total_burned, current_game_day, is_burning_stopped, sale_minted, team_minted, prize_minted, team_whitelist, timelock_addr);
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+(int, int, slice, cell, cell, int, int, int, int, int, cell) get_jetton_data() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell content, int total_burned, int current_game_day, int is_burning_stopped, int sale_minted, int team_minted, int prize_minted, cell team_whitelist, slice timelock_addr) = load_minter_data();
+    return (total_supply, -1, admin_address, content, jetton_wallet_code, total_burned, current_game_day, is_burning_stopped, sale_minted, team_minted, team_whitelist);
+}
+
+int get_current_game_day() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell content, int total_burned, int current_game_day, int is_burning_stopped, int sale_minted, int team_minted, int prize_minted, cell team_whitelist, slice timelock_addr) = load_minter_data();
+    return current_game_day;
+}
+
+int get_total_burned() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell content, int total_burned, int current_game_day, int is_burning_stopped, int sale_minted, int team_minted, int prize_minted, cell team_whitelist, slice timelock_addr) = load_minter_data();
+    return total_burned;
+}
+
+int is_burning_stopped() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell content, int total_burned, int current_game_day, int is_burning_stopped, int sale_minted, int team_minted, int prize_minted, cell team_whitelist, slice timelock_addr) = load_minter_data();
+    return is_burning_stopped;
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell jetton_wallet_code, cell content, int total_burned, int current_game_day, int is_burning_stopped, int sale_minted, int team_minted, int prize_minted, cell team_whitelist, slice timelock_addr) = load_minter_data();
+    return calculate_user_wallet_address(owner_address, jetton_wallet_code, my_address(), current_game_day);
+} 
