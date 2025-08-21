@@ -1,0 +1,34 @@
+#include "stdlib.fc";
+
+;; utils for sending message to CCL:
+
+const CCL_OP::TVM_MSG_TO_EVM = 0x6c582059;
+
+builder store_ccl_data(builder b, int query_id, int operation, int crosschain_ton_amount, slice response_address, cell fee_data) inline {
+  return b
+    .store_op_and_query_id(CCL_OP::TVM_MSG_TO_EVM, query_id)
+    .store_uint(operation, 32)
+    .store_coins(crosschain_ton_amount)
+    .store_maybe_ref(fee_data)
+    .store_slice(response_address);
+}
+
+(slice, (slice, int, cell, cell)) ~load_ccl_data(slice s) inline {
+  slice response_address = s~load_msg_addr();
+  slice crosschain_payload = (s~load_maybe_ref()).begin_parse();
+  int crosschain_ton_amount = crosschain_payload~load_coins();
+  cell fee_data = crosschain_payload~load_maybe_ref();
+  cell evm_data = crosschain_payload~load_maybe_ref();
+
+  return (s, (response_address, crosschain_ton_amount, fee_data, evm_data));
+}
+
+;; utils for parsing message on CCL:
+
+(slice, (int, int, cell, slice)) ~load_tvm_to_evm_data(slice s) inline {
+  int operation_type = s~load_uint(32);
+  int crosschain_ton_amount = s~load_coins();
+  cell fee_data = s~load_maybe_ref();
+  slice response_address = s~load_msg_addr();
+  return (s, (operation_type, crosschain_ton_amount, fee_data, response_address));
+}

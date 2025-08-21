@@ -1,0 +1,60 @@
+#include "../stdlib.fc";
+#include "ccl_gas_utils.fc";
+
+const int MIN_JETTON_PROXY_STORAGE_DURATION = 365 * 24 * 3600; ;; 1 year
+const int MIN_JETTON_WALLET_STORAGE_DURATION = 5 * 365 * 24 * 3600; ;; 5 years
+
+;;# Precompiled constants
+;;
+;;All of the contents are result of contract emulation tests
+;;
+const int JETTON_PROXY_BITS = 7696; ;;[/tests/JettonProxy.spec.ts#JP-1.1]
+const int JETTON_PROXY_CELLS = 16; ;;[/tests/JettonProxy.spec.ts#JP-1.1]
+
+;;## Gas
+;;
+;;Gas constants are calculated in the main test suite.
+;;First the related transaction is found, and then it's
+;;resulting gas consumption is printed to the console.
+const TRANSFER_NOTIFICATION_GAS_CONSUMPTION = 7925; ;;[/tests/JettonProxy.spec.ts#JP-2.5]
+const ERROR_NOTIFICATION_GAS_CONSUMPTION = 5402; ;;[/tests/JettonProxy.spec.ts#JP-3.2]
+
+
+;; Estimated constants
+;; In this section, we provide rounded estimated gas amounts based on our test results. There is no guarantee that this amount will be sufficient
+;; Estimated for the case when JettonWallet code is not libs.
+const ESTIMATED_JETTON_WALLET_BITS = 11000; ;;[/tests/JettonWallet.spec.ts#JW-1.1] Rounded
+const ESTIMATED_JETTON_WALLET_CELLS = 25; ;;[/tests/JettonWallet.spec.ts#JW-1.1] Rounded
+
+const ESTIMATED_SEND_TRANSFER_GAS_CONSUMPTION = 11000; ;;[/tests/JettonWallet.spec.ts#JW-4.4] Rounded
+const ESTIMATED_RECEIVE_TRANSFER_GAS_CONSUMPTION = 12000; ;;[/tests/JettonWallet.spec.ts#JW-4.4] Rounded
+
+int estimated_jetton_wallet_forward_init_state_overhead() inline {
+    return get_simple_forward_fee(BASECHAIN, ESTIMATED_JETTON_WALLET_BITS, ESTIMATED_JETTON_WALLET_CELLS);
+}
+
+int calculate_estimated_jetton_wallet_min_storage_fee() inline {
+    return get_storage_fee(BASECHAIN, MIN_JETTON_WALLET_STORAGE_DURATION, ESTIMATED_JETTON_WALLET_BITS, ESTIMATED_JETTON_WALLET_CELLS);
+}
+
+
+int calculate_jetton_proxy_min_storage_fee() inline {
+    return get_storage_fee(BASECHAIN, MIN_JETTON_PROXY_STORAGE_DURATION, JETTON_PROXY_BITS, JETTON_PROXY_CELLS);
+}
+
+int calculate_proxy_tvm_msg_to_evm_fee(int fwd_fee, int crosschain_ton_amount, int protocol_fee, int tac_executors_fee, int ton_executors_fee) inline {
+    ;; 2 messages: JettonProxy > CrossChainLayer > log
+    ;; or
+    ;; 2 messages: JettonProxy > JettonProxy JettonWallet > User JettonWallet
+    ;; or
+    ;; 4 messages: JettonProxy > CrossChainLayer > JettonProxy > JettonProxy JettonWallet > User JettonWallet
+    return 4 * fwd_fee + crosschain_ton_amount + protocol_fee + tac_executors_fee + ton_executors_fee +
+    get_compute_fee(BASECHAIN, TRANSFER_NOTIFICATION_GAS_CONSUMPTION) +
+    get_compute_fee(BASECHAIN, TVM_MSG_TO_EVM_GAS_CONSUMPTION) +
+    get_compute_fee(BASECHAIN, ERROR_NOTIFICATION_GAS_CONSUMPTION) +
+    estimated_jetton_wallet_forward_init_state_overhead() + ;; additional fwd fees related to initstate in internal_transfer
+    get_compute_fee(BASECHAIN, ESTIMATED_SEND_TRANSFER_GAS_CONSUMPTION) +
+    get_compute_fee(BASECHAIN, ESTIMATED_RECEIVE_TRANSFER_GAS_CONSUMPTION) +
+    calculate_estimated_jetton_wallet_min_storage_fee() +
+    calculate_ccl_min_storage_fee();
+}
