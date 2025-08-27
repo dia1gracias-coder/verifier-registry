@@ -1,0 +1,58 @@
+#include "../shared/utils.fc";
+
+const WIN_FEE_SHARE = 2500;
+const MIN_TON_BET = 250000000;
+const FLIP_GAS_FEE = 45000000;
+const INVALID_MSG = "Send h or t";
+
+const FEE_POOL = "UQCu8lL3X0vfTNRwgdi7IjUi0UHRWmkZdRXDDOIGYUW3yHBS"a;
+
+() check_side(msg) impure inline_ref {
+    int isHeads = equal_slices(msg, "h");
+    int isTails = equal_slices(msg, "t");
+
+    ifnot isHeads | isTails {
+        refund_bet(INVALID_MSG);
+        throw(0);
+    }
+}
+
+() check_bet_amount(
+    int amount,
+    int pool_balance, 
+    int min_bet,
+    int max_win
+) impure inline {
+    int max_bet = get_max_bet(pool_balance, max_win, bet_x);
+
+    if(pool_balance < min_bet){
+        refund_bet("Pool is empty");
+        throw(0);
+    }
+    if(amount < min_bet){
+        refund_bet(
+            response_w_coins("Min bet is ", min_bet, "TON")
+        );
+        throw(0);
+    }
+    if(amount > max_bet){
+        refund_bet(
+            response_w_coins("Max bet is ", max_bet, "TON")
+        );
+        throw(0);
+    }
+}
+
+(cell, ()) set_last_bets_dict(cell last_bets_dict, cell new_bet) impure inline {
+    (int max_bet_id, _, int is_max_bet_id) = last_bets_dict.udict_get_max?(32);
+    int new_bet_id = is_max_bet_id ? max_bet_id + 1 : 1;
+
+    last_bets_dict~udict_set_ref(32, new_bet_id, new_bet);
+    (int min_bet_id, _, int is_min_bet_id) = last_bets_dict.udict_get_min?(32);
+        
+    if (is_min_bet_id & (new_bet_id - min_bet_id) > 18) {
+        last_bets_dict~udict_delete?(32, min_bet_id);
+    }
+
+    return (last_bets_dict, ());
+}
