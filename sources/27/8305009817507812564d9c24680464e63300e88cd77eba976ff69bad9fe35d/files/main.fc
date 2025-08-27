@@ -1,0 +1,476 @@
+#include "stdlib.fc";
+
+(cell) dict_get(cell dict, int key) asm "DICTGET";
+(int) is_null(cell c) asm "ISNULL";
+(int) slice_data_equal?(slice s1, slice s2) asm "SDEQ";
+
+;; Lottery Contract for TON Blockchain
+;; Generates random codes based on different methods and time intervals
+
+;; Operation codes for different lottery methods
+int op:generate_bronze1() asm "0x42524e31 PUSHINT"; ;; 'BRN1'
+int op:generate_bronze2() asm "0x42524e32 PUSHINT"; ;; 'BRN2'
+int op:generate_silver1() asm "0x534c5631 PUSHINT"; ;; 'SLV1'
+int op:generate_silver2() asm "0x534c5632 PUSHINT"; ;; 'SLV2'
+int op:generate_gold1() asm "0x474c4431 PUSHINT"; ;; 'GLD1'
+int op:generate_gold2() asm "0x474c4432 PUSHINT"; ;; 'GLD2'
+int op:generate_platinum1() asm "0x504c5431 PUSHINT"; ;; 'PLT1'
+int op:generate_platinum2() asm "0x504c5432 PUSHINT"; ;; 'PLT2'
+int op:generate_jackpot() asm "0x4a41434b PUSHINT"; ;; 'JACK'
+int op:get_last_codes() asm "0x474c4153 PUSHINT"; ;; 'GLAS'
+int op:get_all_codes() asm "0x47414c4c PUSHINT"; ;; 'GALL'
+int op:get_codes_page() asm "0x47435047 PUSHINT"; ;; 'GCPG'
+
+;; Time intervals for code generation (in seconds)
+const BRONZE1_INTERVAL = 43200;  ;; 12 hours
+const BRONZE2_INTERVAL = 86400;  ;; 24 hours
+const SILVER1_INTERVAL = 172800; ;; 2 days
+const SILVER2_INTERVAL = 345600; ;; 4 days
+const GOLD1_INTERVAL = 604800;   ;; 7 days
+const GOLD2_INTERVAL = 1209600;  ;; 14 days
+const PLATINUM1_INTERVAL = 2592000; ;; 30 days
+const PLATINUM2_INTERVAL = 5184000; ;; 60 days
+const JACKPOT_INTERVAL = 5184000;   ;; 60 days
+
+;; Storage structure:
+;; - random_seed: 256-bit integer for random number generation
+;; - codes_dict: Dictionary mapping method name to latest CodeRecord
+;; - all_codes_dict: Dictionary mapping timestamp to CodeRecord
+;; - method_timestamps_dict: Dictionary mapping method name to linked list of timestamps
+(int, cell, cell, cell) load_storage() impure inline_ref {
+  var ds = get_data().begin_parse();
+  ;; اگر storage خالی است، مقادیر پیش‌فرض برگردان
+  if (ds.slice_bits() == 0) {
+    return (0, new_dict(), new_dict(), new_dict());
+  }
+  return (ds~load_uint(256), ds~load_dict(), ds~load_dict(), ds~load_dict());
+}
+
+;; Save storage with updated values
+() save_storage(int random_seed, cell codes_dict, cell all_codes_dict, cell method_timestamps_dict) impure inline_ref {
+  set_data(begin_cell()
+    .store_uint(random_seed, 256)
+    .store_dict(codes_dict)
+    .store_dict(all_codes_dict)
+    .store_dict(method_timestamps_dict)
+  .end_cell());
+}
+
+;; Generate a secure random number using block data and message data
+(int) secure_random(int max, slice msg_data) impure inline_ref {
+  var (random_seed, _, _, _) = load_storage();
+  int entropy = random_seed + now() + cur_lt();
+  int msg_value = 0;
+  if (msg_data.slice_bits() >= 32) {
+    msg_value = msg_data~load_uint(32);
+  }
+  int new_seed = ((entropy * 65537) ^ (msg_value / 17)) % 0xFFFFFFFF;
+  if (new_seed < 0) {
+    new_seed = new_seed * -1;
+  }
+  return new_seed % max;
+}
+
+;; Generate a random letter (A-Z)
+(slice) random_letter(slice msg_data) impure inline_ref {
+  slice letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  int index = secure_random(26, msg_data);
+  letters~skip_bits(index * 8);
+  return letters~load_bits(8);
+}
+
+;; Generate a random digit (0-9)
+(slice) random_digit(slice msg_data) impure inline_ref {
+  int digit = secure_random(10, msg_data);
+  slice digits = "0123456789";
+  digits~skip_bits(digit * 8);
+  return digits~load_bits(8);
+}
+
+;; Concatenate two slices into one
+(slice) concat_slices(slice a, slice b) inline_ref {
+  return begin_cell().store_slice(a).store_slice(b).end_cell().begin_parse();
+}
+
+;; Validate method name
+(int) is_valid_method(slice method) inline_ref {
+  if (method.slice_bits() < 32) {
+    return 0;
+  }
+  return slice_data_equal?(method, "BRN1") | slice_data_equal?(method, "BRN2") |
+         slice_data_equal?(method, "SLV1") | slice_data_equal?(method, "SLV2") |
+         slice_data_equal?(method, "GLD1") | slice_data_equal?(method, "GLD2") |
+         slice_data_equal?(method, "PLT1") | slice_data_equal?(method, "PLT2") |
+         slice_data_equal?(method, "JACK");
+}
+
+;; Generate a single code based on the method format
+(slice) generate_single_code(slice method, slice msg_data) impure inline_ref {
+  if (is_valid_method(method) == 0) {
+    return "";
+  }
+  if (slice_data_equal?(method, "BRN1") | slice_data_equal?(method, "BRN2")) {
+    slice letter = random_letter(msg_data);
+    slice digits = random_digit(msg_data);
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    return concat_slices(letter, concat_slices("-", digits));
+  }
+  if (slice_data_equal?(method, "SLV1") | slice_data_equal?(method, "SLV2")) {
+    slice letter = random_letter(msg_data);
+    slice digits = random_digit(msg_data);
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    return concat_slices(letter, concat_slices("-", digits));
+  }
+  if (slice_data_equal?(method, "GLD1") | slice_data_equal?(method, "GLD2")) {
+    slice letter = random_letter(msg_data);
+    letter = concat_slices(letter, random_letter(msg_data));
+    slice digits = random_digit(msg_data);
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    return concat_slices(letter, concat_slices("-", digits));
+  }
+  if (slice_data_equal?(method, "PLT1") | slice_data_equal?(method, "PLT2")) {
+    slice letter = random_letter(msg_data);
+    letter = concat_slices(letter, random_letter(msg_data));
+    letter = concat_slices(letter, random_letter(msg_data));
+    slice digits = random_digit(msg_data);
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    return concat_slices(letter, concat_slices("-", digits));
+  }
+  if (slice_data_equal?(method, "JACK")) {
+    slice letter = random_letter(msg_data);
+    letter = concat_slices(letter, random_letter(msg_data));
+    letter = concat_slices(letter, random_letter(msg_data));
+    slice digits = random_digit(msg_data);
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    digits = concat_slices(digits, random_digit(msg_data));
+    return concat_slices(letter, concat_slices("-", digits));
+  }
+  return "";
+}
+
+;; Check if it's time to generate new codes for a method
+(int) should_generate(slice method, int last_timestamp) impure inline_ref {
+  if (last_timestamp == 0) {
+    return 1;
+  }
+  int current_time = now();
+  int elapsed = current_time - last_timestamp;
+  if (slice_data_equal?(method, "BRN1")) { return elapsed >= BRONZE1_INTERVAL; }
+  if (slice_data_equal?(method, "BRN2")) { return elapsed >= BRONZE2_INTERVAL; }
+  if (slice_data_equal?(method, "SLV1")) { return elapsed >= SILVER1_INTERVAL; }
+  if (slice_data_equal?(method, "SLV2")) { return elapsed >= SILVER2_INTERVAL; }
+  if (slice_data_equal?(method, "GLD1")) { return elapsed >= GOLD1_INTERVAL; }
+  if (slice_data_equal?(method, "GLD2")) { return elapsed >= GOLD2_INTERVAL; }
+  if (slice_data_equal?(method, "PLT1")) { return elapsed >= PLATINUM1_INTERVAL; }
+  if (slice_data_equal?(method, "PLT2")) { return elapsed >= PLATINUM2_INTERVAL; }
+  if (slice_data_equal?(method, "JACK")) { return elapsed >= JACKPOT_INTERVAL; }
+  return 0;
+}
+
+;; Align timestamp to the start of the day (00:00:00 GMT)
+(int) align_to_midnight_gmt(int timestamp) inline_ref {
+  return (timestamp / 86400) * 86400;
+}
+
+;; Add timestamp to linked list and trim to 100 items
+(cell) add_to_timestamps_list(cell current_list, int timestamp) inline_ref {
+  ;; اضافه کردن به ابتدای لیست
+  cell new_list = begin_cell()
+    .store_uint(timestamp, 32)
+    .store_ref(current_list)
+  .end_cell();
+  
+  ;; trimming به 100 مورد اخیر
+  cell trimmed_list = null();
+  cell temp = new_list;
+  int count = 0;
+  
+  ;; حلقه تا 100 آیتم یا تا پایان لیست
+  while (count < 100) {
+    var temp_slice = temp.begin_parse();
+    
+    ;; بررسی اگر اسلایس داده دارد
+    if (temp_slice.slice_bits() == 0) {
+      ;; خروج از حلقه وقتی داده‌ای نیست
+      temp = null();
+      count = 100; ;; برای خروج از حلقه
+    } else {
+      int ts = temp_slice~load_uint(32);
+      
+      trimmed_list = begin_cell()
+        .store_uint(ts, 32)
+        .store_ref(trimmed_list)
+      .end_cell();
+      
+      ;; بررسی اگر رفرنس بعدی وجود دارد
+      if (temp_slice.slice_refs() > 0) {
+        temp = temp_slice~load_ref();
+        count += 1;
+      } else {
+        temp = null();
+        count = 100; ;; برای خروج از حلقه
+      }
+    }
+  }
+  
+  return trimmed_list;
+}
+
+;; Generate codes for a specific method
+() generate_method_codes(slice method, slice msg_data) impure method_id {
+  
+  if (method.slice_bits() < 32) {
+    return ();
+  }
+  if (is_valid_method(method) == 0) {
+    return ();
+  }
+
+  var (random_seed, codes_dict, all_codes_dict, method_timestamps_dict) = load_storage();
+
+  int method_hash = method~load_uint(32);
+  var record_cell = dict_get(codes_dict, method_hash);
+  int last_timestamp = 0;
+  if (is_null(record_cell) == 0) {
+    var record_slice = record_cell.begin_parse();
+    if (record_slice.slice_bits() >= 32) {
+      last_timestamp = record_slice~load_uint(32);
+    }
+  }
+  
+  int interval = 0;
+  if (slice_data_equal?(method, "BRN1")) { interval = BRONZE1_INTERVAL; }
+  if (slice_data_equal?(method, "BRN2")) { interval = BRONZE2_INTERVAL; }
+  if (slice_data_equal?(method, "SLV1")) { interval = SILVER1_INTERVAL; }
+  if (slice_data_equal?(method, "SLV2")) { interval = SILVER2_INTERVAL; }
+  if (slice_data_equal?(method, "GLD1")) { interval = GOLD1_INTERVAL; }
+  if (slice_data_equal?(method, "GLD2")) { interval = GOLD2_INTERVAL; }
+  if (slice_data_equal?(method, "PLT1")) { interval = PLATINUM1_INTERVAL; }
+  if (slice_data_equal?(method, "PLT2")) { interval = PLATINUM2_INTERVAL; }
+  if (slice_data_equal?(method, "JACK")) { interval = JACKPOT_INTERVAL; }
+  
+  int current_time = now();
+  int next_time = last_timestamp == 0 ? align_to_midnight_gmt(current_time) : last_timestamp + interval;
+  
+  while (next_time <= current_time) {
+    slice code1 = generate_single_code(method, msg_data);
+    slice code2 = generate_single_code(method, msg_data);
+    slice code3 = generate_single_code(method, msg_data);
+    
+    if (slice_data_equal?(code1, "") | slice_data_equal?(code2, "") | slice_data_equal?(code3, "")) {
+      return ();
+    }
+    
+    cell new_record = begin_cell()
+      .store_uint(next_time, 32)
+      .store_slice(code1)
+      .store_slice(code2)
+      .store_slice(code3)
+    .end_cell();
+    
+    ;; به روز رسانی dictionaries
+    codes_dict = dict_set(codes_dict, method_hash, "", new_record.begin_parse());
+    
+    cell all_codes_cell = begin_cell()
+      .store_slice(method)
+      .store_uint(next_time, 32)
+      .store_slice(code1)
+      .store_slice(code2)
+      .store_slice(code3)
+    .end_cell();
+    all_codes_dict = dict_set(all_codes_dict, next_time, "", all_codes_cell.begin_parse());
+    
+    ;; به روز رسانی لیست timestampها
+    var current_timestamps = dict_get(method_timestamps_dict, method_hash);
+    if (is_null(current_timestamps)) {
+      current_timestamps = null();
+    }
+    current_timestamps = add_to_timestamps_list(current_timestamps, next_time);
+    method_timestamps_dict = dict_set(method_timestamps_dict, method_hash, "", current_timestamps.begin_parse());
+    
+    next_time = next_time + interval;
+  }
+  
+  save_storage(random_seed + 1, codes_dict, all_codes_dict, method_timestamps_dict);
+}
+
+;; Generate codes for all methods
+() generate_all_codes(slice msg_data) impure {
+  slice methods = "BRN1BRN2SLV1SLV2GLD1GLD2PLT1PLT2JACK";
+  int i = 0;
+  while (i < 9) {
+    slice temp_methods = methods;
+    temp_methods~skip_bits(i * 4 * 8);
+    
+    if (temp_methods.slice_bits() >= 32) {
+      slice method = temp_methods~load_bits(32);
+      generate_method_codes(method, msg_data);
+    }
+    i = i + 1;
+  }
+}
+
+;; External Methods to call by Platform
+() BulkGenerate() method_id {
+  slice empty_msg = "";
+  generate_all_codes(empty_msg);
+}
+
+;; External Methods to call by Platform Single
+() Generate(slice method) method_id {
+  slice empty_msg = "";
+  generate_method_codes(method, empty_msg);
+}
+
+;; Handle internal messages to generate codes
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+  var cs = in_msg_cell.begin_parse();
+  cs~skip_bits(4);
+  slice sender = cs~load_msg_addr();
+  if (in_msg.slice_bits() < 32) {
+    return ();
+  }
+  int op = in_msg~load_uint(32);
+  if (op == op:generate_bronze1()) { generate_method_codes("BRN1", in_msg); }
+  elseif (op == op:generate_bronze2()) { generate_method_codes("BRN2", in_msg); }
+  elseif (op == op:generate_silver1()) { generate_method_codes("SLV1", in_msg); }
+  elseif (op == op:generate_silver2()) { generate_method_codes("SLV2", in_msg); }
+  elseif (op == op:generate_gold1()) { generate_method_codes("GLD1", in_msg); }
+  elseif (op == op:generate_gold2()) { generate_method_codes("GLD2", in_msg); }
+  elseif (op == op:generate_platinum1()) { generate_method_codes("PLT1", in_msg); }
+  elseif (op == op:generate_platinum2()) { generate_method_codes("PLT2", in_msg); }
+  elseif (op == op:generate_jackpot()) { generate_method_codes("JACK", in_msg); }
+  else { generate_all_codes(in_msg); }
+}
+
+;; Get the latest codes for all methods
+cell get_last_codes() method_id {
+  var (_, codes_dict, _, _) = load_storage();
+  return codes_dict;
+}
+
+;; Get all historical codes
+cell get_all_codes() method_id {
+  var (_, _, all_codes_dict, _) = load_storage();
+  return all_codes_dict;
+}
+
+;; Get the latest code for a specific method
+cell get_last_code_by_type(slice method) method_id {
+  if (method.slice_bits() < 32) {
+    return begin_cell().end_cell();
+  }
+  
+  if (is_valid_method(method) == 0) {
+    return begin_cell().end_cell();
+  }
+  
+  var (_, codes_dict, _, _) = load_storage();
+  int method_hash = method~load_uint(32);
+  var record_cell = dict_get(codes_dict, method_hash);
+  
+  if (is_null(record_cell) != 0) {
+    return begin_cell().end_cell();
+  }
+  
+  return record_cell;
+}
+
+;; Get codes by page with pagination
+cell get_codes_page(slice method, int page_number, int page_size) method_id {
+  if (method.slice_bits() < 32) {
+    return new_dict();
+  }
+  
+  if (is_valid_method(method) == 0) {
+    return new_dict();
+  }
+  
+  var (_, _, all_codes_dict, method_timestamps_dict) = load_storage();
+  cell filtered = new_dict();
+  
+  int method_hash = method~load_uint(32);
+  var timestamps_cell = dict_get(method_timestamps_dict, method_hash);
+  
+  if (is_null(timestamps_cell) != 0) {
+    return new_dict();
+  }
+  
+  ;; محاسبه محدوده
+  int start_index = page_number * page_size;
+  int end_index = start_index + page_size;
+  int current_index = 0;
+  
+  ;; پیمایش تا برسیم به صفحه مورد نظر
+  var current = timestamps_cell;
+  while (current_index < start_index) {
+    var current_slice = current.begin_parse();
+    
+    ;; اگر اسلایس داده دارد ادامه بده
+    if (current_slice.slice_bits() > 0) {
+      current = current_slice~load_ref();
+      current_index += 1;
+    } else {
+      current_index = start_index; ;; برای خروج از حلقه
+    }
+  }
+  
+  ;; خواندن داده‌های صفحه requested
+  int count = 0;
+  while (count < page_size) {
+    var current_slice = current.begin_parse();
+    
+    ;; اگر اسلایس داده ندارد، خارج شو
+    if (current_slice.slice_bits() == 0) {
+      count = page_size; ;; برای خروج از حلقه
+    } else {
+      int timestamp = current_slice~load_uint(32);
+      
+      var value_cell = dict_get(all_codes_dict, timestamp);
+      if (is_null(value_cell) == 0) {
+        filtered = dict_set(filtered, timestamp, "", value_cell.begin_parse());
+      }
+      
+      count += 1;
+      
+      ;; اگر رفرنس بعدی وجود دارد ادامه بده
+      if (current_slice.slice_refs() > 0) {
+        current = current_slice~load_ref();
+      } else {
+        count = page_size; ;; برای خروج از حلقه
+      }
+    }
+  }
+  
+  return filtered;
+}
+
+;; Helper functions for common pagination requests
+cell get_page_1(slice method) method_id { return get_codes_page(method, 0, 100); }
+cell get_page_2(slice method) method_id { return get_codes_page(method, 1, 100); }
+cell get_page_3(slice method) method_id { return get_codes_page(method, 2, 100); }
+cell get_last_100(slice method) method_id { return get_codes_page(method, 0, 100); }
+
+;; Initialize contract with external message
+() recv_external(slice in_msg) impure {
+  var (random_seed, codes_dict, all_codes_dict, method_timestamps_dict) = load_storage();
+  if (random_seed == 0) {
+    ;; اولین بار - initialize storage
+    random_seed = now() + cur_lt();
+    codes_dict = new_dict();
+    all_codes_dict = new_dict();
+    method_timestamps_dict = new_dict();
+    save_storage(random_seed, codes_dict, all_codes_dict, method_timestamps_dict);
+  }
+  generate_all_codes(in_msg);
+}
