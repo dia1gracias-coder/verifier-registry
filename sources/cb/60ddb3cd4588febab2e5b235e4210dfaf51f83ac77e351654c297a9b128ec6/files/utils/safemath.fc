@@ -1,0 +1,5 @@
+int division(int a, int b) asm "x{A904} s,";   ;; 65 gas units
+int multiply(int a, int b) asm "x{A8} s,";     ;; 65 gas units
+int multiply_f(int a, int b, int c) { ;; multiply with factor
+    return division(multiply(a, b), c);
+}
