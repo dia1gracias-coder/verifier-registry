@@ -1,0 +1,166 @@
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+;; =============== general consts =============================
+
+const ONE_TON = 1000000000; ;; 1 TON
+const TEN_TO_9_POWER = 1000000000;
+
+;; jetton wallet ops
+const JETTON_WALLET_OP::TRANSFER = 0xf8a7ea5;
+
+;; errors
+const int ERROR::NOT_ENOUGH_GAS = 48;
+
+const ERROR::NOT_ENOUGH_TON = 100;
+const ERROR::INSUFFICIENT_BALANCE = 101;
+
+const ERROR::NOT_BOUNCEABLE_OP = 150;
+
+const int MSG_INFO_REST_BITS = 1 + 4 + 4 + 64 + 32;
+const int MSG_ONLY_BODY_SIZE = MSG_INFO_REST_BITS + 1 + 1;
+;;; x = 0 is used for ordinary messages; the gas fees are deducted from the senging amount; action phaes should NOT be ignored.
+const int SEND_MODE::REGULAR = 0;
+;;; +1 means that the sender wants to pay transfer fees separately.
+const int SEND_MODE::PAY_FEES_SEPARATELY = 1;
+;;; + 2 means that any errors arising while processing this message during the action phase should be ignored.
+const int SEND_MODE::IGNORE_ERRORS = 2;
+;;; + 32 means that the current account must be destroyed if its resulting balance is zero.
+const int SEND_MODE::DESTROY = 32;
+;;; x = 64 is used for messages that carry all the remaining value of the inbound message in addition to the value initially indicated in the new message.
+const int SEND_MODE::CARRY_ALL_REMAINING_MESSAGE_VALUE = 64;
+;;; x = 128 is used for messages that are to carry all the remaining balance of the current smart contract (instead of the value originally indicated in the message).
+const int SEND_MODE::CARRY_ALL_BALANCE = 128;
+;;; in the case of action fail - bounce transaction. No effect if SEND_MODE_IGNORE_ERRORS (+2) is used. TVM UPGRADE 2023-07. https://docs.ton.org/learn/tvm-instructions/tvm-upgrade-2023-07#sending-messages
+const int SEND_MODE::BOUNCE_ON_ACTION_FAIL = 16;
+const int FLAGS::NON_BOUNCEABLE = 0x10; ;; 0b010000 tag - 0, ihr_disabled - 1, bounce - 0, bounced - 0, src = adr_none$00
+
+const int MSG_OP_SIZE = 32;
+const int MSG_QUERY_ID_SIZE = 64;
+
+;; =============== send msg utils =============================
+
+const ERROR::UNKNOWN_OP = 0xffff;
+
+const int MSG_WITH_STATE_INIT_AND_BODY_SIZE = MSG_INFO_REST_BITS + 1 + 1 + 1;
+const int MSG_HAVE_STATE_INIT = 4;
+const int MSG_STATE_INIT_IN_REF = 2;
+const int MSG_BODY_IN_REF = 1;
+
+;; if no StateInit:
+;; 0b0 for `Maybe (Either StateInit ^StateInit)` and 0b1 or 0b0 for `body:(Either X ^X)`
+
+const int MSG_ONLY_BODY_SIZE = MSG_INFO_REST_BITS + 1 + 1;
+
+builder store_statinit_ref_and_body_ref(builder b, cell state_init, cell body) inline {
+    return b
+    .store_uint(MSG_HAVE_STATE_INIT + MSG_STATE_INIT_IN_REF + MSG_BODY_IN_REF, MSG_WITH_STATE_INIT_AND_BODY_SIZE)
+    .store_ref(state_init)
+    .store_ref(body);
+}
+
+builder store_only_body_ref(builder b, cell body) inline {
+    return b
+    .store_uint(MSG_BODY_IN_REF, MSG_ONLY_BODY_SIZE)
+    .store_ref(body);
+}
+
+builder store_prefix_only_body(builder b) inline {
+    return b
+    .store_uint(0, MSG_ONLY_BODY_SIZE);
+}
+
+;; parse after sender_address
+(slice, int) ~retrieve_fwd_fee(slice in_msg_full_slice) inline {
+    in_msg_full_slice~load_msg_addr(); ;; skip dst
+    in_msg_full_slice~load_coins(); ;; skip value
+    in_msg_full_slice~skip_dict(); ;; skip extracurrency collection
+    in_msg_full_slice~load_coins(); ;; skip ihr_fee
+    int fwd_fee = in_msg_full_slice~load_coins();
+    return (in_msg_full_slice, fwd_fee);
+}
+
+;; MSG BODY
+
+;; According to the guideline, it is recommended to start the body of the internal message with uint32 op and uint64 query_id
+
+const int MSG_OP_SIZE = 32;
+const int MSG_QUERY_ID_SIZE = 64;
+
+(slice, int) ~load_op(slice s) inline {
+    return s.load_uint(MSG_OP_SIZE);
+}
+(slice, ()) ~skip_op(slice s) inline {
+    return (s.skip_bits(MSG_OP_SIZE), ());
+}
+builder store_op(builder b, int op) inline {
+    return b.store_uint(op, MSG_OP_SIZE);
+}
+
+(slice, int) ~load_query_id(slice s) inline {
+    return s.load_uint(MSG_QUERY_ID_SIZE);
+}
+(slice, ()) ~skip_query_id(slice s) inline {
+    return (s.skip_bits(MSG_QUERY_ID_SIZE), ());
+}
+builder store_query_id(builder b, int query_id) inline {
+    return b.store_uint(query_id, MSG_QUERY_ID_SIZE);
+}
+
+(slice, (int, int)) ~load_op_and_query_id(slice s) inline {
+    int op = s~load_op();
+    int query_id = s~load_query_id();
+    return (s, (op, query_id));
+}
+
+builder store_op_and_query_id(builder b, int op, int query_id) inline {
+    return b
+    .store_uint(op, MSG_OP_SIZE)
+    .store_uint(query_id, MSG_QUERY_ID_SIZE);
+}
+
+(slice, int) ~load_msg_flags(slice s) inline {
+    return s.load_uint(4);
+}
+
+int is_bounced(int msg_flags) inline {
+    return msg_flags & 1;
+}
+
+() send_msg(slice to_address, int amount, cell payload, int flags, int send_mode) impure inline {
+    int has_payload = ~ cell_null?(payload);
+
+    var msg = begin_cell()
+    .store_uint(flags, 6)
+    .store_slice(to_address)
+    .store_coins(amount)
+    .store_uint(has_payload ? 1 : 0, MSG_ONLY_BODY_SIZE);
+
+    if (has_payload) {
+        msg = msg.store_ref(payload);
+    }
+
+    send_raw_message(msg.end_cell(), send_mode);
+}
+
+() send_jettons(slice jetton_wallet_address, int value, int query_id, slice to_owner_address, int jetton_amount, slice response_address, int fwd_amount, cell forward_payload) impure inline {
+    int has_fwd_payload = false;
+    if (fwd_amount != 0) {
+        has_fwd_payload = ~ cell_null?(forward_payload);
+    }
+
+    var msg_payload = begin_cell()
+    .store_uint(JETTON_WALLET_OP::TRANSFER, MSG_OP_SIZE)
+    .store_uint(query_id, MSG_QUERY_ID_SIZE)
+    .store_coins(jetton_amount)
+    .store_slice(to_owner_address)
+    .store_slice(response_address)
+    .store_uint(0, 1)
+    .store_coins(fwd_amount)
+    .store_uint(has_fwd_payload == 0 ? 0 : 1, 1);
+
+    if (has_fwd_payload) {
+        msg_payload = msg_payload.store_ref(forward_payload);
+    }
+
+    send_msg(jetton_wallet_address, value, msg_payload.end_cell(), FLAGS::NON_BOUNCEABLE, SEND_MODE::BOUNCE_ON_ACTION_FAIL);
+}

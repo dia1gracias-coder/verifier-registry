@@ -1,0 +1,157 @@
+;; =============== USDT Treasury contract =====================
+
+#include "imports/eth_usdt_treasury_utils.fc";
+#include "imports/utils.fc";
+#include "imports/usdt_utils.fc";
+#include "imports/precompiled_gas_const/eth_usdt_treasury_gas_utils.fc";
+
+#pragma version >=0.4.0;
+
+;; =============== CONSTS =============================
+;; operation type
+const OPERATION::BRIDGE_USDT_TO_ETH = 0x6e6c1865;
+const ANYONE_OP::EXCESSES = 0xd53276db;
+
+;; errors
+const ERROR::NOT_ENOUGH_MSG_VALUE = 100;
+const ERROR::NOT_ENOUGH_MSG_VALUE_ADD_FEE = 101;
+const ERROR::BRIDGE_AMOUNT_TOO_BIG = 102;
+const ERROR::BRIDGE_AMOUNT_TOO_LITTLE = 103;
+
+global slice jetton_master_address;
+global cell jetton_wallet_code;
+global slice oApp_address;
+global int dst_evm_address;
+global int eth_eid;
+global int max_bridge_amount;
+global int min_bridge_amount;
+global int native_fee;
+global int estimated_gas_cost;
+global int jetton_transfer_gas_cost;
+global int treasury_fee;
+;; =============== STORAGE =============================
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    jetton_master_address = ds~load_msg_addr();
+    jetton_wallet_code = ds~load_ref();
+
+    oApp_address = ds~load_msg_addr();
+    eth_eid = ds~load_uint(32);
+    dst_evm_address = ds~load_uint(256);
+
+    slice fee_data_slice = ds~load_ref().begin_parse();
+    max_bridge_amount = fee_data_slice~load_coins();
+    min_bridge_amount = fee_data_slice~load_coins();
+    native_fee = fee_data_slice~load_coins();
+    estimated_gas_cost = fee_data_slice~load_coins();
+    jetton_transfer_gas_cost = fee_data_slice~load_coins();
+    treasury_fee = fee_data_slice~load_coins();
+}
+
+() save_data() impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(jetton_master_address)
+            .store_ref(jetton_wallet_code)
+            .store_slice(oApp_address)
+            .store_uint(eth_eid, 32)
+            .store_uint(dst_evm_address, 256)
+            .store_ref(begin_cell()
+                .store_coins(max_bridge_amount)
+                .store_coins(min_bridge_amount)
+                .store_coins(native_fee)
+                .store_coins(estimated_gas_cost)
+                .store_coins(jetton_transfer_gas_cost)
+                .store_coins(treasury_fee)
+                .end_cell())
+            .end_cell()
+    );
+}
+
+;; =============== RECV =============================
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_msg_flags();
+
+    if (is_bounced(flags)) {
+        ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    int fwd_fee_from_in_msg = cs~retrieve_fwd_fee();
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+
+    load_data();
+
+    ;; calculate storage fees
+    int ton_balance_before_msg = my_balance - msg_value;
+    int min_storage_fee = calculate_eth_usdt_treasury_min_storage_fee();
+    int storage_fee = min_storage_fee - min(ton_balance_before_msg, min_storage_fee);
+    msg_value -= storage_fee;
+
+    if (op == OPERATION::BRIDGE_USDT_TO_ETH) {
+        int usdt_amount = in_msg_body~load_coins();
+        throw_unless(ERROR::BRIDGE_AMOUNT_TOO_BIG, usdt_amount <= max_bridge_amount);
+        throw_unless(ERROR::BRIDGE_AMOUNT_TOO_LITTLE, usdt_amount >= min_bridge_amount);
+
+        cell add_fee = in_msg_body~load_maybe_ref();
+        int add_native_fee = 0;
+        int add_estimated_gas_cost = 0;
+        int add_jetton_transfer_gas_cost = 0;
+
+        if (cell_null?(add_fee) == FALSE) {
+            slice add_fee_slice = add_fee.begin_parse();
+            add_native_fee = add_fee_slice~load_coins();
+            add_estimated_gas_cost = add_fee_slice~load_coins();
+            add_jetton_transfer_gas_cost = add_fee_slice~load_coins();
+        }
+
+        int new_native_fee = native_fee + add_native_fee;
+        int new_estimated_gas_cost = estimated_gas_cost + add_estimated_gas_cost;
+        int new_jetton_transfer_gas_cost = jetton_transfer_gas_cost + add_jetton_transfer_gas_cost;
+
+        slice jetton_wallet_address = calculate_user_usdt_jetton_wallet_address(my_address(), jetton_master_address, jetton_wallet_code);
+        cell lz_payload = OFTSend::New(eth_eid, dst_evm_address, 0, new_native_fee, 0, begin_cell().end_cell(), begin_cell().end_cell());
+
+        throw_unless(ERROR::NOT_ENOUGH_MSG_VALUE_ADD_FEE, msg_value >= add_native_fee + add_estimated_gas_cost + new_jetton_transfer_gas_cost + treasury_fee);
+        throw_unless(ERROR::NOT_ENOUGH_MSG_VALUE, my_balance >= new_native_fee + new_estimated_gas_cost + new_jetton_transfer_gas_cost + treasury_fee);
+        int fwd_amount = new_native_fee + new_estimated_gas_cost;
+
+        send_jettons(jetton_wallet_address, fwd_amount + new_jetton_transfer_gas_cost, query_id, oApp_address, usdt_amount, my_address(), fwd_amount, lz_payload);
+
+        return ();
+    }
+
+    if (op == ANYONE_OP::EXCESSES) {
+        return ();
+    }
+
+    throw(ERROR::UNKNOWN_OP);
+}
+
+;; =============== GETTERS =============================
+
+(_) get_full_data() method_id {
+    load_data();
+
+    return (
+        jetton_master_address,
+        jetton_wallet_code,
+        oApp_address,
+        dst_evm_address,
+        eth_eid,
+        max_bridge_amount,
+        min_bridge_amount,
+        native_fee,
+        estimated_gas_cost,
+        jetton_transfer_gas_cost,
+        treasury_fee
+    );
+}
