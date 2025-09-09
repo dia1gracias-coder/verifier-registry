@@ -1,0 +1,49 @@
+#include "stdlib.fc";
+
+const ADMIN_ADDRESSES_KEY_SIZE = 32;
+
+const key::immediate_admin_addresses = 0x54590f59; ;; crc32('immediate_admin_addresses')
+const key::time_locked_admin_addresses = 0x24c94eae; ;; crc32('time_locked_admin_addresses')
+
+(slice, (slice, slice)) ~load_admin_addresses(slice s) inline { ;; (admin_address, next_admin_address)
+    slice admin_address = s~load_msg_addr();
+    slice next_admin_address = s~load_msg_addr();
+
+    return (s, (admin_address, next_admin_address));
+}
+
+builder store_admin_addresses(builder b, (slice, slice) admin_addresses) inline {
+    (slice admin_address, slice next_admin_address) = admin_addresses;
+    return b
+            .store_slice(admin_address)
+            .store_slice(next_admin_address);
+}
+
+slice get_curr_admin((slice, slice) admin_addresses) inline {
+    (slice current_admin_address, _) = admin_addresses;
+    return current_admin_address;
+}
+
+slice get_next_admin((slice, slice) admin_addresses) inline {
+    (_, slice next_admin_address) = admin_addresses;
+    return next_admin_address;
+}
+
+(slice, slice) udict_get_admin_addresses(cell admin_addresses_dict, int key) inline {
+    (cell result, _) = admin_addresses_dict.udict_get_ref?(ADMIN_ADDRESSES_KEY_SIZE, key);
+    slice data = result.begin_parse();
+
+    var addresses = data~load_admin_addresses();
+    data.end_parse();
+
+    return addresses;
+}
+
+cell udict_set_admin_addresses(cell admin_addresses_dict, int key, (slice, slice) admin_addresses) inline {
+    return admin_addresses_dict
+                .udict_set_ref(
+                    ADMIN_ADDRESSES_KEY_SIZE,
+                    key,
+                    begin_cell().store_admin_addresses(admin_addresses).end_cell()
+                );
+}

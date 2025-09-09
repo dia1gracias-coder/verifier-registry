@@ -1,0 +1,436 @@
+;; Jetton minter smart contract
+
+#pragma version >=0.4.3;
+
+#include "stdlib.fc";
+#include "op-codes.fc";
+#include "workchain.fc";
+#include "jetton-utils.fc";
+#include "admin-addresses-utils.fc";
+#include "gas.fc";
+
+global cell admin_addresses_dict;
+;; (current_admin, next_admin)
+global (slice, slice) immediate_admin_addresses;
+global (slice, slice) time_locked_admin_addresses;
+
+(int, cell, cell, cell, int) load_data() impure inline {
+    slice ds = get_data().begin_parse();
+
+    int total_supply = ds~load_coins();
+
+    admin_addresses_dict = ds~load_dict();
+    immediate_admin_addresses = admin_addresses_dict.udict_get_admin_addresses(key::immediate_admin_addresses);
+    time_locked_admin_addresses = admin_addresses_dict.udict_get_admin_addresses(key::time_locked_admin_addresses);
+
+    cell jetton_wallet_code = ds~load_ref();
+    cell metadata = ds~load_ref();
+    cell cross_chain_fees = ds~load_dict();
+    int last_executed_mint_query_id = ds~load_query_id();
+
+    ds.end_parse();
+
+    return (
+        total_supply,
+        jetton_wallet_code,
+        metadata,
+        cross_chain_fees,
+        last_executed_mint_query_id
+    );
+}
+
+() save_data(int total_supply, cell jetton_wallet_code, cell metadata, cell cross_chain_fees, int last_executed_mint_query_id) impure inline {
+    set_data(
+        begin_cell()
+        .store_coins(total_supply)
+        .store_dict(admin_addresses_dict)
+        .store_ref(jetton_wallet_code)
+        .store_ref(metadata)
+        .store_dict(cross_chain_fees)
+        .store_query_id(last_executed_mint_query_id)
+        .end_cell()
+    );
+}
+
+() send_to_jetton_wallet(slice to_address, cell jetton_wallet_code, int ton_amount, cell master_msg, int need_state_init) impure inline {
+    raw_reserve(ONE_TON, RESERVE_REGULAR); ;; reserve for storage fees
+
+    cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+    slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+
+    ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L746
+    var msg = begin_cell()
+    .store_msg_flags_and_address_none(BOUNCEABLE)
+    .store_slice(to_wallet_address) ;; dest
+    .store_coins(ton_amount);
+
+    if (need_state_init) {
+        msg = msg.store_statinit_ref_and_body_ref(state_init, master_msg);
+    } else {
+        msg = msg.store_only_body_ref(master_msg);
+    }
+
+    send_raw_message(msg.end_cell(), SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+}
+
+int get_fees_by_chain_selector(cell dict, int selector) impure inline {
+    (slice result, int success?) = dict.udict_get?(CHAIN_SELECTOR_SIZE, selector);
+    throw_unless(error::invalid_chain_selector, success?);
+
+    int fees = result~load_coins();
+    result.end_parse();
+
+    throw_unless(error::invalid_chain_selector, fees > 0);
+
+    return fees;
+}
+
+(slice, slice) get_admin_addresses(int is_time_locked_admin?) inline {
+    return is_time_locked_admin? ? time_locked_admin_addresses : immediate_admin_addresses;
+}
+
+() set_admin_addresses((slice, slice) admin_addresses, int is_time_locked_admin?) impure inline {
+    int admin_addresses_key = key::time_locked_admin_addresses;
+
+    if (is_time_locked_admin?) {
+        time_locked_admin_addresses = admin_addresses;
+    } else {
+        admin_addresses_key = key::immediate_admin_addresses;
+        immediate_admin_addresses = admin_addresses;
+    }
+
+    admin_addresses_dict = admin_addresses_dict.udict_set_admin_addresses(admin_addresses_key, admin_addresses);
+}
+
+() only_admin(slice sender_address, int is_time_locked_admin?) impure inline {
+    throw_unless(
+        error::not_owner,
+        equal_slices_bits(
+            sender_address,
+            get_curr_admin(get_admin_addresses(is_time_locked_admin?))
+        )
+    );
+}
+
+() only_next_admin(slice sender_address, int is_time_locked_admin?) impure inline {
+    throw_unless(
+        error::not_owner,
+        equal_slices_bits(sender_address, get_next_admin(get_admin_addresses(is_time_locked_admin?)))
+    );
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    int msg_flags = in_msg_full_slice~load_msg_flags();
+
+    if (msg_flags & 1) { ;; is bounced
+        in_msg_body~skip_bounced_prefix();
+        ;; process only mint bounces
+        ifnot (in_msg_body~load_op() == op::internal_transfer) {
+            return ();
+        }
+        in_msg_body~skip_query_id();
+        int jetton_amount = in_msg_body~load_coins();
+        (int total_supply, cell jetton_wallet_code, cell metadata, cell cross_chain_fees, int last_executed_mint_query_id) = load_data();
+        save_data(total_supply - jetton_amount, jetton_wallet_code, metadata, cross_chain_fees, last_executed_mint_query_id);
+        return ();
+    }
+
+    slice sender_address = in_msg_full_slice~load_msg_addr();
+    int fwd_fee_from_in_msg = in_msg_full_slice~retrieve_fwd_fee();
+    int fwd_fee = get_original_fwd_fee(MY_WORKCHAIN, fwd_fee_from_in_msg); ;; we use message fwd_fee for estimation of forward_payload costs
+
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+
+    (int total_supply, cell jetton_wallet_code, cell metadata, cell cross_chain_fees, int last_executed_mint_query_id) = load_data();
+
+    if (op == op::mint) {
+        only_admin(sender_address, FALSE);
+
+        throw_unless(error::invalid_mint_query_id, last_executed_mint_query_id + 1 == query_id);
+        slice to_address = in_msg_body~load_msg_addr();
+        check_same_workchain(to_address);
+        int ton_amount = in_msg_body~load_coins();
+
+        _ = in_msg_body~load_uint(CROSS_CHAIN_REQUEST_ID_SIZE); ;; cross chain request id
+        _ = in_msg_body~load_uint(CHAIN_SELECTOR_SIZE); ;; source chain selector
+        _ = in_msg_body~load_ref(); ;; source external address
+
+        cell master_msg = in_msg_body~load_ref();
+
+        in_msg_body.end_parse();
+
+        ;; see internal_transfer TL-B layout in jetton.tlb
+        slice master_msg_slice = master_msg.begin_parse();
+        throw_unless(error::invalid_op, master_msg_slice~load_op() == op::internal_transfer);
+        master_msg_slice~skip_query_id();
+        int jetton_amount = master_msg_slice~load_coins();
+        master_msg_slice~load_msg_addr(); ;; from_address
+        master_msg_slice~load_msg_addr(); ;; response_address
+        int forward_ton_amount = master_msg_slice~load_coins(); ;; forward_ton_amount
+        check_either_forward_payload(master_msg_slice); ;; either_forward_payload
+
+        ;; a little more than needed, it’s ok since it’s sent by the admin and excesses will return back
+        check_amount_is_enough_to_transfer(ton_amount, forward_ton_amount, fwd_fee);
+
+        send_to_jetton_wallet(to_address, jetton_wallet_code, ton_amount, master_msg, TRUE);
+        save_data(total_supply + jetton_amount, jetton_wallet_code, metadata, cross_chain_fees, query_id);
+        return ();
+    }
+
+    if (op == op::burn_notification) {
+        ;; see burn_notification TL-B layout in jetton.tlb
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(error::not_valid_wallet,
+            equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+        );
+        save_data(total_supply - jetton_amount, jetton_wallet_code, metadata, cross_chain_fees, last_executed_mint_query_id);
+        slice response_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        if (~ is_address_none(response_address)) {
+            ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L746
+            var msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(response_address) ;; dest
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_op(op::excesses)
+            .store_query_id(query_id);
+            send_raw_message(msg.end_cell(), SEND_MODE_IGNORE_ERRORS | SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        }
+        return ();
+    }
+
+    if (op == op::provide_wallet_address) {
+        ;; see provide_wallet_address TL-B layout in jetton.tlb
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_bool();
+        in_msg_body.end_parse();
+
+        cell included_address = include_address?
+        ? begin_cell().store_slice(owner_address).end_cell()
+        : null();
+
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L746
+        var msg = begin_cell()
+        .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_prefix_only_body()
+        .store_op(op::take_wallet_address)
+        .store_query_id(query_id);
+
+        if (is_same_workchain(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code));
+        } else {
+            msg = msg.store_address_none();
+        }
+
+        cell msg_cell = msg.store_maybe_ref(included_address).end_cell();
+
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        return ();
+    }
+
+    if (op == op::change_admin) {
+        only_admin(sender_address, TRUE);
+
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        int is_time_locked_admin? = in_msg_body~load_bool();
+
+        set_admin_addresses(
+            (
+                get_curr_admin(get_admin_addresses(is_time_locked_admin?)),
+                new_admin_address
+            ),
+            is_time_locked_admin?
+        );
+
+        in_msg_body.end_parse();
+        save_data(total_supply, jetton_wallet_code, metadata, cross_chain_fees, last_executed_mint_query_id);
+        return ();
+    }
+
+    if (op == op::claim_admin) {
+        int is_time_locked_admin? = in_msg_body~load_bool();
+        only_next_admin(sender_address, is_time_locked_admin?);
+        in_msg_body.end_parse();
+
+        set_admin_addresses(
+            (
+                get_next_admin(get_admin_addresses(is_time_locked_admin?)),
+                address_none()
+            ),
+            is_time_locked_admin?
+        );
+
+        save_data(total_supply, jetton_wallet_code, metadata, cross_chain_fees, last_executed_mint_query_id);
+        return ();
+    }
+
+    ;; can be used to lock, unlock or reedem funds
+    if (op == op::call_to) {
+        only_admin(sender_address, TRUE);
+
+        slice to_address = in_msg_body~load_msg_addr();
+        int ton_amount = in_msg_body~load_coins();
+        cell master_msg = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        slice master_msg_slice = master_msg.begin_parse();
+        int master_op = master_msg_slice~load_op();
+        master_msg_slice~skip_query_id();
+        ;; parse-validate messages
+        if (master_op == op::transfer) {
+            ;; see transfer TL-B layout in jetton.tlb
+            master_msg_slice~load_coins(); ;; jetton_amount
+            master_msg_slice~load_msg_addr(); ;; to_owner_address
+            master_msg_slice~load_msg_addr(); ;; response_address
+            master_msg_slice~skip_maybe_ref(); ;; custom_payload
+            int forward_ton_amount = master_msg_slice~load_coins(); ;; forward_ton_amount
+            check_either_forward_payload(master_msg_slice); ;; either_forward_payload
+
+            check_amount_is_enough_to_transfer(ton_amount, forward_ton_amount, fwd_fee);
+
+        } elseif (master_op == op::burn) {
+            ;; see burn TL-B layout in jetton.tlb
+            master_msg_slice~load_coins(); ;; jetton_amount
+            master_msg_slice~load_msg_addr(); ;; response_address
+            master_msg_slice~skip_maybe_ref(); ;; custom_payload
+            master_msg_slice.end_parse();
+
+            check_amount_is_enough_to_burn(ton_amount);
+
+        } elseif (master_op == op::set_status) {
+            master_msg_slice~load_uint(STATUS_SIZE); ;; status
+            master_msg_slice.end_parse();
+        } else {
+            throw(error::invalid_op);
+        }
+        send_to_jetton_wallet(to_address, jetton_wallet_code, ton_amount, master_msg, FALSE);
+        return ();
+    }
+
+    if (op == op::change_metadata) {
+        only_admin(sender_address, TRUE);
+
+        cell new_metadata = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        save_data(total_supply, jetton_wallet_code, new_metadata, cross_chain_fees, last_executed_mint_query_id);
+        return ();
+    }
+
+    if (op == op::update_fees) {
+        only_admin(sender_address, FALSE);
+
+        cell updated_fees = in_msg_body~load_dict();
+        in_msg_body.end_parse();
+
+        save_data(total_supply, jetton_wallet_code, metadata, updated_fees, last_executed_mint_query_id);
+
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L746
+        var msg = begin_cell()
+         .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+         .store_slice(sender_address) ;; dest
+         .store_coins(0)
+         .store_prefix_only_body();
+        send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_IGNORE_ERRORS);
+
+        return ();
+    }
+
+    if (op == op::cross_chain_transfer_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(error::not_valid_wallet,
+            equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+        );
+
+        slice response_address = in_msg_body~load_msg_addr();
+        int chain_selector = in_msg_body~load_uint(CHAIN_SELECTOR_SIZE);
+        _ = in_msg_body~load_ref(); ;; address on external chain
+        in_msg_body.end_parse();
+
+        int ext_chain_fees = get_fees_by_chain_selector(cross_chain_fees, chain_selector);
+        int amount_to_return = msg_value - ext_chain_fees - my_storage_due();
+
+        throw_unless(error::not_enough_fees_for_cross_chain_transfer, amount_to_return >= 0);
+
+        save_data(total_supply - jetton_amount, jetton_wallet_code, metadata, cross_chain_fees, last_executed_mint_query_id);
+
+        if ((~ is_address_none(response_address)) & (amount_to_return > 0)) {
+            ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L746
+            var msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(response_address) ;; dest
+            .store_coins(amount_to_return)
+            .store_prefix_only_body()
+            .store_op(op::excesses)
+            .store_query_id(query_id);
+            send_raw_message(msg.end_cell(), SEND_MODE_IGNORE_ERRORS);
+        }
+
+        return ();
+    }
+
+    if (op == op::withdraw_ton) {
+        only_admin(sender_address, TRUE);
+
+        slice to_address = in_msg_body~load_msg_addr();
+        int ton_amount = in_msg_body~load_coins();
+        in_msg_body.end_parse();
+
+        var msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(to_address)
+            .store_coins(ton_amount)
+            .store_prefix_only_body();
+        send_raw_message(msg.end_cell(), SEND_MODE_IGNORE_ERRORS);
+
+        return ();
+    }
+
+    if (op == op::upgrade) {
+        only_admin(sender_address, TRUE);
+
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_data(new_data);
+        set_code(new_code);
+        return ();
+    }
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }
+
+    throw(error::wrong_op);
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    (int total_supply, cell jetton_wallet_code, cell metadata, cell cross_chain_fees, int last_executed_mint_query_id) = load_data();
+    return (total_supply, TRUE, get_curr_admin(immediate_admin_addresses), metadata, jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    (int total_supply, cell jetton_wallet_code, cell metadata, cell cross_chain_fees, int last_executed_mint_query_id) = load_data();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code);
+}
+
+((slice, slice), (slice, slice)) get_all_admin_addresses() method_id {
+    _ = load_data();
+    return (immediate_admin_addresses, time_locked_admin_addresses);
+}
+
+int get_cross_chain_fees(int chain_selector) method_id {
+    (int total_supply, cell jetton_wallet_code, cell metadata, cell cross_chain_fees, int last_executed_mint_query_id) = load_data();
+    return get_fees_by_chain_selector(cross_chain_fees, chain_selector);
+}
+
+int get_last_executed_mint_query_id() method_id {
+    (int total_supply, cell jetton_wallet_code, cell metadata, cell cross_chain_fees, int last_executed_mint_query_id) = load_data();
+    return last_executed_mint_query_id;
+}
