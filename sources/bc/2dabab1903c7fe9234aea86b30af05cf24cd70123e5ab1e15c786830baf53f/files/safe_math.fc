@@ -1,0 +1,50 @@
+#include "constants.fc";
+
+(int, int) safe_add(int a, int b) inline {
+    int result = a + b;
+    int success = (result >= a) & (result >= b);
+    return (result, success);
+}
+
+(int, int) safe_sub(int a, int b) inline {
+    int success = a >= b;
+    return (a - b, success);
+}
+
+(int, int) safe_mul(int a, int b) inline {
+    if ((a == 0) | (b == 0)) {
+        return (0, -1);
+    }
+    
+    int result = a * b;
+    int success = (result / b) == a;
+    return (result, success);
+}
+
+int is_amount_safe(int amount) inline {
+    return (amount >= 0) & (amount <= MAX_AMOUNT);
+}
+
+(int, int) calculate_total_amount(int winner_amount, int referrer_amount, int owner_amount) inline {
+    (int subtotal, int success1) = safe_add(winner_amount, referrer_amount);
+    if (~ success1) {
+        return (0, 0);
+    }
+    
+    (int total, int success2) = safe_add(subtotal, owner_amount);
+    if (~ success2) {
+        return (0, 0);
+    }
+   
+    int is_safe = is_amount_safe(total);
+    return (total, is_safe);
+}
+
+int has_sufficient_funds(int balance, int amount, int min_reserve) inline {
+    (int required_balance, int success) = safe_add(amount, min_reserve);
+    if (~ success) {
+        return 0;
+    }
+  
+    return balance >= required_balance;
+}

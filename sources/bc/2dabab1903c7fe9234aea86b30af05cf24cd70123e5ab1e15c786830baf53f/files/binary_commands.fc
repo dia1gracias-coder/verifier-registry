@@ -1,0 +1,327 @@
+#include "constants.fc";
+#include "utils.fc";
+#include "safe_math.fc";
+
+(int, slice, slice, int, int, int, int, int) process_binary_command(
+int op,
+slice in_msg_body,
+slice sender_address,
+slice owner,
+slice distributor,
+int winner_amount,
+int referrer_amount,
+int owner_amount,
+int min_deposit,
+int min_reserve,
+int contract_flags,
+int msg_value
+) impure inline {
+
+if (op == op::withdraw) {
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ int balance = get_balance().pair_first();
+
+ if (~ has_sufficient_funds(balance, msg_value, min_reserve)) {
+   send_error_code(sender_address, error::insufficient_funds);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ (int amount_to_send, int success) = safe_sub(balance, min_reserve);
+ if (~ success) {
+   send_error_code(sender_address, error::calculation_error);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ send_empty_message(sender_address, amount_to_send, 1);
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::pause) {
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ if (is_paused(contract_flags)) {
+   send_error_code(sender_address, error::already_paused);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ contract_flags = contract_flags | flag::is_paused;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::unpause) {
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ if (~ is_paused(contract_flags)) {
+   send_error_code(sender_address, error::not_paused);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ contract_flags = contract_flags & ~ flag::is_paused;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::set_distributor_owner) {
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ distributor = owner;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::set_winner_amount) {
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ int new_winner_amount = in_msg_body~load_coins();
+ 
+ if (~ is_amount_safe(new_winner_amount)) {
+   send_error_code(sender_address, error::amount_too_large);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ winner_amount = new_winner_amount;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::set_referrer_amount) {
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ int new_referrer_amount = in_msg_body~load_coins();
+
+ if (~ is_amount_safe(new_referrer_amount)) {
+   send_error_code(sender_address, error::amount_too_large);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ referrer_amount = new_referrer_amount;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::set_owner_amount) {
+ 
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ int new_owner_amount = in_msg_body~load_coins();
+ 
+ if (~ is_amount_safe(new_owner_amount)) {
+   send_error_code(sender_address, error::amount_too_large);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ owner_amount = new_owner_amount;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::set_min_deposit_amount) {
+ 
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ int new_min_deposit = in_msg_body~load_coins();
+
+ if (~ is_amount_safe(new_min_deposit)) {
+   send_error_code(sender_address, error::amount_too_large);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ min_deposit = new_min_deposit;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::set_min_reserve) {
+
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ int new_min_reserve = in_msg_body~load_coins();
+
+ if (new_min_reserve < MIN_RESERVE_VALUE) {
+   send_error_code(sender_address, error::reserve_too_small);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ if (~ is_amount_safe(new_min_reserve)) {
+   send_error_code(sender_address, error::amount_too_large);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ min_reserve = new_min_reserve;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::withdraw_amount) {
+
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ int amount = in_msg_body~load_coins();
+
+ if (~ is_amount_safe(amount)) {
+   send_error_code(sender_address, error::amount_too_large);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ int balance = get_balance().pair_first();
+
+ if (~ has_sufficient_funds(balance, amount, min_reserve)) {
+   send_error_code(sender_address, error::insufficient_funds);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ send_empty_message(sender_address, amount, 1);
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::set_distributor) {
+
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ slice new_distributor = in_msg_body~load_msg_addr();
+ 
+ if (~ is_valid_address(new_distributor)) {
+   send_error_code(sender_address, error::invalid_address);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ distributor = new_distributor;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::set_owner) {
+
+ if (~ equal_slice_bits(sender_address, owner)) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+
+ slice new_owner = in_msg_body~load_msg_addr();
+ 
+ if (~ is_valid_address(new_owner)) {
+   send_error_code(sender_address, error::invalid_address);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ owner = new_owner;
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == op::play_alt) {
+
+ if ((~ equal_slice_bits(sender_address, distributor)) & (~ equal_slice_bits(sender_address, owner))) {
+   send_error_code(sender_address, error::access_denied);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ if (is_paused(contract_flags) & (~ equal_slice_bits(sender_address, owner))) {
+   send_error_code(sender_address, error::contract_paused);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ 
+ int balance = get_balance().pair_first();
+ 
+ int total_amount = winner_amount;
+ int has_referrer = in_msg_body.slice_bits() >= 267 * 2;
+ 
+ if (has_referrer) {
+   (int temp_total, int success1) = safe_add(total_amount, referrer_amount);
+   if (~ success1) {
+     send_error_code(sender_address, error::calculation_error);
+     return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+   }
+   total_amount = temp_total;
+ }
+ 
+ (int final_total, int success2) = safe_add(total_amount, owner_amount);
+ if (~ success2) {
+   send_error_code(sender_address, error::calculation_error);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ total_amount = final_total;
+
+ int distributor_amount = DEFAULT_DISTRIBUTOR_AMOUNT;
+ (int final_total_with_distributor, int success3) = safe_add(total_amount, distributor_amount);
+ if (~ success3) {
+   send_error_code(sender_address, error::calculation_error);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+ }
+ total_amount = final_total_with_distributor;
+ 
+ if (~ has_sufficient_funds(balance, total_amount, min_reserve)) {
+   send_error_code(sender_address, error::insufficient_funds);
+   return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+ slice winner_address = in_msg_body~load_msg_addr();
+
+ if (~ is_valid_address(winner_address)) {
+  send_error_code(sender_address, error::invalid_address);
+  return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+ send_text_message_with_mode(winner_address, winner_amount, "Random Donation", 1);
+
+ if (has_referrer) {
+   slice referrer_address = in_msg_body~load_msg_addr();
+
+   if (is_valid_address(referrer_address)) {
+     send_text_message_with_mode(referrer_address, referrer_amount, "Referral Reward", 1);
+   } else {
+     send_text_message_with_mode(owner, referrer_amount, "System", 1);
+   }
+ }
+ 
+ send_text_message_with_mode(owner, owner_amount, "System",1);
+ 
+ send_text_message_with_mode(distributor, DEFAULT_DISTRIBUTOR_AMOUNT, "Services", 1);
+ 
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+if (op == 0) {
+ return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
+
+send_error_code(sender_address, error::unknown_command);
+return (contract_flags, owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve);
+}
