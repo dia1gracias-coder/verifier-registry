@@ -1,0 +1,519 @@
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/handlerCore.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/protocol/channel/storage.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/protocol/interfaces.fc";
+
+;; md's and structs from the protocol we are reusing
+#include "../../structs/LayerZeroStructs.fc";
+
+#include "../../structs/Address.fc";
+#include "../../structs/SetPeer.fc";
+
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/actions/call.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/actions/event.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/actions/dispatch.fc";
+
+#include "./storage.fc";
+#include "./interface.fc";
+
+
+;;; ================================= INTERFACE FUNCTIONS ===================================
+
+;; returns the base oApp storage object from the contract storage
+cell getOAppStorage() impure inline method_id;
+
+;; this doesn't set the actual contract storage, rather returns the new storage object
+cell setOAppStorage(cell $storage, cell $NewOAppStorage) impure inline;
+
+(cell, tuple) _sendCallback(cell $storage, tuple actions, cell $MessagingReceipt) impure inline;
+tuple _lzReceivePrepare(cell $storage, tuple actions, cell $Packet) impure inline;
+(cell, tuple) _lzReceiveExecute(cell $storage, tuple actions, cell $Packet) impure inline;
+
+;; We declare it here because it saves the need for declaring initialStorage everytime we call event
+tuple _newAction<event>(int topic, cell $Body) impure inline {
+    return action::event::create(topic, $Body, cl::nullObject());
+}
+
+;;; ================================= HELPER FUNCTIONS ===================================
+
+;; Derive the endpoint address for a given destination EID
+int _getEndpointAddress(int dstEid) impure inline {
+    cell $OAppStorage = getOAppStorage();
+    return computeContractAddress(
+        $OAppStorage
+            .OApp::getEndpointInitStorage()
+            .cl::set(Endpoint::dstEid, dstEid),
+        $OAppStorage.OApp::getEndpointCode()
+    );
+}
+
+;; Derive the expected address of the channel given a particular initial storage
+int _getChannelAddressFromStorageInit(cell $ChannelStorageInit) impure inline method_id {
+    cell channelCode = getOAppStorage().OApp::getChannelCode();
+    return computeContractAddress($ChannelStorageInit, channelCode);
+}
+
+;; Derive the channel address for a given path
+int _getChannelAddress(cell $Path) impure inline method_id {
+    return _getChannelAddressFromStorageInit(
+        Channel::New(
+            getOAppStorage().OApp::getControllerAddress(),
+            $Path,
+            _getEndpointAddress(
+                $Path.lz::Path::getDstEid()
+            )
+        )
+    );
+}
+
+;; Assert the caller of the current transaction is a valid channel
+() assertChannelAddress(cell $ChannelStorageInit) impure inline {
+    ;; Validate that the input contains the correct owner inside this channel storage
+    throw_unless(
+        ERROR::WrongChannelOwner,
+        $ChannelStorageInit
+            .Channel::getBaseStorage()
+            .BaseStorage::getOwner()
+        == getOAppStorage().OApp::getControllerAddress()
+    );
+
+    int channelAddress = _getChannelAddressFromStorageInit($ChannelStorageInit);
+    throw_unless(ERROR::WrongChannel, channelAddress == getCaller());
+}
+
+() _assertUnpackedPath(int srcEid, int srcOApp, int dstEid, int dstOApp) impure inline {
+    cell $OAppStorage = getOAppStorage();
+
+    ;; make sure peer exists
+    (int peerAddress, int peerExists) = $OAppStorage
+        .OApp::getPeers()
+        .cl::dict256::get<uint256>(dstEid);
+
+    ;; throw if any part of the path is incorrect
+    throw_unless(ERROR::WrongSrcEid, srcEid == $OAppStorage.OApp::getEid());
+    throw_unless(ERROR::PeerNotSet, peerExists);
+    throw_unless(ERROR::WrongSrcOApp, srcOApp == getContractAddress());
+    throw_unless(ERROR::WrongPeer, peerAddress == dstOApp);
+}
+
+() _assertSendPath(cell $SendPath) impure inline {
+    (
+        int srcEid,
+        int srcOApp,
+        int dstEid,
+        int dstOApp
+    ) = $SendPath.lz::Path::deserialize();
+
+    _assertUnpackedPath(srcEid, srcOApp, dstEid, dstOApp);
+}
+
+() _assertReceivePath(cell $ReceivePath) impure inline {
+    (
+        int dstEid,
+        int dstOApp,
+        int srcEid,
+        int srcOApp
+    ) = $ReceivePath.lz::Path::deserialize();
+
+    _assertUnpackedPath(srcEid, srcOApp, dstEid, dstOApp);
+}
+
+() _assertGas(int gasRequired) impure inline {
+    int tonLeft = getMsgValue() - _gasToNanoton(get_gas_consumed());
+    throw_unless(ERROR::InsufficientGas, tonLeft >= _gasToNanoton(gasRequired));
+}
+
+() _assertGasWithFee(int gasRequired, int fee) impure inline {
+    int tonLeft = getMsgValue() - _gasToNanoton(get_gas_consumed());
+    throw_unless(ERROR::InsufficientGas, (tonLeft - fee) >= _gasToNanoton(gasRequired));
+}
+
+;;; ========================== OWNERSHIP FUNCTIONS =======================================
+
+;; This will override an existing tentative owner
+;; Becuase we assert that the 'claimOwnership' can't be done by the 'null' address, it means
+;; if we want to burn the ownership, we will need to set it to a contract which only has ability to
+;; claim, but nothing else. This effectively burns it.
+tuple transferOwnership(cell $Address) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    int tentativeOwner = $Address.Address::getAddress();
+
+    setContractStorage(
+        setOAppStorage(
+            $storage,
+            getOAppStorage().cl::set(
+                OApp::tentativeOwner,
+                tentativeOwner
+            )
+        )
+    );
+
+    actions~pushAction<event>(
+        EVENT::TentativeOwnerSet,
+        Address::New(tentativeOwner)
+    );
+
+    return actions;
+}
+
+tuple claimOwnership(cell $Empty) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    int newOwner = getOAppStorage().OApp::getTentativeOwner();
+
+    ;; this should be caught by the permission check, BUT let's be super safe about this
+    throw_if(ERROR::NullTentativeOwner, newOwner == NULLADDRESS);
+
+    setContractStorage(setOAppStorage(
+        $storage,
+        getOAppStorage()
+            .OApp::setOwnerAndTentativeOwner(
+                newOwner,
+                NULLADDRESS
+            )
+    ));
+
+    actions~pushAction<event>(
+        EVENT::OwnerSet,
+        Address::New(newOwner)
+    );
+
+    return actions;
+}
+
+;;; ========================== OWNER FUNCTIONS =====================================
+
+;; Sets the peer address for a given endpoint id
+tuple setPeer(cell $SetPeer) impure inline method_id {
+    (cell $storage, tuple actions) = preamble();
+
+    (int eid, int peer) = $SetPeer.SetPeer::getEidAndPeer();
+
+    cell $NewOAppStorage = getOAppStorage()
+        .cl::nestedDict256::set(OApp::peers, eid, peer);
+
+    setContractStorage($storage.setOAppStorage($NewOAppStorage));
+    actions~pushAction<event>(EVENT::PeerSet, $SetPeer);
+
+    return actions;
+}
+
+tuple setLzConfig(cell $Config) impure inline method_id {
+    (_, tuple actions) = preamble();
+
+    ;; we use the send path here becuase the send path is used to derive the channel address
+    ;; and the channel is used to configure both send and receive configs
+
+    (
+        cell $SendPath,
+        int forwardingAddress,
+        int opCode,
+        cell $innerConfig
+    ) = lz::Config::deserialize($Config);
+
+    _assertSendPath($SendPath);
+
+    ifnot (
+        (opCode == Controller::OP::SET_EP_CONFIG_OAPP) |
+        (opCode == MsglibManager::OP::SET_OAPP_MSGLIB_SEND_CONFIG) |
+        (opCode == MsglibManager::OP::SET_OAPP_MSGLIB_RECEIVE_CONFIG)
+    ) {
+        throw(ERROR::InvalidLzConfigOpCode);
+    }
+
+    actions~pushAction<call>(
+        forwardingAddress,
+        opCode,
+        md::MdObj::New(
+            $innerConfig,
+            $SendPath
+        )
+    );
+
+    return actions;
+}
+
+tuple upgradeCode(cell $mdObj) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    (
+        cell newCode,
+        cell newStorage
+    ) = $mdObj.md::MdObj::deserialize();
+    
+    setContractStorage(newStorage);
+    set_code(newCode);
+
+    return actions;
+}
+
+;;; ========================== OPTIONS FUNCTIONS =======================================
+
+;; invariant is that enforced is either NULL, or a valid classlib object
+() _assertOptionsValid(cell $ExtraOptions, cell $EnforcedOptions) impure inline {
+    if (
+        (~ $ExtraOptions.cl::isNullObject())
+        & (~ $EnforcedOptions.cl::isNullObject())
+    ) {
+        ;; extra == 'something', enforced == 'something'
+        throw_unless(ERROR::InvalidExtraOptionsVersion, $ExtraOptions.cl::equalObjTypeShallow($EnforcedOptions));
+    } elseif ($EnforcedOptions.cl::isNullObject()) {
+        ;; extra == 'something', enforced == 'null'
+        ;; ensure that the enforced options are well formed, and dont contain any arbitrary refs
+        throw_unless(ERROR::InvalidExtraOptions, $ExtraOptions.cl::noRefFields());
+    } else {
+        ;; extra == 'null', enforced == 'null'
+        ;; OR
+        ;; extra == 'null', enforced == 'something'
+
+        ;; Dont need this check because its done inside of setEnforcedOptions,
+        ;; therefore enforced are always be valid
+        ;; throw_unless(ERROR::InvalidEnforcedOptions, $EnforcedOptions.cl::noRefFields());
+
+        ;; do nothing
+    }
+}
+
+;; derive the enforcedOptions mapping key
+int getEnforcedOptionsKey(int eid, int msgType) impure inline {
+    return (eid << 32) | msgType;
+}
+
+cell getEnforcedOptions(int eid, int msgType) impure inline method_id {
+    (cell $EnforcedOptions, int exists) = getOAppStorage()
+        .OApp::getEnforcedOptions()
+        .cl::dict256::get<cellRef>(getEnforcedOptionsKey(eid, msgType));
+
+    if (exists) {
+        return $EnforcedOptions;
+    } else {
+        return cl::nullObject();
+    }
+}
+
+;; Sets the enforced option for a given msg type and dstEid
+tuple setEnforcedOptions(cell $OptionsExtended) impure inline method_id {
+    (cell $storage, tuple actions) = preamble();
+
+    (
+        int eid,
+        int msgType,
+        cell $EnforcedOptions
+    ) = $OptionsExtended.md::OptionsExtended::deserialize();
+
+    ;; ensure that the enforced options are well formed, and dont contain any arbitrary refs
+    throw_unless(ERROR::InvalidEnforcedOptions, $EnforcedOptions.cl::noRefFields());
+
+    ;; update the enforced options to that key
+    cell $OAppStorage = getOAppStorage()
+        .cl::nestedDict256::setRef(
+            OApp::enforcedOptions,
+            getEnforcedOptionsKey(
+                eid,
+                msgType
+            ),
+            $EnforcedOptions
+        );
+
+    ;; store the updated mapping
+    setContractStorage($storage.setOAppStorage($OAppStorage));
+
+    ;; emit event
+    actions~pushAction<event>(EVENT::EnforcedOptionsSet, $OptionsExtended);
+
+    return actions;
+}
+
+
+;;; ========================== MANAGEMENT FUNCTIONS =======================================
+
+;; Calls on the controller to deploy a channel for this OApp
+tuple deployChannel(cell $Deploy) impure inline method_id {
+    (_, tuple actions) = preamble();
+    $Deploy = $Deploy.md::Deploy::sanitize();
+
+    actions~pushAction<call>(
+        getOAppStorage().cl::get<address>(OApp::controllerAddress),
+        Controller::OP::DEPLOY_CHANNEL,
+        $Deploy
+    );
+
+    return actions;
+}
+
+;; Calls on the controller to deploy a channel for this OApp
+tuple deployConnection(cell $MdAddress) impure inline method_id {
+    (_, tuple actions) = preamble();
+
+    actions~pushAction<call>(
+        $MdAddress.Address::getAddress(),
+        MsglibManager::OP::DEPLOY_CONNECTION,
+        $MdAddress.md::MdAddress::getMd()  ;; This 'md' is a $deploy
+    );
+
+    return actions;
+}
+
+;; todo: add LzSend.sanitize to monorepo
+;; Attempt to abort a Packet
+tuple forceAbort(cell $LzSend) impure inline method_id {
+    (_, tuple actions) = preamble();
+
+    cell $SendPath = $LzSend.md::LzSend::getPath();
+    _assertSendPath($SendPath);
+
+    actions~pushAction<call>(
+        _getChannelAddress($SendPath),
+        Channel::OP::FORCE_ABORT,
+        $LzSend
+    );
+
+    return actions;
+}
+
+;; Burns nonce on channel
+tuple burn(cell $PacketId) impure inline method_id {
+    (_, tuple actions) = preamble();
+    $PacketId = $PacketId.md::PacketId::sanitize();
+
+    cell $ReceivePath = $PacketId.cl::get<objRef>(md::PacketId::path);
+    cell $SendPath = $ReceivePath.lz::Path::reverse();
+    _assertReceivePath($ReceivePath);
+
+    actions~pushAction<call>(
+        _getChannelAddress($SendPath),
+        Channel::OP::BURN,
+        $PacketId
+    );
+
+    return actions;
+}
+
+;; Marks a Packet as 'uncommitted' until it is re-committed
+tuple nilify(cell $PacketId) impure inline method_id {
+    (_, tuple actions) = preamble();
+    $PacketId = $PacketId.md::PacketId::sanitize();
+
+    cell $ReceivePath = $PacketId.cl::get<objRef>(md::PacketId::path);
+    cell $SendPath = $ReceivePath.lz::Path::reverse();
+    _assertReceivePath($ReceivePath);
+
+    ;; send the nilify message to the channel address
+    actions~pushAction<call>(
+        _getChannelAddress($SendPath),
+        Channel::OP::NILIFY,
+        $PacketId
+    );
+
+    return actions;
+}
+
+
+;;; ========================== LZ_SEND FUNCTIONS =======================================
+
+;; This is not an interface function, it should be called by the OApp, not from outside
+tuple _lzSend(
+    tuple actions,
+    int dstEid,
+    int msgType,
+    int nativeFee,
+    int zroFee,
+    cell $ExtraOptions,
+    cell lzMessage,
+    cell callbackData
+) impure inline {
+    cell $oAppStorage = getOAppStorage();
+
+    ;; assert the remote peer is valid
+    (int peerAddress, int exists) = $oAppStorage
+        .OApp::getPeers()
+        .cl::dict256::get<uint256>(dstEid);
+    throw_unless(ERROR::PeerNotSet, ((exists) & (peerAddress != NULLADDRESS)));
+
+    cell $SendPath = lz::Path::build(
+        OApp::getEid($oAppStorage),
+        getContractAddress(),
+        dstEid,
+        peerAddress
+    );
+
+    ;; check that the options being used are valid
+    cell $EnforcedOptions = getEnforcedOptions(dstEid, msgType);
+    _assertOptionsValid($ExtraOptions, $EnforcedOptions);
+
+    cell $LzSend = md::LzSend::build(
+        nativeFee,
+        zroFee,
+        $ExtraOptions,
+        $EnforcedOptions,
+        lz::Packet::nonceless(
+            $SendPath,
+            lzMessage
+        ),
+        callbackData
+    );
+
+    actions~pushAction<call>(
+        _getEndpointAddress(dstEid),
+        Endpoint::OP::ENDPOINT_SEND,
+        $LzSend
+    );
+
+    return actions;
+}
+
+;; in: Channel::send_callback (currently msglib_quote_callback)
+;; @in_md MdObj( messagingReceipt(lzSend, quoted_nativeFee, quoted_zroFee, errorCode), initialChannelStorage)
+tuple channelSendCallback(cell $MdObj) impure inline method_id {
+    (cell $storage, tuple actions) = preamble();
+    
+    cell $MessagingReceipt = md::MdObj::getMd($MdObj);
+    ($storage, actions) = _sendCallback($storage, actions, $MessagingReceipt);
+
+    setContractStorage($storage);
+
+    return actions;
+}
+
+;;; ========================== LZ_RECEIVE FUNCTIONS =======================================
+
+;;; ==========================================
+;; lzReceive follows a two-phase commit pattern in TON
+;; first, a permissionless call is made to lzReceivePrepare
+;;      failure => permissionless retry at endpoint
+;; second, the OApp performs a gas assertion and sends a clear request to the Packet
+;;      failure => permissionless retry from step 1 at endpoint
+;; third, the Packet locks itself and notifies the OApp to execute the request
+;;      failure => OApp must unlock the Packet and retry from step 1
+;; finally, the OApp clears and destroys the message
+;;      failure => can be ignored, but the OApp will be blocklisted by the executor
+;;; ==========================================
+tuple lzReceivePrepare(cell $Packet) impure inline method_id {
+    (cell $storage, tuple actions) = preamble();
+
+    ;; assert the packet is coming from a valid path
+    _assertReceivePath($Packet.lz::Packet::getPath());
+
+    ;; handles the gas assertion because its dependent on the underlying OApp implementation
+    actions = _lzReceivePrepare($storage, actions, $Packet);
+
+    ;; send lock request to channel
+    actions~pushAction<call>(
+        getCaller(),
+        Channel::OP::LZ_RECEIVE_LOCK,
+        md::Nonce::build($Packet.lz::Packet::getNonce())
+    );
+
+    return actions;
+}
+
+tuple lzReceiveExecute(cell $MdObj) impure inline method_id {
+    (cell $storage, tuple actions) = preamble();
+
+    cell $Packet = md::MdObj::getMd($MdObj);
+
+    ($storage, actions) = _lzReceiveExecute($storage, actions, $Packet);
+    setContractStorage($storage);
+
+    return actions;
+}

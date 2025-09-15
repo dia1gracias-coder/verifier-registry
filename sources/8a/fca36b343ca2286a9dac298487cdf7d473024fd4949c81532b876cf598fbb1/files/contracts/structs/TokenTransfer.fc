@@ -1,0 +1,28 @@
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+
+const int TokenTransfer::NAME = "TknTrsfer"u;
+
+const int TokenTransfer::to = 0;
+const int TokenTransfer::amount = 1;
+
+cell TokenTransfer::New(int to, int amount) inline method_id {
+    return cl::declare(
+        TokenTransfer::NAME,
+        unsafeTuple([
+            [cl::t::address, to],
+            [cl::t::coins, amount]
+        ])
+    );
+}
+
+const int TokenTransfer::_toOffset = _HEADER_WIDTH;
+const int TokenTransfer::_amountOffset = TokenTransfer::_toOffset + 256;
+
+;; ;; (to, amount)
+(int, int) TokenTransfer::getToAndAmount(cell $self) impure inline {
+    slice selfSlice = $self.begin_parse();
+    return (
+        selfSlice.preloadAddressAt(TokenTransfer::_toOffset),
+        selfSlice.preloadCoinsAt(TokenTransfer::_amountOffset)
+    );
+}

@@ -1,0 +1,94 @@
+#include "../oApp/storage.fc";
+#include "../../structs/GasAsserts.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/stdlib.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/utils.fc";
+
+;; required object name
+const int EthenaOFT::NAME = "EthenaOFT"u;
+
+;; field names
+const int EthenaOFT::oAppStorage = 0; ;; == BASE_OAPP_STORAGE_INDEX
+
+const int EthenaOFT::masterAddress = 1;
+;; used for gas assertions when dealing with the protocol
+;; note that the last field is unused in this objRef, and is duplicated in the OApp
+const int EthenaOFT::gasAsserts = 2;
+const int EthenaOFT::isPaused = 3;
+const int EthenaOFT::admin = 4;
+const int EthenaOFT::rateLimits = 5;
+
+;; @owner oApp owner EOA
+cell EthenaOFT::New(
+    int owner,
+    int controllerAddress,
+    int eid,
+    cell endpointCode,
+    cell channelCode,
+    int adminAddress
+) method_id {
+    return cl::declare(
+        EthenaOFT::NAME,
+        unsafeTuple([
+            [cl::t::objRef, OApp::New(
+                owner,
+                controllerAddress,
+                eid,
+                endpointCode,
+                channelCode
+            )],                                 ;; EthenaOFT::oAppStorage
+            [cl::t::address, NULLADDRESS],      ;; EthenaOFT::masterAddress
+            [cl::t::objRef, GasAsserts::New(
+                0,
+                0,
+                0,
+                0
+            )],                                  ;; EthenaOFT::gasAsserts
+            [cl::t::bool, false],                ;; EthenaOFT::isPaused
+            [cl::t::address, adminAddress],      ;; EthenaOFT::admin
+            [cl::t::dict256, cl::dict256::New()] ;; EthenaOFT::rateLimits
+        ])
+    );
+}
+
+;; ====================== Object Getters  =========================
+const int EthenaOFT::_headerInfoBits = _BASIC_HEADER_WIDTH + (_FIELD_INFO_WIDTH * 6);
+const int EthenaOFT::_headerFillerBits = _HEADER_WIDTH - EthenaOFT::_headerInfoBits;
+const int EthenaOFT::_headerInfo = 415777521740389581325405232640264788494659618294624252;
+
+const int EthenaOFT::_masterAddressOffset = _HEADER_WIDTH;
+const int EthenaOFT::_isPausedOffset = EthenaOFT::_masterAddressOffset + 256;
+const int EthenaOFT::_adminOffset = EthenaOFT::_isPausedOffset + 1;
+const int EthenaOFT::_rootCellBits = EthenaOFT::_adminOffset + 256;
+
+int EthenaOFT::getMasterAddress(cell $EthenaOFT) impure inline {
+    return $EthenaOFT.cellPreloadUint256At(EthenaOFT::_masterAddressOffset);
+}
+
+cell EthenaOFT::getOAppStorage(cell $EthenaOFT) impure inline {
+    return $EthenaOFT.cellPreloadRefAt(0);
+}
+
+cell EthenaOFT::getGasAsserts(cell $EthenaOFT) impure inline {
+    return $EthenaOFT.cellPreloadRefAt(1);
+}
+
+int EthenaOFT::getIsPaused(cell $EthenaOFT) impure inline {
+    return $EthenaOFT.cellPreloadBoolAt(EthenaOFT::_isPausedOffset);
+}
+
+cell EthenaOFT::getRateLimits(cell $EthenaOFT) impure inline {
+    return $EthenaOFT.cellPreloadRefAt(2).cellPreloadRefAt(0);
+}
+
+cell EthenaOFT::setRateLimit(cell $EthenaOFT, int dstEid, cell $RateLimitBucket) impure inline {
+    cell $RateLimits = $EthenaOFT.EthenaOFT::getRateLimits();
+    return begin_cell()
+        .store_slice($EthenaOFT.begin_parse().scutfirst(EthenaOFT::_rootCellBits, 2))
+        .store_ref(
+            begin_cell()
+                .store_ref($RateLimits.cl::dict256::setRef(dstEid, $RateLimitBucket))
+                .end_cell()
+        )
+        .end_cell();
+}

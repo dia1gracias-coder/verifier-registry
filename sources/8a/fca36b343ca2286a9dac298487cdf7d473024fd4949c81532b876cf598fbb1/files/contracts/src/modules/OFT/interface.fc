@@ -1,0 +1,37 @@
+#include "../../oApp/interface.fc";
+
+;; operation codes
+const int OP::SetGasAsserts = "OP::SetGasAsserts"c;
+const int OP::Pause = "OP::Pause"c;
+const int OP::Unpause = "OP::Unpause"c;
+const int OP::SetAdmin = "OP::SetAdmin"c;
+const int OP::SetRateLimit = "OP::SetRateLimit"c;
+const int OP::DisableRateLimit = "OP::DisableRateLimit"c;
+
+;; events
+const int EVENT::OFTSentInit = "EVENT::OFTSentInit"u;
+const int EVENT::OFTSentSucceed = "EVENT::OFTSentSucceed"u;
+const int EVENT::OFTSentFailed = "EVENT::OFTSentFailed"u;
+const int EVENT::OFTReceived = "EVENT::OFTReceived"u;
+const int EVENT::Paused = "EVENT::Paused"u;
+const int EVENT::Unpaused = "EVENT::Unpaused"u;
+const int EVENT::AdminSet = "EVENT::AdminSet"u;
+const int EVENT::GasAssertsSet = "EVENT::GasAssertsSet"u;
+const int EVENT::RateLimitSet = "EVENT::RateLimitSet"u;
+const int EVENT::RateLimitDisabled = "EVENT::RateLimitDisabled"u;
+
+;; error codes
+const int ERROR::InvalidAmount = "ERROR::invalidAmount"c & ERRORCODE_MASK;
+const int ERROR::InvalidEid = "ERROR::invalidEid"c & ERRORCODE_MASK;
+const int ERROR::InvalidFee = "ERROR::InvalidFee"c & ERRORCODE_MASK;
+const int ERROR::InvalidMsgType = "ERROR::InvalidMsgType"c & ERRORCODE_MASK;
+const int ERROR::SlippageExceeded = "ERROR::slippageExceeded"c & ERRORCODE_MASK;
+const int ERROR::InsufficientLayerZeroFee = "ERROR::InsufficientLayerZeroFee"c & ERRORCODE_MASK;
+const int ERROR::NoError = "ERROR::NoError"c & ERRORCODE_MASK;
+const int ERROR::Paused = "ERROR::Paused"c & ERRORCODE_MASK;
+const int ERROR::InvalidField = "ERROR::InvalidField"c & ERRORCODE_MASK;
+const int ERROR::OnlyMasterAddress = "ERROR::OnlyMasterAddress"c & ERRORCODE_MASK;
+const int ERROR::OnlyAdminOrOwner = "ERROR::OnlyAdminOrOwner"c & ERRORCODE_MASK;
+const int ERROR::RateLimitExceeded = "ERROR::RateLimitExceeded"c & ERRORCODE_MASK;
+
+const int ERROR::InsufficientContractBalance = "ERROR::InsufficientContractBalance"c & ERRORCODE_MASK;
