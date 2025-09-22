@@ -1,0 +1,264 @@
+#include "stdlib.fc";
+
+;; 盲盒抽奖智能合约
+;; 基于TON区块链的安全盲盒抽奖系统
+
+
+;; 错误码
+const int error::blind_box_sold_out = 101;
+const int error::not_owner = 102;
+const int error::already_drawn = 103;
+const int error::not_sold_out = 104;
+
+;; 操作码
+const int op::record_purchase = 0x1;  ;; 记录购买（支持批量）
+const int op::draw_prizes = 0x2;      ;; 开奖
+
+global int ctx_blind_box_id;
+global int ctx_price;
+global int ctx_total_quantity;
+global int ctx_sold_quantity;
+global slice ctx_owner;
+global int ctx_is_sold_out;
+global int ctx_is_drawn;
+global cell ctx_prizes_dict;
+global cell ctx_buyers_dict;
+
+;; 解析发送者地址的辅助函数
+slice parse_sender_address(cell in_msg_full) inline {
+    ;; 从消息头中解析发送者地址
+    slice cs = in_msg_full.begin_parse();
+    cs~load_uint(4); ;; skip msg_type
+    cs~load_uint(1); ;; skip ihr_disabled
+    cs~load_uint(1); ;; skip bounce
+    cs~load_uint(1); ;; skip bounced
+    slice src = cs~load_msg_addr();
+    return src;
+}
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    ctx_blind_box_id = ds~load_uint(64);
+    ctx_price = ds~load_coins();
+    ctx_total_quantity = ds~load_uint(32);
+    ctx_sold_quantity = ds~load_uint(32);
+    ctx_owner = ds~load_msg_addr();
+    ctx_is_sold_out = ds~load_uint(1);
+    ctx_is_drawn = ds~load_uint(1);
+    ctx_prizes_dict = ds~load_ref();
+    ctx_buyers_dict = ds~load_ref();
+}
+
+;; 保存存储数据
+() save_data() impure {
+    set_data(begin_cell()
+        .store_uint(ctx_blind_box_id, 64)
+        .store_coins(ctx_price)
+        .store_uint(ctx_total_quantity, 32)
+        .store_uint(ctx_sold_quantity, 32)
+        .store_slice(ctx_owner)
+        .store_uint(ctx_is_sold_out, 1)
+        .store_uint(ctx_is_drawn, 1)
+        .store_ref(ctx_prizes_dict)
+        .store_ref(ctx_buyers_dict)
+        .end_cell());
+}
+
+;; 生成安全随机数
+int generate_secure_random(int max_value) {
+    ;; 使用多个熵源生成安全随机数
+    int seed = now() + cur_lt() + cell_hash(get_data()) + random();
+    randomize(seed);
+    return rand(max_value);
+}
+
+;; 根据概率选择奖品
+int select_prize_by_probability() {
+    ;; 获取所有奖品的概率配置
+    cell prizes = ctx_prizes_dict;
+    
+    ;; 生成0-10000的随机数（支持小数点后两位的概率）
+    int random_value = generate_secure_random(10000);
+    int cumulative_probability = 0;
+    
+    ;; 遍历奖品字典，根据概率选择
+    int prize_id = 0;
+    do {
+        (int key, slice value, int found) = udict_get_next?(prizes, 64, prize_id);
+        if (found) {
+            ;; 解析奖品信息
+            int current_prize_id = value~load_uint(64);
+            value~load_ref(); ;; 跳过名称
+            value~load_uint(32); ;; 跳过数量
+            int probability = value~load_uint(16); ;; 概率*100，如50.25%存储为5025
+            
+            cumulative_probability += probability;
+            if (random_value < cumulative_probability) {
+                return current_prize_id;
+            }
+            prize_id = key + 1;
+        }
+    } until (~ found);
+    
+    ;; 如果没有匹配到，返回最后一个奖品（兜底）
+    return prize_id - 1;
+}
+
+;; 记录购买（由平台调用，支持批量）
+() record_purchase(slice in_msg_body, cell in_msg_full) impure {
+    ;; 检查调用者权限（只有owner可以记录购买）
+    slice sender = parse_sender_address(in_msg_full);
+    throw_unless(error::not_owner, slice_hash(ctx_owner) == slice_hash(sender));
+    
+    ;; 读取批量计数
+    int batch_count = in_msg_body~load_uint(32);
+    throw_unless(402, batch_count > 0);
+    throw_unless(403, batch_count <= 100); ;; 限制批量大小
+    
+    int i = 0;
+    repeat (batch_count) {
+        ;; 读取购买者地址
+        slice buyer_address = in_msg_body~load_msg_addr();
+        
+        ;; 读取购买数量
+        int quantity = in_msg_body~load_uint(32);
+        
+        ;; 读取时间戳
+        int timestamp = in_msg_body~load_uint(32);
+        
+        ;; 读取商品ID
+         int product_id = in_msg_body~load_uint(64);
+        
+        ;; 为每个购买数量创建单独的购买记录
+        int j = 0;
+        repeat (quantity) {
+            ;; 检查是否还有库存
+            throw_if(error::blind_box_sold_out, ctx_sold_quantity >= ctx_total_quantity);
+            
+            ;; 增加销售数量
+            ctx_sold_quantity += 1;
+            
+            ;; 将购买者信息存储到字典中
+            builder buyer_info = begin_cell()
+                .store_slice(buyer_address)
+                .store_uint(timestamp, 32)
+                .store_uint(0, 64)      ;; 奖品ID，开奖后设置
+                .store_uint(product_id, 64); ;; 商品ID
+            
+            ;; 使用销售数量作为购买者ID
+            ctx_buyers_dict~udict_set_builder(32, ctx_sold_quantity, buyer_info);
+            
+            j += 1;
+        }
+        
+        i += 1;
+    }
+    
+    ;; 检查是否售罄
+    if (ctx_sold_quantity >= ctx_total_quantity) {
+        ctx_is_sold_out = -1;
+    }
+    
+    save_data();
+}
+
+
+;; 开奖（仅限所有者，且必须售罄）
+() draw_prizes(cell in_msg_full) impure {
+    ;; 检查权限（只有所有者可以开奖）
+    slice sender = parse_sender_address(in_msg_full);
+    throw_unless(error::not_owner, slice_hash(ctx_owner) == slice_hash(sender));
+    
+    ;; 检查是否已售罄
+    throw_unless(error::not_sold_out, ctx_is_sold_out);
+    
+    ;; 检查是否已开奖
+    throw_if(error::already_drawn, ctx_is_drawn);
+    
+    ;; 为每个购买者分配奖品
+    int buyer_id = 1;
+    repeat (ctx_sold_quantity) {
+        ;; 根据概率选择奖品
+        int selected_prize_id = select_prize_by_probability();
+        
+        ;; 获取购买者信息
+        (slice buyer_data, int found) = udict_get?(ctx_buyers_dict, 32, buyer_id);
+        if (found) {
+            slice buyer_address = buyer_data~load_msg_addr();
+            int purchase_time = buyer_data~load_uint(32);
+            
+            ;; 更新购买者信息，设置奖品ID
+            builder updated_buyer = begin_cell()
+                .store_slice(buyer_address)
+                .store_uint(purchase_time, 32)
+                .store_uint(selected_prize_id, 64);
+            
+            ctx_buyers_dict~udict_set_builder(32, buyer_id, updated_buyer);
+        }
+        
+        buyer_id += 1;
+    }
+    
+    ;; 标记为已开奖
+    ctx_is_drawn = -1;
+    
+    save_data();
+}
+
+;; 主消息处理函数
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; 空消息，忽略
+        return ();
+    }
+    
+    load_data();
+    
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == op::record_purchase) {
+        record_purchase(in_msg_body, in_msg_full);
+        return ();
+    }
+    
+    if (op == op::draw_prizes) {
+        draw_prizes(in_msg_full);
+        return ();
+    }
+    
+    throw(0xffff); ;; 未知操作
+}
+
+;; Get方法
+
+;; 获取盲盒基本信息
+(int, int, int, int, int, int) get_blind_box_info() method_id {
+    load_data();
+    return (ctx_blind_box_id, ctx_price, ctx_total_quantity, ctx_sold_quantity, 
+            ctx_is_sold_out, ctx_is_drawn);
+}
+
+;; 获取奖品信息
+(int, slice, int, int) get_prize_info(int prize_id) method_id {
+    load_data();
+    (slice prize_data, int found) = udict_get?(ctx_prizes_dict, 64, prize_id);
+    if (found) {
+        int current_prize_id = prize_data~load_uint(64);
+        slice name = prize_data~load_ref().begin_parse();
+        int quantity = prize_data~load_uint(32);
+        int probability = prize_data~load_uint(16);
+        return (current_prize_id, name, quantity, probability);
+    }
+    return (0, null(), 0, 0);
+}
+
+;; 获取购买者信息
+(slice, int, int) get_buyer_info(int buyer_id) method_id {
+    load_data();
+    (slice buyer_data, int found) = udict_get?(ctx_buyers_dict, 32, buyer_id);
+    if (found) {
+        slice buyer_address = buyer_data~load_msg_addr();
+        int purchase_time = buyer_data~load_uint(32);
+        int prize_id = buyer_data~load_uint(64);
+        return (buyer_address, purchase_time, prize_id);
+    }
+    return (null(), 0, 0);
+}
