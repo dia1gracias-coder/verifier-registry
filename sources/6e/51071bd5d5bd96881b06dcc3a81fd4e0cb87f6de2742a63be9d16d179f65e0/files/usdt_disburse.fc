@@ -1,0 +1,417 @@
+#include "imports/stdlib.fc";
+
+;; ===== CONSTANTS =====
+;; Request opcodes
+const op::transfer_ownership   = 0x2fcb26a2;
+const op::add_admin            = 0x3bcc7f0f;
+const op::remove_admin         = 0x5fcc3d14;
+const op::set_jetton_master    = 0x2a4f9e75;
+const op::disburse             = 0x1a2b3c4d;
+const op::disburse_batch       = 0x5e6f7a8b;
+const op::withdraw_all_usdt    = 0x9c8d7e6f;  ;; NOTE: amount=0 is non-standard; see comment in handler
+const op::withdraw_ton         = 0x3f4e5d6c;
+const op::pause                = 0x7a8b9c0d;
+const op::unpause              = 0x1e2f3a4b;
+
+;; Jetton standard opcodes
+const op::jetton_transfer             = 0x0f8a7ea5;  ;; transfer
+const op::transfer_notification       = 0x7362d09c;  ;; notification from wallet to recipient
+const op::excesses                    = 0xd53276db;
+
+;; Confirmation/emit opcodes (for your out-messages)
+const conf::ownership_transferred     = 0x12345678;
+const conf::admin_added               = 0x23456789;
+const conf::admin_removed             = 0x3456789a;
+const conf::jetton_master_set         = 0x456789ab;
+const conf::all_usdt_withdrawn        = 0x56789abc;
+const conf::ton_withdrawn             = 0x6789abcd;
+const conf::contract_paused           = 0x789abcde;
+const conf::contract_unpaused         = 0x89abcdef;
+const conf::disbursed                 = 0x9abcdef0;
+const conf::batch_disbursed           = 0xabcdef01;
+
+;; ===== STORAGE STRUCTURE =====
+;; owner: slice (267 bits address)
+;; jetton_master: slice (267 bits)
+;; admins: dict (uint key=address 267 bits -> cell value present=1)  [udict_*]
+;; paused: uint1
+;; jetton_wallet: slice (267 bits), cached wallet that sent us a notification
+
+global slice owner_address;
+global slice jetton_master_address;
+global cell  admins_dict;
+global int   paused_state;
+global slice jetton_wallet_address;
+
+;; ===== STORAGE IO =====
+() load_data() impure {
+  var ds = get_data().begin_parse();
+  owner_address         = ds~load_bits(267);
+  jetton_master_address = ds~load_bits(267);
+  admins_dict           = ds~load_dict();
+  paused_state          = ds~load_uint(1);
+  jetton_wallet_address = ds~load_bits(267);
+  ds.end_parse();
+}
+
+() save_data() impure {
+  set_data(
+    begin_cell()
+      .store_slice(owner_address)
+      .store_slice(jetton_master_address)
+      .store_dict(admins_dict)
+      .store_uint(paused_state, 1)
+      .store_slice(jetton_wallet_address)
+    .end_cell()
+  );
+}
+
+;; ===== UTILS =====
+int is_owner(slice who) impure {
+  return equal_slice_bits(who, owner_address);
+}
+
+;; Admins are stored as unsigned-int keys (267-bit)
+int is_admin(slice who) impure {
+  var ( _val_ref, exists ) = udict_get_ref?(admins_dict, 267, who.preload_uint(267));
+  return exists;
+}
+
+int is_paused() impure {
+  return paused_state;
+}
+
+slice get_jetton_wallet() impure {
+  return jetton_wallet_address;
+}
+
+;; ===== JETTON SEND =====
+() send_jetton_transfer(
+  slice to_address,
+  int   jetton_amount,        ;; uint128 expected by standard
+  int   query_id,
+  int   attach_grams,         ;; grams attached to internal message to wallet
+  slice response_destination  ;; where the wallet should send responses
+) impure {
+  var wallet = get_jetton_wallet();
+  throw_unless(0xA0, wallet.slice_empty?() == 0);  ;; require cached wallet
+
+  ;; Build jetton "transfer" payload per standard:
+  ;; transfer#0f8a7ea5 query_id:uint64 amount:uint128 destination:MsgAddress
+  ;; response_destination:MsgAddress custom_payload:(Maybe ^Cell)
+  ;; forward_ton_amount:Coins forward_payload:(Either Cell ^Cell)
+  var transfer_body = begin_cell()
+    .store_uint(op::jetton_transfer, 32)
+    .store_uint(query_id, 64)
+    .store_uint(jetton_amount, 128)
+    .store_slice(to_address)
+    .store_slice(response_destination)
+    .store_maybe_ref(null())        ;; no custom payload
+    .store_grams(0)                 ;; forward_ton_amount
+    .store_uint(1, 1)               ;; right branch for ^Cell
+    .store_ref(begin_cell().end_cell()) ;; empty forward_payload cell
+  .end_cell();
+
+  ;; Wrap into internal message to jetton wallet
+  var msg = begin_cell()
+    .store_uint(0x10, 6)      ;; int msg, bounceable (0x10 pattern commonly used)
+    .store_slice(wallet)
+    .store_grams(attach_grams)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)  ;; default headers (no state init, no code, etc.)
+    .store_ref(transfer_body)
+  .end_cell();
+
+  ;; Mode 1: pay from balance, ignore errors -> adjust if you want different semantics
+  send_raw_message(msg, 1);
+}
+
+;; ===== FORWARD DECLS =====
+() handle_transfer_ownership(slice sender, slice body, int q) impure;
+() handle_add_admin(slice sender, slice body, int q) impure;
+() handle_remove_admin(slice sender, slice body, int q) impure;
+() handle_set_jetton_master(slice sender, slice body, int q) impure;
+() handle_disburse(slice sender, slice body, int q) impure;
+() handle_disburse_batch(slice sender, slice body, int q) impure;
+() handle_withdraw_all_usdt(slice sender, slice body, int q) impure;
+() handle_withdraw_ton(slice sender, slice body, int q) impure;
+() handle_pause(slice sender, slice body, int q) impure;
+() handle_unpause(slice sender, slice body, int q) impure;
+
+;; ===== MAIN HANDLER =====
+() recv_internal(int my_balance, int msg_value, cell in_full, slice in_body) impure {
+  if (in_body.slice_empty?()) { return (); }
+
+  slice cs = in_full.begin_parse();
+  int flags = cs~load_uint(4);
+  if (flags & 1) { return (); }      ;; ignore bounced
+
+  slice sender_address = cs~load_msg_addr();  ;; parse sender early
+  load_data();
+
+  int op = in_body~load_uint(32);
+  int qid = in_body~load_uint(64);
+
+  ;; Jetton wallet notification (cache wallet)
+  if (op == op::transfer_notification) {
+    ;; safer to trust parsed sender_address as wallet address
+    jetton_wallet_address = sender_address;
+    save_data();
+    return ();
+  }
+
+  if (op == op::excesses) { return (); }
+
+  ;; Pause guard (currently only disburse paths)
+  if ((op == op::disburse) | (op == op::disburse_batch)) {
+    throw_unless(0xFF, is_paused() == 0);
+  }
+
+  ;; Routing
+  if      (op == op::transfer_ownership) { handle_transfer_ownership(sender_address, in_body, qid); }
+  elseif (op == op::add_admin)           { handle_add_admin(sender_address, in_body, qid); }
+  elseif (op == op::remove_admin)        { handle_remove_admin(sender_address, in_body, qid); }
+  elseif (op == op::set_jetton_master)   { handle_set_jetton_master(sender_address, in_body, qid); }
+  elseif (op == op::disburse)            { handle_disburse(sender_address, in_body, qid); }
+  elseif (op == op::disburse_batch)      { handle_disburse_batch(sender_address, in_body, qid); }
+  elseif (op == op::withdraw_all_usdt)   { handle_withdraw_all_usdt(sender_address, in_body, qid); }
+  elseif (op == op::withdraw_ton)        { handle_withdraw_ton(sender_address, in_body, qid); }
+  elseif (op == op::pause)               { handle_pause(sender_address, in_body, qid); }
+  elseif (op == op::unpause)             { handle_unpause(sender_address, in_body, qid); }
+  else { throw(0xffff); }
+}
+
+;; ===== OWNER =====
+() handle_transfer_ownership(slice sender, slice body, int q) impure {
+  throw_unless(0x01, is_owner(sender));
+  slice new_owner = body~load_bits(267);
+  owner_address = new_owner;
+  save_data();
+
+  var msg = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::ownership_transferred, 32)
+    .store_uint(q, 64)
+    .store_slice(new_owner)
+  .end_cell();
+  send_raw_message(msg, 1);
+}
+
+() handle_add_admin(slice sender, slice body, int q) impure {
+  throw_unless(0x02, is_owner(sender));
+  slice new_admin = body~load_bits(267);
+
+  admins_dict = udict_set_ref(
+    admins_dict, 267, new_admin.preload_uint(267),
+    begin_cell().store_uint(1,1).end_cell()
+  );
+  save_data();
+
+  var m = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::admin_added, 32)
+    .store_uint(q, 64)
+    .store_slice(new_admin)
+  .end_cell();
+  send_raw_message(m, 1);
+}
+
+() handle_remove_admin(slice sender, slice body, int q) impure {
+  throw_unless(0x03, is_owner(sender));
+  slice admin_to_remove = body~load_bits(267);
+
+  var (new_dict, success) = udict_delete?(admins_dict, 267, admin_to_remove.preload_uint(267));
+  admins_dict = new_dict;
+  save_data();
+
+  var m = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::admin_removed, 32)
+    .store_uint(q, 64)
+    .store_slice(admin_to_remove)
+  .end_cell();
+  send_raw_message(m, 1);
+}
+
+() handle_set_jetton_master(slice sender, slice body, int q) impure {
+  throw_unless(0x04, is_owner(sender));
+  slice new_master = body~load_bits(267);
+  jetton_master_address = new_master;
+
+  ;; Reset cached wallet; will be set again on first incoming notification
+  jetton_wallet_address = begin_cell().end_cell().begin_parse();  ;; empty slice
+  save_data();
+
+  var m = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::jetton_master_set, 32)
+    .store_uint(q, 64)
+    .store_slice(new_master)
+  .end_cell();
+  send_raw_message(m, 1);
+}
+
+() handle_withdraw_all_usdt(slice sender, slice body, int q) impure {
+  throw_unless(0x05, is_owner(sender));
+  slice destination = body~load_bits(267);
+
+  ;; NOTE: Jetton standard expects a concrete amount (uint128). Sending 0 is non-standard.
+  ;; Many wallets WILL REJECT amount=0. Prefer a dedicated withdraw(amount) with explicit amount.
+  throw_unless(0x06, jetton_wallet_address.slice_empty?() == 0);
+
+  ;; Attempt transfer with amount=0 as "all" (non-standard; keep if your wallet supports)
+  send_jetton_transfer(destination, 0, q, 0, my_address());
+
+  var m = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::all_usdt_withdrawn, 32)
+    .store_uint(q, 64)
+    .store_slice(destination)
+  .end_cell();
+  send_raw_message(m, 1);
+}
+
+() handle_withdraw_ton(slice sender, slice body, int q) impure {
+  throw_unless(0x07, is_owner(sender));
+  slice destination = body~load_bits(267);
+  int amount = body~load_grams();
+
+  var payout = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(destination)
+    .store_grams(amount)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+  .end_cell();
+  send_raw_message(payout, 1);
+
+  var m = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::ton_withdrawn, 32)
+    .store_uint(q, 64)
+    .store_slice(destination)
+    .store_grams(amount)
+  .end_cell();
+  send_raw_message(m, 1);
+}
+
+() handle_pause(slice sender, slice _body, int q) impure {
+  throw_unless(0x08, is_owner(sender));
+  paused_state = 1;
+  save_data();
+
+  var m = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::contract_paused, 32)
+    .store_uint(q, 64)
+  .end_cell();
+  send_raw_message(m, 1);
+}
+
+() handle_unpause(slice sender, slice _body, int q) impure {
+  throw_unless(0x09, is_owner(sender));
+  paused_state = 0;
+  save_data();
+
+  var m = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::contract_unpaused, 32)
+    .store_uint(q, 64)
+  .end_cell();
+  send_raw_message(m, 1);
+}
+
+;; ===== ADMIN =====
+() handle_disburse(slice sender, slice body, int q) impure {
+  throw_unless(0x0a, is_admin(sender));
+  slice recipient = body~load_bits(267);
+  int   amount    = body~load_uint(64);  ;; if you truly need 128, change to load_uint(128)
+
+  send_jetton_transfer(recipient, amount, q, 0, my_address());
+
+  var m = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::disbursed, 32)
+    .store_uint(q, 64)
+    .store_slice(recipient)
+    .store_uint(amount, 64)
+  .end_cell();
+  send_raw_message(m, 1);
+}
+
+() handle_disburse_batch(slice sender, slice body, int q) impure {
+  throw_unless(0x0b, is_admin(sender));
+  int count = body~load_uint(8);
+  throw_unless(0x0c, (count > 0) & (count <= 255));
+
+  int i = 0;
+  while (i < count) {
+    slice rcpt  = body~load_bits(267);
+    int   amt64 = body~load_uint(64);
+    send_jetton_transfer(rcpt, amt64, q, 0, my_address());
+    i += 1;
+  }
+
+  var m = begin_cell()
+    .store_uint(0x10, 6)
+    .store_slice(sender)
+    .store_grams(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(conf::batch_disbursed, 32)
+    .store_uint(q, 64)
+    .store_uint(count, 8)
+  .end_cell();
+  send_raw_message(m, 1);
+}
+
+;; ===== GET METHODS =====
+slice get_owner() method_id { load_data(); return owner_address; }
+slice get_jetton_master() method_id { load_data(); return jetton_master_address; }
+slice get_jetton_wallet_address() method_id { load_data(); return jetton_wallet_address; }
+
+int is_address_admin(slice addr) method_id {
+  load_data();
+  return is_admin(addr);
+}
+
+int get_paused_status() method_id {
+  load_data();
+  return is_paused();
+}
+
+int get_jetton_balance() method_id {
+  load_data();
+  ;; Not available via get-method (no cross-contract). Keep stub=0.
+  if (jetton_wallet_address.slice_empty?()) { return 0; }
+  return 0;
+}
+
+cell get_all_admins() method_id {
+  load_data();
+  return admins_dict;
+}
