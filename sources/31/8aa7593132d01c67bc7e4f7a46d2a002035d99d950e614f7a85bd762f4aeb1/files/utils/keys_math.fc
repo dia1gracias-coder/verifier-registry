@@ -1,0 +1,23 @@
+#include "safemath.fc";
+
+int keys_at(int amount) inline {
+    {-
+        b = start_price * 2 - delta;
+        = ( sqrt( b**2 + 8 * delta * amount ) - b ) / ( 2 * delta )
+    -}
+    int ticket_start_price = 75000;
+    int ticket_price_delta = 1;
+
+    int b = multiply(ticket_start_price, 2) - ticket_price_delta;
+
+    return muldiv(1,
+        sqrt( multiply(b, b) + (multiply(multiply(amount, ticket_price_delta), 8)) ) - b,
+        multiply(2, ticket_price_delta)
+    );
+}
+
+int calculate_keys_quantity(int total_tons, int activate_amount) inline {
+    return total_tons
+    ? keys_at(total_tons + activate_amount) - keys_at(total_tons)
+    : keys_at(activate_amount);
+}

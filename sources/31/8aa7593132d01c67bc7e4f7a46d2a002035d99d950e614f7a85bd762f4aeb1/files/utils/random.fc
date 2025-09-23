@@ -1,0 +1,40 @@
+int get_byte(int hash, int index) inline_ref {
+    return (hash >> (8 * index)) & 0xFF;
+}
+
+;; Random number generation with chained randomness history and comprehensive entropy mixing
+int get_random_byte(slice user_address, int user_commit_hash, int prev_random_seed) inline_ref {
+    ;; Get current entropy sources
+    [int balance, _] = get_balance();
+    int current_lt = cur_lt();
+    int current_time = now();
+    int global_seed = get_seed();
+    int gas_used = gas_consumed();
+    int storage_due = my_storage_due();
+
+    cell mix = begin_cell()
+        .store_uint(prev_random_seed, 256)           ;; Chained randomness history
+        .store_uint(user_commit_hash, 256)           ;; User commit hash (opaque)
+        .store_uint(current_lt, 64)                  ;; Logical time
+        .store_uint(current_time, 46)                ;; Current timestamp
+        .store_uint(global_seed, 256)                ;; TON global seed (optimized from 256)
+        .store_coins(gas_used)                       ;; Runtime gas consumption (optimized from 64)
+        .store_uint(storage_due, 32)                 ;; Runtime storage due (optimized from 64)
+        .store_coins(balance)                        ;; Current balance (optimized from 128)
+    .end_cell();
+
+    ;; Generate hash and random byte
+    int hash = cell_hash(mix);
+    int index = (hash % 30) + 1;
+    int random_byte = get_byte(hash, index);
+
+    return random_byte;
+}
+
+;; Get random word (16-bit) using two random bytes
+int get_random_word(slice user_address, int user_commit_hash, int prev_random_seed) inline_ref {
+    int byte1 = get_random_byte(user_address, user_commit_hash, prev_random_seed);
+    int byte2 = get_random_byte(user_address, user_commit_hash ^ 0x12345678, prev_random_seed ^ 0x87654321);
+
+    return (byte1 << 8) | byte2;
+}
