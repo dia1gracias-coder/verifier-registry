@@ -1,0 +1,20 @@
+() request_wallet_address(slice resolver_address) impure inline {
+    force_chain(resolver_address);
+    send_raw_message(
+        begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(resolver_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+            .store_dict(
+                begin_cell()
+                    .store_uint(op::provide_wallet_address, 32)
+                    .store_uint(0, 64)
+                    .store_slice(my_address())
+                    .store_uint(0, 1)
+                    .end_cell()
+            )
+            .end_cell(), 
+        CARRY_REMAINING_GAS
+    );
+}
