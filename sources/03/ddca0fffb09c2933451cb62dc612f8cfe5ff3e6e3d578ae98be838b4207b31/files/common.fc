@@ -1,0 +1,286 @@
+#include "storage.fc";
+#include "op_codes.fc";
+#include "errors.fc";
+#include "params.fc";
+#include "imports/i_bcl_math.fc";
+#include "imports/i_stdlib_modern.fc";
+#include "imports/i_discovery_params.fc";
+#include "utils/u_jetton_utils.fc";
+#include "utils/u_log.fc";
+
+int storage_fees() asm "STORAGEFEES";
+
+slice burner_address() inline {
+    return "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"a;
+}
+
+slice address_none() asm "<b 0 2 u, b> <s PUSHSLICE";
+
+int calculate_jetton_amount(int total_supply, int ton_amount) inline {
+    return math::calc_coins_for_tons(ton_amount, total_supply);
+}
+
+int calculate_ton_amount(int total_supply, int jetton_amount) inline {
+    return math::calc_tons_for_coins(jetton_amount, total_supply);
+}
+
+() send_fee(int amount, int op_code, int query_id, cell custom_payload) impure inline {
+    if (amount > 0) {
+        var message = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(ctx_fee_recipient)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op_code, 32)
+            .store_uint(query_id, 64)
+            .store_maybe_ref(custom_payload);
+
+        send_raw_message(message.end_cell(), SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+    }
+}
+
+() buy(int msg_value, slice in_msg_body, slice sender_address, int initial, int auto_deposit_liquidity, int query_id) impure inline {
+    var initial_gas = initial ? gas::initial : 0;
+    var total_gas = gas::buy + initial_gas;
+
+    int min_receive = in_msg_body~load_coins();
+    slice destination = in_msg_body~load_msg_addr();
+    cell custom_payload = in_msg_body~load_maybe_ref();
+
+    if (destination.preload_uint(2) == 0) {
+        destination = sender_address;
+    }
+
+    try {
+        throw_unless(err::trading_finished, ctx_phase == phase::trading);
+        throw_unless(err::insufficient_funds, msg_value > total_gas);
+
+        int ton_amount = msg_value - total_gas;
+
+        var (fee, jetton_amount, tons_consumed) = calc_coins_for_tons(ton_amount);
+
+        int forward_amount = ton_amount - tons_consumed;
+
+        if (ton_amount != tons_consumed) {
+            min_receive = muldiv(tons_consumed, min_receive, ton_amount);
+        }
+
+        throw_unless(err::slippage_not_satisfied, jetton_amount >= min_receive);
+
+        ctx_total_supply += jetton_amount;
+        ctx_last_trade_date = now();
+        ctx_ton_liq_collected += tons_consumed - fee;
+
+        var should_deposit_liquidity = ctx_total_supply == threshold_supply & auto_deposit_liquidity;
+
+        if (should_deposit_liquidity) {
+            forward_amount += forward::buy;
+        } else {
+            raw_reserve(initial_gas + tons_consumed - fee + storage_fees(), 4 + SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        }
+
+        emit_log(
+            begin_cell()
+                .store_uint(log::buy, 32)
+            ;; Buyer
+                .store_slice(destination)
+            ;; TON amount
+                .store_coins(tons_consumed)
+            ;; Jetton amount
+                .store_coins(jetton_amount)
+            ;; New total supply
+                .store_coins(ctx_total_supply)
+            ;; New collected TON amount
+                .store_coins(ctx_ton_liq_collected)
+            ;; Custom payload
+                .store_maybe_ref(custom_payload)
+        );
+
+        send_fee(fee, op::fee_payout, query_id, custom_payload);
+
+        cell master_msg = begin_cell()
+            .store_uint(op::internal_transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(jetton_amount)
+            .store_uint(0, 2) ;; empty address
+            .store_slice(destination)
+            .store_coins(0)
+            .end_cell();
+
+        cell state_init = calculate_jetton_wallet_state_init(destination, my_address(), ctx_wallet_code);
+        slice to_wallet_address = calculate_address(state_init);
+
+        var message = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to_wallet_address)
+            .store_coins(forward_amount)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(state_init)
+            .store_ref(master_msg)
+            .end_cell();
+
+        send_raw_message(message, should_deposit_liquidity ? (SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL) : (SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_BOUNCE_ON_ACTION_FAIL));
+    } catch (err_arg, err_code) {
+        raw_reserve(initial_gas + storage_fees(), 4 + SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        var message = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(destination)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::failed, 32)
+            .store_uint(query_id, 64)
+            .store_uint(abs(err_code != 1 ? err_code : err_arg.to_int()), 32);
+
+        send_raw_message(message.end_cell(), SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+    }
+}
+
+() sell(int msg_value, slice in_msg_body, slice sender_address, int query_id) impure inline {
+    int jetton_amount = in_msg_body~load_coins();
+    int min_ton_amount = in_msg_body~load_coins();
+    slice owner_address = in_msg_body~load_msg_addr();
+    cell custom_payload = in_msg_body~load_maybe_ref();
+
+    throw_unless(err::trading_finished, ctx_phase == phase::trading);
+    throw_unless(err::insufficient_funds, msg_value >= gas::sell);
+    throw_unless(err::not_valid_wallet, equal_slices_bits(calculate_user_jetton_wallet_address(owner_address, my_address(), ctx_wallet_code), sender_address));
+
+    var (fee, ton_amount) = calc_tons_for_coins(jetton_amount);
+    var total_ton_amount = (ton_amount + fee);
+
+    throw_unless(err::slippage_not_satisfied, ton_amount >= min_ton_amount);
+
+    ctx_total_supply -= jetton_amount;
+    ctx_last_trade_date = now();
+    ctx_ton_liq_collected -= total_ton_amount;
+
+    int storage_fees = storage_fees();
+
+    if (total_ton_amount > storage_fees) {
+        raw_reserve(total_ton_amount - storage_fees, 4 + 8 + SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+    } else {
+        raw_reserve(storage_fees - total_ton_amount, 4 + SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+    }
+
+    ;; Send sell fee to fee recipient
+    send_fee(fee, op::fee_payout, query_id, custom_payload);
+
+    emit_log(
+        begin_cell()
+            .store_uint(log::sell, 32)
+        ;; Seller
+            .store_slice(owner_address)
+        ;; TON amount
+            .store_coins(ton_amount)
+        ;; Jetton amount
+            .store_coins(jetton_amount)
+        ;; New total supply
+            .store_coins(ctx_total_supply)
+        ;; New collected TON amount
+            .store_coins(ctx_ton_liq_collected)
+        ;; Custom payload
+            .store_maybe_ref(custom_payload)
+    );
+
+    var payout_message = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(owner_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::sell_payout, 32)
+        .store_uint(query_id, 64);
+
+    send_raw_message(payout_message.end_cell(), SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+}
+
+() unlock(slice in_msg_body, slice sender_address, int query_id) impure inline {
+    slice owner_address = in_msg_body~load_msg_addr();
+
+    throw_unless(err::not_valid_wallet, equal_slices_bits(calculate_user_jetton_wallet_address(owner_address, my_address(), ctx_wallet_code), sender_address));
+    throw_unless(err::not_listed, ctx_phase == phase::listed);
+
+    send_raw_message(
+        begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(sender_address)
+            .store_grams(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::unlock_approve, 32)
+            .store_uint(query_id, 64)
+            .end_cell(),
+        64
+    );
+}
+
+() handle_burn_notification(slice in_msg_body, slice sender_address, int query_id) impure inline {
+    int jetton_amount = in_msg_body~load_coins();
+    slice from_address = in_msg_body~load_msg_addr();
+
+    throw_unless(err::not_owner, equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), ctx_wallet_code), sender_address));
+
+    ctx_total_supply -= jetton_amount;
+
+    slice response_address = in_msg_body~load_msg_addr();
+
+    if (response_address.preload_uint(2) != 0) {
+        var message = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(response_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::excesses, 32)
+            .store_uint(query_id, 64);
+
+        send_raw_message(message.end_cell(), 2 + 64);
+    }
+}
+
+() handle_transfer_notification(slice in_msg_body, slice sender_address, int query_id) impure inline {
+    int jetton_amount = in_msg_body~load_coins();
+
+    var message_body = begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(query_id, 64) ;; query id
+        .store_coins(jetton_amount)
+        .store_slice(burner_address()) ;; burner address
+        .store_slice(my_address()) ;; response address
+        .store_uint(0, 1)
+        .store_coins(0)
+        .store_uint(0, 1)
+        .end_cell();
+
+    var message = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(message_body)
+        .end_cell();
+
+    send_raw_message(message, 64);
+}
+
+() provide_wallet_address(int msg_value, int fwd_fee, slice in_msg_body, int query_id, slice sender_address) impure inline {
+    throw_unless(err::insufficient_funds, msg_value > fwd_fee + provide_address_gas_consumption());
+
+    slice owner_address = in_msg_body~load_msg_addr();
+    int include_address? = in_msg_body~load_uint(1);
+
+    cell included_address = include_address? ? begin_cell().store_slice(owner_address).end_cell() : null();
+
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::take_wallet_address(), 32)
+        .store_uint(query_id, 64);
+
+    if (is_resolvable?(owner_address)) {
+        msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), ctx_wallet_code));
+    } else {
+        msg = msg.store_uint(0, 2); ;; addr_none
+    }
+
+    send_raw_message(msg.store_maybe_ref(included_address).end_cell(), 64);
+}

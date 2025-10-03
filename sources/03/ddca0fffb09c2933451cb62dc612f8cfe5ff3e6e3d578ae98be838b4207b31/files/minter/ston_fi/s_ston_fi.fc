@@ -1,0 +1,102 @@
+#include "s_storage.fc";
+#include "../../params.fc";
+#include "../../op_codes.fc";
+#include "../../storage.fc";
+#include "../../imports/i_stdlib_modern.fc";
+#include "../../utils/u_jetton_utils.fc";
+#include "../../utils/u_log.fc";
+
+const op::ston_fi::provide_lp = 0x37c096df;
+const op::pton_transfer = 0x01f3835d;
+
+const ston_fi::forward::jetton = 240000000; ;; 0.24 TON
+const ston_fi::forward::dex = 60000000; ;; 0.06 TON
+
+() deposit_liquidity_to_ston_fi(int query_id) impure inline {
+    slice ref = ctx_addresses.begin_parse();
+    slice stonfi_router = ref~load_msg_addr();
+    slice stonfi_router_pton_wallet = ref~load_msg_addr();
+
+    int deadline = now() + 15 * 60;
+    int ton_amount = ctx_ton_liq_collected - ctx_liquidity_fee - forward::deposit - forward::deposit - gas::deposit_liquidity - forward::buy;
+    int jetton_amount = max_supply - threshold_supply;
+
+    cell state_init = calculate_jetton_wallet_state_init(stonfi_router, my_address(), ctx_wallet_code);
+    slice stonfi_router_wallet = calculate_address(state_init);
+
+    cell internal_payload = begin_cell()
+        .store_coins(1)
+        .store_slice(my_address())
+        .store_uint(1, 1)
+        .store_coins(ston_fi::forward::dex)
+        .store_uint(0, 1)
+        .end_cell();
+
+    cell ton_forward_payload = begin_cell()
+        .store_uint(op::ston_fi::provide_lp, 32)
+        .store_slice(stonfi_router_wallet)
+        .store_slice(my_address())
+        .store_slice(my_address())
+        .store_uint(deadline, 64)
+        .store_ref(internal_payload)
+        .end_cell();
+
+    cell message_body = begin_cell()
+        .store_uint(op::pton_transfer, 32)
+        .store_uint(query_id, 64) ;; query id
+        .store_coins(ton_amount) ;; amount
+        .store_slice(my_address())
+        .store_uint(1, 1)
+        .store_ref(ton_forward_payload)
+        .end_cell();
+
+    var message = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(stonfi_router_pton_wallet)
+        .store_coins(ton_amount + forward::deposit)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(message_body)
+        .end_cell();
+
+    send_raw_message(message, SEND_MODE_PAY_FEES_SEPARATELY);
+
+    cell jetton_forward_payload = begin_cell()
+        .store_uint(op::ston_fi::provide_lp, 32)
+        .store_slice(stonfi_router_pton_wallet)
+        .store_slice(my_address())
+        .store_slice(my_address())
+        .store_uint(deadline, 64)
+        .store_ref(internal_payload)
+        .end_cell();
+
+    var transfer_message_body = begin_cell()
+        .store_uint(op::internal_transfer, 32)
+        .store_uint(query_id, 64) ;; query id
+        .store_coins(jetton_amount)
+        .store_slice(my_address())
+        .store_slice(my_address())
+        .store_coins(ston_fi::forward::jetton)
+        .store_uint(1, 1)
+        .store_ref(jetton_forward_payload)
+        .end_cell();
+
+    var transfer_message = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(stonfi_router_wallet)
+        .store_coins(forward::deposit)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(transfer_message_body)
+        .end_cell();
+
+    send_raw_message(transfer_message, SEND_MODE_PAY_FEES_SEPARATELY);
+
+    emit_log(
+        begin_cell()
+            .store_uint(log::send_liquidity, 32)
+        ;; Liquidity TON amount
+            .store_coins(ton_amount)
+        ;; Liquidity jetton amount
+            .store_coins(jetton_amount)
+    );
+}

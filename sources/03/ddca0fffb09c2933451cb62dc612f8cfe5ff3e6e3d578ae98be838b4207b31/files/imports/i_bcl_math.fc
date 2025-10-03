@@ -1,0 +1,141 @@
+#include "../params.fc";
+#include "../storage.fc";
+#include "../errors.fc";
+
+;;
+;; Core curve math, does not include any edge cases handling or fees calculation
+;;
+
+const coeff::vTon = 333333333333333333;
+const coeff::vToken = 333333333333333333;
+const coeff::K = 444444444444444444;
+
+const ONE_9 = 1000000000; ;; 1e9
+const ONE_18 = 1000000000000000000; ;; 1e18
+
+;; public functions
+
+int math::fp::mul(int a, int b) inline {
+    return muldiv(a, b, ONE_18);
+}
+
+int math::fp::div(int a, int b) impure inline {
+    throw_if(err::zero_division, b == 0);
+    return muldiv(a, ONE_18, b);
+}
+
+;; Formulas for on TONs and TOKENS, not in nano format
+
+;; Converts nanoTON to TON & FP
+;; nano TON is 10^9, FP numbers are * 10^18,
+;; so we need to mul by 10^18 and div by 10^9 which is just mul by 10^9
+int to_fp(int value) inline {
+    return value * ONE_9;
+}
+
+;; Converts FP TON to nanoTON
+int from_fp(int value) inline {
+    return value / ONE_9;
+}
+
+int real_ton(int r_token) {
+    var a = math::fp::mul(math::fp::mul(coeff::K, to_fp(ctx_curve_ton)), to_fp(threshold_supply));
+    var b = (math::fp::mul(coeff::vToken, to_fp(threshold_supply)) + r_token);
+
+    return math::fp::div(a, b) - math::fp::mul(coeff::vTon, to_fp(ctx_curve_ton));
+}
+
+;; Current price
+int math::calc_coin_price(int current_supply) inline {
+    var r_token = to_fp(threshold_supply) - to_fp(current_supply);
+    var r_ton = real_ton(r_token);
+
+    var a = math::fp::mul(coeff::vTon, to_fp(ctx_curve_ton)) + r_ton;
+    var b = math::fp::mul(coeff::vToken, to_fp(threshold_supply)) + r_token;
+
+    return from_fp(math::fp::div(a, b));
+}
+
+;; Calculates how much TONs could be received for selling given amount of coins
+;; Used for SELL operation
+var math::calc_tons_for_coins(int tokens, int current_supply) inline {
+    current_supply = to_fp(current_supply);
+    tokens = to_fp(tokens);
+
+    var r_token = to_fp(threshold_supply) - current_supply;
+    var r_ton = real_ton(r_token);
+
+    var a = math::fp::mul(
+        tokens,
+        math::fp::mul(coeff::vTon, to_fp(ctx_curve_ton)) + r_ton
+    );
+
+    var b = math::fp::mul(coeff::vToken, to_fp(threshold_supply)) + tokens + r_token;
+
+    return from_fp(math::fp::div(a, b));
+}
+
+;; Calculates how much tokens could be received for given amount of TONs
+;; Used for BUY operation
+var math::calc_coins_for_tons(int tons, int current_supply) inline {
+    tons = to_fp(tons);
+    current_supply = to_fp(current_supply);
+
+    var r_token = to_fp(threshold_supply) - current_supply;
+    var r_ton = real_ton(r_token);
+
+    var a = math::fp::mul(tons, math::fp::mul(coeff::vToken, to_fp(threshold_supply)) + r_token);
+    var b = math::fp::mul(coeff::vTon, to_fp(ctx_curve_ton)) + tons + r_ton;
+
+    return from_fp(math::fp::div(a, b));
+}
+
+;;
+;; High level curve math
+;;
+
+;; Current price
+int calc_coin_price() inline {
+    if (ctx_total_supply == 0) {
+        return 0;
+    }
+
+    int last_supply = ctx_total_supply > threshold_supply ? threshold_supply : ctx_total_supply;
+    return math::calc_coin_price(last_supply);
+}
+
+var calc_tons_for_all_coins() inline {
+    var tons_need = math::calc_tons_for_coins(threshold_supply, threshold_supply);
+    var full_tons_need = muldivc(tons_need, 10000, 10000 - ctx_buy_fee_basis) + 1;
+    var fees = muldiv(full_tons_need, ctx_buy_fee_basis, 10000);
+    return (fees, full_tons_need);
+}
+
+;; Sell operation
+var calc_tons_for_coins(int tokens) inline {
+    var tons_to_get = math::calc_tons_for_coins(tokens, ctx_total_supply);
+    var fees = muldiv(tons_to_get, ctx_sell_fee_basis, 10000);
+    tons_to_get -= fees;
+    return (fees, tons_to_get);
+}
+
+;; Buy operation
+var calc_coins_for_tons(int tons) inline {
+    var incoming_tons = tons;
+    var available_to_buy = threshold_supply - ctx_total_supply;
+
+    var fees = muldiv(tons, ctx_buy_fee_basis, 10000);
+    tons = tons - fees;
+
+    var coins_to_get = math::calc_coins_for_tons(tons, ctx_total_supply);
+
+    ;; Calculations for rest of available coins
+    if (coins_to_get > available_to_buy) {
+        var tons_no_fees = math::calc_tons_for_coins(available_to_buy, ctx_total_supply + available_to_buy);
+        var tons_need = muldivc(tons_no_fees, 10000, 10000 - ctx_buy_fee_basis);
+        var fees = muldiv(tons_need, ctx_buy_fee_basis, 10000);
+        return (fees, available_to_buy, tons_need);
+    }
+
+    return (fees, coins_to_get, incoming_tons);
+}

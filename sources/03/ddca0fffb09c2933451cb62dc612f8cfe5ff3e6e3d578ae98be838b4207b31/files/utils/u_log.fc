@@ -1,0 +1,11 @@
+#include "../imports/i_stdlib_modern.fc";
+
+() emit_log(builder data) impure inline {
+    send_raw_message(begin_cell()
+        .store_uint(12, 4)
+        .store_uint(0, 100)
+        .store_builder(data)
+        .end_cell(),
+        0
+    );
+}

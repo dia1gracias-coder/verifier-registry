@@ -1,0 +1,61 @@
+#include "../../storage.fc";
+#include "../../imports/i_stdlib_modern.fc";
+
+global cell ctx_addresses;
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+
+    ctx_total_supply = ds~load_coins();
+    ctx_phase = ds~load_uint(2);
+    ctx_content = ds~load_ref();
+    ctx_wallet_code = ds~load_ref();
+
+    slice params_ds = ds~load_ref().begin_parse();
+    ctx_curve_ton = params_ds~load_coins();
+    ctx_last_trade_date = params_ds~load_uint(32);
+    ctx_ton_liq_collected = params_ds~load_coins();
+    params_ds.end_parse();
+
+    slice config_ds = ds~load_ref().begin_parse();
+    ctx_factory = config_ds~load_msg_addr();
+    ctx_author = config_ds~load_msg_addr();
+    ctx_has_agent = config_ds~load_uint(1);
+    ctx_fee_recipient = config_ds~load_msg_addr();
+    ctx_buy_fee_basis = config_ds~load_uint(16);
+    ctx_sell_fee_basis = config_ds~load_uint(16);
+    ctx_liquidity_fee = config_ds~load_coins();
+    ctx_custom_payload = config_ds~load_maybe_ref();
+    ctx_addresses = config_ds~load_ref();
+    config_ds.end_parse();
+
+    ds.end_parse();
+}
+
+() store_data() impure {
+    set_data(begin_cell()
+        .store_coins(ctx_total_supply)
+        .store_uint(ctx_phase, 2)
+        .store_ref(ctx_content)
+        .store_ref(ctx_wallet_code)
+        .store_ref(begin_cell()
+            .store_coins(ctx_curve_ton)
+            .store_uint(ctx_last_trade_date, 32)
+            .store_coins(ctx_ton_liq_collected)
+            .end_cell()
+        )
+        .store_ref(begin_cell()
+            .store_slice(ctx_factory)
+            .store_slice(ctx_author)
+            .store_uint(ctx_has_agent, 1)
+            .store_slice(ctx_fee_recipient)
+            .store_uint(ctx_buy_fee_basis, 16)
+            .store_uint(ctx_sell_fee_basis, 16)
+            .store_coins(ctx_liquidity_fee)
+            .store_maybe_ref(ctx_custom_payload)
+            .store_ref(ctx_addresses)
+            .end_cell()
+        )
+        .end_cell()
+    );
+}
