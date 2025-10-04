@@ -1,0 +1,16 @@
+#include "error_codes.fc";
+
+const int operations_fee = 60000000; ;;SIX_TONS / 100;
+const int min_tons_for_storage = 20000000; ;;TWO_TONS / 100;
+const int min_share_to_send = 1000000000; ;; ONE TON
+
+const int workchain = 0;
+
+int is_resolvable?(slice addr) inline {
+  (int wc, _) = parse_std_addr(addr);
+  return wc == workchain;
+}
+
+() force_chain(slice addr) impure {
+  throw_unless(error::wrong_workchain, is_resolvable?(addr));
+}

@@ -1,0 +1,779 @@
+#pragma version >=0.4.0;
+
+;;  ███████╗ ██████╗ ███╗   ███╗ ██████╗ ██████╗ ██╗   ██╗███████╗██╗  ██╗
+;;  ██╔════╝██╔═══██╗████╗ ████║██╔═══██╗██╔══██╗██║   ██║██╔════╝██║  ██║
+;;  █████╗  ██║   ██║██╔████╔██║██║   ██║██████╔╝██║   ██║███████╗███████║
+;;  ██╔══╝  ██║   ██║██║╚██╔╝██║██║   ██║██╔══██╗██║   ██║╚════██║██╔══██║
+;;  ██║     ╚██████╔╝██║ ╚═╝ ██║╚██████╔╝██║  ██║╚██████╔╝███████║██║  ██║
+;;  ╚═╝      ╚═════╝ ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
+;;
+;;   ██████╗  █████╗ ███╗   ███╗███████╗
+;;  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝
+;;  ██║  ███╗███████║██╔████╔██║█████╗
+;;  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝
+;;  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗
+;;   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝
+;;
+;; FomoRush - A decentralized FOMO game built on TON blockchain
+;; Players activate keys to extend the game timer and compete for the pot
+;; The player who performed the last key activation within the time limit wins the accumulated rewards
+;;
+;; Features:
+;; • Real-time competitive gameplay with countdown mechanics
+;; • Provably fair RNG for key activation bonuses
+;; • Referral system and community rewards
+;; • Staking integration and cross-round progression
+;; • Fully transparent smart contracts with instant payouts
+;;
+;; Links:
+;; • Website: https://fomorush.io
+;; • Telegram: @fomorush_bot
+
+#include "imports/stdlib.fc";
+#include "imports/mathlib.fc";
+#include "utils/helpers.fc";
+#include "utils/messages.fc";
+#include "utils/op-codes.fc";
+#include "utils/error_codes.fc";
+#include "utils/params.fc";
+#include "utils/utils.fc";
+#include "utils/safemath.fc";
+#include "utils/keys_math.fc";
+#include "utils/random.fc";
+
+const int day_seconds = 86400;
+
+const int jackpot_bitmap = 0x467ce192d508cf9b2e5088e16243850608080;
+
+;; storage functions
+(cell, cell, int, slice, slice, cell, int) load_data() inline {
+  slice ds = get_data().begin_parse();
+  return (
+    ds~load_ref(), ;; stats
+    ds~load_ref(), ;; shares
+    ds~load_uint(2), ;; stage
+    ds~load_msg_addr(), ;; admin_address akka community
+    ds~load_msg_addr(), ;; staking address
+    ds~load_ref(), ;; user_main_game_wallet_code
+    ds~load_uint(256) ;; prev_random_seed
+  );
+}
+
+() save_data(
+  cell stats,
+  cell shares,
+  int stage,
+  slice admin_address,
+  slice staking_address,
+  cell user_main_game_wallet_code,
+  int prev_random_seed
+) impure inline {
+
+  set_data(begin_cell()
+    .store_ref(stats)
+    .store_ref(shares)
+    .store_uint(stage, 2)
+    .store_slice(admin_address)
+    .store_slice(staking_address)
+    .store_ref(user_main_game_wallet_code)
+    .store_uint(prev_random_seed, 256)
+    .end_cell()
+  );
+}
+
+() ensure_game_started(int stage) impure inline {
+  throw_unless(error::forbidden_at_this_stage, stage > 0);
+}
+
+() send_keys(slice user_address, cell user_main_game_wallet_code, int amount, cell master_msg) impure {
+  cell state_init = calculate_wallet_state_init(user_address, my_address(), user_main_game_wallet_code);
+  slice to_wallet_address = calc_address(state_init);
+
+  var msg = begin_cell()
+    .store_msg_flag(msg_flag::bounceable)
+    .store_slice(to_wallet_address)
+    .store_coins(amount)
+    .store_msgbody_prefix_stateinit(state_init, master_msg);
+
+  send_raw_message(msg.end_cell(), PAY_FEES_SEPARATELY); ;; pay transfer fees separately, revert on errors
+}
+
+int calculate_time_limit(int round_start, int now) inline {
+  int diff_4h = muldiv(1, day_seconds, 6); ;; 4h
+
+  int time_passed = now - round_start;
+  int days_passed = muldiv(1, time_passed, day_seconds);
+
+  int new_limit = day_seconds - multiply(days_passed, diff_4h);
+
+  if (new_limit > diff_4h) {
+    return new_limit;
+  }
+
+  int diff_30min = muldiv(1, day_seconds, 48);
+
+  time_passed -= multiply(day_seconds, 5); ;; exclude days with 4h time diff
+  int periods_passed = muldiv(1, time_passed, diff_4h);
+
+  new_limit = diff_4h - multiply(periods_passed, diff_30min);
+  if (new_limit > diff_30min) {
+    return new_limit;
+  }
+
+  return diff_30min;
+}
+
+(int, int) process_external_shares(int stake, slice stake_addr, int community, slice community_addr) inline {
+  if (stake > min_share_to_send) {
+    var msg = prepare_for_send_with_op(stake_addr, stake, op::dividends_transfer, msg_flag::bounceable);
+
+    send_raw_message(msg.end_cell(), REVERT_ON_ERRORS);
+
+    stake = 0;
+  }
+
+  if (community > min_share_to_send) {
+    send_tons(community_addr, community);
+    community = 0;
+  }
+
+  return (stake, community);
+}
+
+(cell, cell, int) new_round(int now, cell stats, cell shares) inline {
+  (int pot, int keys_share, int stake, int community, int luck, int swap) = unpack_shares_data(shares);
+
+  pot = swap;
+
+  stake += keys_share;
+  keys_share = 0;
+  swap = 0;
+
+  shares = pack_shares_data(
+    pot,
+    keys_share,
+    stake,
+    community,
+    luck,
+    swap
+  );
+
+  (
+    int round,
+    int total_keys,
+    int total_tons,
+    int round_mask,
+    int round_start,
+    int stage_ends,
+    int time_limit,
+    slice last_ticket_owner
+  ) = unpack_stats_data(stats);
+
+  round += 1;
+  total_keys = 0;
+  total_tons = pot;
+  round_mask = 0;
+
+  round_start = now;
+  int time_limit = day_seconds;
+  stage_ends = round_start + time_limit;
+
+  last_ticket_owner = address_none();
+
+  stats = pack_stats_data(round, total_keys, total_tons, round_mask, round_start, stage_ends, time_limit, last_ticket_owner);
+
+  return (stats, shares, 1);
+}
+
+(cell, cell, int, int, int) end_stage1(int now, cell stats, cell shares, slice stake_address, slice community_address) inline {
+  (
+    int round,
+    int total_keys,
+    int total_tons,
+    int round_mask,
+    int round_start,
+    int stage_ends,
+    int time_limit,
+    slice last_ticket_owner
+  ) = unpack_stats_data(stats);
+
+  stage_ends += day_seconds.multiply(2);
+
+  total_keys = 0;
+
+  stats = pack_stats_data(round, total_keys, total_tons, round_mask, round_start, stage_ends, time_limit, last_ticket_owner);
+
+  (int pot, int keys_share, int stake, int community, int luck, int swap) = unpack_shares_data(shares);
+
+  int pot_percent = muldiv(1, pot, 100);
+
+  int win = multiply(pot_percent, 48);
+  send_tons(last_ticket_owner, win);
+
+  stake += multiply(pot_percent, 10);
+  community += multiply(pot_percent, 2);
+  (stake, community) = process_external_shares(stake, stake_address, community, community_address);
+
+  swap += multiply(pot_percent, 18);
+  pot = multiply(pot_percent, 22);
+
+  shares = pack_shares_data(
+    pot,
+    keys_share,
+    stake,
+    community,
+    luck,
+    swap
+  );
+
+  return (stats, shares, 2, total_keys, stage_ends);
+}
+
+(cell, cell, int) end_stage2(int now, cell stats, cell shares) inline {
+  (int pot, int keys_share, int stake, int community, int luck, int swap) = unpack_shares_data(shares);
+
+  keys_share += pot;
+  pot = 0;
+
+  shares = pack_shares_data(
+    pot,
+    keys_share,
+    stake,
+    community,
+    luck,
+    swap
+  );
+
+  (
+    int round,
+    int total_keys,
+    int total_tons,
+    int round_mask,
+    int round_start,
+    int stage_ends,
+    int time_limit,
+    slice last_ticket_owner
+  ) = unpack_stats_data(stats);
+
+  if (total_keys == 0) {
+    return new_round(now, stats, shares);
+  }
+
+  stage_ends += day_seconds.multiply(2);
+
+  round_mask = muldiv(1, keys_share, total_keys);
+
+  stats = pack_stats_data(round, total_keys, total_tons, round_mask, round_start, stage_ends, time_limit, last_ticket_owner);
+
+  return (stats, shares, 3);
+}
+
+(cell, int) process_round_shares(cell shares, int activate_amount, int dust, slice community_addr, slice stake_addr) inline {
+  (int pot, int keys_share, int stake, int community, int luck, int swap) = unpack_shares_data(shares);
+
+  int activate_tons_percent = muldiv(1, activate_amount, 100);
+
+  stake += multiply(activate_tons_percent, 6);
+
+  community += multiply(activate_tons_percent, 2);
+
+  (stake, community) = process_external_shares(stake, stake_addr, community, community_addr);
+
+  shares = pack_shares_data(
+    pot + multiply(activate_tons_percent, 37),
+    keys_share + multiply(activate_tons_percent, 43),
+    stake,
+    community,
+    luck + activate_tons_percent + dust,
+    swap + activate_tons_percent
+  );
+
+  int to_referrer = multiply(activate_tons_percent, 10);
+
+  return (shares, to_referrer);
+}
+
+() activate_keys(int msg_value, slice user_address, slice in_msg_body) impure inline {
+  throw_unless(error::invalid_msg_value, msg_value > operations_fee);
+
+  (
+    cell stats,
+    cell shares,
+    int stage,
+    slice admin_address,
+    slice dividends_address,
+    cell user_main_game_wallet_code,
+    int prev_random_seed
+  ) = load_data();
+
+  ensure_game_started(stage);
+
+  (
+    int round,
+    int total_keys,
+    int total_tons,
+    int round_mask,
+    int round_start,
+    int stage_ends,
+    int time_limit,
+    slice last_ticket_owner
+  ) = unpack_stats_data(stats);
+
+  int now = now();
+
+  if ((stage == 3) & (now >= stage_ends)) {
+    (stats, shares, stage) = new_round(now, stats, shares);
+
+    (
+      round,
+      total_keys,
+      total_tons,
+      round_mask,
+      round_start,
+      stage_ends,
+      time_limit,
+      last_ticket_owner
+    ) = unpack_stats_data(stats);
+  }
+
+  throw_unless(error::forbidden_at_this_stage, (stage == 1));
+
+  int activate_amount = msg_value - operations_fee;
+
+  if (now >= stage_ends) {
+    (stats, shares, stage, _, _) = end_stage1(now, stats, shares, dividends_address, admin_address);
+
+    save_data(stats, shares, stage, admin_address, dividends_address, user_main_game_wallet_code, prev_random_seed);
+    send_tons(user_address, activate_amount + operations_fee - min_tons_for_storage );
+
+    return ();
+  }
+
+  throw_unless(error::forbidden_at_this_stage,
+      (total_tons > 1000000000000)
+  | ((activate_amount < 20000000000) & ~ equal_slices_bits(last_ticket_owner, user_address))
+  );
+
+  int keys = calculate_keys_quantity(total_tons, activate_amount);
+
+  throw_unless(error::invalid_keys_value, keys > 0);
+
+  total_tons += activate_amount;
+
+  int activate_tons_percent = muldiv(1, activate_amount, 100);
+  int keys_share = activate_tons_percent.multiply(43);
+
+  int ppk = 0;
+
+  if (total_keys > 0) {
+    ppk = muldiv(1, keys_share, total_keys);
+    round_mask += ppk;
+  }
+  total_keys += keys;
+
+  int mask_diff = round_mask.multiply(keys);
+
+  time_limit = calculate_time_limit(round_start, now);
+
+  int add_timer = multiply(keys, 30);
+  stage_ends = min(stage_ends + add_timer, now + time_limit);
+
+  stats = pack_stats_data(round, total_keys, total_tons, round_mask, round_start, stage_ends, time_limit, user_address);
+
+  int dust = ppk ? keys_share - ppk.multiply(total_keys - keys) : 0;
+  int to_referrer = shares~process_round_shares(activate_amount, dust, admin_address, dividends_address);
+
+  var activate_key_msg = begin_cell()
+    .store_op(op::internal_transfer)
+    .store_uint(0, 2) ;; from_address, addr_none$00
+    .store_slice(my_address()) ;; response_address, 3 + 8 + 256 = 267 bit
+    .store_coins(0) ;; forward_amount, 4 bit if zero
+    .store_uint(0, 1) ;; no forward_payload, 1 bit
+    .store_uint(round, 16) ;; round
+    .store_coins(keys) ;; keys
+    .store_coins(activate_amount) ;; spent
+    .store_coins(mask_diff);
+
+  if (~ in_msg_body.slice_empty?()) { ;; check for referrer address was sent
+    activate_key_msg = activate_key_msg.store_slice(in_msg_body~load_msg_addr());
+  }
+
+  save_data(stats, shares, stage, admin_address, dividends_address, user_main_game_wallet_code, prev_random_seed);
+
+  send_keys(
+    user_address,
+    user_main_game_wallet_code,
+    to_referrer + operations_fee - min_tons_for_storage,
+    activate_key_msg.end_cell()
+  );
+}
+
+int get_win_percent(int level) inline {
+  if ((level < 1) | (level > 20)) {
+    return 0;
+  }
+
+  return (jackpot_bitmap >> (level * 7)) & 0x7F;
+}
+
+(int, int) process_user_win(
+  slice user_address,
+  int level,
+  int luck_amount,
+  slice sender_address,
+  int user_lucky_num,
+  int user_commit_hash,
+  int prev_random_seed
+) inline {
+  int game_lucky_num = get_random_word(sender_address, user_commit_hash, prev_random_seed);
+  int new_random_seed = cell_hash(begin_cell()
+        .store_uint(prev_random_seed, 256)
+        .store_uint(user_commit_hash, 256)
+        .store_uint(cur_lt(), 64)
+        .store_uint(now(), 32)
+        .store_uint(game_lucky_num, 16)
+    .end_cell());
+
+  int win_amount = 0;
+  if ((level > 0) & (level <= 20)) {
+    int lucky_number = user_lucky_num ^ game_lucky_num;
+
+    if (lucky_number % 262 == 0) {
+      int percent = get_win_percent(level);
+      win_amount = muldiv(percent, luck_amount, 100);
+    }
+  }
+
+  return (win_amount, new_random_seed);
+}
+
+() process_post_activate(slice sender_address, int into_luck_share, slice in_msg_body) impure inline {
+  int luck_level = in_msg_body~load_uint(7);
+  int user_lucky_num = in_msg_body~load_uint(16);
+  int user_commit_hash = in_msg_body~load_uint(256);  ;; User's commit hash for enhanced RNG
+  slice user_address = in_msg_body~load_msg_addr();
+
+  (
+    cell stats,
+    cell shares,
+    int stage,
+    slice admin_address,
+    slice dividends_address,
+    cell user_main_game_wallet_code,
+    int prev_random_seed
+  ) = load_data();
+
+  ensure_game_started(stage);
+
+  throw_unless(
+    error::unauthorized_incoming_transfer,
+    equal_slices_bits(
+      sender_address,
+      calc_user_wallet_address(user_address, my_address(), user_main_game_wallet_code)
+    )
+  );
+
+  (int pot, int keys_share, int stake, int community, int luck_amount, int swap) = unpack_shares_data(shares);
+
+  luck_amount += into_luck_share;
+  (
+    int win_amount,
+    prev_random_seed
+  ) = process_user_win(
+    user_address,
+    luck_level,
+    luck_amount,
+    sender_address,
+    user_lucky_num,
+    user_commit_hash,
+    prev_random_seed
+  );
+
+  shares = pack_shares_data(
+    pot,
+    keys_share,
+    stake,
+    community,
+    luck_amount - win_amount,
+    swap
+  );
+
+  save_data(stats, shares, stage, admin_address, dividends_address, user_main_game_wallet_code, prev_random_seed);
+
+  if (win_amount > 0) {
+    send_tons(user_address, win_amount);
+  }
+}
+
+() process_ask_for_keys_share(slice sender_address, slice in_msg_body) impure inline {
+  (
+    cell stats,
+    cell shares,
+    int stage,
+    slice admin_address,
+    slice dividends_address,
+    cell user_main_game_wallet_code,
+    int prev_random_seed
+  ) = load_data();
+
+  ensure_game_started(stage);
+
+  int user_round = in_msg_body~load_uint(16);
+  int user_keys = in_msg_body~load_coins();
+  int user_share_limit = in_msg_body~load_coins();
+  int user_gained = in_msg_body~load_coins();
+  int user_mask = in_msg_body~load_coins();
+  int stage3_status = in_msg_body~load_uint(2);
+  slice user_address = in_msg_body~load_msg_addr();
+
+  throw_unless(
+    error::unauthorized_incoming_transfer,
+    equal_slices_bits(
+      sender_address,
+      calc_user_wallet_address(user_address, my_address(), user_main_game_wallet_code)
+    )
+  );
+
+  (
+    int round,
+    int total_keys,
+    int total_tons,
+    int round_mask,
+    int round_start,
+    int stage_ends,
+    int time_limit,
+    slice last_ticket_owner
+  ) = unpack_stats_data(stats);
+
+  throw_unless(error::round_not_match, round == user_round);
+
+  int now = now();
+
+  if ((stage == 1) & (now >= stage_ends)) {
+    (stats, shares, stage, total_keys, stage_ends) = end_stage1(now, stats, shares, dividends_address, admin_address);
+  }
+
+  int user_share = multiply(user_keys, round_mask);
+  user_share = min(user_share - user_mask, user_share_limit - user_gained);
+
+  if (stage == 2) {
+    if (now >= stage_ends) {
+      (stats, shares, stage) = end_stage2(now, stats, shares);
+
+      (
+        round,
+        total_keys,
+        total_tons,
+        round_mask,
+        round_start,
+        stage_ends,
+        time_limit,
+        last_ticket_owner
+      ) = unpack_stats_data(stats);
+
+      ;; skip the rest processing as a new round has been started or user is not registered for stage3
+      if ((stage == 1) | (stage3_status != 1)) {
+        save_data(stats, shares, stage, admin_address, dividends_address, user_main_game_wallet_code, prev_random_seed);
+
+        ;; send keys_share_transfer to unlock pending request
+        var msg = prepare_for_send_with_op(sender_address, 0, op::keys_share_transfer, msg_flag::bounceable)
+          .store_coins(user_mask)
+          .store_uint(stage, 2);
+        send_raw_message(msg.end_cell(), CARRY_REMAINING_GAS);
+
+        return ();
+      }
+    } else {
+      if (user_share_limit > user_gained + user_share) {
+        total_keys += user_keys;
+      }
+
+      stats = pack_stats_data(
+        round,
+        total_keys,
+        total_tons,
+        round_mask,
+        round_start,
+        stage_ends,
+        time_limit,
+        last_ticket_owner
+      );
+    }
+  }
+
+  if (stage == 3) {
+    if (now >= stage_ends) {
+      (stats, shares, stage) = new_round(now, stats, shares);
+      save_data(stats, shares, stage, admin_address, dividends_address, user_main_game_wallet_code, prev_random_seed);
+    }
+
+    if ((stage == 1) | (stage3_status != 1)) {
+      ;; send keys_share_transfer to unlock pending request
+        var msg = prepare_for_send_with_op(sender_address, 0, op::keys_share_transfer, msg_flag::bounceable)
+          .store_coins(user_mask)
+          .store_uint(stage, 2);
+        send_raw_message(msg.end_cell(), CARRY_REMAINING_GAS);
+
+      return ();
+    }
+
+    user_share = multiply(user_keys, round_mask);
+  }
+
+  user_gained += user_share;
+  user_mask += user_share;
+
+  (int pot, int keys_share, int stake, int community, int luck, int swap) = unpack_shares_data(shares);
+
+  throw_unless(error::not_enough_tons, keys_share >= user_share);
+
+  keys_share -= user_share;
+  shares = pack_shares_data(pot, keys_share, stake, community, luck, swap);
+
+  ;; always reserve summary funds at the contract
+  int reserve_amount = min_tons_for_storage + pot + keys_share + stake + community + luck + swap;
+  raw_reserve(reserve_amount, 2);
+
+  save_data(stats, shares, stage, admin_address, dividends_address, user_main_game_wallet_code, prev_random_seed);
+
+  var msg = prepare_for_send_with_op(sender_address, user_share, op::keys_share_transfer, msg_flag::bounceable)
+    .store_coins(user_mask)
+    .store_uint(stage, 2);
+  send_raw_message(msg.end_cell(), CARRY_REMAINING_GAS);
+}
+
+() increase_round_pot(int amount) impure inline {
+  (cell stats, cell shares, int stage, slice admin_address, slice dividends_address, cell user_main_game_wallet_code, int prev_random_seed) = load_data();
+
+  (
+    int round,
+    int total_keys,
+    int total_tons,
+    int round_mask,
+    int round_start,
+    int stage_ends,
+    int time_limit,
+    slice last_ticket_owner
+  ) = unpack_stats_data(stats);
+
+  (int pot, int keys_share, int stake, int community, int luck, int swap) = unpack_shares_data(shares);
+
+  pot += amount;
+  total_tons += amount;
+
+  stats = pack_stats_data(round, total_keys, total_tons, round_mask, round_start, stage_ends, time_limit, last_ticket_owner);
+
+  shares = pack_shares_data(pot, keys_share, stake, community, luck, swap);
+
+  save_data(stats, shares, stage, admin_address, dividends_address, user_main_game_wallet_code, prev_random_seed);
+}
+
+() increase_jackpot(int amount) impure inline {
+  (cell stats, cell shares, int stage, slice admin_address, slice dividends_address, cell user_main_game_wallet_code, int prev_random_seed) = load_data();
+
+  (int pot, int keys_share, int stake, int community, int luck, int swap) = unpack_shares_data(shares);
+
+  luck += amount;
+
+  shares = pack_shares_data(pot, keys_share, stake, community, luck, swap);
+
+  save_data(stats, shares, stage, admin_address, dividends_address, user_main_game_wallet_code, prev_random_seed);
+}
+
+() start_game(slice sender_address) impure inline {
+  (cell stats, cell shares, int stage, slice admin_address, slice dividends_address, cell user_main_game_wallet_code, int prev_random_seed) = load_data();
+
+  if (stage > 0) {
+    return ();
+  }
+
+  throw_unless(error::unauthorized_incoming_transfer,
+    equal_slices_bits(sender_address, admin_address)
+  );
+
+  (
+    int round,
+    int total_keys,
+    int total_tons,
+    int round_mask,
+    int round_start,
+    int stage_ends,
+    int time_limit,
+    slice last_ticket_owner
+  ) = unpack_stats_data(stats);
+
+  round_start = now();
+  stage_ends = round_start + day_seconds;
+  stats = pack_stats_data(round, total_keys, total_tons, round_mask, round_start, stage_ends, time_limit, last_ticket_owner);
+
+  stage = 1;
+
+  int prev_random_seed = cell_hash(begin_cell()
+      .store_uint(now(), 32)
+      .store_uint(cur_lt(), 64)
+      .store_uint(get_seed(), 256)
+      .store_coins(gas_consumed())
+      .store_uint(my_address().preload_uint(256), 256)
+      .store_uint(cell_hash(my_code()), 256)
+  .end_cell());
+
+  save_data(stats, shares, stage, admin_address, dividends_address, user_main_game_wallet_code, prev_random_seed);
+}
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+    return ();
+  }
+
+  slice cs = in_msg_full.begin_parse();
+  int flags = cs~load_uint(4);
+
+  if (flags & 1) { ;; ignore all bounced messages
+    return ();
+  }
+
+  slice sender_address = cs~load_msg_addr();
+  int op = in_msg_body~load_op();
+
+  ;; activate keys - message sent from the user's wallet
+  if (op == op::activate_key) {
+    activate_keys(msg_value, sender_address, in_msg_body);
+    return ();
+  }
+
+  if (op == op::post_activate) {
+    process_post_activate(sender_address, msg_value, in_msg_body);
+    return ();
+  }
+
+  if (op == op::ask_keys_share) {
+    process_ask_for_keys_share(sender_address, in_msg_body);
+    return ();
+  }
+
+  if (op == op::increase_pot) {
+    increase_round_pot(msg_value);
+    return ();
+  }
+
+  if (op == op::increase_jackpot) {
+    increase_jackpot(msg_value);
+    return ();
+  }
+
+  if (op == op::start_game) {
+    start_game(sender_address);
+    return ();
+  }
+
+  throw(error::unknown_op); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+(cell, cell, int, slice, slice, cell, int) get_game_data() method_id {
+  return load_data();
+}
+
+int get_game_day_seconds() method_id {
+  return day_seconds;
+}
