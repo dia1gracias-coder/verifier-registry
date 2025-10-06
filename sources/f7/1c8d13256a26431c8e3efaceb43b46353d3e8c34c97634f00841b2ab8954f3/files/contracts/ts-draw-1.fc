@@ -1,0 +1,136 @@
+#include "imports/stdlib.fc";
+#include "imports/params.fc";
+
+#pragma version >=0.4.3;
+
+;; storage
+global slice storage::owner;
+global slice storage::lottery_owner;
+global int   storage::executed;
+global int   storage::win_number;
+global int   storage::tickets_count;
+
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+
+    storage::owner = ds~load_msg_addr();
+    storage::lottery_owner = ds~load_msg_addr();
+    storage::executed = ds~load_int(1);
+    storage::win_number = ds~load_uint(64);
+    storage::tickets_count = ds~load_uint(64);
+
+}
+
+() store_data() impure {
+    set_data(
+            begin_cell()
+                    .store_slice(storage::owner)
+                    .store_slice(storage::lottery_owner)
+                    .store_int(storage::executed, 1)
+                    .store_uint(storage::win_number, 64)
+                    .store_uint(storage::tickets_count, 64)
+            .end_cell()
+    );
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  if (in_msg_body.slice_empty?()) { 
+    load_data();
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    if(equal_slices_bits(sender_address, storage::lottery_owner)) {
+      throw_unless(1001, storage::executed == 0); 
+      throw_unless(1002, storage::tickets_count != 0); 
+      randomize_lt();
+      do {
+        storage::win_number = rand(storage::tickets_count);
+      }  until (storage::win_number != 0);
+      storage::executed = -1;
+      store_data();
+      cell msg = begin_cell()
+      .store_uint(0x10, 6)
+      .store_slice(my_address())
+      .store_coins(10000000)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_uint(storage::win_number, 32)
+      .store_uint(0, 64)
+      .end_cell();
+      send_raw_message(msg, 3);
+     
+    }
+    return ();
+  }
+
+  slice cs = in_msg_full.begin_parse();
+  int flags = cs~load_uint(4);
+  slice sender_address = cs~load_msg_addr();
+  cs~load_msg_addr(); ;; skip dst
+  cs~load_coins(); ;; skip value
+  cs~skip_bits(1); ;; skip extracurrency collection
+  cs~load_coins(); ;; skip ihr_fee
+  int fwd_fee = cs~load_coins(); 
+  int op = in_msg_body~load_uint(32);
+  int query_id = in_msg_body~load_uint(64); 
+  load_data();
+  if(op == 1) {
+    throw_unless(1003, equal_slices_bits(sender_address, storage::owner));
+    throw_unless(1004, storage::executed == 0);
+    storage::tickets_count = in_msg_body~load_uint(64); 
+    store_data();
+    return();
+  }
+
+  if(op == 2) {
+    throw_unless(1003, equal_slices_bits(sender_address, storage::owner));
+    throw_unless(1004, storage::executed == 0);
+    storage::lottery_owner = in_msg_body~load_msg_addr(); 
+    store_data();
+    return();
+  }
+  
+  ifnot(equal_slices_bits(sender_address, my_address())) {
+    throw(0xffff);
+  }
+ 
+    
+    
+   
+    
+ 
+}
+
+(int) get_win_number() method_id {
+  load_data();
+  return storage::win_number;
+}
+
+(int) get_executed() method_id {
+  load_data();
+  return storage::executed;
+}
+
+(int) get_tickets_count() method_id {
+  load_data();
+  return storage::tickets_count;
+}
+
+(slice) get_owner() method_id {
+  load_data();
+  return storage::owner;
+}
+
+(slice) get_lottery_owner() method_id {
+  load_data();
+  return storage::lottery_owner;
+}
+
+(int) get_lottery_id() method_id {
+  return 1;
+}
+
+(int) get_draw_id() method_id {
+  return 1;
+}
