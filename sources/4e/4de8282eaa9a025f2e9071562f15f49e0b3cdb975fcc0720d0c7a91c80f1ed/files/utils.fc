@@ -1,0 +1,193 @@
+#include "constants.fc";
+#include "safe_math.fc";
+
+int is_valid_address(slice addr) inline {
+if (null?(addr)) {
+ return 0;
+}
+
+if (slice_bits(addr) < 267) {
+ return 0;
+}
+
+return -1;
+}
+
+int is_owner(slice address, slice owner) inline {
+ if (null?(owner)) {
+     return 0;
+ }
+ return equal_slice_bits(address, owner);
+}
+
+int is_distributor(slice address, slice distributor) inline {
+ if (null?(distributor)) {
+     return 0;
+ }
+ return equal_slice_bits(address, distributor);
+}
+
+int is_paused(int flags) inline {
+ return (flags & flag::is_paused) != 0;
+}
+
+() send_text_message(slice address, int value, slice text) impure inline {
+ if (null?(address)) {
+     return ();
+ }
+ 
+ cell msg = begin_cell()
+     .store_uint(0x18, 6)
+     .store_slice(address)
+     .store_coins(value)
+     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+     .store_uint(0, 32)
+     .store_slice(text)
+     .end_cell();
+
+ send_raw_message(msg, 64);
+}
+
+() send_text_message_with_mode(slice address, int value, slice text, int mode) impure inline {
+ if (null?(address)) {
+     return ();
+ }
+ 
+ cell msg = begin_cell()
+     .store_uint(0x18, 6)
+     .store_slice(address)
+     .store_coins(value)
+     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+     .store_uint(0, 32)
+     .store_slice(text)
+     .end_cell();
+ send_raw_message(msg, mode);
+}
+
+() send_empty_message(slice address, int value, int mode) impure inline {
+ if (null?(address)) {
+     return ();
+ }
+ 
+ cell msg = begin_cell()
+     .store_uint(0x18, 6)
+     .store_slice(address)
+     .store_coins(value)
+     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+     .end_cell();
+ send_raw_message(msg, mode);
+}
+
+() send_error_code(slice address, int error_code) impure inline {
+if (null?(address)) {
+    return ();
+}
+
+slice error_text = "Unknown error";
+
+if (error_code == error::access_denied) {
+    error_text = ERROR_401;
+} elseif (error_code == error::insufficient_funds) {
+    error_text = ERROR_402;
+} elseif (error_code == error::invalid_parameters) {
+    error_text = ERROR_403;
+} elseif (error_code == error::contract_paused) {
+    error_text = ERROR_404;
+} elseif (error_code == error::min_deposit_required) {
+    error_text = ERROR_406;
+} elseif (error_code == error::min_reserve_required) {
+    error_text = ERROR_407;
+} elseif (error_code == error::invalid_address) {
+    error_text = ERROR_408;
+} elseif (error_code == error::amount_too_large) {
+    error_text = ERROR_409;
+} elseif (error_code == error::overflow_detected) {
+    error_text = ERROR_410;
+} elseif (error_code == error::insufficient_gas) {
+    error_text = ERROR_411;
+} elseif (error_code == error::already_paused) {
+    error_text = ERROR_412;
+} elseif (error_code == error::not_paused) {
+    error_text = ERROR_413;
+} elseif (error_code == error::calculation_error) {
+    error_text = ERROR_414;
+} elseif (error_code == error::reserve_too_small) {
+    error_text = ERROR_415;
+} elseif (error_code == error::unknown_command) {
+    error_text = ERROR_416;
+}
+
+cell msg = begin_cell()
+    .store_uint(0x18, 6)
+    .store_slice(address)
+    .store_coins(0)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_uint(0, 32)
+    .store_slice(error_text)
+    .end_cell();
+
+send_raw_message(msg, 64);
+}
+
+int check_owner_access(slice sender_address, slice owner) impure inline {
+ if (~ is_owner(sender_address, owner)) {
+     send_error_code(sender_address, error::access_denied);
+     return 0;
+ }
+ return -1;
+}
+
+int check_not_paused(slice sender_address, int contract_flags) impure inline {
+ if (is_paused(contract_flags)) {
+     send_error_code(sender_address, error::contract_paused);
+     return 0;
+ }
+ return -1;
+}
+
+int check_amount_not_too_large(slice sender_address, int amount) impure inline {
+ if (~ is_amount_safe(amount)) {
+     send_error_code(sender_address, error::amount_too_large);
+     return 0;
+ }
+ return -1;
+}
+
+int check_sufficient_funds(slice sender_address, int balance, int amount, int min_reserve) impure inline {
+ if (~ has_sufficient_funds(balance, amount, min_reserve)) {
+     send_error_code(sender_address, error::insufficient_funds);
+     return 0;
+ }
+ return -1;
+}
+
+int check_valid_address(slice sender_address, slice address) impure inline {
+ if (~ is_valid_address(address)) {
+     send_error_code(sender_address, error::invalid_address);
+     return 0;
+ }
+ return -1;
+}
+
+(slice, slice) load_addresses() inline {
+cell data = get_data();
+if (cell_null?(data)) {
+ return (null(), null());
+}
+
+slice ds = data.begin_parse();
+
+if (ds.slice_bits() < 267) {
+ return (null(), null());
+}
+
+slice owner = ds~load_msg_addr();
+
+if (ds.slice_bits() < 267) {
+ return (owner, owner);
+}
+
+slice distributor = ds~load_msg_addr();
+
+return (owner, distributor);
+}

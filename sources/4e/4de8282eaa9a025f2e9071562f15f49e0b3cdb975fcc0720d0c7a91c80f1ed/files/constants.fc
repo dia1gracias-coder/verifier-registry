@@ -1,0 +1,67 @@
+const int CONTRACT_VERSION = 5; 
+
+const int op::withdraw = 1;
+const int op::pause = 2;
+const int op::unpause = 3;
+const int op::set_distributor_owner = 4;
+const int op::set_winner_amount = 5;
+const int op::set_referrer_amount = 6;
+const int op::set_owner_amount = 7;
+const int op::set_min_deposit_amount = 8;
+const int op::set_min_reserve = 9;
+const int op::withdraw_amount = 10;
+const int op::set_distributor = 11;
+const int op::set_owner = 12;
+const int op::play_alt = 13;
+
+const int DEFAULT_WINNER_AMOUNT = 450000000;
+const int DEFAULT_REFERRER_AMOUNT = 150000000;
+const int DEFAULT_OWNER_AMOUNT = 300000000;
+const int DEFAULT_MIN_DEPOSIT = 1000000000;
+const int DEFAULT_MIN_RESERVE = 200000000;
+const int MIN_RESERVE_VALUE = 50000000;
+const int MAX_TEXT_LENGTH = 1024;
+const int MAX_AMOUNT = 10000000000000;
+const int DEFAULT_DISTRIBUTOR_AMOUNT = 50000000;
+
+const int MIN_GAS_FOR_OPERATION = 700000;       
+const int GAS_RESERVE = 200000;                 
+
+const int flag::is_paused = 2;
+
+const int error::access_denied = 401;
+const int error::insufficient_funds = 402;
+const int error::invalid_parameters = 403;
+const int error::contract_paused = 404;
+const int error::min_deposit_required = 406;
+const int error::min_reserve_required = 407;
+const int error::invalid_address = 408;
+const int error::amount_too_large = 409;
+const int error::overflow_detected = 410;
+const int error::insufficient_gas = 411;
+const int error::already_paused = 412;
+const int error::not_paused = 413;
+const int error::calculation_error = 414;
+const int error::reserve_too_small = 415;
+const int error::unknown_command = 416;
+
+const slice ERROR_401 = "401";
+const slice ERROR_402 = "402";
+const slice ERROR_403 = "403";
+const slice ERROR_404 = "404";
+const slice ERROR_406 = "406";
+const slice ERROR_407 = "407";
+const slice ERROR_408 = "408";
+const slice ERROR_409 = "409";
+const slice ERROR_410 = "410";
+const slice ERROR_411 = "411";
+const slice ERROR_412 = "412";
+const slice ERROR_413 = "413";
+const slice ERROR_414 = "414";
+const slice ERROR_415 = "415";
+const slice ERROR_416 = "416";
+
+const int SEND_MODE_REGULAR = 1;
+const int SEND_MODE_CARRY_REMAINING_GAS = 64;
+const int SEND_MODE_IGNORE_ERRORS = 2;
+const int SEND_MODE_BOUNCE_ON_FAIL = 16;

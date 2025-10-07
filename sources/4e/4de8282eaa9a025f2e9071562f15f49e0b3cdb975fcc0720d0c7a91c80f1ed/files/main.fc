@@ -1,0 +1,244 @@
+#include "constants.fc";
+#include "stdlib.fc";
+#include "utils.fc";
+#include "commands.fc";
+#include "safe_math.fc";
+#include "security.fc"; 
+
+(slice, slice, int, int, int, int, int, int) load_data() inline {
+ cell data = get_data();
+ if (cell_null?(data)) {
+     return (null(), null(), DEFAULT_WINNER_AMOUNT, DEFAULT_REFERRER_AMOUNT, 
+             DEFAULT_OWNER_AMOUNT, DEFAULT_MIN_DEPOSIT, DEFAULT_MIN_RESERVE, 0);
+ }
+ 
+ slice ds = data.begin_parse();
+ 
+ if (ds.slice_bits() < 267) {
+     return (null(), null(), DEFAULT_WINNER_AMOUNT, DEFAULT_REFERRER_AMOUNT, 
+             DEFAULT_OWNER_AMOUNT, DEFAULT_MIN_DEPOSIT, DEFAULT_MIN_RESERVE, 0);
+ }
+ 
+ slice owner = ds~load_msg_addr();
+
+ if (ds.slice_bits() < 267) {
+     return (owner, owner, DEFAULT_WINNER_AMOUNT, DEFAULT_REFERRER_AMOUNT, 
+             DEFAULT_OWNER_AMOUNT, DEFAULT_MIN_DEPOSIT, DEFAULT_MIN_RESERVE, 0);
+ }
+ 
+ slice distributor = ds~load_msg_addr();
+ 
+ if (ds.slice_bits() < 32) {
+     return (owner, distributor, DEFAULT_WINNER_AMOUNT, DEFAULT_REFERRER_AMOUNT, 
+             DEFAULT_OWNER_AMOUNT, DEFAULT_MIN_DEPOSIT, DEFAULT_MIN_RESERVE, 0);
+ }
+ 
+ int winner_amount = ds~load_coins();
+ 
+ if (ds.slice_bits() < 32) {
+     return (owner, distributor, winner_amount, DEFAULT_REFERRER_AMOUNT, 
+             DEFAULT_OWNER_AMOUNT, DEFAULT_MIN_DEPOSIT, DEFAULT_MIN_RESERVE, 0);
+ }
+ 
+ int referrer_amount = ds~load_coins();
+ 
+ if (ds.slice_bits() < 32) {
+     return (owner, distributor, winner_amount, referrer_amount, 
+             DEFAULT_OWNER_AMOUNT, DEFAULT_MIN_DEPOSIT, DEFAULT_MIN_RESERVE, 0);
+ }
+ 
+ int owner_amount = ds~load_coins();
+ 
+ if (ds.slice_bits() < 32) {
+     return (owner, distributor, winner_amount, referrer_amount, 
+             owner_amount, DEFAULT_MIN_DEPOSIT, DEFAULT_MIN_RESERVE, 0);
+ }
+ 
+ int min_deposit = ds~load_coins();
+ 
+ if (ds.slice_bits() < 32) {
+     return (owner, distributor, winner_amount, referrer_amount, 
+             owner_amount, min_deposit, DEFAULT_MIN_RESERVE, 0);
+ }
+ 
+ int min_reserve = ds~load_coins();
+ 
+ if (ds.slice_bits() < 8) {
+     return (owner, distributor, winner_amount, referrer_amount, 
+             owner_amount, min_deposit, min_reserve, 0);
+ }
+ 
+ int flags = ds~load_uint(8);
+ 
+ return (owner, distributor, winner_amount, referrer_amount, 
+         owner_amount, min_deposit, min_reserve, flags);
+}
+
+() save_data(slice owner, slice distributor, int winner_amount, int referrer_amount, 
+          int owner_amount, int min_deposit, int min_reserve, int flags) impure inline {
+ set_data(begin_cell()
+     .store_slice(owner)
+     .store_slice(distributor)
+     .store_coins(winner_amount)
+     .store_coins(referrer_amount)
+     .store_coins(owner_amount)
+     .store_coins(min_deposit)
+     .store_coins(min_reserve)
+     .store_uint(flags, 8)
+     .end_cell());
+}
+
+() handle_bounced_message(slice in_msg_body, int msg_value) impure inline {
+  return ();
+}
+
+int check_gas_sufficient() inline {
+  return -1;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+ slice cs = in_msg_full.begin_parse();
+ int flags = cs~load_uint(4);
+ 
+ if (flags & 1) {
+     handle_bounced_message(in_msg_body, msg_value);
+     return ();
+ }
+ 
+ slice sender_address = cs~load_msg_addr();
+ 
+ (slice owner, slice distributor, int winner_amount, int referrer_amount, 
+  int owner_amount, int min_deposit, int min_reserve, int contract_flags) = load_data();
+ 
+ if (null?(owner)) {
+     owner = sender_address;
+     distributor = sender_address;
+    
+     save_data(owner, distributor, winner_amount, referrer_amount, 
+               owner_amount, min_deposit, min_reserve, contract_flags);
+     
+     send_text_message_with_mode(sender_address, 0, "Contract initialized", 1);
+     return ();
+ }
+
+ int has_message = ~ in_msg_body.slice_empty?();
+
+ int op = 0;
+
+ if (has_message & (in_msg_body.slice_bits() >= 32)) {
+   op = in_msg_body~load_uint(32);
+   
+   if (in_msg_body.slice_bits() >= 64) {
+       in_msg_body~load_uint(64);
+   }
+ }
+ 
+ if (equal_slice_bits(sender_address, owner)) {
+   (contract_flags, owner, distributor, winner_amount, referrer_amount, 
+    owner_amount, min_deposit, min_reserve) = process_binary_command(
+       op, in_msg_body, sender_address, owner, distributor, winner_amount, 
+       referrer_amount, owner_amount, min_deposit, min_reserve, contract_flags, msg_value
+   );
+
+   save_data(owner, distributor, winner_amount, referrer_amount, 
+             owner_amount, min_deposit, min_reserve, contract_flags);
+   return ();
+ }
+
+ if (equal_slice_bits(sender_address, distributor)) {
+   if (is_paused(contract_flags)) {
+     send_error_code(sender_address, error::contract_paused);
+     return ();
+   }
+   
+   if (op == op::play_alt) {
+     (contract_flags, owner, distributor, winner_amount, referrer_amount, 
+      owner_amount, min_deposit, min_reserve) = process_binary_command(
+         op, in_msg_body, sender_address, owner, distributor, winner_amount, 
+         referrer_amount, owner_amount, min_deposit, min_reserve, contract_flags, msg_value
+     );
+     
+     save_data(owner, distributor, winner_amount, referrer_amount, 
+               owner_amount, min_deposit, min_reserve, contract_flags);
+     return ();
+   } else {
+     send_error_code(sender_address, error::access_denied);
+     return ();
+   }
+ }
+ 
+ if (is_paused(contract_flags)) {
+   send_empty_message(sender_address, 0, 64);
+   return ();
+ }
+ 
+ if (msg_value < min_deposit) {
+   send_text_message_with_mode(sender_address, 0, "Minimum deposit required", 64);
+   return ();
+ }
+
+ save_data(owner, distributor, winner_amount, referrer_amount, 
+           owner_amount, min_deposit, min_reserve, contract_flags);
+ return ();
+}
+
+(slice, slice, int, int, int, int, int, int) get_contract_info() method_id {
+ (slice owner, slice distributor, int winner_amount, int referrer_amount, 
+  int owner_amount, int min_deposit, int min_reserve, int flags) = load_data();
+ return (owner, distributor, winner_amount, referrer_amount, owner_amount, min_deposit, min_reserve, flags);
+}
+
+int is_address_owner(slice address) method_id {
+ (slice owner, _, _, _, _, _, _, _) = load_data();
+ if (null?(owner)) {
+     return 0;
+ }
+ return equal_slice_bits(address, owner);
+}
+
+int is_address_distributor(slice address) method_id {
+ (_, slice distributor, _, _, _, _, _, _) = load_data();
+ if (null?(distributor)) {
+     return 0;
+ }
+ return equal_slice_bits(address, distributor);
+}
+
+(int, int) get_contract_status() method_id {
+ (_, _, _, _, _, _, _, int flags) = load_data();
+ return (is_paused(flags), 0);
+}
+
+(int, int, int) get_distribution_amounts() method_id {
+ cell data = get_data();
+ slice ds = data.begin_parse();
+
+ ds~load_msg_addr();
+ ds~load_msg_addr();
+
+ int winner_amount = ds~load_coins();
+ int referrer_amount = ds~load_coins();
+ int owner_amount = ds~load_coins();
+ 
+ return (winner_amount, referrer_amount, owner_amount);
+}
+
+(int, int) get_minimum_values() method_id {
+ cell data = get_data();
+ slice ds = data.begin_parse();
+
+ ds~load_msg_addr();
+ ds~load_msg_addr();
+ ds~load_coins();
+ ds~load_coins();
+ ds~load_coins();
+
+ int min_deposit = ds~load_coins();
+ int min_reserve = ds~load_coins();
+ 
+ return (min_deposit, min_reserve);
+}
+
+int get_contract_version() method_id {
+ return CONTRACT_VERSION;
+}

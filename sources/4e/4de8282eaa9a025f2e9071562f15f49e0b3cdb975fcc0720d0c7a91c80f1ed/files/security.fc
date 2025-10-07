@@ -1,0 +1,165 @@
+#include "constants.fc";
+#include "utils.fc";
+#include "safe_math.fc";
+
+int check_access(
+slice sender_address,
+slice owner,
+slice distributor,
+int flags,
+int op,
+int msg_value,
+int min_deposit,
+int has_message
+) inline {
+if (~ is_valid_address(sender_address)) {
+return 0;
+}
+
+if (equal_slice_bits(sender_address, owner)) {
+return -1;
+}
+
+if (equal_slice_bits(sender_address, distributor)) {
+if (is_paused(flags)) {
+  return 0;
+}
+
+if (op == op::play_alt) {
+  return -1;
+}
+return 0;
+}
+
+if (has_message) {
+return 0;
+}
+
+if (is_paused(flags)) {
+return 0;
+}
+
+if (msg_value < min_deposit) {
+return 0;
+}
+
+return -1;
+}
+
+int check_command_params(int op, slice in_msg_body) inline {
+if ((op == op::set_winner_amount) | (op == op::set_referrer_amount) | 
+  (op == op::set_owner_amount) | (op == op::set_min_deposit_amount) | 
+  (op == op::withdraw_amount) | (op == op::set_min_reserve)) {
+
+if (in_msg_body.slice_bits() < 32) {
+  return 0;
+}
+
+int amount = in_msg_body~load_coins();
+if (amount <= 0) {
+  return 0;
+}
+
+if (amount > MAX_AMOUNT) {
+  return 0;
+}
+
+if (op == op::set_min_reserve) {
+  if (amount < MIN_RESERVE_VALUE) {
+    return 0;
+  }
+}
+
+return -1;
+}
+
+if ((op == op::set_distributor) | (op == op::set_owner) | (op == op::play_alt)) {
+if (in_msg_body.slice_bits() < 267) {
+  return 0;
+}
+
+if ((op == op::set_distributor) | (op == op::set_owner)) {
+  slice addr = in_msg_body~load_msg_addr();
+  if (~ is_valid_address(addr)) {
+    return 0;
+  }
+}
+
+return -1;
+}
+
+return -1;
+}
+
+int check_data_integrity() inline {
+cell data = get_data();
+if (cell_null?(data)) {
+  return 0;
+}
+
+slice ds = data.begin_parse();
+
+if (ds.slice_bits() < 267) {
+  return 0;
+}
+
+slice owner = ds~load_msg_addr();
+
+if (ds.slice_bits() < 267) {
+  return 0;
+}
+
+slice distributor = ds~load_msg_addr();
+
+if ((~ is_valid_address(owner)) | (~ is_valid_address(distributor))) {
+  return 0;
+}
+
+if (ds.slice_bits() < 32) {
+  return 0;
+}
+
+int winner_amount = ds~load_coins();
+
+if (ds.slice_bits() < 32) {
+  return 0;
+}
+
+int referrer_amount = ds~load_coins();
+
+if (ds.slice_bits() < 32) {
+  return 0;
+}
+
+int owner_amount = ds~load_coins();
+
+if (ds.slice_bits() < 32) {
+  return 0;
+}
+
+int min_deposit = ds~load_coins();
+
+if (ds.slice_bits() < 32) {
+  return 0;
+}
+
+int min_reserve = ds~load_coins();
+
+if ((winner_amount <= 0) | (referrer_amount <= 0) | (owner_amount <= 0) | 
+    (min_deposit <= 0) | (min_reserve < MIN_RESERVE_VALUE)) {
+  return 0;
+}
+
+if ((~ is_amount_safe(winner_amount)) | (~ is_amount_safe(referrer_amount)) | 
+    (~ is_amount_safe(owner_amount)) | (~ is_amount_safe(min_deposit)) | 
+    (~ is_amount_safe(min_reserve))) {
+  return 0;
+}
+
+(int total_amount, int success) = calculate_total_amount(winner_amount, referrer_amount, owner_amount);
+if (~ success) {
+  return 0;
+}
+
+return -1;
+}
