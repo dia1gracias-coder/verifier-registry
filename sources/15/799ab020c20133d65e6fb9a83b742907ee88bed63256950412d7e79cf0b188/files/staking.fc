@@ -1,0 +1,191 @@
+#include "imports/stdlib.fc";
+#include "imports/storage.fc";
+#include "imports/utils.fc";
+#include "imports/op.fc";
+#include "imports/errors.fc";
+#include "imports/params.fc";
+#include "imports/admin-calls.fc";
+
+() deploy_stake_item(int item_index, cell stake_item_code, int amount, cell stake_content) impure inline {
+    cell state_init = calculate_stake_item_state_init(item_index, stake_item_code);
+    slice stake_address = calculate_stake_item_address(workchain, state_init);
+    var msg = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(stake_address)
+        .store_coins(amount)
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(stake_content);
+    send_raw_message(msg.end_cell(), 1);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    load_data();
+
+    if (equal_slices(sender_address, storage::owner_address)) {
+        handle_admin_messages(op, query_id, in_msg_body);
+        return ();
+    }
+
+    if (op == op::transfer_notification) {
+        (int jetton_amount, slice from_user) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+        ifnot ((equal_slices(sender_address, storage::jetton_wallet_address)) & (msg_value >= min_tons_for_stake_deploy)) {
+            builder msg_body = create_simple_transfer_body(query_id, jetton_amount, from_user);
+            send_message(0x10, 0, sender_address, msg_body.end_cell(), 64);
+            return ();
+        }
+
+        if ((in_msg_body.slice_refs() > 0) & equal_slices(from_user, storage::owner_address)) {
+            slice ref_cs = in_msg_body~load_ref().begin_parse();
+            int transferred_op = ref_cs~load_uint(32);
+            if (transferred_op == op::top_up_jtn_balance) {
+                storage::token_balance += jetton_amount;
+                storage::budget += jetton_amount;
+                save_data();
+                return ();
+            }
+            throw(error::unknown_op);
+        }
+
+        if (storage::is_staking_paused) {
+            builder msg_body = create_simple_transfer_body_with_payload(query_id, jetton_amount, from_user, begin_cell().store_uint(0, 32).store_slice("New stakes are not allowed"));
+            send_message(0x10, 0, sender_address, msg_body.end_cell(), 64);
+            return ();
+        }
+
+        if (jetton_amount < storage::min_stake) {
+            builder msg_body = create_simple_transfer_body_with_payload(query_id, jetton_amount, from_user, begin_cell().store_uint(0, 32).store_slice("Too small stake amount"));
+            send_message(0x10, 0, sender_address, msg_body.end_cell(), 64);
+            return ();
+        }
+
+        ;; Calculate maximum possible interest for accounting purposes
+        int percent_one_minute = storage::percent_year / (365 * 24 * 60);
+        int interest_one_minute = muldiv(jetton_amount, percent_one_minute, hundred_percent);
+        int max_interest = interest_one_minute * storage::lockup_period;
+        storage::token_balance += jetton_amount;
+        storage::active_stake_amount += jetton_amount;
+        storage::payed_and_pending_reward += max_interest;
+        storage::pending_reward += max_interest;
+        if (storage::budget < storage::payed_and_pending_reward) {
+            builder msg_body = create_simple_transfer_body_with_payload(query_id, jetton_amount, from_user, begin_cell().store_uint(0, 32).store_slice("No reward!"));
+            send_message(0x10, 0, sender_address, msg_body.end_cell(), 64);
+            return ();
+        }
+
+        int stake_start_time = now();
+        slice cnt = storage::content.begin_parse();
+        cnt~load_ref();
+        cell stake_content = begin_cell()
+            .store_slice(from_user)
+            .store_ref(
+                begin_cell()
+                    .store_uint(stake_start_time + (storage::lockup_period * seconds_per_minute), 64)
+                    .store_uint(stake_start_time, 64)
+                    .store_coins(jetton_amount)
+                    .store_slice(storage::owner_address)
+                    .store_ref(cnt~load_ref())
+                    .end_cell()
+            )
+            .end_cell();
+
+        deploy_stake_item(storage::next_item_index, storage::stake_item_code, min_tons_for_stake_deploy, stake_content);
+        storage::next_item_index += 1;
+        save_data();
+        return ();
+    }
+
+    if (op == op::process_unstake) {
+        int idx = in_msg_body~load_uint(256);
+        throw_if(error::invalid_index, (idx < 0) | (idx >= storage::next_item_index));
+        throw_unless(error::wrong_sender, equal_slices(sender_address, calculate_stake_item_address(0, calculate_stake_item_state_init(idx, storage::stake_item_code))));
+
+        slice from_user = in_msg_body~load_msg_addr();
+
+        slice staking_params = in_msg_body~load_ref().begin_parse();
+        int unlock_time = staking_params~load_uint(64);
+        int stake_start_time = staking_params~load_uint(64);
+        int stake_size = staking_params~load_coins();
+
+        ;; Calculate actual staking time
+        int current_time = now();
+        int actual_staking_time = max(current_time - stake_start_time, 0);
+        int lockup_period_seconds = storage::lockup_period * seconds_per_minute;
+
+        ;; Calculate interest based on actual staking time
+        int percent_one_minute = storage::percent_year / (365 * 24 * 60);
+        int interest_one_minute = muldiv(stake_size, percent_one_minute, hundred_percent);
+        int max_interest = interest_one_minute * storage::lockup_period;
+        int actual_interest = muldiv(max_interest, min(actual_staking_time, lockup_period_seconds), lockup_period_seconds);
+
+        slice excesses_recipient = from_user;
+        if (in_msg_body~load_uint(1) == 1) {
+            excesses_recipient = storage::owner_address;
+        }
+        send_message(0x10, min_tons_for_destroy, sender_address, begin_cell().store_uint(op::destroy, 32).store_uint(query_id, 64).store_slice(excesses_recipient).end_cell(), 0);
+
+        builder msg_body = create_simple_transfer_body(query_id, stake_size + actual_interest, from_user);
+
+        send_message(0x10, msg_value - min_tons_for_unstake - min_tons_for_destroy, storage::jetton_wallet_address, msg_body.end_cell(), 0);
+        storage::token_balance -= (stake_size + actual_interest);
+        storage::active_stake_amount -= stake_size;
+        storage::payed_and_pending_reward -= max_interest;
+        storage::payed_and_pending_reward += actual_interest;
+        storage::pending_reward -= max_interest;
+        save_data();
+        return ();
+    }
+
+    throw(error::unknown_op);
+}
+
+;; Get methods
+
+(int, cell, slice) get_collection_data() method_id {
+    load_data();
+    slice cs = storage::content.begin_parse();
+    return (storage::next_item_index, cs~load_ref(), storage::owner_address);
+}
+
+slice get_nft_address_by_index(int index) method_id {
+    load_data();
+    cell state_init = calculate_stake_item_state_init(index, storage::stake_item_code);
+    return calculate_stake_item_address(0, state_init);
+}
+
+cell get_nft_content(int index, cell individual_nft_content) method_id {
+    return individual_nft_content;
+}
+
+slice get_jetton_wallet_address() method_id {
+    load_data();
+    return storage::jetton_wallet_address;
+}
+
+(int, int, int, int, int, int) get_staking_data() method_id {
+    load_data();
+    return (
+        storage::percent_year,
+        storage::lockup_period,
+        storage::budget,
+        storage::payed_and_pending_reward,
+        storage::active_stake_amount,
+        storage::min_stake
+    );
+}
