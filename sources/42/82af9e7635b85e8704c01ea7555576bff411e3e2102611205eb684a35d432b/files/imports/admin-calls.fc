@@ -1,0 +1,47 @@
+#include "stdlib.fc";
+#include "storage.fc";
+#include "op.fc";
+#include "errors.fc";
+#include "utils.fc";
+
+()handle_admin_messages(int op, int query_id, slice in_msg_body) impure inline {
+    if (op == op::set_jetton_wallet_address) {
+        storage::jetton_wallet_address = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+
+    if (op == op::pause) {
+        storage::is_staking_paused = 1;
+        save_data();
+        return ();
+    }
+
+    if (op == op::resume) {
+        storage::is_staking_paused = 0;
+        save_data();
+        return ();
+    }
+
+    if (op == op::withdraw_ton) {
+        [int balance, _] = get_balance();
+        int send_amount = balance - 50000000;
+
+        cell msg_body = begin_cell().end_cell();
+
+        send_message(0x10, send_amount, storage::owner_address, msg_body, 1); ;; mode = 1 (оплата внешним сообщением)
+        return ();
+    }
+
+    if (op == op::withdraw_jetton) {
+        int jetton_amount = storage::token_balance - storage::active_stake_amount - storage::pending_reward;
+        storage::token_balance -= jetton_amount;
+
+        cell msg_body = create_simple_transfer_body(query_id, jetton_amount, storage::owner_address).end_cell();
+        send_message(0x10, 0, storage::jetton_wallet_address, msg_body, 64); ;; mode = 64 (обычный тон-перевод)
+        save_data();
+        return ();
+    }
+
+    throw(error::unknown_op);
+}
