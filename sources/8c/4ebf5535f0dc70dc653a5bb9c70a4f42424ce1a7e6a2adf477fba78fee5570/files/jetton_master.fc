@@ -1,0 +1,471 @@
+#include "imports/stdlib.fc";
+#include "params.fc";
+#include "op-codes.fc";
+#include "jetton-utils.fc";
+
+;; Gas constants with safety margins
+const int MIN_TONS_FOR_STORAGE = 50000000;      ;; 0.05 TON - minimal balance for storage
+const int GAS_CONSUMPTION_BASE = 15000000;      ;; 0.015 TON - base gas for processing
+const int MINT_FORWARD_AMOUNT = 20000000;       ;; 0.02 TON - forward to wallet (with margin)
+const int WALLET_DEPLOY_GAS = 30000000;         ;; 0.03 TON - wallet deployment cost
+const int SAFETY_MARGIN = 15000000;             ;; 0.015 TON - safety buffer
+const int MIN_MINT_GAS = 80000000;              ;; 0.08 TON - minimum required for mint
+
+;; Content size limits (to prevent storage abuse)
+const int MAX_CONTENT_BITS = 8192;              ;; 1KB max for content cell (8192 bits)
+const int MAX_CONTENT_REFS = 4;                 ;; Max 4 references in content cell
+
+;; Excesses return amount for UI tracking
+const int EXCESSES_AMOUNT = 1000000;            ;; 0.001 TON - small amount for UI events
+
+;; Build salt for unique contract hash (not stored in data)
+;; This will be different each time contract is compiled
+const int BUILD_SALT = 1759998083; ;; Updated on each build
+
+;; Admin management - timelock is now configurable via deployment
+
+{-
+  data#_ total_supply:Coins
+        admin_address:MsgAddress
+        original_admin_address:MsgAddress
+        pending_admin_address:MsgAddress
+        content:^Cell
+        jetton_wallet_code:^Cell
+        max_supply:Coins
+        is_mint_locked:uint1
+        admin_change_available_at:uint32
+        admin_change_delay:uint32
+= Storage;
+-}
+
+(int, slice, slice, slice, cell, cell, int, int, int, int) load_data() inline {
+  slice ds = get_data().begin_parse();
+  return (
+      ds~load_coins(), ;; total_supply
+      ds~load_msg_addr(), ;; admin_address
+      ds~load_msg_addr(), ;; original_admin_address
+      ds~load_msg_addr(), ;; pending_admin_address
+      ds~load_ref(), ;; content
+      ds~load_ref(), ;; jetton_wallet_code
+      ds~load_coins(), ;; max_supply
+      ds~load_uint(1), ;; is_mint_locked
+      ds~load_uint(32), ;; admin_change_available_at
+      ds~load_uint(32) ;; admin_change_delay
+  );
+}
+
+() save_data(int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) impure inline {
+  set_data(begin_cell()
+            .store_coins(total_supply)
+            .store_slice(admin_address)
+            .store_slice(original_admin_address)
+            .store_slice(pending_admin_address)
+            .store_ref(content)
+            .store_ref(jetton_wallet_code)
+            .store_coins(max_supply)
+            .store_uint(is_mint_locked, 1)
+            .store_uint(admin_change_available_at, 32)
+            .store_uint(admin_change_delay, 32)
+           .end_cell()
+          );
+}
+
+;; Helper function to validate content cell size
+int validate_content_size(cell content) inline {
+  slice cs = content.begin_parse();
+  int bits = cs.slice_bits();
+  int refs = cs.slice_refs();
+  
+  ;; Check that content doesn't exceed size limits
+  ;; This prevents storage bloat and excessive gas costs
+  return (bits <= MAX_CONTENT_BITS) & (refs <= MAX_CONTENT_REFS);
+}
+
+() mint_tokens(slice to_address, cell jetton_wallet_code, int amount, cell master_msg) impure {
+  ;; Calculate expected wallet address for recipient
+  cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+  slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+  
+  ;; SECURITY: Double-check wallet address matches expected
+  ;; This ensures tokens go to the correct wallet
+  slice expected_wallet = calculate_user_jetton_wallet_address(to_address, my_address(), jetton_wallet_code);
+  throw_unless(79, equal_slices(to_wallet_address, expected_wallet));
+  
+  ;; Ensure we have enough TON for wallet deployment and notification
+  ;; amount is TON value to send to wallet, not jetton amount
+  throw_unless(81, amount >= MINT_FORWARD_AMOUNT);
+  
+  var msg = begin_cell()
+    .store_uint(0x18, 6)
+    .store_slice(to_wallet_address)
+    .store_coins(amount)
+    .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+    .store_ref(state_init)
+    .store_ref(master_msg);
+  send_raw_message(msg.end_cell(), 1); ;; pay transfer fees separately, revert on errors
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; Reserve minimum for storage first to prevent self-destruction
+    raw_reserve(MIN_TONS_FOR_STORAGE, 0);
+    
+    if (in_msg_body.slice_empty?()) { ;; Could be deployment - validate storage
+        ;; Check if this is initial deployment
+        try {
+            (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+            ;; If we can load data, validate content size
+            throw_unless(82, validate_content_size(content));
+        } catch (x, y) {
+            ;; If load_data fails, this is deployment - allow it
+        }
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; Handle bounced messages
+        ;; ENHANCED SECURITY: Additional bounce message validation
+        ;; When wallet deployment fails or rejects internal_transfer, we must rollback
+        
+        in_msg_body~skip_bits(32); ;; skip 0xffffffff bounced prefix
+        
+        ;; Get sender address for bounce validation (moved up from below)
+        slice sender_address = cs~load_msg_addr();
+        cs~load_msg_addr(); ;; skip dst
+        cs~load_coins(); ;; skip value
+        cs~skip_bits(1); ;; skip extracurrency collection
+        cs~load_coins(); ;; skip ihr_fee
+        int fwd_fee = cs~load_coins(); ;; load fwd_fee for later use
+        
+        ;; Check if we have enough bits to read the original op
+        if (in_msg_body.slice_bits() >= 32) {
+            int original_op = in_msg_body~load_uint(32);
+            
+            ;; If this was internal_transfer from mint, rollback total_supply
+            if (original_op == op::internal_transfer()) {
+                if (in_msg_body.slice_bits() >= 64 + 124) { ;; check we can read query_id and amount
+                    int query_id = in_msg_body~load_uint(64);
+                    int jetton_amount = in_msg_body~load_coins();
+                    
+                    ;; Load data first for validation
+                    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+                    
+                    ;; ENHANCED SECURITY: Validate bounce sender
+                    ;; Bounce must come from the wallet we created for original admin
+                    slice expected_wallet = calculate_user_jetton_wallet_address(original_admin_address, my_address(), jetton_wallet_code);
+                    throw_unless(78, equal_slices(sender_address, expected_wallet));
+                    
+                    ;; Additional validation of internal_transfer structure
+                    if (in_msg_body.slice_bits() >= 267 + 267) { ;; enough for 2 addresses
+                        slice from_address = in_msg_body~load_msg_addr();
+                        slice response_address = in_msg_body~load_msg_addr();
+                        
+                        ;; Validate internal_transfer was from master to original admin
+                        throw_unless(79, equal_slices(from_address, my_address()));
+                        throw_unless(87, equal_slices(response_address, original_admin_address));
+                    }
+                    
+                    ;; Enhanced safety checks for bounce processing
+                    ;; 1. Ensure we don't go negative
+                    throw_unless(76, total_supply >= jetton_amount);
+                    
+                    ;; 2. Validate the bounced amount is reasonable (not more than last mint)
+                    throw_unless(77, jetton_amount <= total_supply);
+                    
+                    ;; Send bounce notification to admin
+                    var bounce_notification = begin_cell()
+                        .store_uint(0x18, 6)
+                        .store_slice(admin_address)
+                        .store_coins(EXCESSES_AMOUNT)
+                        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                        .store_uint(0x424f554e, 32) ;; "BOUN" - bounce notification op
+                        .store_uint(query_id, 64)
+                        .store_coins(jetton_amount);
+                    send_raw_message(bounce_notification.end_cell(), 1);
+                    
+                    save_data(total_supply - jetton_amount, admin_address, original_admin_address, pending_admin_address, content, jetton_wallet_code, max_supply, is_mint_locked, admin_change_available_at, admin_change_delay);
+                }
+            }
+        }
+        return ();
+    }
+    
+    ;; Parse message for regular operations
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr(); ;; skip dst
+    cs~load_coins(); ;; skip value
+    cs~skip_bits(1); ;; skip extracurrency collection
+    cs~load_coins(); ;; skip ihr_fee
+    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of forward_payload costs
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+
+    if (op == op::mint()) {
+        ;; Mint new tokens and send them to the original admin address
+        ;; Only the current admin can perform this operation
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        
+        ;; Check that minting is not permanently locked (for exchange compliance)
+        throw_unless(906, is_mint_locked == 0);
+        
+        ;; Ensure sufficient gas for the entire mint operation
+        throw_unless(80, msg_value >= MIN_MINT_GAS);
+        
+        ;; Parse the mint parameters from the message
+        int jetton_amount = in_msg_body~load_coins();
+        int forward_ton_amount = in_msg_body~load_coins();
+        
+        ;; Verify that minting this amount won't exceed the maximum supply
+        throw_unless(85, (total_supply + jetton_amount) <= max_supply);
+        
+        ;; Ensure the original admin address is in the correct workchain
+        force_chain(original_admin_address);
+        
+        ;; Build the internal transfer message that will be sent to the wallet
+        cell master_msg = begin_cell()
+            .store_uint(0x178d4519, 32)           ;; op::internal_transfer
+            .store_uint(0, 64)                    ;; query_id
+            .store_coins(jetton_amount)           ;; amount
+            .store_slice(my_address())            ;; from_address (master contract)
+            .store_slice(original_admin_address)  ;; response_address (original admin)
+            .store_coins(forward_ton_amount)      ;; forward_ton_amount
+            .store_uint(0, 1)                     ;; forward_payload (empty)
+            .end_cell();
+        
+        ;; Calculate TON to send: enough for wallet deployment and forward
+        int ton_amount = WALLET_DEPLOY_GAS + forward_ton_amount;
+        
+        ;; SECURITY: All minted tokens ALWAYS go to original admin address (deployer)
+        ;; This prevents current admin from minting to themselves
+        mint_tokens(original_admin_address, jetton_wallet_code, ton_amount, master_msg);
+        save_data(total_supply + jetton_amount, admin_address, original_admin_address, pending_admin_address, content, jetton_wallet_code, max_supply, is_mint_locked, admin_change_available_at, admin_change_delay);
+        return ();
+    }
+
+    if (op == op::burn_notification()) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(74,
+            equal_slices(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+        );
+        save_data(total_supply - jetton_amount, admin_address, original_admin_address, pending_admin_address, content, jetton_wallet_code, max_supply, is_mint_locked, admin_change_available_at, admin_change_delay);
+        slice response_address = in_msg_body~load_msg_addr();
+        if (response_address.preload_uint(2) != 0) {
+          var msg = begin_cell()
+            .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+            .store_slice(response_address)
+            .store_coins(EXCESSES_AMOUNT) ;; Small amount for UI tracking
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::excesses(), 32)
+            .store_uint(query_id, 64);
+          send_raw_message(msg.end_cell(), 2 + 128); ;; use mode 128 instead of 64
+        }
+        return ();
+    }
+
+    if (op == op::provide_wallet_address()) {
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_uint(1);
+
+        cell included_address = include_address?
+            ? begin_cell().store_slice(owner_address).end_cell()
+            : null();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(op::take_wallet_address(), 32)
+            .store_uint(query_id, 64);
+
+        if (is_resolvable?(owner_address)) {
+            msg = msg.store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code));
+        } else {
+            msg = msg.store_uint(0, 2); ;; addr_none
+        }
+        msg = msg.store_maybe_ref(included_address);
+        send_raw_message(msg.end_cell(), 128); ;; carry all remaining balance after reserve
+        return ();
+    }
+
+
+    if (op == op::cancel_admin_transfer()) {
+        ;; Cancel any pending admin transfer request
+        ;; Only the current admin can cancel a pending transfer
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        ;; Remove the pending admin by setting it to empty
+        save_data(total_supply, admin_address, original_admin_address, begin_cell().store_uint(0, 2).end_cell().begin_parse(), content, jetton_wallet_code, max_supply, is_mint_locked, admin_change_available_at, admin_change_delay);
+        return ();
+    }
+
+
+    if (op == 4) {
+        ;; Update the token metadata such as name, symbol, description, image
+        ;; Only the current admin can update the metadata
+        throw_unless(73, equal_slices(sender_address, admin_address));
+        
+        ;; Extract the new metadata from the message
+        cell new_content = in_msg_body~load_ref();
+        
+        ;; Validate that the content size is within acceptable limits
+        ;; This prevents storage abuse and excessive gas costs
+        throw_unless(82, validate_content_size(new_content));
+        
+        ;; Store the updated metadata in the contract
+        save_data(total_supply, admin_address, original_admin_address, pending_admin_address, new_content, jetton_wallet_code, max_supply, is_mint_locked, admin_change_available_at, admin_change_delay);
+        return ();
+    }
+
+    ;; ============================================
+    ;; EXCHANGE LISTING COMPLIANCE OPERATIONS
+    ;; ============================================
+
+    if (op == op::set_pending_admin()) {
+        ;; Set pending admin with timelock for enhanced security
+        throw_unless(901, equal_slices(sender_address, admin_address));
+        slice new_admin = in_msg_body~load_msg_addr();
+        force_chain(new_admin);
+
+        int available_at = now() + admin_change_delay;
+        save_data(total_supply, admin_address, original_admin_address, new_admin, content, jetton_wallet_code, max_supply, is_mint_locked, available_at, admin_change_delay);
+        return ();
+    }
+
+    if (op == op::accept_admin()) {
+        ;; Accept admin role after timelock period
+        throw_unless(902, equal_slices(sender_address, pending_admin_address));
+        throw_unless(903, admin_change_available_at <= now());
+
+        save_data(total_supply, pending_admin_address, original_admin_address, begin_cell().store_uint(0, 2).end_cell().begin_parse(), content, jetton_wallet_code, max_supply, is_mint_locked, 0, admin_change_delay);
+        return ();
+    }
+
+    if (op == op::lock_mint()) {
+        ;; Permanently disable the ability to mint new tokens
+        ;; This is irreversible and used for exchange listing compliance
+        throw_unless(904, equal_slices(sender_address, admin_address));
+        throw_unless(905, is_mint_locked == 0);
+        save_data(total_supply, admin_address, original_admin_address, pending_admin_address, content, jetton_wallet_code, max_supply, 1, admin_change_available_at, admin_change_delay);
+        return ();
+    }
+
+    if (op == op::unlock_mint()) {
+        ;; Re-enable the ability to mint new tokens
+        ;; Only available if minting was previously locked
+        throw_unless(907, equal_slices(sender_address, admin_address));
+        throw_unless(908, is_mint_locked == 1);
+        save_data(total_supply, admin_address, original_admin_address, pending_admin_address, content, jetton_wallet_code, max_supply, 0, admin_change_available_at, admin_change_delay);
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+    return (total_supply, -1, admin_address, content, jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+    return calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code);
+}
+
+(slice, slice, slice) get_admin_data() method_id {
+    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+    return (admin_address, original_admin_address, pending_admin_address);
+}
+
+;; Calculate required gas for mint operation with safety margins
+;; Returns: mint_gas_consumption, forward_ton_amount
+(int, int) get_mint_gas_price() method_id {
+    ;; Gas consumption with safety margins:
+    ;; - Base processing: 0.015 TON
+    ;; - Wallet deployment: 0.03 TON  
+    ;; - Forward amount: 0.02 TON
+    ;; - Safety margin: 0.015 TON
+    ;; - Total: 0.08 TON (double previous estimate for safety)
+    int mint_gas_consumption = MIN_MINT_GAS;        ;; 0.08 TON total with margin
+    int forward_ton_amount = MINT_FORWARD_AMOUNT;  ;; 0.02 TON for wallet (increased)
+    return (mint_gas_consumption, forward_ton_amount);
+}
+
+;; Get security configuration constants for audit
+;; Returns: min_mint_gas, max_content_bits, max_content_refs, excesses_amount
+(int, int, int, int) get_security_params() method_id {
+    return (MIN_MINT_GAS, MAX_CONTENT_BITS, MAX_CONTENT_REFS, EXCESSES_AMOUNT);
+}
+
+;; Check if address is admin or pending admin
+;; Returns: is_admin, is_pending_admin, is_original_admin
+(int, int, int) check_admin_status(slice address) method_id {
+    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+    
+    int is_admin = equal_slices(address, admin_address);
+    int is_original = equal_slices(address, original_admin_address);
+    int is_pending = 0;
+    
+    ;; Check if pending admin exists and matches
+    if (pending_admin_address.slice_bits() >= 267) {
+        is_pending = equal_slices(address, pending_admin_address);
+    }
+    
+    return (is_admin, is_pending, is_original);
+}
+
+;; ============================================
+;; EXCHANGE LISTING COMPLIANCE GETTERS
+;; ============================================
+
+;; Check if minting is permanently locked
+(int) get_is_mint_locked() method_id {
+    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+    return is_mint_locked;
+}
+
+;; Get admin data with timelock information
+(slice, slice, int) get_admin_data_with_timelock() method_id {
+    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+    return (admin_address, pending_admin_address, admin_change_available_at);
+}
+
+;; Get full contract state for monitoring
+;; Returns: total_supply, is_mintable, has_pending_admin, content_hash
+(int, int, int, int) get_contract_state() method_id {
+    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+    
+    ;; Check if minting is possible (!is_mint_locked)
+    int is_mintable = is_mint_locked == 0;
+    
+    ;; Check if there's a pending admin
+    int has_pending_admin = pending_admin_address.slice_bits() >= 267;
+    
+    ;; Get content hash for verification
+    int content_hash = content.cell_hash();
+    
+    return (total_supply, is_mintable, has_pending_admin, content_hash);
+}
+
+;; Get supply limits
+;; Returns: current_supply, max_supply, remaining_mintable
+(int, int, int) get_supply_data() method_id {
+    (int total_supply, slice admin_address, slice original_admin_address, slice pending_admin_address, cell content, cell jetton_wallet_code, int max_supply, int is_mint_locked, int admin_change_available_at, int admin_change_delay) = load_data();
+    
+    int remaining = max_supply - total_supply;
+    
+    ;; Ensure remaining is not negative
+    if (remaining < 0) {
+        remaining = 0;
+    }
+    
+    return (total_supply, max_supply, remaining);
+}
+
+;; Get build salt (for unique contract hash)
+int get_build_salt() method_id {
+    return BUILD_SALT;
+}

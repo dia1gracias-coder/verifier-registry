@@ -1,0 +1,81 @@
+;; Standard Jetton operation codes (TEP-74)
+int op::transfer() asm "0xf8a7ea5 PUSHINT";              ;; Transfer tokens between wallets
+int op::transfer_notification() asm "0x7362d09c PUSHINT"; ;; Notify receiver about incoming transfer
+int op::internal_transfer() asm "0x178d4519 PUSHINT";     ;; Internal transfer between wallets
+int op::excesses() asm "0xd53276db PUSHINT";              ;; Return excess funds
+int op::burn() asm "0x595f07bc PUSHINT";                  ;; Burn tokens from wallet
+int op::burn_notification() asm "0x7bdd97de PUSHINT";     ;; Notify master about burned tokens
+int op::mint() asm "21 PUSHINT";                          ;; Mint new tokens (to original admin only)
+int op::provide_wallet_address() asm "0x2c76b973 PUSHINT"; ;; Request wallet address for user
+int op::take_wallet_address() asm "0xd1735400 PUSHINT";   ;; Response with wallet address
+
+
+;; Custom admin management operations  
+int op::cancel_admin_transfer() asm "0x11223344 PUSHINT"; ;; Cancel pending admin transfer
+int op::change_treasurer() asm "0x99999999 PUSHINT";      ;; Change treasurer address (admin only)
+
+;; Oracle operations for mass registration
+int op::oracle_bulk_register() asm "0xCCC30002 PUSHINT"; ;; Oracle: Bulk register users with referrers
+
+;; User registration operations  
+int op::register_user() asm "0xBBB20001 PUSHINT";        ;; Register user without staking
+int op::admin_register_root_user() asm "0xAAA10004 PUSHINT"; ;; Admin: Register root user without referrer
+
+;; Withdrawal operations
+int op::withdraw_staking_request() asm "0xBBB20010 PUSHINT";    ;; Request normal withdrawal (30 days, 5% burn)
+int op::withdraw_staking_fast() asm "0xBBB20011 PUSHINT";       ;; Request fast withdrawal (15 days, 30% burn)  
+int op::process_withdrawal() asm "0xBBB20012 PUSHINT";          ;; Process ready withdrawal
+int op::cancel_withdrawal() asm "0xBBB20013 PUSHINT";           ;; Cancel withdrawal request
+
+;; Rewards operations
+int op::claim_staking_rewards() asm "0xBBB20020 PUSHINT";       ;; Claim accumulated staking + MLM rewards
+int op::reinvest_rewards() asm "0xBBB20021 PUSHINT";            ;; Reinvest available rewards as new stake
+
+;; Enhanced admin operations for exchange listing compliance
+int op::set_pending_admin() asm "0xA11D0001 PUSHINT";     ;; Set pending admin with timelock
+int op::accept_admin() asm "0xA11D0002 PUSHINT";          ;; Accept admin role after timelock
+int op::lock_mint() asm "0xA11D00FF PUSHINT";             ;; Permanently lock minting
+int op::unlock_mint() asm "0xA11D00FE PUSHINT";           ;; Unlock minting (admin only)
+
+;; Admin system management operations
+int op::set_oracle() asm "0xAAA10003 PUSHINT";           ;; Admin: Set oracle address
+int op::admin_unlock_rank() asm "0xAAA10005 PUSHINT";    ;; Admin: Unlock user rank for auto-calculation
+
+;; Migration operations
+int op::freeze_all() asm "0xFFF90001 PUSHINT";           ;; Admin: Freeze all operations for migration
+int op::unfreeze_all() asm "0xFFF90002 PUSHINT";         ;; Admin: Unfreeze all operations after migration
+
+;; MLM Staking pause/emergency operations  
+int op::pause_staking() asm "0x53544150 PUSHINT";         ;; 'STAP' - Pause staking
+int op::resume_staking() asm "0x53544152 PUSHINT";        ;; 'STAR' - Resume staking
+int op::emergency_pause() asm "0xE11CE111 PUSHINT";       ;; Emergency pause all operations
+int op::emergency_resume() asm "0xE11CE110 PUSHINT";      ;; Emergency resume operations
+int op::fund_reward_pool() asm "0xFFF10001 PUSHINT";      ;; Admin: Fund reward pool with jettons
+
+
+;; ICO Auto-Staking operations
+int op::purchase_with_staking_ton() asm "0xBBB10001 PUSHINT";      ;; Purchase tokens with TON and auto-stake
+int op::purchase_with_staking_usdt() asm "0xBBB10002 PUSHINT";     ;; Purchase tokens with USDT and auto-stake
+int op::ico_stake_notification() asm "0xBBB10003 PUSHINT";         ;; Notification from ICO to staking with user data
+int op::toggle_staking_mode() asm "0xBBB10004 PUSHINT";            ;; Admin: Toggle between normal sale and auto-staking
+int op::set_ico_contract() asm "0xBBB10005 PUSHINT";               ;; Admin: Set ICO contract address for verification
+int op::set_staking_contract() asm "0x1c051a9e PUSHINT";  ;; Set staking contract address
+int op::set_staking_forward_gas() asm "0xBBB10006 PUSHINT";         ;; Admin: Set forward gas amount for staking operations
+int op::staking_set_jetton_wallet() asm "0xAAA10006 PUSHINT";       ;; Admin: Set jetton wallet address
+int op::staking_failed() asm "0xBBB10099 PUSHINT";                  ;; Staking failed notification - return tokens to buyer
+
+;; Micro-Events for TonAPI monitoring (0.0003 TON each)
+int op::event_staking() asm "0x45565401 PUSHINT";                ;; Event: New staking (amount, wallet)
+int op::event_rank_change() asm "0x45565402 PUSHINT";            ;; Event: Rank change (wallet, rank)
+int op::event_parent_rank_change() asm "0x45565403 PUSHINT";     ;; Event: Parent rank change (wallet, rank)
+int op::event_mlm_distribution() asm "0x45565404 PUSHINT";       ;; Event: MLM bonus distribution (wallet, amount, staker_wallet)
+int op::event_claim() asm "0x45565405 PUSHINT";                  ;; Event: Claim rewards (amount, wallet)
+int op::event_reinvest() asm "0x45565406 PUSHINT";               ;; Event: Reinvest (amount, wallet)
+int op::event_withdrawal() asm "0x45565407 PUSHINT";             ;; Event: Withdrawal complete (amount, wallet)
+int op::event_withdrawal_request() asm "0x45565408 PUSHINT";     ;; Event: Withdrawal request (amount, wallet)
+int op::event_withdrawal_fast() asm "0x45565409 PUSHINT";        ;; Event: Fast withdrawal request (amount, wallet)
+int op::event_registration() asm "0x4556540A PUSHINT";               ;; Event: User registration (user, referrer)
+
+;; Events management operations
+int op::set_events_address() asm "0x45565431 PUSHINT";            ;; Admin: Set events monitoring address
+int op::toggle_events() asm "0x45565432 PUSHINT";                 ;; Admin: Enable/disable events
