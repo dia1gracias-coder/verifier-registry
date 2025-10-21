@@ -1,0 +1,992 @@
+#include "stdlib.fc";
+
+;; ========================================
+;; CONSTANTS
+;; ========================================
+
+;; Operation codes
+const int OP_CREATE_ROOM = 0x01;
+const int OP_JOIN_ROOM = 0x02;
+const int OP_LEAVE_ROOM = 0x03;
+const int OP_KICK_PLAYER = 0x04;
+const int OP_START_GAME = 0x05;
+const int OP_END_GAME = 0x06;
+const int OP_CLAIM_REWARD = 0x07;
+const int OP_CLAIM_REFUND = 0x08;
+const int OP_SET_PAUSE = 0x09;
+const int OP_SET_ADMIN_ADDRESS = 0x10;
+const int OP_SET_EVENT_LISTENER = 0x11;
+const int OP_WITHDRAW = 0x0A;
+const int OP_SET_FEE_RATE = 0x0B;
+const int OP_SET_ALLOWED_DEPOSITS = 0x0C;
+const int OP_SET_EVENT_FEE = 0x0D;
+const int OP_SET_MIN_BALANCE = 0x0E;
+const int OP_DEPOSIT = 0x0F;
+const int OP_SET_PENALTY_FEE = 0x12;
+
+;; Room status
+const int STATUS_CREATED = 1;
+const int STATUS_STARTED = 2;
+const int STATUS_ENDED = 3;
+
+;; Pause flags
+const int PAUSE_CREATE = 1;
+const int PAUSE_JOIN = 2;
+const int PAUSE_START = 8;
+const int PAUSE_CLAIM = 16;
+
+;; Error codes
+const int ERROR_UNAUTHORIZED = 100;
+const int ERROR_PAUSED = 101;
+const int ERROR_ROOM_EXISTS = 102;
+const int ERROR_ROOM_NOT_FOUND = 103;
+const int ERROR_INSUFFICIENT = 104;
+const int ERROR_INVALID_DEPOSIT = 105;
+const int ERROR_WRONG_STATUS = 106;
+const int ERROR_ROOM_FULL = 107;
+const int ERROR_ALREADY_JOINED = 108;
+const int ERROR_NOT_MEMBER = 109;
+const int ERROR_NOT_ENOUGH_PLAYERS = 110;
+const int ERROR_INVALID_WINNER = 111;
+const int ERROR_NO_REWARD = 112;
+const int ERROR_NO_REFUND = 113;
+const int ERROR_INVALID_MAX_PLAYERS = 119;
+
+;; Event types
+const int EVENT_ROOM_CREATED = 0x1001;
+const int EVENT_PLAYER_JOINED = 0x1002;
+const int EVENT_PLAYER_LEFT = 0x1003;
+const int EVENT_PLAYER_KICKED = 0x1004;
+const int EVENT_GAME_STARTED = 0x1005;
+const int EVENT_GAME_ENDED = 0x1006;
+const int EVENT_REWARD_CLAIMED = 0x1007;
+const int EVENT_REFUND_CLAIMED = 0x1008;
+const int EVENT_PAUSE_CHANGED = 0x100B;
+const int EVENT_DEPOSIT = 0x1009;
+const int EVENT_WITHDRAW = 0x100A;
+
+;; ========================================
+;; STORAGE
+;; ========================================
+
+global slice admin_address;
+global slice event_listener_address;
+
+global cell rooms;                    ;; dict<uint64, room_data>
+global cell pending_rewards;          ;; dict<uint64, dict<slice, coins>> - per-room nested
+global cell pending_refunds;          ;; dict<uint64, dict<slice, coins>>
+
+global int platform_fee_rate;         ;; percentage (default 10)
+global cell allowed_deposits;         ;; dict<coins, null> - optimized
+
+global int paused;
+global int pause_until;
+
+global int event_fee;
+global int min_contract_balance;
+global int penalty_fee;               ;; coins, e.g., 6000000 for 0.006 TON
+
+;; ========================================
+;; STORAGE FUNCTIONS
+;; ========================================
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+
+    admin_address = ds~load_msg_addr();
+    event_listener_address = ds~load_msg_addr();
+
+    rooms = ds~load_dict();
+    pending_rewards = ds~load_dict();
+    pending_refunds = ds~load_dict();
+
+    platform_fee_rate = ds~load_uint(8);
+    allowed_deposits = ds~load_dict();
+
+    paused = ds~load_uint(8);
+    pause_until = ds~load_uint(32);
+
+    event_fee = ds~load_coins();
+    min_contract_balance = ds~load_coins();
+    penalty_fee = ds~load_coins();
+}
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_slice(admin_address)
+            .store_slice(event_listener_address)
+            .store_dict(rooms)
+            .store_dict(pending_rewards)
+            .store_dict(pending_refunds)
+            .store_uint(platform_fee_rate, 8)
+            .store_dict(allowed_deposits)
+            .store_uint(paused, 8)
+            .store_uint(pause_until, 32)
+            .store_coins(event_fee)
+            .store_coins(min_contract_balance)
+            .store_coins(penalty_fee)
+        .end_cell()
+    );
+}
+
+;; ========================================
+;; HELPER FUNCTIONS
+;; ========================================
+
+() check_auto_unpause() impure {
+    if ((pause_until > 0) & (now() >= pause_until)) {
+        paused = 0;
+        pause_until = 0;
+    }
+}
+
+() emit_event(int event_type, cell event_data) impure {
+    var [actual_balance, _] = get_balance();
+    throw_unless(ERROR_INSUFFICIENT, actual_balance >= event_fee);
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(event_listener_address)
+        .store_coins(event_fee)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(event_type, 32)
+        .store_ref(event_data)
+    .end_cell();
+
+    send_raw_message(msg, 1);
+}
+
+int is_deposit_allowed(int amount) inline {
+    (slice value, int found) = allowed_deposits.udict_get?(64, amount);
+    return found;
+}
+
+;; ========================================
+;; ROOM DATA PARSING
+;; ========================================
+
+;; Full room data (removed gas_calculate)
+(int, int, slice, cell, int, int, int, int) parse_room_full(slice rs) inline {
+    int status = rs~load_uint(8);
+    int deposit_amount = rs~load_coins();
+    slice host = rs~load_msg_addr();
+    cell players = rs~load_dict();
+    int total_deposited = rs~load_coins();
+    int created_at = rs~load_uint(32);
+    int player_count = rs~load_uint(8);
+    int max_players = rs~load_uint(8);
+    return (status, deposit_amount, host, players, total_deposited, created_at, player_count, max_players);
+}
+
+;; ========================================
+;; CREATE ROOM
+;; ========================================
+
+() handle_create_room(slice sender, int msg_value, slice in_msg_body) impure {
+    check_auto_unpause();
+    throw_if(ERROR_PAUSED, paused & PAUSE_CREATE);
+
+    int room_id = in_msg_body~load_uint(64);
+    int deposit_amount = in_msg_body~load_coins();
+    int max_players = in_msg_body~load_uint(8);
+
+    ;; Validate
+    (slice existing, int found) = rooms.udict_get?(64, room_id);
+    throw_if(ERROR_ROOM_EXISTS, found);
+
+    throw_unless(ERROR_INSUFFICIENT, msg_value >= deposit_amount);
+    throw_unless(ERROR_INVALID_DEPOSIT, is_deposit_allowed(deposit_amount));
+
+    throw_unless(ERROR_INVALID_MAX_PLAYERS, (max_players >= 2) & (max_players <= 4));
+
+    ;; Create players dict
+    cell players = new_dict();
+    players~udict_set_ref(256, slice_hash(sender), begin_cell().store_slice(sender).end_cell());
+
+    ;; Store room data
+    cell room_data = begin_cell()
+        .store_uint(STATUS_CREATED, 8)
+        .store_coins(deposit_amount)
+        .store_slice(sender)
+        .store_dict(players)
+        .store_coins(deposit_amount)
+        .store_uint(now(), 32)
+        .store_uint(1, 8)
+        .store_uint(max_players, 8)
+    .end_cell();
+
+    rooms~udict_set_ref(64, room_id, room_data);
+
+    ;; Emit event
+    cell event_data = begin_cell()
+        .store_uint(room_id, 64)
+        .store_slice(sender)
+        .store_coins(deposit_amount)
+        .store_uint(max_players, 8)
+        .store_uint(now(), 32)
+    .end_cell();
+    emit_event(EVENT_ROOM_CREATED, event_data);
+}
+
+;; ========================================
+;; JOIN ROOM
+;; ========================================
+
+() handle_join_room(slice sender, int msg_value, slice in_msg_body) impure {
+    check_auto_unpause();
+    throw_if(ERROR_PAUSED, paused & PAUSE_JOIN);
+
+    int room_id = in_msg_body~load_uint(64);
+
+    (cell room_cell, int found) = rooms.udict_get_ref?(64, room_id);
+    throw_unless(ERROR_ROOM_NOT_FOUND, found);
+    slice room_ref = room_cell.begin_parse();
+
+    var (status, deposit_amount, host, players, total_deposited, created_at, player_count, max_players) = parse_room_full(room_ref);
+
+    ;; Validate
+    throw_unless(ERROR_WRONG_STATUS, status == STATUS_CREATED);
+
+    throw_unless(ERROR_INSUFFICIENT, msg_value >= deposit_amount);
+
+    throw_if(ERROR_ROOM_FULL, player_count >= max_players);
+
+    (cell existing, int already_joined) = players.udict_get_ref?(256, slice_hash(sender));
+    throw_if(ERROR_ALREADY_JOINED, already_joined);
+
+    ;; Add player
+    players~udict_set_ref(256, slice_hash(sender), begin_cell().store_slice(sender).end_cell());
+    total_deposited += deposit_amount;
+    player_count += 1;
+
+    ;; Update room
+    cell room_data = begin_cell()
+        .store_uint(status, 8)
+        .store_coins(deposit_amount)
+        .store_slice(host)
+        .store_dict(players)
+        .store_coins(total_deposited)
+        .store_uint(created_at, 32)
+        .store_uint(player_count, 8)
+        .store_uint(max_players, 8)
+    .end_cell();
+
+    rooms~udict_set_ref(64, room_id, room_data);
+
+    ;; Emit event
+    cell event_data = begin_cell()
+        .store_uint(room_id, 64)
+        .store_slice(sender)
+        .store_uint(now(), 32)
+    .end_cell();
+    emit_event(EVENT_PLAYER_JOINED, event_data);
+}
+
+;; ========================================
+;; LEAVE ROOM
+;; ========================================
+
+() handle_leave_room(slice sender, slice in_msg_body) impure {
+    check_auto_unpause();
+
+    int room_id = in_msg_body~load_uint(64);
+
+    (cell room_cell, int found) = rooms.udict_get_ref?(64, room_id);
+    throw_unless(ERROR_ROOM_NOT_FOUND, found);
+    slice room_ref = room_cell.begin_parse();
+
+    var (status, deposit_amount, host, players, total_deposited, created_at, player_count, max_players) = parse_room_full(room_ref);
+
+    throw_unless(ERROR_WRONG_STATUS, status == STATUS_CREATED);
+
+    (cell player_data, int is_member) = players.udict_get_ref?(256, slice_hash(sender));
+    throw_unless(ERROR_NOT_MEMBER, is_member);
+
+    ;; ===== SPECIAL CASE: HOST LEAVES =====
+    if (equal_slice_bits(sender, host)) {
+        var [actual_balance, _] = get_balance();
+        throw_unless(ERROR_INSUFFICIENT, actual_balance >= (deposit_amount * player_count) - (penalty_fee * player_count));
+
+        rooms~udict_delete?(64, room_id);
+
+        save_data();
+
+        int player_hash = -1;
+        do {
+            (player_hash, slice player_slice, int f) = players.udict_get_next?(256, player_hash);
+            if (f) {
+                slice player_details = player_slice;
+                slice player_addr = player_slice~load_ref().begin_parse();
+                int refund_amount = deposit_amount - penalty_fee;
+
+                var refund_msg = begin_cell()
+                    .store_uint(0x10, 6)
+                    .store_slice(player_addr)
+                    .store_coins(refund_amount)
+                    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell();
+                send_raw_message(refund_msg, 1);
+            }
+        } until (~ f);
+
+        ;; Emit event
+        cell event_data = begin_cell()
+            .store_uint(room_id, 64)
+            .store_slice(sender)
+            .store_uint(1, 8)  ;; 1 for host leave
+            .store_uint(now(), 32)
+        .end_cell();
+        emit_event(EVENT_PLAYER_LEFT, event_data);
+
+        return ();
+    }
+
+    ;; ===== NORMAL CASE: Non-host player leaves =====
+    players~udict_delete?(256, slice_hash(sender));
+    total_deposited -= deposit_amount;
+    player_count -= 1;
+
+    int refund_amount = deposit_amount - penalty_fee;
+
+    var [actual_balance, _] = get_balance();
+    throw_unless(ERROR_INSUFFICIENT, actual_balance >= refund_amount);
+
+    ;; Auto-cleanup if room is empty
+    if (player_count == 0) {
+        rooms~udict_delete?(64, room_id);
+    } else {
+        ;; Update room
+        cell room_data = begin_cell()
+            .store_uint(status, 8)
+            .store_coins(deposit_amount)
+            .store_slice(host)
+            .store_dict(players)
+            .store_coins(total_deposited)
+            .store_uint(created_at, 32)
+            .store_uint(player_count, 8)
+            .store_uint(max_players, 8)
+        .end_cell();
+
+        rooms~udict_set_ref(64, room_id, room_data);
+    }
+
+    save_data();
+
+    ;; Send refund immediately
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(sender)
+        .store_coins(refund_amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .end_cell();
+    send_raw_message(msg, 1);
+
+    ;; Emit event
+    cell event_data = begin_cell()
+        .store_uint(room_id, 64)
+        .store_slice(sender)
+        .store_uint(0, 8)  ;; 0 for normal leave
+        .store_uint(now(), 32)
+    .end_cell();
+    emit_event(EVENT_PLAYER_LEFT, event_data);
+
+    return ();
+}
+
+;; ========================================
+;; KICK PLAYER
+;; ========================================
+
+() handle_kick_player(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    int room_id = in_msg_body~load_uint(64);
+    slice player = in_msg_body~load_msg_addr();
+
+    (cell room_cell, int found) = rooms.udict_get_ref?(64, room_id);
+    throw_unless(ERROR_ROOM_NOT_FOUND, found);
+    slice room_ref = room_cell.begin_parse();
+
+    var (status, deposit_amount, host, players, total_deposited, created_at, player_count, max_players) = parse_room_full(room_ref);
+
+    throw_unless(ERROR_WRONG_STATUS, status == STATUS_CREATED);
+
+    (cell player_data, int is_member) = players.udict_get_ref?(256, slice_hash(player));
+    throw_unless(ERROR_NOT_MEMBER, is_member);
+
+    ;; ===== SPECIAL CASE: HOST DISCONNECTED =====
+    if (equal_slice_bits(player, host)) {
+        var (slice inner_ref, int has_inner) = pending_refunds.udict_get?(64, room_id);
+        cell inner_dict = has_inner ? inner_ref~load_ref() : new_dict();
+
+        var [actual_balance, _] = get_balance();
+        throw_unless(ERROR_INSUFFICIENT, actual_balance >= total_deposited - (penalty_fee * player_count));
+
+        int player_hash = -1;
+        do {
+            (player_hash, slice player_slice, int f) = players.udict_get_next?(256, player_hash);
+            if (f) {
+                slice player_details = player_slice;
+                slice player_addr = player_slice~load_ref().begin_parse();
+                int refund_amount = deposit_amount - penalty_fee;
+                inner_dict~udict_set(256, slice_hash(player_addr), begin_cell().store_coins(refund_amount).end_cell().begin_parse());
+            }
+        } until (~ f);
+
+        pending_refunds~udict_set_ref(64, room_id, inner_dict);
+
+        rooms~udict_delete?(64, room_id);
+
+        save_data();
+
+        ;; Emit event
+        cell event_data = begin_cell()
+            .store_uint(room_id, 64)
+            .store_slice(host)
+            .store_uint(player_count, 8)
+            .store_coins(total_deposited - (penalty_fee * player_count))
+        .end_cell();
+        emit_event(EVENT_PLAYER_KICKED, event_data);
+
+        return ();
+    }
+
+    ;; ===== NORMAL CASE: Non-host player kicked =====
+    players~udict_delete?(256, slice_hash(player));
+    player_count -= 1;
+
+    if (player_count == 0) {
+        rooms~udict_delete?(64, room_id);
+    } else {
+        ;; Update room
+        cell room_data = begin_cell()
+            .store_uint(status, 8)
+            .store_coins(deposit_amount)
+            .store_slice(host)
+            .store_dict(players)
+            .store_coins(total_deposited)
+            .store_uint(created_at, 32)
+            .store_uint(player_count, 8)
+            .store_uint(max_players, 8)
+        .end_cell();
+
+        rooms~udict_set_ref(64, room_id, room_data);
+    }
+    int refund_amount = deposit_amount - penalty_fee;
+    var [actual_balance, _] = get_balance();
+    throw_unless(ERROR_INSUFFICIENT, actual_balance >= refund_amount);
+
+    ;; Mark refundable (per-room nested dict)
+    var (slice inner_ref, int has_inner) = pending_refunds.udict_get?(64, room_id);
+    cell inner_dict = has_inner ? inner_ref~load_ref() : new_dict();
+    inner_dict~udict_set_ref(256, slice_hash(player), begin_cell().store_coins(refund_amount).end_cell());
+    pending_refunds~udict_set_ref(64, room_id, inner_dict);
+
+    save_data();
+
+    ;; Emit event
+    cell event_data = begin_cell()
+        .store_uint(room_id, 64)
+        .store_slice(player)
+        .store_coins(refund_amount)
+    .end_cell();
+    emit_event(EVENT_PLAYER_KICKED, event_data);
+}
+
+;; ========================================
+;; START GAME
+;; ========================================
+
+() handle_start_game(slice sender, slice in_msg_body) impure {
+    check_auto_unpause();
+    throw_if(ERROR_PAUSED, paused & PAUSE_START);
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    int room_id = in_msg_body~load_uint(64);
+
+    (cell room_cell, int found) = rooms.udict_get_ref?(64, room_id);
+    throw_unless(ERROR_ROOM_NOT_FOUND, found);
+    slice room_ref = room_cell.begin_parse();
+
+    var (status, deposit_amount, host, players, total_deposited, created_at, player_count, max_players) = parse_room_full(room_ref);
+    throw_unless(ERROR_WRONG_STATUS, status == STATUS_CREATED);
+    throw_unless(ERROR_NOT_ENOUGH_PLAYERS, player_count >= 2);
+
+    ;; Update status
+    cell room_data = begin_cell()
+        .store_uint(STATUS_STARTED, 8)
+        .store_coins(deposit_amount)
+        .store_slice(host)
+        .store_dict(players)
+        .store_coins(total_deposited)
+        .store_uint(created_at, 32)
+        .store_uint(player_count, 8)
+        .store_uint(max_players, 8)
+    .end_cell();
+
+    rooms~udict_set_ref(64, room_id, room_data);
+
+    ;; Build list of users for event
+    builder users_list = begin_cell();
+    int player_hash = -1;
+    do {
+        (player_hash, slice player_slice, int f) = players.udict_get_next?(256, player_hash);
+        if (f) {
+            slice player_addr = player_slice~load_msg_addr();
+            users_list = users_list.store_slice(player_addr);
+        }
+    } until (~ f);
+
+    cell users_cell = users_list.end_cell();
+
+    ;; Emit event with users list
+    cell event_data = begin_cell()
+        .store_uint(room_id, 64)
+        .store_uint(player_count, 8)
+        .store_coins(total_deposited)
+        .store_uint(now(), 32)
+        .store_ref(users_cell)
+    .end_cell();
+    emit_event(EVENT_GAME_STARTED, event_data);
+}
+
+;; ========================================
+;; END GAME + AGGRESSIVE CLEANUP
+;; ========================================
+
+() handle_end_game(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    int room_id = in_msg_body~load_uint(64);
+    slice winner = in_msg_body~load_msg_addr();
+    int gas_calculated = in_msg_body~load_coins();
+
+    (cell room_cell, int found) = rooms.udict_get_ref?(64, room_id);
+    throw_unless(ERROR_ROOM_NOT_FOUND, found);
+    slice room_ref = room_cell.begin_parse();
+
+    var (status, deposit_amount, host, players, total_deposited, created_at, player_count, max_players) = parse_room_full(room_ref);
+
+    throw_unless(ERROR_WRONG_STATUS, status == STATUS_STARTED);
+
+    ;; Verify winner is a player
+    (cell winner_data, int is_player) = players.udict_get_ref?(256, slice_hash(winner));
+    throw_unless(ERROR_INVALID_WINNER, is_player);
+
+    ;; Calculate prize
+    int platform_fee = (total_deposited * platform_fee_rate) / 100;
+    int prize = total_deposited - platform_fee - gas_calculated;
+
+    rooms~udict_delete?(64, room_id);
+
+    ;; Mark claimable (per-room nested dict)
+    var (slice inner_ref, int has_inner) = pending_rewards.udict_get?(64, room_id);
+    cell inner_dict = has_inner ? inner_ref~load_ref() : new_dict();
+    inner_dict~udict_set(256, slice_hash(winner), begin_cell().store_coins(prize).end_cell().begin_parse());
+    pending_rewards~udict_set_ref(64, room_id, inner_dict);
+
+    cell event_data = begin_cell()
+        .store_uint(room_id, 64)
+        .store_slice(winner)
+        .store_coins(prize)
+        .store_coins(platform_fee)
+        .store_uint(player_count, 8)
+        .store_coins(deposit_amount)
+        .store_uint(now(), 32)
+        .store_coins(gas_calculated)
+    .end_cell();
+    emit_event(EVENT_GAME_ENDED, event_data);
+}
+
+;; ========================================
+;; CLAIM REWARD
+;; ========================================
+
+() handle_claim_reward(slice sender, slice in_msg_body) impure {
+    check_auto_unpause();
+    throw_if(ERROR_PAUSED, paused & PAUSE_CLAIM);
+
+    int room_id = in_msg_body~load_uint(64);
+
+    (slice inner_ref, int found_room) = pending_rewards.udict_get?(64, room_id);
+    throw_unless(ERROR_NO_REWARD, found_room);
+
+    cell inner_dict = inner_ref~load_ref();
+    (slice reward_slice, int has_reward) = inner_dict.udict_get?(256, slice_hash(sender));
+    throw_unless(ERROR_NO_REWARD, has_reward);
+
+    int reward_amount = reward_slice~load_coins();
+
+    var [actual_balance, _] = get_balance();
+    throw_unless(ERROR_INSUFFICIENT, actual_balance >= reward_amount);
+
+    ;; Delete reward
+    inner_dict~udict_delete?(256, slice_hash(sender));
+
+    if (inner_dict.dict_empty?()) {
+        pending_rewards~udict_delete?(64, room_id);
+    } else {
+        pending_rewards~udict_set_ref(64, room_id, inner_dict);
+    }
+
+    ;; Transfer
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(sender)
+        .store_coins(reward_amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .end_cell();
+    send_raw_message(msg, 1);
+
+    ;; Emit event
+    cell event_data = begin_cell()
+        .store_uint(room_id, 64)
+        .store_slice(sender)
+        .store_coins(reward_amount)
+        .store_uint(now(), 32)
+    .end_cell();
+    emit_event(EVENT_REWARD_CLAIMED, event_data);
+}
+
+;; ========================================
+;; CLAIM REFUND
+;; ========================================
+
+() handle_claim_refund(slice sender, slice in_msg_body) impure {
+    check_auto_unpause();
+    throw_if(ERROR_PAUSED, paused & PAUSE_CLAIM);
+
+    int room_id = in_msg_body~load_uint(64);
+
+    ;; Get per-room refunds
+    (slice inner_ref, int found_room) = pending_refunds.udict_get?(64, room_id);
+    throw_unless(ERROR_NO_REFUND, found_room);
+
+    cell inner_dict = inner_ref~load_ref();
+    (slice refund_slice, int has_refund) = inner_dict.udict_get?(256, slice_hash(sender));
+    throw_unless(ERROR_NO_REFUND, has_refund);
+
+    int refund_amount = refund_slice~load_coins();
+
+    var [actual_balance, _] = get_balance();
+    throw_unless(ERROR_INSUFFICIENT, actual_balance >= refund_amount);
+
+    ;; Delete refund
+    inner_dict~udict_delete?(256, slice_hash(sender));
+
+    if (inner_dict.dict_empty?()) {
+        pending_refunds~udict_delete?(64, room_id);
+    } else {
+        pending_refunds~udict_set_ref(64, room_id, inner_dict);
+    }
+
+    ;; Transfer
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(sender)
+        .store_coins(refund_amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .end_cell();
+    send_raw_message(msg, 1);
+
+    ;; Emit event
+    cell event_data = begin_cell()
+        .store_uint(room_id, 64)
+        .store_slice(sender)
+        .store_coins(refund_amount)
+        .store_uint(now(), 32)
+    .end_cell();
+    emit_event(EVENT_REFUND_CLAIMED, event_data);
+}
+
+;; ========================================
+;; ADMIN FUNCTIONS
+;; ========================================
+
+() handle_set_pause(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    int flags = in_msg_body~load_uint(8);
+    int duration = in_msg_body~load_uint(32);
+    int mode = in_msg_body~load_uint(8);  ;; 0 = add flags, 1 = remove flags
+
+    ;; Update paused flags
+    if (mode == 0) {
+        paused = paused | flags;  ;; Add flags (bitwise OR)
+    } else {
+        int mask = 255 - flags;   ;; 8-bit mask: 0xFF - flags (clears specified bits)
+        paused = paused & mask;   ;; Remove flags (bitwise AND with mask)
+    }
+
+    if (duration > 0) {
+        pause_until = now() + duration;
+    } else {
+        pause_until = 0;
+    }
+
+    cell event_data = begin_cell()
+        .store_uint(paused, 8)    ;; Store updated paused state
+        .store_uint(pause_until, 32)
+        .store_uint(now(), 32)
+        .store_uint(mode, 8)      ;; Include mode in event
+    .end_cell();
+    emit_event(EVENT_PAUSE_CHANGED, event_data);
+}
+
+() handle_withdraw(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    int amount = in_msg_body~load_coins();
+
+    ;; Check actual withdrawable balance (must keep min_contract_balance as reserve)
+    var [actual_balance, _] = get_balance();
+    int withdrawable = actual_balance - min_contract_balance;
+    throw_unless(ERROR_INSUFFICIENT, withdrawable >= amount);
+
+    var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(admin_address)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .end_cell();
+    send_raw_message(msg, 1);
+
+    cell event_data = begin_cell()
+        .store_slice(sender)
+        .store_coins(amount)
+        .store_uint(now(), 32)
+    .end_cell();
+    emit_event(EVENT_WITHDRAW, event_data);
+
+    save_data();
+}
+
+() handle_set_fee_rate(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    int new_rate = in_msg_body~load_uint(8);
+
+    platform_fee_rate = new_rate;
+}
+
+() handle_set_allowed_deposits(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    allowed_deposits = in_msg_body~load_dict();
+}
+
+() handle_set_event_fee(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    event_fee = in_msg_body~load_coins();
+}
+
+() handle_set_min_balance(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    min_contract_balance = in_msg_body~load_coins();
+}
+
+() handle_set_penalty_fee(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    penalty_fee = in_msg_body~load_coins();
+}
+
+() handle_deposit(slice sender, int msg_value, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    cell event_data = begin_cell()
+        .store_slice(sender)
+        .store_coins(msg_value)
+        .store_uint(now(), 32)
+    .end_cell();
+    emit_event(EVENT_DEPOSIT, event_data);
+
+    save_data();
+}
+
+() handle_set_admin_address(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    slice new_admin_address = in_msg_body~load_msg_addr();
+    admin_address = new_admin_address;
+
+    save_data();
+}
+
+() handle_set_event_listener(slice sender, slice in_msg_body) impure {
+    throw_unless(ERROR_UNAUTHORIZED, equal_slice_bits(sender, admin_address));
+
+    slice new_event_listener = in_msg_body~load_msg_addr();
+    event_listener_address = new_event_listener;
+
+    save_data();
+}
+
+;; ========================================
+;; MAIN ROUTER
+;; ========================================
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) {
+        return ();
+    }
+
+    slice sender = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+
+    load_data();
+
+    if (op == OP_CREATE_ROOM) {
+        handle_create_room(sender, msg_value, in_msg_body);
+    } elseif (op == OP_JOIN_ROOM) {
+        handle_join_room(sender, msg_value, in_msg_body);
+    } elseif (op == OP_LEAVE_ROOM) {
+        handle_leave_room(sender, in_msg_body);
+        return ();
+    } elseif (op == OP_KICK_PLAYER) {
+        handle_kick_player(sender, in_msg_body);
+    } elseif (op == OP_START_GAME) {
+        handle_start_game(sender, in_msg_body);
+    } elseif (op == OP_END_GAME) {
+        handle_end_game(sender, in_msg_body);
+    } elseif (op == OP_CLAIM_REWARD) {
+        handle_claim_reward(sender, in_msg_body);
+    } elseif (op == OP_CLAIM_REFUND) {
+        handle_claim_refund(sender, in_msg_body);
+    } elseif (op == OP_SET_PAUSE) {
+        handle_set_pause(sender, in_msg_body);
+    } elseif (op == OP_WITHDRAW) {
+        handle_withdraw(sender, in_msg_body);
+    } elseif (op == OP_SET_FEE_RATE) {
+        handle_set_fee_rate(sender, in_msg_body);
+    } elseif (op == OP_SET_ALLOWED_DEPOSITS) {
+        handle_set_allowed_deposits(sender, in_msg_body);
+    } elseif (op == OP_SET_EVENT_FEE) {
+        handle_set_event_fee(sender, in_msg_body);
+    } elseif (op == OP_SET_MIN_BALANCE) {
+        handle_set_min_balance(sender, in_msg_body);
+    } elseif (op == OP_SET_PENALTY_FEE) {
+        handle_set_penalty_fee(sender, in_msg_body);
+    } elseif (op == OP_DEPOSIT) {
+        handle_deposit(sender, msg_value, in_msg_body);
+    } elseif (op == OP_SET_ADMIN_ADDRESS) {
+        handle_set_admin_address(sender, in_msg_body);
+    } elseif (op == OP_SET_EVENT_LISTENER) {
+        handle_set_event_listener(sender, in_msg_body);
+    } else {
+        return ();
+    }
+
+    save_data();
+}
+
+;; ========================================
+;; GET METHODS
+;; ========================================
+
+(slice, slice) get_config() method_id {
+    load_data();
+    return (admin_address, event_listener_address);
+}
+
+int get_balances() method_id {
+    var [actual_balance, _] = get_balance();
+    return actual_balance;
+}
+
+(int, int) get_pause_state() method_id {
+    load_data();
+    return (paused, pause_until);
+}
+
+int get_platform_fee_rate() method_id {
+    load_data();
+    return platform_fee_rate;
+}
+
+cell get_allowed_deposits() method_id {
+    load_data();
+    return allowed_deposits;
+}
+
+int get_withdrawable() method_id {
+    load_data();
+    var [actual_balance, _] = get_balance();
+    int withdrawable = actual_balance - min_contract_balance;
+    return withdrawable;
+}
+
+cell get_room(int room_id) method_id {
+    load_data();
+    (slice room_ref, int found) = rooms.udict_get?(64, room_id);
+    if (found) {
+        return begin_cell().store_slice(room_ref).end_cell();
+    }
+    return begin_cell().end_cell();
+}
+
+int get_pending_reward(int room_id, slice address) method_id {
+    load_data();
+    (slice inner_ref, int found_room) = pending_rewards.udict_get?(64, room_id);
+    if (~ found_room) {
+        return 0;
+    }
+
+    cell inner_dict = inner_ref~load_ref();
+    (slice reward_slice, int found) = inner_dict.udict_get?(256, slice_hash(address));
+    if (found) {
+        return reward_slice~load_coins();
+    }
+    return 0;
+}
+
+int get_pending_refund(int room_id, slice address) method_id {
+    load_data();
+    (slice inner_ref, int found_room) = pending_refunds.udict_get?(64, room_id);
+    if (~ found_room) {
+        return 0;
+    }
+
+    cell inner_dict = inner_ref~load_ref();
+    (slice refund_slice, int found) = inner_dict.udict_get?(256, slice_hash(address));
+    if (found) {
+        return refund_slice~load_coins();
+    }
+    return 0;
+}
+
+(int, int) get_fees() method_id {
+    load_data();
+    return (event_fee, min_contract_balance);
+}
+
+(int, int, int, slice, int, int, int, int) get_room_parsed(int room_id) method_id {
+    load_data();
+    (slice room_ref, int found) = rooms.udict_get?(64, room_id);
+    if (~ found) {
+        ;; Return empty data if room not found
+        return (0, 0, 0, begin_cell().end_cell().begin_parse(), 0, 0, 0, 0);
+    }
+
+    ;; Full room data (removed gas_calculate)
+    int status = room_ref~load_uint(8);
+    int deposit_amount = room_ref~load_coins();
+    slice host = room_ref~load_msg_addr();
+    cell players = room_ref~load_dict();
+    int total_deposited = room_ref~load_coins();
+    int created_at = room_ref~load_uint(32);
+    int player_count = room_ref~load_uint(8);
+    int max_players = room_ref~load_uint(8);
+    return (1, status, deposit_amount, host, total_deposited, player_count, created_at, max_players);
+}
