@@ -1,0 +1,23 @@
+
+int mod(int x, int y) asm "MOD";
+
+int check_login_string(slice login) {
+    int i = 0;
+    int len = slice_bits(login);
+    int need_break = 0;
+    do {
+        need_break = i == len;
+        if (~ need_break) {
+            int char = login~load_uint(8);
+            ;; we can do it because additional UTF-8 character's octets >= 128 -- https://www.ietf.org/rfc/rfc3629.txt
+            int is_hyphen = (char == 45);
+            int valid_char = (is_hyphen & (i > 0) & (i < len - 8)) | ((char >= 48) & (char <= 57)) | ((char >= 97) & (char <= 122)); ;; '-' or 0-9 or a-z
+
+            need_break = ~ valid_char;
+            if (~ need_break) {
+                i += 8;
+            }
+        }
+    } until (need_break);
+    return i == len;
+}
