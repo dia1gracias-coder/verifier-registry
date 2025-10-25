@@ -1,0 +1,655 @@
+;; CS Profile v1r1 smart contract (implements editable NFT item interface)
+
+#include "imports/stdlib.fc";
+#include "params.fc";
+#include "profile-op-codes-v1.fc";
+
+int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
+
+
+;;
+;;  Storage
+;;
+;;  uint256 index
+;;  MsgAddressInt collection_address
+;;  MsgAddressInt owner_address
+;;  cell content
+;;  cell login - e.g contains "alice" (without ending \0) 
+;;  cell programs
+
+(int, int, slice, slice, cell, cell, cell) load_data() {
+
+    slice ds = get_data().begin_parse();
+
+    ;; Load base fields
+    int   index               = ds~load_uint(256);   ;; NFT index / item identifier
+    slice collection_address  = ds~load_msg_addr();  ;; collection contract address
+
+    if (ds.slice_bits() > 0) {
+        ;; Contract initialized — load remaining fields
+        slice owner_address = ds~load_msg_addr();
+        cell  content        = ds~load_ref();
+        cell  login          = ds~load_ref();
+        cell  programs       = ds~load_dict();
+
+        return (
+            -1,                    ;; init? flag = true
+            index,
+            collection_address,
+            owner_address,
+            content,
+            login,
+            programs
+        );
+    } else {
+        ;; Contract not initialized yet — return defaults
+        return (
+            0,                     ;; init? flag = false
+            index,
+            collection_address,
+            null(),                ;; owner_address
+            null(),                ;; content
+            null(),                ;; login
+            null()                 ;; programs
+        );
+    }
+}
+
+
+() store_data(
+    int   index,
+    slice collection_address,
+    slice owner_address,
+    cell  content,
+    cell  login,
+    cell  programs
+) impure {
+
+    cell data = begin_cell()
+        .store_uint(index, 256)          ;; NFT index / item identifier
+        .store_slice(collection_address) ;; collection contract address
+        .store_slice(owner_address)      ;; current owner
+        .store_ref(content)              ;; content cell (metadata / data)
+        .store_ref(login)                ;; login cell (auth / identity)
+        .store_dict(programs)            ;; dictionary of programs / mappings
+    .end_cell();
+
+    set_data(data);
+}
+
+
+() send_msg(
+    slice  to_address,
+    int    amount,
+    int    op,
+    int    query_id,
+    builder payload,
+    int    bounce,
+    int    send_mode
+) impure inline {
+
+    var msg = begin_cell();
+
+    if (bounce) {
+        ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+        msg = msg.store_uint(0x18, 6);
+    } else {
+        ;; nobounce - when sending to wallets usually
+        ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 010000
+        msg = msg.store_uint(0x10, 6);
+    }
+
+    msg = msg
+        .store_slice(to_address)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)  ;; default msg flags
+        .store_uint(op, 32)
+        .store_uint(query_id, 64);
+
+    ifnot (builder_null?(payload)) {
+        msg = msg.store_builder(payload);
+    }
+
+    send_raw_message(msg.end_cell(), send_mode);
+}
+
+
+() send_text_msg(
+    slice to_address,
+    int   amount,
+    cell  text,
+    int   send_mode
+) impure inline {
+
+    cell body = begin_cell()
+        .store_uint(0, 32)                       ;; zero opcode → simple text message
+        .store_slice("Crypto Style: ")           ;; prefix (label or tag)
+        .store_ref(text)                         ;; actual text content (snake cell)
+    .end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)                     ;; internal message (nobounce)
+        .store_slice(to_address)                 ;; destination address
+        .store_coins(amount)                     ;; amount in nanotons
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)  ;; default message headers
+        .store_uint(1, 1)                        ;; store body as a ref
+        .store_ref(body)
+    .end_cell();
+
+    send_raw_message(msg, send_mode);   
+}
+
+
+() on_bounce (slice sender_address, slice in_msg_body) impure inline_ref {
+
+    in_msg_body~skip_bounced_prefix();
+
+    int op = in_msg_body~load_op();
+    if (op != op::add_referal()) {
+        ;; Not our operation → ignore bounce
+        return ();
+    }
+
+    int query_id = in_msg_body~load_query_id();
+    int program  = in_msg_body~load_uint(32);
+    int seq_no   = in_msg_body~load_uint(32);
+
+    (int init?, int index, slice collection_address, slice owner_address,
+     cell content, cell login, cell programs) = load_data();
+
+    (slice program_entry, int found) = programs.udict_get?(32, program);
+    ifnot (found) {
+        ;; No such program → nothing to do
+        return ();
+    }
+
+    slice saved_inviter = program_entry~load_msg_addr();
+    int   saved_seq_no  = program_entry~load_uint(32);
+    slice saved_invite  = program_entry~load_msg_addr();
+    int   confirmed     = program_entry~load_uint(1);
+
+
+    if (confirmed) {
+        return ();
+    }
+
+    ifnot (equal_slices_bits(sender_address, saved_inviter)) {
+        ;; Sender mismatch → ignore bounce
+        return ();
+    }
+
+    int deleted = programs~udict_delete?(32, program);
+    if (deleted) {
+        store_data(index, collection_address, owner_address, content, login, programs);
+    }
+
+    send_msg(
+        owner_address,
+        0,
+        op::excesses(),
+        query_id,
+        null(),
+        nobounce(),
+        64 + 2        ;; carry all remaining value of inbound message | ignore errors
+    );
+
+    return ();
+}
+
+
+() transfer_bonus(
+    slice owner_address,
+    slice in_msg_body
+) impure inline {
+
+    cell comment = in_msg_body~load_ref();  ;; load attached text/comment cell
+    in_msg_body.end_parse();                ;; ensure message body fully consumed
+
+
+    send_text_msg(
+        owner_address,                      ;; recipient
+        0,                                  ;; send remaining value (0 = all excess)
+        comment,                            ;; comment content
+        64 + 2                              ;; mode: carry remaining value, ignore errors
+    );
+}
+
+
+() withdraw(
+    int   my_balance,
+    int   fwd_fees,
+    slice owner_address,
+    slice sender_address,
+    slice in_msg_body
+) impure inline {
+
+    throw_unless(401, equal_slices_bits(sender_address, owner_address));
+
+    int amount = in_msg_body~load_coins();
+    in_msg_body.end_parse();
+
+    ;; Require at least 0.01 TON (10_000_000 nanotons)
+    throw_unless(708, amount > 10000000);
+
+    int rest_amount = my_balance - min_tons_for_storage();
+    rest_amount -= (amount + fwd_fees);
+
+    ;; Ensure contract has enough balance left
+    throw_unless(402, rest_amount >= 0);
+
+    cell comment = begin_cell()
+        .store_slice("Withdraw")
+    .end_cell();
+
+    send_text_msg(
+        owner_address,   ;; destination address
+        amount,          ;; withdrawal amount
+        comment,         ;; attached text comment
+        1                ;; send_mode: revert on error
+    );
+}
+
+
+() transfer_ownership(
+    int   my_balance,
+    int   index,
+    slice collection_address,
+    slice owner_address,
+    cell  content,
+    slice sender_address,
+    int   query_id,
+    slice in_msg_body,
+    int   fwd_fees,
+    cell  login,
+    cell  programs
+) impure inline {
+
+    throw_unless(401, equal_slices_bits(sender_address, owner_address));
+
+    slice new_owner_address    = in_msg_body~load_msg_addr();
+    force_chain(new_owner_address);
+
+    slice response_destination = in_msg_body~load_msg_addr();
+    in_msg_body~load_int(1);  ;; this NFT doesn't use custom_payload
+    int forward_amount = in_msg_body~load_coins();
+    throw_unless(708, slice_bits(in_msg_body) >= 1);
+    
+    int rest_amount = my_balance - min_tons_for_storage();
+
+    if (forward_amount) {
+        rest_amount -= (forward_amount + fwd_fees);
+    }
+
+    int need_response = response_destination.preload_uint(2) != 0;  ;; if NOT addr_none (00)
+    if (need_response) {
+        rest_amount -= fwd_fees;
+    }
+
+    throw_unless(402, rest_amount >= 0);  ;; base NFT spends fixed gas, no further response check
+
+    if (forward_amount) {
+        send_msg(
+            new_owner_address,
+            forward_amount,
+            op::ownership_assigned(),
+            query_id,
+            begin_cell()
+                .store_slice(owner_address)
+                .store_slice(in_msg_body),
+            nobounce(),
+            1        ;; paying fees, revert on errors
+        );
+    }
+
+    if (need_response) {
+        force_chain(response_destination);
+        send_msg(
+            response_destination,
+            rest_amount,
+            op::excesses(),
+            query_id,
+            null(),
+            nobounce(),
+            1        ;; paying fees, revert on errors
+        );
+    }
+
+    store_data(index, collection_address, new_owner_address, content, login, programs);
+}
+
+
+() choose_inviter(
+    int   index,
+    slice collection_address,
+    slice owner_address,
+    slice sender_address,
+    cell  content,
+    int   query_id,
+    slice in_msg_body,
+    cell  login,
+    cell  programs
+) impure inline {
+
+    throw_unless(401, equal_slices_bits(sender_address, owner_address));
+
+    int   program = in_msg_body~load_uint(32);
+    slice inviter = in_msg_body~load_msg_addr();
+    int   seq_no  = in_msg_body~load_uint(32);
+    slice invite  = in_msg_body~load_msg_addr();
+    in_msg_body.end_parse();
+
+    (slice value, int found) = programs.udict_get?(32, program);
+
+    if (found) {
+        ;; --- Parse existing entry ---
+        slice saved_inviter = value~load_msg_addr();
+        int   saved_seq_no  = value~load_uint(32);
+        slice saved_invite  = value~load_msg_addr();
+        int   confirmed     = value~load_uint(1);
+
+        ;; --- Reject already confirmed ---
+        throw_if(403, confirmed);
+
+        ;; --- Use stored values (prevent duplicates) ---
+        inviter = saved_inviter;
+        seq_no  = saved_seq_no;
+        invite  = saved_invite;
+    }
+
+    builder payload = begin_cell()
+        .store_uint(program, 32)
+        .store_uint(seq_no, 32)
+        .store_slice(invite);
+
+    send_msg(
+        inviter,
+        0,
+        op::add_referal(),
+        query_id,
+        payload,
+        bounce(),
+        64     ;; carry all remaining value of the inbound message | revert on errors
+    );
+
+    ifnot (found) {
+        builder new_value = begin_cell()
+            .store_slice(inviter)
+            .store_uint(seq_no, 32)
+            .store_slice(invite)
+            .store_uint(0, 1);  ;; confirmed = false
+
+        programs~udict_set_builder(32, program, new_value);
+        store_data(index, collection_address, owner_address, content, login, programs);
+    }
+}
+
+
+() report_of_invite(
+    int index,
+    slice collection_address,
+    slice owner_address,
+    slice sender_address,
+    cell content,
+    int query_id,
+    slice in_msg_body,
+    cell login,
+    cell programs
+) impure inline {
+
+    int program = in_msg_body~load_uint(32);
+    int valid   = in_msg_body~load_uint(1);
+    in_msg_body.end_parse();
+
+    (slice entry, int found) = programs.udict_get?(32, program);
+    throw_unless(403, found);
+
+    slice inviter  = entry~load_msg_addr();
+    int seq_no     = entry~load_uint(32);
+    slice invite   = entry~load_msg_addr();
+    int confirmed  = entry~load_uint(1);
+
+    throw_if(403, confirmed);
+    throw_unless(403, equal_slices_bits(sender_address, invite));
+
+    ifnot (valid) {
+        ;; Invalid report → delete program
+        int deleted = programs~udict_delete?(32, program);
+        if (deleted) {
+            store_data(index, collection_address, owner_address, content, login, programs);
+        }
+    } else {
+        ;; Valid report → mark confirmed
+        builder b = begin_cell()
+            .store_slice(inviter)
+            .store_uint(seq_no, 32)
+            .store_slice(invite)
+            .store_uint(1, 1);   ;; confirmed = true
+
+        int replaced = programs~udict_replace_builder?(32, program, b);       
+        if (replaced) {
+            store_data(index, collection_address, owner_address, content, login, programs);
+        }
+    }
+
+    ;; carry all remaining inbound value, ignore errors
+    send_msg(owner_address, 0, op::excesses(), query_id, null(), nobounce(), 64 + 2);
+}
+
+
+() recv_internal(
+    int  my_balance,
+    int  msg_value,
+    cell in_msg_full,
+    slice in_msg_body
+) impure {
+
+    ;; ======================================================
+    ;;  1. Ignore empty messages
+    ;; ======================================================
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    ;; ======================================================
+    ;;  2. Parse message header
+    ;; ======================================================
+    slice cs    = in_msg_full.begin_parse();
+    int   flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    ;; ======================================================
+    ;;  3. Handle bounced messages
+    ;; ======================================================
+    if (flags & 1) {
+        on_bounce(sender_address, in_msg_body);
+        return ();
+    }
+
+    ;; ======================================================
+    ;;  4. Skip unused fields
+    ;; ======================================================
+    cs~load_msg_addr();    ;; skip destination
+    cs~load_coins();       ;; skip value
+    cs~skip_bits(1);       ;; skip extra currency collection
+    cs~load_coins();       ;; skip ihr_fee
+    int fwd_fee = muldiv(cs~load_coins(), 3, 2); ;; we use message fwd_fee for estimation of forward_payload costs
+
+    ;; ======================================================
+    ;;  5. Load contract data
+    ;; ======================================================
+    (int  init?,
+     int  index,
+     slice collection_address,
+     slice owner_address,
+     cell  content,
+     cell  login,
+     cell  programs) = load_data();
+
+    ;; ======================================================
+    ;;  6. Handle first-time initialization
+    ;; ======================================================
+    ifnot (init?) {
+        throw_unless(405, equal_slices_bits(collection_address, sender_address));
+
+        slice from_address = in_msg_body~load_msg_addr();
+        cell  login        = in_msg_body~load_ref();
+        cell  content      = in_msg_body~load_ref();
+
+        store_data(index, collection_address, from_address, content, login, new_dict());
+        return ();
+    }
+
+    ;; ======================================================
+    ;;  7. Parse operation header
+    ;; ======================================================
+    int op       = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    ;; ======================================================
+    ;;  8. Dispatch operations
+    ;; ======================================================
+
+    ;; --- Transfer ownership ---
+    if (op == op::transfer()) {
+        transfer_ownership(
+            my_balance,
+            index,
+            collection_address,
+            owner_address,
+            content,
+            sender_address,
+            query_id,
+            in_msg_body,
+            fwd_fee,
+            login,
+            programs
+        );
+        return ();
+    }
+
+    ;; --- Edit content ---
+    if (op == op::edit_content()) {
+        throw_unless(401, equal_slices_bits(sender_address, owner_address));
+        store_data(index, collection_address, owner_address, in_msg_body~load_ref(), login, programs);
+        return ();
+    }
+
+    ;; --- Choose inviter ---
+    if (op == op::choose_inviter()) {
+        choose_inviter(index, collection_address, owner_address, sender_address, content, query_id, in_msg_body, login, programs);
+        return ();
+    }
+
+    ;; --- Report of invite ---
+    if (op == op::report_of_invite()) {
+        report_of_invite(index, collection_address, owner_address, sender_address, content, query_id, in_msg_body, login, programs);
+        return ();
+    }
+
+    ;; --- Transfer bonus ---
+    if (op == op::bonus()) {
+        transfer_bonus(owner_address, in_msg_body);
+        return ();
+    }
+
+    ;; --- Withdraw ---
+    if (op == op::withdraw()) {
+        withdraw(my_balance, fwd_fee, owner_address, sender_address, in_msg_body);
+        return ();
+    }
+
+    ;; --- Get static data ---
+    if (op == op::get_static_data()) {
+        send_msg(
+            sender_address,
+            0,
+            op::report_static_data(),
+            query_id,
+            begin_cell()
+                .store_uint(index, 256)
+                .store_slice(collection_address),
+            nobounce(),
+            64     ;; carry all remaining inbound value
+        );
+        return ();
+    }
+
+    ;; ======================================================
+    ;;  9. Unknown operation → throw
+    ;; ======================================================
+    throw(0xffff);
+}
+
+
+;;
+;;  GET Methods
+;;
+
+(int, int, slice, slice, cell) get_nft_data() method_id {
+  
+    (int  init?,
+     int  index,
+     slice collection_address,
+     slice owner_address,
+     cell  content,
+     cell  login,
+     cell  programs) = load_data();
+
+    return (init?, index, collection_address, owner_address, content);
+}
+
+
+slice get_editor() method_id {
+   
+    (int  init?,
+     int  index,
+     slice collection_address,
+     slice owner_address,
+     cell  content,
+     cell  login,
+     cell  programs) = load_data();
+
+    return owner_address;
+}
+
+
+slice get_login() method_id {
+
+    (int  init?,
+     int  index,
+     slice collection_address,
+     slice owner_address,
+     cell  content,
+     cell  login,
+     cell  programs) = load_data();
+
+    return login.begin_parse();
+}
+
+
+cell get_programs() method_id {
+    (int  init?,
+     int  index,
+     slice collection_address,
+     slice owner_address,
+     cell  content,
+     cell  login,
+     cell  programs) = load_data();
+
+    return programs;
+}
+
+
+(int, int) get_version() method_id {
+
+    int version  = 1;
+    int revision = 1;
+
+    return (version, revision);
+}
+
+
+(int) get_due_payment() method_id {
+    int due = my_storage_due();
+    return (due);
+}
