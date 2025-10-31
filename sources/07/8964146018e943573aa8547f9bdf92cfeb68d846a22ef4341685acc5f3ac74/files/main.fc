@@ -1,0 +1,282 @@
+;; Trustless Escrow Smart Contract
+;; Single contract handling multiple deals
+
+#include "stdlib.fc";
+
+;; Helper function: Compare two slices for equality
+int equal_slices(slice a, slice b) inline {
+    return equal_slice_bits(a, b) & (a.slice_refs() == b.slice_refs());
+}
+
+;; Constants
+const int MIN_TON_BALANCE = 1000000000; ;; 1 TON minimum
+const int FEE_AMOUNT = 140000000; ;; 0.5 TON fee
+const int STATUS_PENDING = 0;
+const int STATUS_LOCKED = 1;
+const int STATUS_RELEASED = 2;
+const int STATUS_DISPUTED = 3;
+const int STATUS_REFUNDED = 4;
+
+;; Error codes
+const int ERROR_UNAUTHORIZED = 100;
+const int ERROR_INSUFFICIENT_AMOUNT = 101;
+const int ERROR_INVALID_STATUS = 102;
+const int ERROR_DEAL_NOT_FOUND = 103;
+const int ERROR_ALREADY_LOCKED = 104;
+
+;; Load data from storage
+(slice, int, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),  ;; admin_address
+        ds~load_coins(),     ;; fee_amount
+        ds~load_dict()       ;; deals dictionary
+    );
+}
+
+;; Save data to storage
+() save_data(slice admin_address, int fee_amount, cell deals) impure inline {
+    set_data(
+        begin_cell()
+            .store_slice(admin_address)
+            .store_coins(fee_amount)
+            .store_dict(deals)
+        .end_cell()
+    );
+}
+
+;; Main message handler
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    if (flags & 1) {
+        return ();
+    }
+    
+    slice sender_address = cs~load_msg_addr();
+    
+    (slice admin_address, int fee_amount, cell deals) = load_data();
+    
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == 1) { ;; DEPOSIT
+        int deal_id = in_msg_body~load_uint(64);
+        slice buyer_address = in_msg_body~load_msg_addr();
+        
+        throw_unless(ERROR_INSUFFICIENT_AMOUNT, msg_value > (fee_amount + MIN_TON_BALANCE));
+        
+        (slice deal_slice, int found?) = deals.udict_get?(64, deal_id);
+        throw_if(ERROR_ALREADY_LOCKED, found?);
+        
+        cell new_deal = begin_cell()
+            .store_slice(sender_address)
+            .store_slice(buyer_address)
+            .store_coins(msg_value)
+            .store_uint(STATUS_LOCKED, 8)
+            .store_uint(now(), 32)
+        .end_cell();
+        
+        deals~udict_set(64, deal_id, new_deal.begin_parse());
+        save_data(admin_address, fee_amount, deals);
+        
+        return ();
+    }
+    
+    if (op == 2) { ;; RELEASE
+        int deal_id = in_msg_body~load_uint(64);
+        
+        (slice deal_slice, int found?) = deals.udict_get?(64, deal_id);
+        throw_unless(ERROR_DEAL_NOT_FOUND, found?);
+        
+        slice seller = deal_slice~load_msg_addr();
+        slice buyer = deal_slice~load_msg_addr();
+        int amount = deal_slice~load_coins();
+        int status = deal_slice~load_uint(8);
+        int created_at = deal_slice~load_uint(32);
+        
+        int is_seller = equal_slices(sender_address, seller);
+        int is_admin = equal_slices(sender_address, admin_address);
+        throw_unless(ERROR_UNAUTHORIZED, is_seller | is_admin);
+        
+        throw_unless(ERROR_INVALID_STATUS, status == STATUS_LOCKED);
+        
+        int net_amount = amount - fee_amount;
+        
+        var msg_buyer = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(buyer)
+            .store_coins(net_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+        .end_cell();
+        send_raw_message(msg_buyer, 1);
+        
+        var msg_fee = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(admin_address)
+            .store_coins(fee_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+        .end_cell();
+        send_raw_message(msg_fee, 1);
+        
+        cell updated_deal = begin_cell()
+            .store_slice(seller)
+            .store_slice(buyer)
+            .store_coins(amount)
+            .store_uint(STATUS_RELEASED, 8)
+            .store_uint(created_at, 32)
+        .end_cell();
+        
+        deals~udict_set(64, deal_id, updated_deal.begin_parse());
+        save_data(admin_address, fee_amount, deals);
+        
+        return ();
+    }
+    
+    if (op == 3) { ;; DISPUTE
+        int deal_id = in_msg_body~load_uint(64);
+        
+        (slice deal_slice, int found?) = deals.udict_get?(64, deal_id);
+        throw_unless(ERROR_DEAL_NOT_FOUND, found?);
+        
+        slice seller = deal_slice~load_msg_addr();
+        slice buyer = deal_slice~load_msg_addr();
+        int amount = deal_slice~load_coins();
+        int status = deal_slice~load_uint(8);
+        int created_at = deal_slice~load_uint(32);
+        
+        int is_seller = equal_slices(sender_address, seller);
+        int is_buyer = equal_slices(sender_address, buyer);
+        throw_unless(ERROR_UNAUTHORIZED, is_seller | is_buyer);
+        
+        throw_unless(ERROR_INVALID_STATUS, status == STATUS_LOCKED);
+        
+        cell updated_deal = begin_cell()
+            .store_slice(seller)
+            .store_slice(buyer)
+            .store_coins(amount)
+            .store_uint(STATUS_DISPUTED, 8)
+            .store_uint(created_at, 32)
+        .end_cell();
+        
+        deals~udict_set(64, deal_id, updated_deal.begin_parse());
+        save_data(admin_address, fee_amount, deals);
+        
+        return ();
+    }
+    
+    if (op == 4) { ;; ADMIN_RESOLVE
+        throw_unless(ERROR_UNAUTHORIZED, equal_slices(sender_address, admin_address));
+        
+        int deal_id = in_msg_body~load_uint(64);
+        int resolution = in_msg_body~load_uint(8);
+        
+        (slice deal_slice, int found?) = deals.udict_get?(64, deal_id);
+        throw_unless(ERROR_DEAL_NOT_FOUND, found?);
+        
+        slice seller = deal_slice~load_msg_addr();
+        slice buyer = deal_slice~load_msg_addr();
+        int amount = deal_slice~load_coins();
+        int status = deal_slice~load_uint(8);
+        int created_at = deal_slice~load_uint(32);
+        
+        throw_unless(ERROR_INVALID_STATUS, status == STATUS_DISPUTED);
+        
+        int net_amount = amount - fee_amount;
+        
+        ;; Determine recipient based on resolution
+        slice recipient = seller;
+        if (resolution != 0) {
+            recipient = buyer;
+        }
+        
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(recipient)
+            .store_coins(net_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+        .end_cell();
+        send_raw_message(msg, 1);
+        
+        var msg_fee = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(admin_address)
+            .store_coins(fee_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
+        .end_cell();
+        send_raw_message(msg_fee, 1);
+        
+        int new_status = STATUS_RELEASED;
+        if (resolution == 0) {
+            new_status = STATUS_REFUNDED;
+        }
+        
+        cell updated_deal = begin_cell()
+            .store_slice(seller)
+            .store_slice(buyer)
+            .store_coins(amount)
+            .store_uint(new_status, 8)
+            .store_uint(created_at, 32)
+        .end_cell();
+        deals~udict_set(64, deal_id, updated_deal.begin_parse());
+        
+        save_data(admin_address, fee_amount, deals);
+        return ();
+    }
+    
+    if (op == 5) { ;; UPDATE_FEE
+        throw_unless(ERROR_UNAUTHORIZED, equal_slices(sender_address, admin_address));
+        int new_fee = in_msg_body~load_coins();
+        save_data(admin_address, new_fee, deals);
+        return ();
+    }
+    
+    return ();
+}
+
+;; Get methods
+int get_deal_status(int deal_id) method_id {
+    (slice admin_address, int fee_amount, cell deals) = load_data();
+    (slice deal_slice, int found?) = deals.udict_get?(64, deal_id);
+    
+    if (~ found?) {
+        return -1;
+    }
+    
+    deal_slice~skip_bits(267 + 267);
+    deal_slice~load_coins();
+    return deal_slice~load_uint(8);
+}
+
+(slice, slice, int, int, int) get_deal_info(int deal_id) method_id {
+    (slice admin_address, int fee_amount, cell deals) = load_data();
+    (slice deal_slice, int found?) = deals.udict_get?(64, deal_id);
+    
+    throw_unless(ERROR_DEAL_NOT_FOUND, found?);
+    
+    return (
+        deal_slice~load_msg_addr(),
+        deal_slice~load_msg_addr(),
+        deal_slice~load_coins(),
+        deal_slice~load_uint(8),
+        deal_slice~load_uint(32)
+    );
+}
+
+int get_fee_amount() method_id {
+    (slice admin_address, int fee_amount, cell deals) = load_data();
+    return fee_amount;
+}
+
+slice get_admin_address() method_id {
+    (slice admin_address, int fee_amount, cell deals) = load_data();
+    return admin_address;
+}
