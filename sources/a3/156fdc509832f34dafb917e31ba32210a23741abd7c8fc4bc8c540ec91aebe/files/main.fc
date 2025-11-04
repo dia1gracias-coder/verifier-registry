@@ -1,0 +1,801 @@
+#include "stdlib.fc";
+
+;; ====== V50 CONSTANTS ======
+;; Token and blockchain constants
+const int BRIT_DECIMALS = 4;
+const int TON_DECIMALS = 9;
+const int BRIT_UNIT = 10000;
+const int TON_UNIT = 1000000000;
+const int BASECHAIN = 0;
+
+const int ADMIN_WALLET = 0x1e1bbe15bebb67123f32b3ca1db0bc80603ceccb25ec01a7bfe0ccb0dc716bfe;
+const int PRESALE_WALLET = 0xe329c54ab4ab490553db205853bb0ca3f28c43b73f1eb3bad1c325756437c627;
+const int BRIT_MASTER = 0x24c78e91d6aadb249d6bd4776f4f58d287473da1f31a7a339430e248628236a4;
+;; Presale parameters
+const int PRESALE_CAP = 200000000000;
+const int START_PRICE = 100000000;
+const int END_PRICE = 1000000000;
+const int CURVE_SEGMENTS = 100;
+const int SEGMENT_SIZE = 2000000000;
+
+;; Scaling parameters
+const int USERS_PER_SHARD = 20000;
+const int SHARD_SCALE_THRESHOLD = 97;
+const int MAX_SHARDS = 50;
+const int DEPLOY_SHARD_GAS = 280000000;
+const int MIN_GAS_FOR_SCALING = 450000000;
+
+;; Timing
+const int REPORT_TIMEOUT = 300;
+const int MAX_REPORT_DRIFT = 10000000;
+const int MIN_SCALE_INTERVAL = 60;
+
+;; Gas and fees
+const int BASE_FEE_BPS = 80;
+const int MAX_FEE_BPS = 300;
+const int FEE_ADJUST_BPS = 10;
+const int MIN_TON_PURCHASE = 1000000000;
+const int GAS_FOR_CLAIM = 55000000;
+const int GAS_FOR_TRANSFER = 65000000;
+const int GAS_FOR_DEPLOY = 280000000;
+const int GAS_FOR_REPORT = 15000000;
+const int GAS_TARGET = 2000000000;
+const int GAS_CRITICAL = 500000000;
+const int MIN_CONTRACT_BALANCE = 50000000;
+
+;; Message flags
+const int BOUNCEABLE = 0x18;
+const int NON_BOUNCEABLE = 0x10;
+const int SEND_MODE_PAY_FEES_SEPARATELY = 1;
+const int SEND_MODE_IGNORE_ERRORS = 2;
+const int SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE = 64;
+const int SEND_MODE_BOUNCE_ON_ACTION_FAIL = 16;
+
+;; Operation codes
+const int op::transfer = 0xf8a7ea5;
+const int op::transfer_notification = 0x7362d09c;
+const int op::internal_transfer = 0x178d4519;
+const int op::excesses = 0xd53276db;
+const int op::burn = 0x595f07bc;
+
+const int op::buy = 0x42555920;
+const int op::claim_brit = 0x434c414d;
+const int op::admin_pause = 0x50415553;
+const int op::admin_resume = 0x5245534d;
+const int op::sweep_gas = 0x53574550;
+const int op::emergency_stop = 0x454d455247;
+const int op::withdraw_protocol = 0x57495448;
+const int op::shard_report = 0x52455054;
+const int op::validate_shard = 0x56414c44;
+const int op::deploy_shard = 0x4445504c;
+const int op::top_up = 0xd372158c;
+
+;; Error codes
+const int err::invalid_op = 72;
+const int err::wrong_op = 0xffff;
+const int err::not_owner = 73;
+const int err::not_valid_wallet = 74;
+const int err::wrong_workchain = 333;
+const int err::invalid_message = 49;
+const int err::unauthorized = 401;
+const int err::paused = 402;
+const int err::below_min = 403;
+const int err::exceeds_cap = 404;
+const int err::low_gas = 405;
+const int err::shard_full = 406;
+const int err::invalid_shard = 407;
+const int err::stale_report = 408;
+const int err::report_drift = 409;
+const int err::invalid_proof = 410;
+const int err::reentrancy = 411;
+const int err::emergency_stop = 412;
+const int err::invalid_state = 413;
+const int err::overflow = 414;
+const int err::balance_error = 47;
+const int err::not_enough_gas = 48;
+
+;; ====== GLOBAL STATE ======
+global int ctx_is_master;
+global int ctx_paused;
+global int ctx_emergency_stop;
+global int ctx_total_sold;
+global int ctx_gas_reserve;
+global int ctx_protocol_funds;
+global int ctx_dynamic_fee_bps;
+global int ctx_total_users;
+global int ctx_active_shards;
+global int ctx_shard_id;
+global int ctx_deployment_nonce;
+global int ctx_last_report_time;
+global int ctx_reentrancy_guard;
+global cell ctx_shard_registry;
+global cell ctx_purchases;
+global int ctx_local_users;
+global slice ctx_master_address;
+global int ctx_code_hash;
+global int ctx_last_scale_time;
+
+;; ====== PACKED STATE FOR FAST GETTERS ======
+global int ctx_packed_state;  ;; paused(1) | emergency(1) | is_master(1) | fee_bps(16) | total_users(24) | active_shards(16) | local_users(5)
+
+() pack_state() impure inline {
+    ctx_packed_state = (ctx_paused << 63) | 
+                      (ctx_emergency_stop << 62) | 
+                      (ctx_is_master << 61) |
+                      (ctx_dynamic_fee_bps << 45) |
+                      (ctx_total_users << 21) |
+                      (ctx_active_shards << 5) |
+                      (ctx_local_users & 0x1F);
+}
+
+(int, int, int, int, int, int, int) unpack_state(int packed) inline {
+    int paused = (packed >> 63) & 1;
+    int emergency_stop = (packed >> 62) & 1;
+    int is_master = (packed >> 61) & 1;
+    int fee_bps = (packed >> 45) & 0xFFFF;
+    int total_users = (packed >> 21) & 0xFFFFFF;
+    int active_shards = (packed >> 5) & 0xFFFF;
+    int local_users = packed & 0x1F;
+    return (paused, emergency_stop, is_master, fee_bps, total_users, active_shards, local_users);
+}
+
+;; ====== SAFE MATH OPERATIONS ======
+int safe_add(int a, int b) inline {
+    throw_if(err::overflow, (a < 0) | (b < 0));
+    int result = a + b;
+    throw_if(err::overflow, result < a);
+    return result;
+}
+
+int safe_mul(int a, int b) inline {
+    if ((a == 0) | (b == 0)) { return 0; }
+    throw_if(err::overflow, (a < 0) | (b < 0));
+    int result = a * b;
+    throw_if(err::overflow, result / b != a);
+    return result;
+}
+
+int safe_sub(int a, int b) inline {
+    throw_unless(err::below_min, a >= b);
+    return a - b;
+}
+
+int safe_div(int a, int b) inline {
+    throw_unless(err::invalid_state, b > 0);
+    return a / b;
+}
+
+;; ====== SECURITY FUNCTIONS ======
+() lock() impure inline {
+    throw_if(err::reentrancy, ctx_reentrancy_guard);
+    ctx_reentrancy_guard = 1;
+}
+
+() unlock() impure inline {
+    ctx_reentrancy_guard = 0;
+}
+
+() check_emergency() inline {
+    throw_if(err::emergency_stop, ctx_emergency_stop);
+}
+
+() check_paused() inline {
+    throw_if(err::paused, ctx_paused);
+}
+
+int is_admin(slice addr) inline {
+    return slice_hash(addr) == ADMIN_WALLET;
+}
+
+() check_admin(slice addr) impure inline {
+    throw_unless(err::unauthorized, is_admin(addr));
+}
+
+int equal_slices(slice a, slice b) inline {
+    return equal_slice_bits(a, b);
+}
+
+;; ====== MESSAGE UTILITIES ======
+int is_bounced(int flags) inline {
+    return flags & 1;
+}
+
+slice load_msg_addr_from_full(slice cs) inline {
+    cs~skip_bits(4); ;; flags
+    return cs~load_msg_addr();
+}
+
+slice make_address(int workchain, int addr_hash) inline {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(workchain, 8)
+        .store_uint(addr_hash, 256)
+        .end_cell()
+        .begin_parse();
+}
+
+;; ====== DATA MANAGEMENT ======
+() load_data_minimal() impure inline {
+    ;; Fast loading for getters - only essential fields
+    slice ds = get_data().begin_parse();
+    ds~load_ref(); ;; skip code
+    
+    if (ds.slice_empty?()) {
+        ;; Default state for getters
+        ctx_paused = 0;
+        ctx_emergency_stop = 0;
+        ctx_is_master = 1;
+        ctx_total_sold = 0;
+        ctx_gas_reserve = 0;
+        ctx_protocol_funds = 0;
+        ctx_dynamic_fee_bps = BASE_FEE_BPS;
+        ctx_total_users = 0;
+        ctx_active_shards = 0;
+        ctx_shard_id = 0;
+        ctx_local_users = 0;
+        pack_state();
+        return ();
+    }
+    
+    ;; Load minimal state
+    ctx_paused = ds~load_uint(1);
+    ctx_emergency_stop = ds~load_uint(1);
+    ctx_is_master = ds~load_uint(1);
+    ctx_total_sold = ds~load_coins();
+    ctx_gas_reserve = ds~load_coins();
+    ctx_protocol_funds = ds~load_coins();
+    ctx_dynamic_fee_bps = ds~load_uint(16);
+    ctx_total_users = ds~load_uint(32);
+    ctx_active_shards = ds~load_uint(16);
+    ctx_shard_id = ds~load_uint(16);
+    
+    ;; Skip non-essential fields for getters
+    ds~skip_bits(64 + 32 + 1); ;; deployment_nonce, last_report_time, reentrancy_guard
+    ds~load_dict(); ;; shard_registry
+    ds~load_dict(); ;; purchases
+    
+    ctx_local_users = ds~load_uint(32);
+    pack_state();
+}
+
+() load_data_full() impure inline {
+    ;; Full loading for transactions
+    slice ds = get_data().begin_parse();
+    cell code = ds~load_ref();
+    
+    if (ds.slice_empty?()) {
+        ;; Initialize contract state
+        ctx_is_master = 1;
+        ctx_paused = 0;
+        ctx_emergency_stop = 0;
+        ctx_total_sold = 0;
+        ctx_gas_reserve = GAS_TARGET;
+        ctx_protocol_funds = 0;
+        ctx_dynamic_fee_bps = BASE_FEE_BPS;
+        ctx_total_users = 0;
+        ctx_active_shards = 0;
+        ctx_shard_id = 0;
+        ctx_deployment_nonce = 0;
+        ctx_last_report_time = 0;
+        ctx_reentrancy_guard = 0;
+        ctx_shard_registry = new_dict();
+        ctx_purchases = new_dict();
+        ctx_local_users = 0;
+        ctx_master_address = my_address();
+        ctx_code_hash = cell_hash(code);
+        ctx_last_scale_time = 0;
+        pack_state();
+        return ();
+    }
+    
+    ;; Load full state
+    ctx_is_master = ds~load_uint(1);
+    ctx_paused = ds~load_uint(1);
+    ctx_emergency_stop = ds~load_uint(1);
+    ctx_total_sold = ds~load_coins();
+    ctx_gas_reserve = ds~load_coins();
+    ctx_protocol_funds = ds~load_coins();
+    ctx_dynamic_fee_bps = ds~load_uint(16);
+    ctx_total_users = ds~load_uint(32);
+    ctx_active_shards = ds~load_uint(16);
+    ctx_shard_id = ds~load_uint(16);
+    ctx_deployment_nonce = ds~load_uint(64);
+    ctx_last_report_time = ds~load_uint(32);
+    ctx_reentrancy_guard = ds~load_uint(1);
+    ctx_shard_registry = ds~load_dict();
+    ctx_purchases = ds~load_dict();
+    ctx_local_users = ds~load_uint(32);
+    ctx_master_address = ds~load_msg_addr();
+    ctx_code_hash = ds~load_uint(256);
+    ctx_last_scale_time = ds~load_uint(32);
+    pack_state();
+}
+
+() save_data() impure inline {
+    slice data_slice = get_data().begin_parse();
+    cell code = data_slice~load_ref();
+    
+    set_data(begin_cell()
+        .store_ref(code)
+        .store_uint(ctx_is_master, 1)
+        .store_uint(ctx_paused, 1)
+        .store_uint(ctx_emergency_stop, 1)
+        .store_coins(ctx_total_sold)
+        .store_coins(ctx_gas_reserve)
+        .store_coins(ctx_protocol_funds)
+        .store_uint(ctx_dynamic_fee_bps, 16)
+        .store_uint(ctx_total_users, 32)
+        .store_uint(ctx_active_shards, 16)
+        .store_uint(ctx_shard_id, 16)
+        .store_uint(ctx_deployment_nonce, 64)
+        .store_uint(ctx_last_report_time, 32)
+        .store_uint(ctx_reentrancy_guard, 1)
+        .store_dict(ctx_shard_registry)
+        .store_dict(ctx_purchases)
+        .store_uint(ctx_local_users, 32)
+        .store_slice(ctx_master_address)
+        .store_uint(ctx_code_hash, 256)
+        .store_uint(ctx_last_scale_time, 32)
+        .end_cell());
+}
+
+;; ====== PRICING ENGINE ======
+int get_current_segment() inline {
+    if (ctx_total_sold >= PRESALE_CAP) { return CURVE_SEGMENTS - 1; }
+    int segment = ctx_total_sold / SEGMENT_SIZE;
+    return min(segment, CURVE_SEGMENTS - 1);
+}
+
+int calculate_price() inline {
+    int segment = get_current_segment();
+    int price_range = END_PRICE - START_PRICE;
+    int segment_base = START_PRICE + safe_div(safe_mul(segment, price_range), CURVE_SEGMENTS);
+    
+    if (segment >= CURVE_SEGMENTS - 1) { return END_PRICE; }
+    
+    int segment_next = START_PRICE + safe_div(safe_mul(segment + 1, price_range), CURVE_SEGMENTS);
+    int within_segment = ctx_total_sold % SEGMENT_SIZE;
+    int progress = safe_div(safe_mul(within_segment, 100), SEGMENT_SIZE);
+    int price_delta = safe_div(safe_mul(segment_next - segment_base, progress), 100);
+    return segment_base + price_delta;
+}
+
+int calculate_brit_for_ton(int ton_amount) inline {
+    int price = calculate_price();
+    throw_unless(err::invalid_state, price > 0);
+    int numerator = safe_mul(ton_amount, BRIT_UNIT);
+    return safe_div(numerator, price);
+}
+
+;; ====== FEE MANAGEMENT ======
+int adjust_fee_rate() inline {
+    int current = ctx_dynamic_fee_bps;
+    if (ctx_gas_reserve < GAS_CRITICAL) {
+        int new_fee = current + safe_mul(FEE_ADJUST_BPS, 3);
+        return min(new_fee, MAX_FEE_BPS);
+    }
+    if (ctx_gas_reserve < (GAS_TARGET / 2)) {
+        int new_fee = current + FEE_ADJUST_BPS;
+        return min(new_fee, MAX_FEE_BPS);
+    }
+    if (ctx_gas_reserve > (GAS_TARGET * 3)) {
+        if (current > BASE_FEE_BPS) {
+            return max(current - FEE_ADJUST_BPS, BASE_FEE_BPS);
+        }
+    }
+    return current;
+}
+
+(int, int, int) split_fees(int total_fees) inline {
+    int gas_needed = 0;
+    if (ctx_gas_reserve < GAS_TARGET) {
+        gas_needed = GAS_TARGET - ctx_gas_reserve;
+    }
+    int to_gas = min(total_fees, gas_needed);
+    int remaining = total_fees - to_gas;
+    int to_protocol = safe_div(safe_mul(remaining, 40), 100);
+    int to_operations = remaining - to_protocol;
+    return (to_gas, to_protocol, to_operations);
+}
+
+;; ====== SHARD MANAGEMENT ======
+int validate_shard_identity(slice sender_addr, int claimed_shard_id) inline {
+    if (ctx_is_master == 0) { return 0; }
+    (slice registered_data, int found) = ctx_shard_registry.udict_get?(16, claimed_shard_id);
+    if (~ found) { return 0; }
+    slice registered_addr = registered_data~load_msg_addr();
+    int is_active = registered_data~load_uint(1);
+    int registered_code_hash = registered_data~load_uint(256);
+    return equal_slices(sender_addr, registered_addr) & is_active & (registered_code_hash == ctx_code_hash);
+}
+
+int should_scale_now() inline {
+    if (ctx_is_master == 0) { return 0; }
+    if (ctx_active_shards >= MAX_SHARDS) { return 0; }
+    if (ctx_gas_reserve < MIN_GAS_FOR_SCALING) { return 0; }
+    if ((now() - ctx_last_scale_time) < MIN_SCALE_INTERVAL) { return 0; }
+    int divisor = max(ctx_active_shards, 1);
+    int avg_users = safe_div(ctx_total_users, divisor);
+    int threshold = safe_div(safe_mul(USERS_PER_SHARD, SHARD_SCALE_THRESHOLD), 100);
+    return (avg_users >= threshold) | (ctx_active_shards == 0);
+}
+
+() deploy_validated_shard() impure {
+    throw_unless(err::low_gas, ctx_gas_reserve >= DEPLOY_SHARD_GAS);
+    int new_shard_id = safe_add(ctx_active_shards, 1);
+    ctx_deployment_nonce = safe_add(ctx_deployment_nonce, 1);
+    
+    cell shard_data = begin_cell()
+        .store_uint(0, 1)  ;; is_master
+        .store_uint(ctx_paused, 1)
+        .store_uint(ctx_emergency_stop, 1)
+        .store_coins(0)  ;; total_sold
+        .store_coins(DEPLOY_SHARD_GAS / 2)  ;; gas_reserve
+        .store_coins(0)  ;; protocol_funds
+        .store_uint(ctx_dynamic_fee_bps, 16)
+        .store_uint(0, 32)  ;; total_users
+        .store_uint(ctx_active_shards, 16)  ;; active_shards
+        .store_uint(new_shard_id, 16)  ;; shard_id
+        .store_uint(0, 64)  ;; deployment_nonce
+        .store_uint(0, 32)  ;; last_report_time
+        .store_uint(0, 1)  ;; reentrancy_guard
+        .store_dict(new_dict())  ;; shard_registry
+        .store_dict(new_dict())  ;; purchases
+        .store_uint(0, 32)  ;; local_users
+        .store_slice(my_address())  ;; master_address
+        .store_uint(ctx_code_hash, 256)  ;; code_hash
+        .store_uint(0, 32)  ;; last_scale_time
+        .end_cell();
+    
+    slice data_slice = get_data().begin_parse();
+    cell code = data_slice~load_ref();
+    
+    cell state_init = begin_cell()
+        .store_uint(0, 2)
+        .store_dict(code)
+        .store_dict(shard_data)
+        .store_uint(0, 1)
+        .end_cell();
+    
+    int addr_hash = cell_hash(state_init);
+    slice shard_addr = make_address(BASECHAIN, addr_hash);
+    
+    cell body = begin_cell()
+        .store_uint(op::validate_shard, 32)
+        .store_uint(now(), 64)
+        .store_uint(new_shard_id, 16)
+        .end_cell();
+    
+    var msg = begin_cell()
+        .store_uint(BOUNCEABLE, 6)
+        .store_slice(shard_addr)
+        .store_coins(DEPLOY_SHARD_GAS)
+        .store_uint(3, 1 + 4 + 4 + 64 + 32 + 1 + 1)  ;; stateinit + body
+        .store_ref(state_init)
+        .store_ref(body)
+        .end_cell();
+    
+    send_raw_message(msg, SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+    
+    builder shard_info = begin_cell()
+        .store_slice(shard_addr)
+        .store_uint(1, 1)  ;; active
+        .store_uint(ctx_code_hash, 256)
+        .store_uint(ctx_deployment_nonce, 64);
+    ctx_shard_registry~udict_set_builder(16, new_shard_id, shard_info);
+    
+    ctx_active_shards = new_shard_id;
+    ctx_gas_reserve = safe_sub(ctx_gas_reserve, DEPLOY_SHARD_GAS);
+    ctx_last_scale_time = now();
+}
+
+;; ====== USER MANAGEMENT ======
+int get_purchase(slice addr) inline {
+    int addr_hash = slice_hash(addr);
+    (slice val, int found) = ctx_purchases.udict_get?(256, addr_hash);
+    return found ? val~load_coins() : 0;
+}
+
+() set_purchase(slice addr, int amt) impure inline {
+    int addr_hash = slice_hash(addr);
+    ctx_purchases~udict_set_builder(256, addr_hash, begin_cell().store_coins(amt));
+}
+
+;; ====== MESSAGE SENDING ======
+() send_jetton(slice recipient, int amount, int forward_ton) impure inline {
+    var body = begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(0, 64)
+        .store_coins(amount)
+        .store_slice(recipient)
+        .store_slice(recipient)
+        .store_uint(0, 1)
+        .store_coins(forward_ton)
+        .store_uint(0, 1)
+        .end_cell();
+    
+    var msg = begin_cell()
+        .store_uint(BOUNCEABLE, 6)
+        .store_uint(BRIT_MASTER, 256)
+        .store_coins(forward_ton + 50000000)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body)
+        .end_cell();
+    
+    send_raw_message(msg, SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+() send_tons(slice addr, int amount) impure inline {
+    var msg = begin_cell()
+        .store_uint(NON_BOUNCEABLE, 6)
+        .store_slice(addr)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+    
+    send_raw_message(msg, SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+() report_to_master(int local_sold, int local_users) impure {
+    if (ctx_is_master) { return (); }
+    
+    var body = begin_cell()
+        .store_uint(op::shard_report, 32)
+        .store_uint(now(), 64)
+        .store_uint(ctx_shard_id, 16)
+        .store_coins(local_sold)
+        .store_uint(local_users, 32)
+        .store_uint(ctx_code_hash, 256)
+        .end_cell();
+    
+    var msg = begin_cell()
+        .store_uint(BOUNCEABLE, 6)
+        .store_slice(ctx_master_address)
+        .store_coins(GAS_FOR_REPORT)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body)
+        .end_cell();
+    
+    send_raw_message(msg, SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+;; ====== BOUNCE HANDLER ======
+() on_bounce(slice in_msg_body) impure inline {
+    in_msg_body~skip_bits(32); ;; skip 0xffffffff
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == op::internal_transfer) {
+        in_msg_body~skip_bits(64); ;; query_id
+        int jetton_amount = in_msg_body~load_coins();
+        ctx_total_sold = safe_sub(ctx_total_sold, jetton_amount);
+        return ();
+    }
+}
+
+;; ====== MAIN MESSAGE HANDLER ======
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { return (); }
+    if (in_msg_body.slice_bits() < 32) { return (); }
+    
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    if (is_bounced(flags)) {
+        on_bounce(in_msg_body);
+        return ();
+    }
+    
+    slice sender = cs~load_msg_addr();
+    load_data_full();
+    
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    
+    if (op == op::buy) {
+        lock();
+        check_emergency();
+        check_paused();
+        throw_unless(err::below_min, msg_value >= MIN_TON_PURCHASE);
+        throw_unless(err::shard_full, ctx_local_users < USERS_PER_SHARD);
+        throw_unless(err::low_gas, ctx_gas_reserve >= GAS_FOR_CLAIM);
+        
+        int existing = get_purchase(sender);
+        ctx_dynamic_fee_bps = adjust_fee_rate();
+        int total_fee = safe_div(safe_mul(msg_value, ctx_dynamic_fee_bps), 10000);
+        int net_ton = safe_sub(msg_value, total_fee);
+        int required_reserve = GAS_FOR_CLAIM + MIN_CONTRACT_BALANCE;
+        throw_unless(err::low_gas, net_ton > required_reserve);
+        int usable_ton = safe_sub(net_ton, required_reserve);
+        int brit_amount = calculate_brit_for_ton(usable_ton);
+        int new_total = safe_add(ctx_total_sold, brit_amount);
+        throw_unless(err::exceeds_cap, new_total <= PRESALE_CAP);
+        
+        (int to_gas, int to_protocol, int to_ops) = split_fees(total_fee);
+        ctx_gas_reserve = safe_add(ctx_gas_reserve, to_gas);
+        ctx_protocol_funds = safe_add(ctx_protocol_funds, to_protocol);
+        ctx_total_sold = new_total;
+        
+        if (existing == 0) {
+            ctx_local_users = safe_add(ctx_local_users, 1);
+            ctx_total_users = safe_add(ctx_total_users, 1);
+        }
+        
+        set_purchase(sender, safe_add(existing, brit_amount));
+        
+        if (usable_ton > 0) {
+            slice presale_addr = make_address(BASECHAIN, PRESALE_WALLET);
+            send_tons(presale_addr, usable_ton);
+        }
+        
+        send_jetton(sender, brit_amount, GAS_FOR_CLAIM);
+        ctx_gas_reserve = safe_sub(ctx_gas_reserve, GAS_FOR_CLAIM);
+        
+        if (ctx_is_master == 0) {
+            report_to_master(brit_amount, ctx_local_users);
+        }
+        
+        if (ctx_is_master & should_scale_now()) {
+            deploy_validated_shard();
+        }
+        
+        unlock();
+        save_data();
+        return ();
+    }
+    
+    if (op == op::claim_brit) {
+        lock();
+        check_emergency();
+        check_paused();
+        int user_balance = get_purchase(sender);
+        throw_unless(err::below_min, user_balance > 0);
+        throw_unless(err::low_gas, ctx_gas_reserve >= GAS_FOR_CLAIM);
+        
+        set_purchase(sender, 0);
+        send_jetton(sender, user_balance, GAS_FOR_CLAIM);
+        ctx_gas_reserve = safe_sub(ctx_gas_reserve, GAS_FOR_CLAIM);
+        
+        unlock();
+        save_data();
+        return ();
+    }
+    
+    if (op == op::shard_report) {
+        throw_unless(err::unauthorized, ctx_is_master);
+        int report_time = query_id;
+        int shard_id = in_msg_body~load_uint(16);
+        int shard_sold = in_msg_body~load_coins();
+        int shard_users = in_msg_body~load_uint(32);
+        int shard_code_hash = in_msg_body~load_uint(256);
+        
+        throw_unless(err::invalid_shard, validate_shard_identity(sender, shard_id));
+        throw_unless(err::invalid_proof, shard_code_hash == ctx_code_hash);
+        
+        int time_diff = now() - report_time;
+        throw_unless(err::stale_report, (time_diff >= 0) & (time_diff < REPORT_TIMEOUT));
+        throw_unless(err::report_drift, shard_sold <= MAX_REPORT_DRIFT);
+        
+        ctx_last_report_time = now();
+        save_data();
+        return ();
+    }
+    
+    if (op == op::validate_shard) {
+        if (ctx_is_master == 0) {
+            int expected_shard_id = in_msg_body~load_uint(16);
+            throw_unless(err::invalid_shard, ctx_shard_id == expected_shard_id);
+        }
+        save_data();
+        return ();
+    }
+    
+    if (op == op::top_up) {
+        return (); ;; accept TON without processing
+    }
+    
+    check_admin(sender);
+    
+    if (op == op::admin_pause) {
+        ctx_paused = 1;
+        save_data();
+        return ();
+    }
+    
+    if (op == op::admin_resume) {
+        ctx_paused = 0;
+        save_data();
+        return ();
+    }
+    
+    if (op == op::emergency_stop) {
+        ctx_emergency_stop = 1;
+        ctx_paused = 1;
+        save_data();
+        return ();
+    }
+    
+    if (op == op::sweep_gas) {
+        lock();
+        int sweep_amount = in_msg_body~load_coins();
+        throw_unless(err::below_min, sweep_amount > 0);
+        throw_unless(err::low_gas, ctx_gas_reserve > GAS_TARGET);
+        int excess_gas = safe_sub(ctx_gas_reserve, GAS_TARGET);
+        throw_unless(err::low_gas, excess_gas >= sweep_amount);
+        ctx_gas_reserve = safe_sub(ctx_gas_reserve, sweep_amount);
+        send_tons(sender, sweep_amount);
+        unlock();
+        save_data();
+        return ();
+    }
+    
+    if (op == op::withdraw_protocol) {
+        lock();
+        int withdraw_amount = in_msg_body~load_coins();
+        throw_unless(err::below_min, withdraw_amount > 0);
+        throw_unless(err::below_min, ctx_protocol_funds >= withdraw_amount);
+        ctx_protocol_funds = safe_sub(ctx_protocol_funds, withdraw_amount);
+        send_tons(sender, withdraw_amount);
+        unlock();
+        save_data();
+        return ();
+    }
+    
+    throw(err::wrong_op);
+}
+
+;; ====== GETTER METHODS ======
+int get_total_sold() method_id {
+    load_data_minimal();
+    return ctx_total_sold;
+}
+
+int get_current_price() method_id {
+    load_data_minimal();
+    return calculate_price();
+}
+
+int get_user_purchase(slice user_addr) method_id {
+    load_data_minimal();
+    return get_purchase(user_addr);
+}
+
+int get_protocol_funds() method_id {
+    load_data_minimal();
+    return ctx_protocol_funds;
+}
+
+int get_gas_reserve() method_id {
+    load_data_minimal();
+    return ctx_gas_reserve;
+}
+
+(int, int, int, int, int) get_presale_stats() method_id {
+    load_data_minimal();
+    return (ctx_total_sold, ctx_total_users, ctx_active_shards, calculate_price(), ctx_dynamic_fee_bps);
+}
+
+int get_brit_for_ton(int ton_amount) method_id {
+    load_data_minimal();
+    return calculate_brit_for_ton(ton_amount);
+}
+
+(int, int, int, int, int, int, int) get_packed_state() method_id {
+    load_data_minimal();
+    return unpack_state(ctx_packed_state);
+}
+
+(int, int, int, int, int, int, int, int) get_contract_state() method_id {
+    load_data_minimal();
+    return (ctx_is_master, ctx_paused, ctx_total_sold, ctx_gas_reserve, 
+            ctx_dynamic_fee_bps, ctx_total_users, ctx_active_shards, ctx_local_users);
+}
+
+int get_emergency_status() method_id {
+    load_data_minimal();
+    return ctx_emergency_stop;
+}
+
+int get_code_hash() method_id {
+    load_data_minimal();
+    return ctx_code_hash;
+}
