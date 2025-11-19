@@ -1,0 +1,378 @@
+;; SPDX-License-Identifier: MIT
+;; TON IAP Purchase Smart Contract
+;; Equivalent to IAPPurchase.sol for EVM chains
+
+#include "imports/stdlib.fc";
+
+;; Storage structure
+;; owner_address:MsgAddressInt signature_manager:MsgAddressInt signature_manager_public_key:uint256 purchased_ids:dict
+global slice owner_address;
+global slice signature_manager;
+global int signature_manager_public_key;
+global cell purchased_ids; ;; Dictionary of purchased purchase IDs
+
+;; Error codes
+const int error::invalid_signature = 100;
+const int error::deadline_expired = 101;
+const int error::invalid_buyer = 102;
+const int error::purchase_id_exists = 103;
+const int error::insufficient_payment = 104;
+const int error::unauthorized = 105;
+const int error::invalid_jetton = 106;
+const int error::transfer_failed = 107;
+
+;; Op codes
+const int op::purchase_with_signature = 0x12345678;
+const int op::withdraw_funds = 0x87654321;
+const int op::withdraw_jettons = 0x11223344;
+const int op::set_owner = 0x55667788;
+const int op::jetton_transfer = 0xf8a7ea5;
+const int op::jetton_notification = 0x7362d09c;
+
+
+;; Purchase data structure (matches Solidity struct)
+;; buyer:MsgAddressInt payment_token:MsgAddressInt quantity:uint64
+;; total_price:Coins purchase_id:uint256 deadline:uint32 purchase_contract:MsgAddressInt
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    owner_address = ds~load_msg_addr();
+    signature_manager = ds~load_msg_addr();
+    signature_manager_public_key = ds~load_uint(256);
+    purchased_ids = ds~load_dict();
+}
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_slice(owner_address)
+            .store_slice(signature_manager)
+            .store_uint(signature_manager_public_key, 256)
+            .store_dict(purchased_ids)
+        .end_cell()
+    );
+}
+
+;; Initialize contract
+() init(slice owner_addr, slice sig_manager, int sig_manager_pubkey) impure {
+    owner_address = owner_addr;
+    signature_manager = sig_manager;
+    signature_manager_public_key = sig_manager_pubkey;
+    purchased_ids = new_dict();
+    save_data();
+}
+
+;; Verify signature on purchase data
+int verify_purchase_signature(
+    slice buyer,
+    slice payment_token,
+    int quantity,
+    int total_price,
+    int purchase_id,
+    int deadline,
+    slice purchase_contract,
+    slice signature
+) {
+    ;; Create hash of purchase data (similar to EIP712 in Solidity)
+    cell purchase_data = begin_cell()
+        .store_slice(buyer)
+        .store_slice(payment_token)
+        .store_uint(quantity, 64)
+        .store_coins(total_price)
+        .store_uint(purchase_id, 256)
+        .store_uint(deadline, 32)
+        .store_ref(
+            begin_cell()
+                .store_slice(purchase_contract)
+            .end_cell()
+        )
+    .end_cell();
+
+    int data_hash = cell_hash(purchase_data);
+
+    ;; Verify signature using check_signature
+    return check_signature(data_hash, signature, signature_manager_public_key);
+}
+
+;; Retrieve stored purchase amount (0 if not found)
+int load_purchase_amount(int purchase_id) {
+    (slice value, int found) = purchased_ids.udict_get?(256, purchase_id);
+    if (~ found) {
+        return 0;
+    }
+    return value~load_coins();
+}
+
+;; Record purchase amount for a purchase ID
+() record_purchase(int purchase_id, int amount) impure {
+    purchased_ids~udict_set(
+        256,
+        purchase_id,
+        begin_cell()
+            .store_coins(amount)
+        .end_cell()
+        .begin_parse()
+    );
+}
+
+;; Handle TON (native) payment purchase
+() handle_ton_purchase(
+    slice buyer,
+    int quantity,
+    int total_price,
+    int purchase_id,
+    int deadline,
+    slice signature,
+    int msg_value,
+    slice sender_address
+) impure {
+
+    ;; Verify sender is buyer
+    throw_unless(error::invalid_buyer, equal_slices(buyer, sender_address));
+
+    ;; Verify deadline
+    throw_if(error::deadline_expired, deadline <= now());
+
+    ;; Verify purchase ID not already used
+    throw_if(error::purchase_id_exists, load_purchase_amount(purchase_id) > 0);
+    
+    ;; Verify sufficient payment - value must cover the stated price
+    throw_if(error::insufficient_payment, msg_value < total_price);
+    
+    ;; Verify signature
+    int sig_valid = verify_purchase_signature(
+        buyer,
+        begin_cell().store_uint(0, 2).end_cell().begin_parse(), ;; addr_none for TON native payment
+        quantity,
+        total_price,
+        purchase_id,
+        deadline,
+        my_address(),
+        signature
+    );
+
+    throw_unless(error::invalid_signature, sig_valid);
+
+    ;; Mark purchase as completed
+    record_purchase(purchase_id, total_price);
+
+}
+
+;; Handle jetton (USDT) payment purchase
+() handle_jetton_purchase(
+    slice buyer,
+    slice jetton_master,
+    int quantity,
+    int total_price,
+    int purchase_id,
+    int deadline,
+    slice signature,
+    slice jetton_sender,
+    int jetton_amount
+) impure {
+    ;; Verify deadline - throw to bounce jetton back
+    throw_if(error::deadline_expired, deadline <= now());
+
+    ;; Verify purchase ID not already used - throw to bounce jetton back
+    throw_if(error::purchase_id_exists, load_purchase_amount(purchase_id) > 0);
+
+    ;; Verify sufficient jetton payment - throw to bounce jetton back
+    throw_if(error::insufficient_payment, jetton_amount < total_price);
+
+    ;; Verify signature - throw to bounce jetton back
+    int sig_valid = verify_purchase_signature(
+        buyer,
+        jetton_master,
+        quantity,
+        total_price,
+        purchase_id,
+        deadline,
+        my_address(),
+        signature
+    );
+    throw_unless(error::invalid_signature, sig_valid);
+
+    ;; Mark purchase as completed
+    record_purchase(purchase_id, total_price);
+
+}
+
+;; Main message receiver
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    load_data();
+
+    ;; Handle bounced messages
+    if (flags & 1) {
+        return (); ;; ignore bounced messages
+    }
+
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::purchase_with_signature) {
+        ;; Purchase with signature (TON payment)
+        slice buyer = in_msg_body~load_msg_addr();
+        int quantity = in_msg_body~load_uint(64);
+        int total_price = in_msg_body~load_coins();
+        int purchase_id = in_msg_body~load_uint(256);
+        int deadline = in_msg_body~load_uint(32);
+        cell signature_cell = in_msg_body~load_ref();
+        slice signature = signature_cell.begin_parse();
+
+        handle_ton_purchase(
+            buyer,
+            quantity,
+            total_price,
+            purchase_id,
+            deadline,
+            signature,
+            msg_value,
+            sender_address
+        );
+
+        save_data();
+        return ();
+    }
+
+    if (op == op::jetton_notification) {
+        ;; Jetton transfer notification
+        int jetton_amount = in_msg_body~load_coins();
+        slice jetton_sender = in_msg_body~load_msg_addr();
+
+        int has_forward_payload = in_msg_body~load_uint(1);
+        slice forward_payload = begin_cell().end_cell().begin_parse();
+        if (has_forward_payload) {
+            cell forward_payload_cell = in_msg_body~load_ref();
+            forward_payload = forward_payload_cell.begin_parse();
+        }
+
+        ;; Parse purchase data from forward payload - throw if invalid format
+        slice buyer = forward_payload~load_msg_addr();
+        slice jetton_master = forward_payload~load_msg_addr();
+        int quantity = forward_payload~load_uint(64);
+        int total_price = forward_payload~load_coins();
+        int purchase_id = forward_payload~load_uint(256);
+        int deadline = forward_payload~load_uint(32);
+        cell signature_cell = forward_payload~load_ref();
+        slice signature = signature_cell.begin_parse();
+
+        handle_jetton_purchase(
+            buyer,
+            jetton_master,
+            quantity,
+            total_price,
+            purchase_id,
+            deadline,
+            signature,
+            jetton_sender,
+            jetton_amount
+        );
+
+        save_data();
+        return ();
+    }
+
+    if (op == op::withdraw_funds) {
+        ;; Only owner can withdraw
+        throw_unless(error::unauthorized, equal_slices(sender_address, owner_address));
+
+        ;; Withdraw TON
+        int balance = get_balance().pair_first();
+        if (balance > 10000000) {
+            send_raw_message(
+                begin_cell()
+                    .store_uint(0x10, 6) ;; nobounce
+                    .store_slice(owner_address)
+                    .store_coins(balance - 10000000) ;; Keep some for storage
+                    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .end_cell(),
+                1 ;; IGNORE_ERRORS
+            );
+        }
+        return ();
+    }
+
+    if (op == op::set_owner) {
+        ;; Only owner can update owner address
+        throw_unless(error::unauthorized, equal_slices(sender_address, owner_address));
+
+        slice new_owner = in_msg_body~load_msg_addr();
+        owner_address = new_owner;
+        save_data();
+        return ();
+    }
+
+    if (op == op::withdraw_jettons) {
+        ;; Only owner can withdraw jettons
+        throw_unless(error::unauthorized, equal_slices(sender_address, owner_address));
+
+        ;; Parse jetton wallet address and withdrawal amount from message body
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+        int withdrawal_amount = in_msg_body~load_coins();
+
+        ;; Determine TON value to attach (keep small reserve for storage and bounce handling)
+        int jetton_transfer_value = msg_value - 10000000; ;; reserve 0.01 TON
+        throw_if(error::transfer_failed, jetton_transfer_value <= 0);
+
+        ;; Send jetton transfer message to the jetton wallet
+        ;; This transfers jettons from our contract to the owner
+        var msg_body = begin_cell()
+            .store_uint(op::jetton_transfer, 32)   ;; op code for transfer
+            .store_uint(0, 64)    ;; query_id
+            .store_coins(withdrawal_amount)         ;; jetton amount
+            .store_slice(owner_address)      ;; destination address
+            .store_slice(owner_address) ;; response_destination
+            .store_uint(0, 1)     ;; no custom_payload
+            .store_coins(1) ;; forward TON amount
+            .store_uint(1, 1)      ;; forward payload present
+            .store_ref(begin_cell().end_cell())  ;; empty payload by reference
+        .end_cell();
+
+        var msg = begin_cell()
+            .store_uint(0x18, 6)               ;; msg_flags: bounce, int_msg, etc.
+            .store_slice(jetton_wallet_address) ;; to: jetton wallet
+            .store_coins(jetton_transfer_value)                     ;; value: TON attached (for fees)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1) ;; all zeros for rest of hdr
+            .store_uint(1, 1)  ;; has_message_body
+            .store_ref(msg_body)
+        .end_cell();
+
+        send_raw_message(msg, 1);
+        
+        return ();
+    }
+}
+
+;; Get methods (read-only functions)
+
+int get_is_purchase_id_used(int purchase_id) method_id {
+    load_data();
+    return load_purchase_amount(purchase_id);
+}
+
+slice get_owner() method_id {
+    load_data();
+    return owner_address;
+}
+
+slice get_signature_manager() method_id {
+    load_data();
+    return signature_manager;
+}
+
+int get_signature_manager_public_key() method_id {
+    load_data();
+    return signature_manager_public_key;
+}
+
+int get_current_time() method_id {
+    return now();
+}
