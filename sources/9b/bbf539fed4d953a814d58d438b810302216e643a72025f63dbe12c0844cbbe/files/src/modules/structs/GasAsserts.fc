@@ -1,0 +1,56 @@
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/utils.fc";
+
+const int GasAsserts::NAME = "GasAssert"u;
+
+const int GasAsserts::sendOFTGas = 0;
+const int GasAsserts::sendOFTGasReceiveGas = 1;           ;; sendOFTGas.receiveGas
+const int GasAsserts::lzReceiveExecuteCallbackGas = 2;
+const int GasAsserts::mintGas = 3;
+
+cell GasAsserts::New(
+    int sendOFTGas,
+    int sendOFTGasReceiveGas,
+    int lzReceiveExecuteCallbackGas,
+    int mintGas
+) inline method_id {
+    return cl::declare(
+        GasAsserts::NAME,
+        unsafeTuple([
+            [cl::t::uint32, sendOFTGas],                   ;; GasAsserts::sendOFTGas
+            [cl::t::uint32, sendOFTGasReceiveGas],         ;; GasAsserts::sendOFTGasReceiveGas
+            [cl::t::uint32, lzReceiveExecuteCallbackGas],  ;; GasAsserts::lzReceiveExecuteCallbackGas
+            [cl::t::uint32, mintGas]                       ;; GasAsserts::mintGas
+        ])
+    );
+}
+
+const int GasAsserts::_sendOFTGasOffset = _HEADER_WIDTH;
+const int GasAsserts::_sendOFTGasReceiveGasOffset = GasAsserts::_sendOFTGasOffset + 32;
+const int GasAsserts::_lzReceiveExecuteCallbackGasOffset = GasAsserts::_sendOFTGasReceiveGasOffset + 32;
+const int GasAsserts::_mintGasOffset = GasAsserts::_lzReceiveExecuteCallbackGasOffset + 32;
+
+int GasAsserts::getSendOFTGas(cell $gasAsserts) impure inline {
+    return $gasAsserts.cellPreloadUint32At(GasAsserts::_sendOFTGasOffset);
+}
+
+int GasAsserts::getSendOFTGasReceiveGas(cell $gasAsserts) impure inline {
+    return $gasAsserts.cellPreloadUint32At(GasAsserts::_sendOFTGasReceiveGasOffset);
+}
+
+int GasAsserts::getLzReceiveExecuteCallbackGas(cell $gasAsserts) impure inline {
+    return $gasAsserts.cellPreloadUint32At(GasAsserts::_lzReceiveExecuteCallbackGasOffset);
+}
+
+int GasAsserts::getMintGas(cell $gasAsserts) impure inline {
+    return $gasAsserts.cellPreloadUint32At(GasAsserts::_mintGasOffset);
+}
+
+cell GasAsserts::sanitize(cell $gasAsserts) impure inline {
+    return GasAsserts::New(
+        $gasAsserts.cl::get<uint32>(GasAsserts::sendOFTGas),
+        $gasAsserts.cl::get<uint32>(GasAsserts::sendOFTGasReceiveGas),
+        $gasAsserts.cl::get<uint32>(GasAsserts::lzReceiveExecuteCallbackGas),
+        $gasAsserts.cl::get<uint32>(GasAsserts::mintGas)
+    );
+}
