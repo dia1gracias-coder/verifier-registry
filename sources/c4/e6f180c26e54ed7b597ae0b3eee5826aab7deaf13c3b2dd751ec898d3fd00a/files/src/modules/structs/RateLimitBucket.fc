@@ -1,0 +1,115 @@
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/constants.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/utils.fc";
+
+;; required storage name
+const int RateLimitBucket::NAME = "Bucket"u;
+
+;; field names
+const int RateLimitBucket::tokens = 0;
+const int RateLimitBucket::capacity = 1;
+const int RateLimitBucket::refillPerSecond = 2;
+const int RateLimitBucket::lastRefill = 3;
+
+const int ERROR::invalidRateLimit = "invalidRateLimit"c & ERRORCODE_MASK;
+
+cell RateLimitBucket::New(int tokens, int capacity, int refillPerSecond) inline method_id {
+    return cl::declare(
+        RateLimitBucket::NAME,
+        unsafeTuple([
+            [cl::t::uint64, tokens],             ;; RateLimitBucket::tokens
+            [cl::t::uint64, capacity],           ;; RateLimitBucket::capacity
+            [cl::t::uint64, refillPerSecond],   ;; RateLimitBucket::refillPerSecond
+            [cl::t::uint64, 0]                  ;; RateLimitBucket::lastRefill
+        ])
+    );
+}
+
+const int md::RateLimitBucket::_headerInfoBits = _BASIC_HEADER_WIDTH + (_FIELD_INFO_WIDTH * 4);
+const int md::RateLimitBucket::_headerFillerBits = _HEADER_WIDTH - md::RateLimitBucket::_headerInfoBits;
+const int md::RateLimitBucket::_headerInfo = 345072511412561930437550742266808443;
+
+cell RateLimitBucket::serialize(
+    int tokens,
+    int capacity,
+    int refillPerSecond,
+    int lastRefill
+) impure inline {
+    return begin_cell()
+        .store_uint(md::RateLimitBucket::_headerInfo, md::RateLimitBucket::_headerInfoBits)
+        .store_ones(md::RateLimitBucket::_headerFillerBits)
+        .store_uint64(tokens)
+        .store_uint64(capacity)
+        .store_uint64(refillPerSecond)
+        .store_uint64(lastRefill)
+        .end_cell();
+}
+
+(int, int, int, int) RateLimitBucket::deserialize(cell $RateLimitBucket) impure inline {
+    return (
+        $RateLimitBucket.cl::get<uint64>(RateLimitBucket::tokens),
+        $RateLimitBucket.cl::get<uint64>(RateLimitBucket::capacity),
+        $RateLimitBucket.cl::get<uint64>(RateLimitBucket::refillPerSecond),
+        $RateLimitBucket.cl::get<uint64>(RateLimitBucket::lastRefill)
+    );
+}
+
+cell RateLimitBucket::refill(cell $RateLimitBucket, int extraAmount) impure inline {
+    (
+        int tokens,
+        int capacity,
+        int refillPerSecond,
+        int lastRefill
+    ) = RateLimitBucket::deserialize($RateLimitBucket);
+    int curTime = now();
+    int elapsedSeconds = curTime - lastRefill;
+    ;; int is 256 bits, no need to worry about overflow
+    ;; uint128 + (uint64 * uint128) + uint128 < 2^194
+    int newTokens = min(capacity, tokens + (elapsedSeconds * refillPerSecond) + extraAmount);
+    return RateLimitBucket::serialize(
+        newTokens,
+        capacity,
+        refillPerSecond,
+        curTime
+    );
+}
+
+;; NewRateLimitBucket, success?
+(cell, int) RateLimitBucket::refillAndTryConsume(cell $RateLimitBucket, int amount) inline method_id {
+    (
+        int tokens,
+        int capacity,
+        int refillPerSecond,
+        int lastRefill
+    ) = RateLimitBucket::deserialize($RateLimitBucket);
+
+    int curTime = now();
+    int elapsedSeconds = curTime - lastRefill;
+
+    ;; int is 256 bits, no need to worry about overflow
+    int newTokens = min(capacity, tokens + (elapsedSeconds * refillPerSecond));
+    if (amount > newTokens) {
+        return ($RateLimitBucket, false);
+    }
+
+    return (
+        RateLimitBucket::serialize(
+            newTokens - amount,
+            capacity,
+            refillPerSecond,
+            curTime
+        ),
+        true
+    );
+}
+
+cell RateLimitBucket::sanitize(cell $RateLimitBucket) impure {
+    int tokens = $RateLimitBucket.cl::get<uint64>(RateLimitBucket::tokens);
+    int capacity = $RateLimitBucket.cl::get<uint64>(RateLimitBucket::capacity);
+    int refillPerSecond = $RateLimitBucket.cl::get<uint64>(RateLimitBucket::refillPerSecond);
+
+    throw_if(ERROR::invalidRateLimit, tokens > capacity);
+
+    return RateLimitBucket::New(tokens, capacity, refillPerSecond)
+        .cl::set(RateLimitBucket::lastRefill, now());
+}
