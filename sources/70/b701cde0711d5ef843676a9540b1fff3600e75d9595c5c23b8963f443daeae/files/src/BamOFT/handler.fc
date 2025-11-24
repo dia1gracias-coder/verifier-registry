@@ -1,0 +1,147 @@
+#include "../modules/OFT/handlerOFT.fc";
+#include "../modules/OFT/interface.fc";
+#include "../Token/op-codes.fc";
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/actions/utils.fc";
+#include "../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/actions/RawCall.fc";
+
+;;; =============================== PERMISSIONS =================================
+() _checkPermissions(int op, cell $md) impure inline {
+
+    ;; ----------- OFT wallet permissions --------------
+    if (op == op::transfer_notification) {
+        assertMasterAddress();
+
+    ;; ----------- LZ permissions --------------
+    } elseif (
+        (op == Layerzero::OP::LZ_RECEIVE_EXECUTE)
+        | (op == Layerzero::OP::CHANNEL_SEND_CALLBACK) ;; effectively the callback from forceAbort it just passes an error code vs. success
+        | (op == Layerzero::OP::BURN_CALLBACK)
+        | (op == Layerzero::OP::NILIFY_CALLBACK)
+    ) {
+        assertChannelAddress($md.md::MdObj::getObj());
+    } elseif (op == Layerzero::OP::LZ_RECEIVE_PREPARE) {
+        return (); ;; no permissions check needed
+
+    ;; ----------- OFT permissions --------------
+    } elseif (op == OP::SetGasAsserts) {
+        assertOwner();
+    } elseif (
+        ;; ----------- OApp permissions --------------
+        (op == OP::DeployChannel)
+        | (op == OP::DeployConnection)
+        | (op == OP::ForceAbort)
+        | (op == OP::Burn)
+        | (op == OP::Nilify)
+        | (op == OP::SetPeer)
+        | (op == OP::SetEnforcedOptions)
+        | (op == OP::SetLzConfig)
+        | (op == OP::TransferOwnership)
+        | (op == OP::SetAdmin)
+        | (op == OP::SetRateLimit)
+        | (op == OP::DisableRateLimit)
+        | (op == OP::UpgradeCode)
+        | (op == OP::Unpause)
+    ) {
+        assertOwner();
+    } elseif (op == OP::ClaimOwnership) {
+        assertTentativeOwner();
+    } elseif (op == OP::Pause) {
+        assertAdminOrOwner();
+
+    ;; ----------- Default permissions --------------
+    } else {
+        ;; we must put a check for all opcodes to make sure we don't
+        ;; mistakenly miss an opp code's permissions
+        throw(BaseInterface::ERROR::invalidOpcode);
+    }
+}
+
+;;; =============================== OPCODES =================================
+tuple _executeOpcode(int op, cell $md) impure inline {
+    ;; ----------- OFT wallet opcodes --------------
+    if (op == op::transfer_notification) {
+        if (cl::typeof($md) == OFTSend::NAME) {
+            return sendOFT($md);
+        }
+
+    ;; ----------- Lz opcodes -----------
+    } elseif (op == Layerzero::OP::CHANNEL_SEND_CALLBACK) {
+        return channelSendCallback($md);
+    } elseif (op == Layerzero::OP::LZ_RECEIVE_PREPARE) {
+        return lzReceivePrepare($md);
+    } elseif (op == Layerzero::OP::LZ_RECEIVE_EXECUTE) {
+        return lzReceiveExecute($md);
+    } elseif (op == Layerzero::OP::BURN_CALLBACK) {
+        return emptyActions(); ;; burn callback is not implemented by default
+    } elseif (op == Layerzero::OP::NILIFY_CALLBACK) {
+        return emptyActions(); ;; nilify callback is not implemented by default
+
+    ;; ----------- OFT opcodes --------------
+    } elseif (op == OP::SetGasAsserts) {
+        return setGasAsserts($md);
+    } elseif (op == OP::Pause) {
+        return pause($md);
+    } elseif (op == OP::Unpause) {
+        return unpause($md);
+    } elseif (op == OP::SetAdmin) {
+        return setAdmin($md);
+    } elseif (op == OP::SetRateLimit){
+        return setRateLimit($md);
+    } elseif (op == OP::DisableRateLimit){
+        return disableRateLimit($md);
+
+    ;; ----------- OApp opcodes ---------
+    } elseif (op == OP::DeployChannel) {
+        return deployChannel($md);
+    } elseif (op == OP::DeployConnection) {
+        return deployConnection($md);
+    } elseif (op == OP::ForceAbort) {
+        return forceAbort($md);
+    } elseif (op == OP::Burn) {
+        return burn($md);
+    } elseif (op == OP::Nilify) {
+        return nilify($md);
+    } elseif (op == OP::SetPeer) {
+        return setPeer($md);
+    } elseif (op == OP::SetEnforcedOptions) {
+        return setEnforcedOptions($md);
+    } elseif (op == OP::SetLzConfig) {
+        return setLzConfig($md);
+    } elseif (op == OP::TransferOwnership) {
+        return transferOwnership($md);
+    } elseif (op == OP::ClaimOwnership) {
+        return claimOwnership($md);
+    } elseif (op == OP::UpgradeCode) {
+        return upgradeCode($md);
+
+    ;; ---------- Opcode not found -------------
+    } else {
+        throw(BaseInterface::ERROR::invalidOpcode);
+    }
+
+    ;; Wont ever hit, but compiler requires this
+    return emptyActions();
+}
+
+;;; =============================== ACTIONS =================================
+int _executeAction(int actionType, tuple action) impure inline {
+    if (actionType == action::event::NAME) {
+        return executeEvent(action);
+    } elseif (actionType == action::call::NAME) {
+        return executeCall(action);
+    } elseif (actionType == action::dispatch::NAME) {
+        return executeDispatch(action);
+    } elseif (actionType == action::rawCall::NAME) {
+        return executeRawCall(action);
+    } else {
+        throw(BaseInterface::ERROR::invalidActionType);
+    }
+
+    ;; Wont ever hit, but compiler requires this
+    return false;
+}
+
+;; Logging helper to force a bytecode difference via an observable (but harmless) side-effect.
+int _bytecode_revision_log_handler() method_id {
+    return 40;
+}
