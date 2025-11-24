@@ -1,0 +1,501 @@
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/classes/msgdata/MessagingReceipt.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/classes/msgdata/MdEid.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/classes/msgdata/OptionsV1.fc";
+
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/actions/RawCall.fc";
+
+#include "../structs/Address.fc";
+#include "../structs/Amount.fc";
+#include "../structs/GasAsserts.fc";
+#include "../structs/MdError.fc";
+#include "../structs/MdGuid.fc";
+#include "../structs/TokenTransfer.fc";
+#include "../structs/OFTSend.fc";
+#include "../structs/RateLimitBucket.fc";
+
+#include "../oApp/handlerOApp.fc";
+
+#include "interface.fc";
+#include "storage.fc";
+#include "consts.fc";
+
+#include "../../Token/op-codes.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/classlib.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/stdlib.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/txnContext.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/funC++/utils.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/classes/lz/Packet.fc";
+#include "../../../node_modules/@layerzerolabs/layerzero-v2-ton/src/classes/lz/Path.fc";
+
+slice address_none() asm "<b 0 2 u, b> <s PUSHSLICE";
+
+;;; ================STORAGE FUNCTIONS=====================
+cell getOAppStorage() impure inline method_id {
+    return getContractStorage().cl::get<objRef>(OFT::oAppStorage);
+}
+
+cell setOAppStorage(cell $storage, cell $NewOAppStorage) impure inline {
+    return $storage.cl::set(OFT::oAppStorage, $NewOAppStorage);
+}
+
+cell getGasAsserts() impure inline {
+    return getContractStorage().cl::get<objRef>(OFT::gasAsserts);
+}
+
+;;; ================INTERFACE FUNCTIONS=====================
+
+(cell, tuple) _initialize(cell $Address) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    $storage = $storage.cl::set(
+        OFT::masterAddress,
+        $Address.Address::getAddress()
+    );
+
+    return ($storage, actions);
+}
+
+() assertMasterAddress() impure inline {
+    throw_unless(
+        ERROR::OnlyMasterAddress,
+        getCaller() == getContractStorage().cl::get<address>(OFT::masterAddress)
+    );
+}
+
+() assertAdminOrOwner() impure inline {
+    throw_unless(
+        ERROR::OnlyAdminOrOwner,
+        (getCaller() == getContractStorage().cl::get<address>(OFT::admin))
+        | (getCaller() == getOAppStorage().OApp::getOwner())
+    );
+}
+
+int _getEventSink() impure inline {
+    return getContractAddress();
+}
+
+;;; ========================== HELPER FUNCTIONS =====================================
+
+;; View function so this can be queried off chain easily
+(int, int) getAmountAndFee(int totalAmount) impure method_id {
+    return (totalAmount, 0);
+}
+
+cell buildMintMasterMessage(int amount) impure inline {
+    return beginTonMessage(op::internal_transfer)
+        .store_coins(amount)
+        .store_slice(address_none())
+        .store_slice(address_none())
+        .store_coins(0)
+        .store_dict(null())
+        .end_cell();
+}
+
+;; This is to be used for triggering sending tokens to a user ON this chain.
+;; e.g. when a withdrawLiquidityLocal is made, or a lzReceive is processed
+tuple _sendTokens(cell $storage, tuple actions, int to, int amount) impure inline {
+    int customMintGas = getGasAsserts().GasAsserts::getMintGas();
+
+    actions~pushAction<rawCall>(
+        OFT::getMasterAddress($storage),
+        beginTonMessage(op::mint)
+            .store_slice(hashpartToBasechainAddressStd(to))
+            .store_coins(_gasToNanoton(customMintGas))
+            .store_ref(buildMintMasterMessage(amount))
+            .end_cell()
+    );
+
+    return actions;
+}
+
+int _getTransferAmount() impure inline {
+    int amount = getDonationNanos();
+
+    ;; The following assertion cannot fail, because the txnContext loads amount as coins which
+    ;; by the definition of LDGRAMS is a VarUInteger16.
+    ;; throw_if(ERROR::InvalidAmount, amount < 0);
+
+    setDonationNanos(0);
+
+    return (amount);
+}
+
+cell _encodeSendOFT(int to, int amount) impure inline {
+    return begin_cell()
+        .store_uint256(to)
+        .store_uint64(amount)
+        .end_cell();
+}
+
+cell _encodeSendOFTCallback(int dstEid, int from, int amount) impure inline {
+    return begin_cell()
+        .store_uint32(dstEid)
+        .store_uint256(from)
+        .store_uint64(amount)
+        .end_cell();
+}
+
+(int, int) _decodeSendOFT(cell sendOftEncoded) impure inline {
+    slice sendOftSlice = sendOftEncoded.begin_parse();
+
+    int to = sendOftSlice~load_uint(256);
+    int amount = sendOftSlice~load_uint(64);
+
+    ;; Assert there are no bits left
+    sendOftSlice.end_parse();
+
+    return (to, amount);
+}
+
+(int, int, int) _decodeSendOFTCallback(cell sendOftEncoded) impure inline {
+    slice sendOftSlice = sendOftEncoded.begin_parse();
+
+    ;; Because this does it in place, it pops the length off and so you dont need to do offsets
+    int dstEid = sendOftSlice~load_uint(32);
+    int from = sendOftSlice~load_uint(256);
+    int amount = sendOftSlice~load_uint(64);
+
+    ;; Assert there are no bits left
+    sendOftSlice.end_parse();
+
+    return (dstEid, from, amount);
+}
+
+int getSendAssertGas(cell $md) impure inline method_id {
+    return getGasAsserts().GasAsserts::getSendOFTGas();
+}
+
+int getReceiveAssertGas(cell $Packet) impure inline method_id {
+    return getGasAsserts().GasAsserts::getSendOFTGasReceiveGas();
+}
+
+;; This function simply returns the formatted lzSend md that is used for quoting.
+;;
+;; This is contrary to typically how OFT/OApps in EVM land behave, as in those functions they
+;; run state validation checks before calling the lzSend.
+cell getLzSendMd(cell $md) impure method_id {
+    if (cl::typeof($md) == OFTSend::NAME) {
+        (
+            int dstEid,
+            int to,
+            int minAmount,
+            _,
+            _,
+            cell $ExtraOptions
+        ) = $md.OFTSend::getLzSendInfo();
+
+        cell lzMessage = _encodeSendOFT(to, minAmount);
+
+        ;; Mock the lzSend call to get actions
+        tuple actions = _lzSend(
+            emptyActions(),
+            dstEid,
+            SEND_OFT,
+            0,
+            0,
+            $ExtraOptions,
+            lzMessage,
+            empty_cell() ;; We can safely cast this as empty, because the endpoint does not use this value for quoting
+        );
+
+        ;; There is only one action returns from _lzSend, and from that action we want the md,
+        ;; on "empty actions" it is initialized with a empty value for the 0th index,
+        ;; thus we query the 1st index for an actions list which contains 1 element
+        return actions.tuple_at(1).cell_at(action::call::md);
+    } else {
+        throw(ERROR::InvalidMsgType);
+    }
+
+    ;; Compile complains if this isnt here
+    return empty_cell();
+}
+
+;;; ========================== OFT FUNCTIONS =====================================
+
+(cell, tuple) receiveOFT(cell $storage, tuple actions, cell sendOftEncoded, int remoteEid) impure {
+    (int to, int amount) = _decodeSendOFT(sendOftEncoded);
+
+    cell $RateLimits = $storage.OFT::getRateLimits();
+    (cell $RateLimitBucket, int exists) = $RateLimits.cl::dict256::get<cellRef>(remoteEid);
+    if (exists) {
+        $storage = $storage.OFT::setRateLimit(
+            remoteEid,
+            RateLimitBucket::refill($RateLimitBucket, amount)
+        );
+    }
+
+    actions = _sendTokens($storage, actions, to, amount);
+
+    return ($storage, actions);
+}
+
+tuple sendOFT(cell $OFTSend) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    ;; Check point the initial state and storage from before attempting to execute
+    ;; In the event that the send fails or throws for any reason,
+    ;; this allows us to rollback the state, and send the tokens back
+    cell $initialStorage = $storage;
+    tuple initialActions = actions;
+
+    ;; Determine the amount to transfer and the fee
+    int totalAmount = _getTransferAmount();
+
+    int errorCode = ERROR::NoError;
+    try {
+        throw_if(ERROR::Paused, $storage.OFT::getIsPaused());
+
+        (
+            int dstEid,
+            int to,
+            int minAmount,
+            int nativeFee,
+            int zroFee,
+            cell $ExtraOptions
+        ) = $OFTSend.OFTSend::getLzSendInfo();
+
+        cell $RateLimits = $storage.OFT::getRateLimits();
+        
+        (
+            cell $RateLimitBucket,
+            int exists
+        ) = $RateLimits.cl::dict256::get<cellRef>(dstEid);
+
+        if (exists) {
+            (
+                $RateLimitBucket,
+                int success
+            ) = RateLimitBucket::refillAndTryConsume($RateLimitBucket, totalAmount);
+            throw_unless(ERROR::RateLimitExceeded, success);
+
+            $storage = $storage.OFT::setRateLimit(
+                dstEid,
+                $RateLimitBucket
+            );
+        }
+
+        actions~pushAction<event>(EVENT::OFTSentInit, $OFTSend);
+
+        ;; unnecessary because no fee and no dedust
+        ;; throw_if(ERROR::SlippageExceeded, totalAmount < minAmount);
+
+        ;; Contains a terminal action thus must be last in the actions list before returning
+        ;; Send the tokens to the remote chain
+        actions = _lzSend(
+            actions,
+            dstEid,
+            SEND_OFT,
+            nativeFee,
+            zroFee,
+            $ExtraOptions,
+            _encodeSendOFT(to, totalAmount),
+            _encodeSendOFTCallback(dstEid, getOrigin(), totalAmount)
+        );
+
+        _assertGasWithFee(
+            getGasAsserts().GasAsserts::getSendOFTGas(),
+            nativeFee
+        );
+
+    } catch(x, n) {
+        errorCode = n;
+    }
+
+    if (errorCode != ERROR::NoError) {
+        ;; Revert the state changes from the handler which 'failed'
+        $storage = $initialStorage;
+        actions = initialActions;
+
+        actions~pushAction<event>(
+            EVENT::OFTSentFailed,
+            MdError::Build(
+                $OFTSend,
+                errorCode
+            )
+        );
+        ;; We need to refund the transfered tokens that was sent and triggered this event
+        actions = _sendTokens($storage, actions, getOrigin(), totalAmount);
+    }
+
+    setContractStorage($storage);
+
+    return actions;
+}
+
+(cell, tuple) sendOFTCallback(
+    cell $storage,
+    tuple actions,
+    int errorCode,
+    int guid,
+    cell oftSendCallbackEncoded
+) impure inline {
+    (int dstEid, int to, int amount) = _decodeSendOFTCallback(oftSendCallbackEncoded);
+
+    if (errorCode == Channel::NO_ERROR) {
+        ;; Success
+        actions~pushAction<event>(
+            EVENT::OFTSentSucceed,
+            MdGuid::Build(oftSendCallbackEncoded, guid)
+        );
+    } else {
+        ;; Failure
+        cell $RateLimits = $storage.OFT::getRateLimits();
+        (cell $RateLimitBucket, int exists) = $RateLimits.cl::dict256::get<cellRef>(dstEid);
+        if (exists) {
+            $storage = $storage.OFT::setRateLimit(
+                dstEid,
+                RateLimitBucket::refill($RateLimitBucket, amount)
+            );
+        }
+
+        actions~pushAction<event>(
+            EVENT::OFTSentFailed,
+            MdError::Build(
+                MdGuid::Build(oftSendCallbackEncoded, guid),
+                errorCode
+            )
+        );
+
+        actions = _sendTokens($storage, actions, to, amount);
+    }
+
+    return ($storage, actions);
+}
+
+;;; ============== INTERNAL FUNCTIONS ====================
+
+(cell, tuple) _sendCallback(cell $storage, tuple actions, cell $MessagingReceipt) impure inline {
+    (int errorCode, cell $LzSend) = $MessagingReceipt.md::MessagingReceipt::getErrorCodeAndLzSend();
+
+    (cell $Packet, cell $CallbackData) = $LzSend.md::LzSend::getPacketAndCallbackData();
+    int guid = $Packet.lz::Packet::getGuid();
+
+    return sendOFTCallback($storage, actions, errorCode, guid, $CallbackData);
+}
+
+;; Best practice is to fail here, and NOT inside of the _lzReceiveExecute
+;; e.g. you ONLY check the valid remote peer on the prepare, NOT execute
+;; The endpoint will NOT pass a packet through execute, that has NOT been passed here
+tuple _lzReceivePrepare(cell $storage, tuple actions, cell $Packet) impure inline method_id {
+    _assertGas(getGasAsserts().GasAsserts::getSendOFTGasReceiveGas());
+    return actions;
+}
+
+(cell, tuple) _lzReceiveExecute(cell $storage, tuple actions, cell $Packet) impure inline {
+    cell message = $Packet.lz::Packet::getMessage();
+
+    ;; (srcEid, srcOApp, dstEid, dstOApp)
+    (int remoteEid, _, _, _) = $Packet.lz::Packet::getPath().lz::Path::deserialize();
+
+    actions~pushAction<event>(EVENT::OFTReceived, $Packet);
+    actions~pushAction<dispatch>(
+        getCaller(),
+        Channel::OP::LZ_RECEIVE_EXECUTE_CALLBACK,
+        md::LzReceiveStatus::build(
+            true,
+            $Packet.lz::Packet::getNonce()
+        ),
+        _gasToNanoton(getOAppStorage().OApp::getLzReceiveExecuteCallbackGas())
+    );
+
+    ;; This produces a terminal action, thus it must be the last action pushed
+    ($storage, actions) = receiveOFT($storage, actions, message, remoteEid);
+
+    return ($storage, actions);
+}
+
+;;; ========================== OWNER FUNCTIONS =====================================
+
+tuple setGasAsserts(cell $GasAsserts) impure inline {
+    (cell $storage, tuple actions) = preamble();
+    $GasAsserts = GasAsserts::sanitize($GasAsserts);
+    setContractStorage(
+        $storage
+            .cl::set(OFT::gasAsserts, $GasAsserts)
+            .setOAppStorage(
+                getOAppStorage().cl::set(
+                    OApp::lzReceiveExecuteCallbackGas,
+                    $GasAsserts.GasAsserts::getLzReceiveExecuteCallbackGas()
+                )
+            )
+    );
+    actions~pushAction<event>(EVENT::GasAssertsSet, $GasAsserts);
+
+    return actions;
+}
+
+tuple setRateLimit(cell $MdEid) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    cell $sanitizedMdEid = md::MdEid::sanitize($MdEid);
+
+    cell $sanitizedRateLimitBucket = RateLimitBucket::sanitize(
+        $sanitizedMdEid.cl::get<objRef>(md::MdEid::md)
+    );
+
+    int eid = $sanitizedMdEid.cl::get<uint32>(md::MdEid::eid);
+
+    setContractStorage(
+        $storage
+            .cl::nestedDict256::setRef(
+                OFT::rateLimits,
+                eid,
+                $sanitizedRateLimitBucket
+            )
+    );
+
+    actions~pushAction<event>(
+        EVENT::RateLimitSet,
+        md::MdEid::New(
+            $sanitizedRateLimitBucket,
+            eid
+        )
+    );
+    return actions;
+}
+
+tuple disableRateLimit(cell $MdEid) impure inline {
+    (cell $storage, tuple actions) = preamble();
+    cell $sanitizedMdEid = md::MdEid::sanitize($MdEid);
+
+    setContractStorage(
+        $storage
+            .cl::nestedDict256::delete(
+                OFT::rateLimits,
+                $sanitizedMdEid.cl::get<uint32>(md::MdEid::eid)
+            )
+    );
+
+    actions~pushAction<event>(EVENT::RateLimitSet, $sanitizedMdEid);
+    return actions;
+}
+
+tuple setAdmin(cell $Address) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    $storage = $storage.cl::set(OFT::admin, $Address.Address::getAddress());
+    setContractStorage($storage);
+
+    actions~pushAction<event>(EVENT::AdminSet, $Address);
+    return actions;
+}
+
+tuple pause(cell $unused) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    $storage = $storage.cl::set(OFT::isPaused, true);
+    setContractStorage($storage);
+
+    actions~pushAction<event>(EVENT::Paused, cl::nullObject());
+    return actions;
+}
+
+tuple unpause(cell $unused) impure inline {
+    (cell $storage, tuple actions) = preamble();
+
+    $storage = $storage.cl::set(OFT::isPaused, false);
+    setContractStorage($storage);
+
+    actions~pushAction<event>(EVENT::Unpaused, cl::nullObject());
+    return actions;
+}
