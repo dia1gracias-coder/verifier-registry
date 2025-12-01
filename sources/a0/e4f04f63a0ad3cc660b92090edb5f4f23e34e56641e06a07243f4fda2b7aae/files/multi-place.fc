@@ -1,0 +1,295 @@
+#include "imports/stdlib.fc";
+#include "multi-op-codes.fc";
+#include "params.fc";
+#include "utils.fc";
+#include "multi-security.fc";
+
+int min_tons_for_storage() asm "10000000 PUSHINT"; ;; 0.01 TON
+
+{-
+_#_ marketing: MsgAddress     
+    m: Matrix                      
+    parent: MsgAddress
+    craeted_at: uint64  
+    fill_count: (#<= 4)
+    profiles: ^PlaceProfiles
+    security: ^[ admin: MsgAddress ]  
+    children: (Maybe ^PlaceChildren) = PlaceStorage;
+-}
+(slice, int, slice, int, int, cell, cell, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+
+    return (
+        ds~load_msg_addr(), ;; marketing_address
+        ds~load_uint(3),    ;; m
+        ds~load_msg_addr(), ;; parent_address
+        ds~load_uint(64),   ;; craeted_at
+        ds~load_uint(3),    ;; fill_count
+        ds~load_ref(),      ;; profiles
+        ds~load_ref(),      ;; security
+        ds~load_maybe_ref() ;; children
+    );
+}
+
+
+() store_data(slice marketing_address, int m, slice parent_address, int craeted_at, int fill_count, cell profiles, cell security, cell children) impure inline {
+
+    cell data = begin_cell()
+            .store_slice(marketing_address)
+            .store_uint(m, 3)        
+            .store_slice(parent_address)
+            .store_uint(craeted_at, 64)
+            .store_uint(fill_count, 3)
+            .store_ref(profiles)
+            .store_ref(security)
+            .store_maybe_ref(children)
+        .end_cell();
+
+    set_data(data);
+}
+
+
+cell build_place_initdata(slice marketing_address, int m, cell profiles, cell security) inline {
+
+     return begin_cell()
+        .store_slice(marketing_address) 
+        .store_uint(m, 3) 
+        .store_slice(my_address()) ;; parent
+        .store_uint(now(), 64) ;; craeted_at
+        .store_uint(0, 3) ;; fill_count
+        .store_ref(profiles)
+        .store_ref(security)
+        .store_maybe_ref(null())   ;; children
+        .end_cell();
+}
+
+
+() deploy_place(slice place_address, cell state_init) impure inline {
+   
+    var msg = begin_cell()
+        .store_uint(0x10, 6) ;; no bounce - it's deployment
+        .store_slice(place_address)
+        .store_coins(min_tons_for_storage()) ;; amount
+        .store_uint(0, 1 + 4 + 4 + 64 + 32)
+        .store_uint(2 + 1, 2) ;; 11 - init:(Maybe (Either StateInit ^StateInit))
+        .store_uint(0, 1) ;; body:(Either X ^X)
+        .store_ref(state_init)
+        .end_cell(); 
+
+    send_raw_message(msg, 1 + 16); ;; mode: pay fees separately; revert on error; bounce on failure to refund in_msg value to Marketing
+
+}
+
+
+(slice, slice) parse_children(cell children) inline {
+    ;; _#_ left: MsgAddress  right: (Maybe MsgAddress) = PlaceChildren;
+
+    if (null?(children)) {
+        return (null(), null());
+    }
+
+    slice cs = children.begin_parse();
+    var l = cs~load_msg_addr();
+
+    if (cs~load_uint(1)) {   
+        return (l, cs~load_msg_addr());
+    }
+    
+    return (l, null());
+}
+
+
+cell serialize_children(slice l, slice r) inline {
+    ;; _#_ left: MsgAddress  right: (Maybe MsgAddress) = PlaceChildren;
+
+    if (null?(l)) {
+        return null();
+    }
+
+    builder b = begin_cell().store_slice(l);
+
+    if (null?(r)) {
+        return b.store_uint(0, 1).end_cell();
+    }
+
+    return b.store_uint(1, 1).store_slice(r).end_cell();
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {  ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    ;; load operation code and query id (standard message format)
+    var (op, query_id) = (in_msg_body~load_op(), in_msg_body~load_query_id()); 
+
+    ;; load state
+    var (marketing_address, m, parent_address, craeted_at, fill_count, profiles, security, children) = load_data();
+    
+
+    if (op == op::add_grandchild()) {
+        ;; add_grandchild#fec063b3 query_id:uint64 = PlaceInternalMsg;
+        
+        var (left_child_address, right_child_address) = parse_children(children);
+
+        ;; ensure this node has at least one child
+        throw_if(401, null?(left_child_address));
+
+        ;; determine which parent branch (left or right)
+        int is_left = equal_slice_bits(sender_address, left_child_address);
+        int is_right = 0;
+        ifnot (null?(right_child_address)) {
+            is_right = equal_slice_bits(sender_address, right_child_address);
+        }
+
+        ;; reject unauthorized sender
+        throw_unless(401, is_left | is_right);
+
+        ;; update fill count
+        int new_fill_count = fill_count + 1;
+        store_data(marketing_address, m, parent_address, craeted_at, new_fill_count, profiles, security, children);
+
+        ;; reserve min storage amount
+        raw_reserve(min_tons_for_storage(), 0);
+
+        ;; send msg to marketing
+        ;; reward#d4c89207  query_id:uint64  m:Matrix  parent:MsgAddress  craeted_at:uint64  fill_count: (#<= 4)  profiles:^PlaceProfiles = MultiInternalMsg;
+        builder reward_payload = begin_cell()
+            .store_uint(m, 3)
+            .store_slice(parent_address)
+            .store_uint(craeted_at, 64)
+            .store_uint(new_fill_count, 3)
+            .store_ref(profiles);
+        
+        send_msg(
+            marketing_address,      ;; to_address
+            0,                      ;; amount
+            op::reward(), 
+            query_id,               
+            reward_payload,
+            bounce(),               ;; if Multi fails, the reward message will be retried via proxy, so no balance top-up is needed
+            128 + 2);               ;; mode: send entire remaining balance; ignore errors to avoid reverting structure
+
+        return();
+    }
+
+    if (op == op::add_child()) {       
+        ;; add_child#cea08332 query_id:uint64  profiles:^PlaceProfiles = PlaceInternalMsg;
+
+        cell child_profiles = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+   
+        ;; only Marketing allows to add a child
+        throw_unless(err::unauthorized(), equal_slices_bits(sender_address, marketing_address));
+
+        var (left_child_address, right_child_address) = parse_children(children);  
+       
+        ;; revert if there are no empty slots
+        throw_unless(403, null?(left_child_address) | null?(right_child_address));
+
+        ;; the new place deployment
+        cell place_initdata = build_place_initdata(marketing_address, m, child_profiles, security);
+        cell place_stateinit = build_stateinit(my_code(), place_initdata);
+        slice place_address = calc_address(place_stateinit);
+        deploy_place(place_address, place_stateinit);
+
+        ;; assign child
+        if (null?(left_child_address)) {
+            left_child_address = place_address;
+        } else {
+            right_child_address = place_address;
+        }
+
+        ;; update the storage
+        cell new_children = serialize_children(left_child_address, right_child_address);
+        store_data(marketing_address, m, parent_address, craeted_at, fill_count, profiles, security, new_children);
+
+        ;; reserve min storage amount
+        raw_reserve(min_tons_for_storage(), 0);
+
+        ;; add grandchild
+        ifnot (is_address_none(parent_address))
+        {   
+            ;; add_grandchild#fec063b3 query_id:uint64 = PlaceInternalMsg;
+            send_msg(
+                parent_address,         ;; to_address
+                0,                      ;; amount
+                op::add_grandchild(), 
+                query_id,               
+                null(),                 ;; payload
+                bounce(),               ;; if the grandparent errors, the bounced message returns funds so we can retry add_grandchild via proxy
+                128 + 16);              ;; mode: send entire remaining balance; revert on error; bounce on action failure to refund Marketing
+        }
+
+        return();
+    }
+
+    ;; auth admin
+    var ( admin_address ) = parse_security(security);
+    throw_unless(err::unauthorized(), equal_slices_bits(sender_address, admin_address));
+
+    if (op == op::proxy()) {
+        ;; proxy#536b3490 query_id:uint64 msg:^Cell = PlaceInternalMsg;
+
+        int mode = in_msg_body~load_uint(8);
+        cell msg = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        ;; reject if +32 flag is set
+        throw_if(400, mode & 32);
+
+        raw_reserve(min_tons_for_storage(), 0);
+        send_raw_message(msg, mode); 
+        
+        return();
+    }
+
+    if (op == op::update_admin()) {
+        ;; update_admin#08a3447f9 query_id:uint64  new_admin:MsgAddress = PlaceInternalMsg;
+
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        force_chain(new_admin_address);
+        in_msg_body.end_parse();
+
+        ifnot (equal_slice_bits(new_admin_address, admin_address))
+        {
+            cell new_security = serialize_security(new_admin_address);
+            store_data(marketing_address, m, parent_address, craeted_at, fill_count, profiles, new_security, children);
+        }
+
+        return();
+    }
+
+    if (op == op::upgrade()) {
+        ;; upgrade#dbfaf817 code:^Cell data:^Cell = PlaceInternalMsg;
+
+        var code = in_msg_body~load_ref();
+        var data = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+    
+        set_code(code);
+        set_data(data);
+
+        return();
+    }
+    
+    throw(0xffff); 
+}
+
+
+;;
+;; Get methods
+;;
+(slice, int, slice, int, int, cell, cell, cell) get_place_data() method_id {
+    return load_data();
+}
