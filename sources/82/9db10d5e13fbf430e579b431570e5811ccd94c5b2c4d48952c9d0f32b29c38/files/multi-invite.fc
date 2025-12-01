@@ -1,0 +1,306 @@
+#include "imports/stdlib.fc";
+#include "multi-op-codes.fc";
+#include "params.fc";
+#include "utils.fc";
+
+int min_tons_for_storage() asm "10000000 PUSHINT"; ;; 0.01 TON
+
+{-
+_#_ admin: MsgAddress
+    program: # {program > 0}
+    next_ref_no: # {next_ref_no > 0}
+    number: # {number > 0}
+    parent: MsgAddress
+    owner: (Naybe ^InviteOwner) = InviteStorage;
+-}
+(slice, int, int, int, slice, cell) load_data() inline {
+   
+    slice ds = get_data().begin_parse();
+    
+    return (
+        ds~load_msg_addr(),         ;; admin_address
+        ds~load_uint(32),           ;; program
+        ds~load_uint(32),           ;; next_ref_no
+        ds~load_uint(32),           ;; number
+        ds~load_msg_addr(),         ;; parent_address
+        ds~load_maybe_ref()         ;; owner
+    );
+}
+
+
+() store_data(slice admin_address, int program, int next_ref_no, int number, slice parent_address, cell owner) impure inline {
+    
+    cell data = begin_cell()
+        .store_slice(admin_address)
+        .store_uint(program, 32)
+        .store_uint(next_ref_no, 32)
+        .store_uint(number, 32)
+        .store_slice(parent_address)
+        .store_maybe_ref(owner)     
+        .end_cell();
+
+    set_data(data);
+}
+
+
+;; owner: (Naybe ^[owner: MsgAddress  set_at:uint64]) = InviteStorage;
+(int, slice, int) parse_owner(cell owner) inline {
+    
+    if (null?(owner)) {
+        return (0, null(), 0);
+    }
+
+    slice cs = owner.begin_parse();
+    return (-1, cs~load_msg_addr(), cs~load_uint(64));
+}
+
+cell serialize_owner(slice owner_address, int set_at) inline {
+    return begin_cell()
+        .store_slice(owner_address)
+        .store_uint(set_at, 64)
+        .end_cell();
+}
+
+
+cell build_invite_initdata(slice admin_address, int program, int number) inline {
+    return begin_cell()
+        .store_slice(admin_address)
+        .store_uint(program, 32)      
+        .store_uint(1, 32)          ;; next_ref_no
+        .store_uint(number, 32)
+        .store_slice(my_address())  ;; parent
+        .store_maybe_ref(null())    ;; owner
+        .end_cell();
+}
+
+
+() send_set_owner(slice invite_address, cell state_init, int query_id, slice owner_address, int reserved_amount) impure inline {
+    ;; set_owner#a31c7c0 query_id:uint64  owner:MsgAddress = InviteInternalMsg;
+
+    builder b = begin_cell();
+
+    if (null?(state_init)) {
+
+        b = b.store_uint(0x18, 6) ;; bounce
+            .store_slice(invite_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+
+    } else {
+
+         b = b.store_uint(0x10, 6) ;; no bounce
+            .store_slice(invite_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32)
+            .store_uint(6, 3) ;; 110 - init:(Maybe (Either StateInit ^StateInit)) + body:(Either X ^X)
+            .store_ref(state_init);
+    }
+
+    cell msg = b.store_op(op::set_owner())
+        .store_query_id(query_id) 
+        .store_slice(owner_address)
+        .end_cell();
+
+
+    raw_reserve(reserved_amount, 2);
+    send_raw_message(msg, 128 + 16); ;; forward all remaining inbound value; revert on errors and bounce on action failure to return funds to the sender
+}
+
+
+() send_report_of_invite(int program, int valid, slice owner_address, int query_id, int reserved_amount) impure inline {
+    ;; report_of_invite#5cdb127e  query_id:uint64  program:(## 32)  valid:Bit = ProfileInternalMsg;
+    
+    builder payload = begin_cell()
+        .store_uint(program, 32)
+        .store_uint(valid, 1);
+
+    raw_reserve(reserved_amount, 2);
+
+    send_msg(
+        owner_address,          ;; to_address
+        0,                      ;; amount
+        op::report_of_invite(),    
+        query_id,          
+        payload,
+        nobounce(),            ;; we don't care about receiver errors; we simply return the report with remaining inbound funds
+        128 + 2                 ;; carry all remaining inbound value; ignore action failures so we don't revert a valid owner
+    );
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+   
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {  ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    ;; load operation code and query id (standard message format)
+    var (op, query_id) = (in_msg_body~load_op(), in_msg_body~load_query_id()); 
+
+    ;; load state
+    var (admin_address, program, next_ref_no, number, parent_address, owner) = load_data();
+
+
+    ;; reserve at least min_tons_for_storage
+    int balance_before_msg = my_balance - msg_value;
+    int reserved_amount = balance_before_msg;
+    if (balance_before_msg < min_tons_for_storage())
+    {
+        reserved_amount = min_tons_for_storage();
+    }
+
+    if (op == op::add_referal()) { 
+        ;; add_referal#7a3eae1c = query_id:uint64  program:#  seq_no:#  invite:MsgAddress = InviteInternalMsg;
+
+        throw_if(err::forbidden(), null?(owner));
+
+        int msg_program = in_msg_body~load_uint(32);
+        throw_if(err::bad_request(), msg_program != program);
+
+        int msg_seq_no = in_msg_body~load_uint(32); 
+        throw_unless(err::bad_request(), msg_seq_no > 0);
+        throw_if(err::bad_request(), msg_seq_no > next_ref_no);
+
+        slice msg_invite_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+       
+        ;; main profile sends invite == inviter to initialize setup
+        if (equal_slice_bits(msg_invite_address, my_address()))
+        {
+            ;; only the root invite may perform this action
+            throw_unless(403, is_address_none(parent_address));
+
+            ;; seq_no must be 1
+            throw_unless(400, msg_seq_no == 1);
+
+            var (_, owner_address, _) = parse_owner(owner);
+
+            ;; verify sender matches predefined owner
+            int valid = equal_slices_bits(sender_address, owner_address) ? 1 : 0;
+
+            ;; send invite verification result
+            send_report_of_invite(program, valid, sender_address, query_id, reserved_amount);
+
+            return ();
+        }
+
+        ;; authorize by verifying calculated invite address
+        cell invite_initdata = build_invite_initdata(admin_address, program, msg_seq_no);
+        cell invite_stateinit = build_stateinit(my_code(), invite_initdata);
+        slice invite_address = calc_address(invite_stateinit);
+        throw_unless(err::unauthorized(), equal_slices_bits(msg_invite_address, invite_address));
+
+        cell stateinit = null();
+        if (msg_seq_no == next_ref_no) { ;; if deployment
+            store_data(admin_address, program, next_ref_no + 1, number, parent_address, owner);
+            stateinit = invite_stateinit;
+        } 
+
+        send_set_owner(invite_address, stateinit, query_id, sender_address, reserved_amount);
+      
+        return ();
+    }
+
+    if (op == op::set_owner()) {
+        ;; set_owner#a31c7c0 query_id:uint64  owner:MsgAddress = InviteInternalMsg;
+
+        throw_unless(err::unauthorized(), equal_slices_bits(sender_address, parent_address));
+
+        slice msg_owner_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        int valid = 1;
+        if (null?(owner))
+        {
+            ;; _#_ owner: MsgAddress  set_at:uint64 = InviteOwner;
+
+            cell new_owner = begin_cell()
+                .store_slice(msg_owner_address)
+                .store_uint(now(), 64) ;; set_at
+                .end_cell();
+
+            store_data(admin_address, program, next_ref_no, number, parent_address, new_owner);
+        }
+        else
+        {
+            var (_, owner_address, _) = parse_owner(owner);
+            valid = equal_slices_bits(msg_owner_address, owner_address) ? 1 : 0;
+        }
+
+        send_report_of_invite(program, valid, msg_owner_address, query_id, reserved_amount);
+        return ();
+    }
+
+    ;; auth admin
+    throw_unless(err::unauthorized(), equal_slices_bits(sender_address, admin_address));
+
+    if (op == op::proxy()) {
+        ;; proxy#536b3490 query_id:uint64  msg:^Cell = InviteInternalMsg;
+
+        int mode = in_msg_body~load_uint(8);
+        cell msg = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        ;; reject if +32 flag is set
+        throw_if(400, mode & 32);
+
+        raw_reserve(min_tons_for_storage(), 0);
+        send_raw_message(msg, mode); 
+        
+        return();
+    }
+
+    if (op == op::update_admin()) {
+        ;; update_admin#08a3447f9 query_id:uint64  new_admin:MsgAddress = InviteInternalMsg;
+
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        force_chain(new_admin_address);
+        in_msg_body.end_parse();
+
+        ifnot (equal_slice_bits(new_admin_address, admin_address))
+        {
+            store_data(new_admin_address, program, next_ref_no, number, parent_address, owner);
+        }
+
+        return();
+    }
+
+    if (op == op::upgrade()) {
+        ;; proxy#536b3490 query_id:uint64  msg:^Cell = InviteInternalMsg;
+
+        var code = in_msg_body~load_ref();
+        var data = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+    
+        set_code(code);
+        set_data(data);
+
+        return();
+    }
+    
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+
+;;
+;; Get methods
+;;
+(slice, int, int, int, slice, cell) get_invite_data() method_id {
+    return load_data();
+}
+
+slice get_invite_address_by_seq_no(int seq_no) method_id {
+    var (admin_address, program, _, _, _, _) = load_data();
+    cell invite_initdata = build_invite_initdata(admin_address, program, seq_no);
+    cell invite_stateinit = build_stateinit(my_code(), invite_initdata);
+    return calc_address(invite_stateinit);
+}
