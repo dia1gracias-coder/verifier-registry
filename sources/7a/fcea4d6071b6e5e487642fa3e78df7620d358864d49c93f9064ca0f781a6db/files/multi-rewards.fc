@@ -1,0 +1,514 @@
+#include "multi-queue.fc";
+
+builder int_to_string(int n) inline {
+    builder string = begin_cell();
+    tuple chars = null();
+
+    do {
+        int r = n~divmod(10);
+        chars = cons(r + 48, chars);
+    } until (n == 0);
+
+    do {
+        int char = chars~list_next();
+        string~store_uint(char, 8);
+    } until (null?(chars));
+
+    return string;
+}
+
+
+cell gen_bonus_payload(slice title, int m, int place_number) inline {
+    return begin_cell()
+        .store_slice(title)
+        .store_slice(" m")
+        .store_builder(int_to_string(m))
+        .store_slice(" #")
+        .store_builder(int_to_string(place_number))
+        .end_cell();
+}
+
+
+int calc_bonus_fwd_fee(cell payload) inline {
+     var (cells, bits, refs) = compute_data_size(payload, 4);
+
+    int prefix_bits = 144;
+    int prefix_cells = 1;
+
+    return get_forward_fee(0, bits + prefix_bits, cells + prefix_cells);
+}
+
+
+;; _#_ clone:Bit  profile:MsgAddress  place_number:#  inviter_profile_address:MsgAddress = PlaceProfiles;
+(int, slice, int, slice) parse_profiles(cell profiles) inline {
+    
+    slice cs = profiles.begin_parse();
+
+    return (
+        cs~load_uint(1),    ;; clone
+        cs~load_msg_addr(), ;; profile_address
+        cs~load_uint(32),   ;; place_number
+        cs~load_msg_addr()  ;; inviter_profile_address 
+    );
+}
+
+
+(int) send_bonus_msg(slice title, int m, int place_number, slice to_address, int amount, int query_id) impure inline_ref {
+    ;; bonus#39cb9dfb query_id:uint64 comment:^Cell = ProfileInternalMsg;
+
+    cell payload = gen_bonus_payload(title, m, place_number);
+
+     ;; (bonus -> [Profile] -> transfer_bonuse) tx spends 4883 gas
+    int bonus_forward_fee = calc_bonus_fwd_fee(payload);
+    var bonus_compute_fee = get_compute_fee(0, 4883);
+    int extra_amount = bonus_compute_fee + muldiv(bonus_forward_fee, 3, 2); ;; in case we should pay some storage fee
+   
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)    ;; no bounce; even if the receiver errors, they can still withdraw, so we don't need to handle it
+        .store_slice(to_address)
+        .store_coins(amount + extra_amount)                           
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)    
+        .store_uint(op::bonus(), 32)
+        .store_uint(query_id, 64)
+        .store_ref(payload)
+    .end_cell();
+
+   send_raw_message(msg, 1 + 16); ;; all rewards must be processed— clones and bonuses; on bonus send error we bounce back so the grandparent retains funds to retry the reward msg via proxy
+
+   return amount;
+}
+
+
+(int, int, cell) reward(cell profiles, int m,  int fill_count, int query_id, slice admin_address, int seq_no, cell queue) impure inline {
+   
+    int total_paid = 0;
+    var (clone, profile_address, place_number, inviter_profile_address) = parse_profiles(profiles);
+    if (is_address_none(inviter_profile_address)) {
+        inviter_profile_address = profile_address;
+    }
+
+    if (m == 1) {
+        if (fill_count == 1) {
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address 
+                15000000000,            ;; amount 15 TON
+                query_id);   
+
+        } elseif (fill_count == 2) {
+            ;; accumulation
+        } elseif (fill_count == 3) {
+            ;; accumulation
+        } elseif (fill_count == 4) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                1, ;; count
+                query_id, 
+                2, ;; matrix
+                profile_address, 
+                seq_no);
+
+
+        }
+    } elseif (m == 2) {
+        if (fill_count == 1) {
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address 
+                10000000000,            ;; amount 10 TON
+                query_id);   
+                
+
+        } elseif (fill_count == 2) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                2, ;; count
+                query_id, 
+                1, ;; matrix
+                profile_address, 
+                seq_no);
+                
+
+        } elseif (fill_count == 3) {
+            
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address 
+                10000000000,            ;; amount 10 TON
+                query_id);   
+
+
+        } elseif (fill_count == 4) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                2, ;; count
+                query_id, 
+                1, ;; matrix
+                profile_address, 
+                seq_no);
+
+            (seq_no) = queue~add_create_clone_tasks(
+                1, ;; count
+                query_id, 
+                3, ;; matrix
+                profile_address, 
+                seq_no);
+                
+
+        }
+    } elseif (m == 3) {
+        if (fill_count == 1) {
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address 
+                25000000000,            ;; amount 25 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "referal bounus",        ;; title
+                m, 
+                place_number, 
+                inviter_profile_address, ;; to_address
+                10000000000,             ;; amount 10 TON
+                query_id);   
+
+            
+        } elseif (fill_count == 2) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                3, ;; count 
+                query_id, 
+                1, ;; matrix
+                profile_address, 
+                seq_no);
+
+
+        } elseif (fill_count == 3) {
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address 
+                25000000000,            ;; amount 25 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "referal bounus",        ;; title
+                m, 
+                place_number, 
+                inviter_profile_address, ;; to_address
+                10000000000,             ;; amount 10 TON
+                query_id);   
+
+                
+        } elseif (fill_count == 4) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                3, ;; count 
+                query_id, 
+                1, ;; matrix
+                profile_address, 
+                seq_no);
+
+            (seq_no) = queue~add_create_clone_tasks(
+                1, ;; count 
+                query_id, 
+                4, ;; matrix
+                profile_address, 
+                seq_no);
+
+                
+        }
+    } elseif (m == 4) {
+        if (fill_count == 1) {
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address
+                100000000000,           ;; amount 100 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "referal bounus",        ;; title
+                m, 
+                place_number, 
+                inviter_profile_address, ;; to_address
+                20000000000,             ;; amount 20 TON
+                query_id);   
+
+        } elseif (fill_count == 2) {
+            
+            (seq_no) = queue~add_create_clone_tasks(
+                6, ;; count 
+                query_id, 
+                1, ;; matrix
+                profile_address, 
+                seq_no);
+
+             total_paid += send_bonus_msg(
+                "admin bounus",         ;; title
+                m, 
+                place_number, 
+                admin_address,          ;; to_address
+                20000000000,            ;; amount 20 TON
+                query_id);   
+
+
+        } elseif (fill_count == 3) {
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address
+                100000000000,           ;; amount 100 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "referal bounus",        ;; title
+                m, 
+                place_number, 
+                inviter_profile_address, ;; to_address
+                20000000000,             ;; amount 20 TON
+                query_id);   
+                
+
+        } elseif (fill_count == 4) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                6, ;; count 
+                query_id, 
+                1, ;; matrix
+                profile_address, 
+                seq_no);
+
+            total_paid += send_bonus_msg(
+                "admin bounus",         ;; title
+                m, 
+                place_number, 
+                admin_address,          ;; to_address
+                20000000000,            ;; amount 20 TON
+                query_id);   
+
+            (seq_no) = queue~add_create_clone_tasks(
+                1, ;; count 
+                query_id, 
+                5, ;; matrix
+                profile_address, 
+                seq_no);
+                
+
+        }
+    } elseif (m == 5) {
+        if (fill_count == 1) {
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,         ;; to_address 
+                200000000000,            ;; amount 200 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "referal bounus",        ;; title
+                m, 
+                place_number, 
+                inviter_profile_address, ;; to_address 
+                40000000000,             ;; amount 40 TON
+                query_id);   
+                
+
+        } elseif (fill_count == 2) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                8, ;; count 
+                query_id, 
+                1, ;; matrix
+                profile_address, 
+                seq_no);
+
+            total_paid += send_bonus_msg(
+                "admin bounus",         ;; title
+                m, 
+                place_number, 
+                admin_address,          ;; to_address 
+                40000000000,            ;; amount 40 TON
+                query_id);   
+
+
+        } elseif (fill_count == 3) {
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,         ;; to_address 
+                200000000000,            ;; amount 200 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "referal bounus",        ;; title
+                m, 
+                place_number, 
+                inviter_profile_address, ;; to_address 
+                40000000000,             ;; amount 40 TON
+                query_id);   
+                
+
+        } elseif (fill_count == 4) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                8, ;; count 
+                query_id, 
+                1, ;; matrix
+                profile_address, 
+                seq_no);
+
+            total_paid += send_bonus_msg(
+                "admin bounus",         ;; title
+                m, 
+                place_number, 
+                admin_address,          ;; to_address 
+                40000000000,            ;; amount 40 TON
+                query_id);   
+
+            (seq_no) = queue~add_create_clone_tasks(
+                1, ;; count 
+                query_id, 
+                6, ;; matrix
+                profile_address, 
+                seq_no);
+
+                
+        }
+    } elseif (m == 6) {
+        if (fill_count == 1) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                1, ;; count 
+                query_id, 
+                6, ;; matrix
+                profile_address, 
+                seq_no);
+                
+
+        } elseif (fill_count == 2) {
+           
+            (seq_no) = queue~add_create_clone_tasks(
+                4, ;; count
+                query_id, 
+                2, ;; matrix
+                profile_address, 
+                seq_no);
+
+            total_paid += send_bonus_msg(
+                "referal bounus",        ;; title
+                m, 
+                place_number, 
+                inviter_profile_address, ;; to_address 
+                50000000000,             ;; amount 50 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "admin bounus",         ;; title
+                m, 
+                place_number, 
+                admin_address,          ;; to_address 
+                50000000000,            ;; amount 50 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address 
+                920000000000,           ;; amount 920 TON
+                query_id);   
+
+
+        } elseif (fill_count == 3) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                4, ;; count
+                query_id, 
+                2, ;; matrix
+                profile_address, 
+                seq_no);
+
+            total_paid += send_bonus_msg(
+                "referal bounus",        ;; title
+                m, 
+                place_number, 
+                inviter_profile_address, ;; to_address 
+                50000000000,             ;; amount 50 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "admin bounus",         ;; title
+                m, 
+                place_number, 
+                admin_address,          ;; to_address 
+                50000000000,            ;; amount 50 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address 
+                920000000000,           ;; amount 920 TON
+                query_id);   
+
+                
+        } elseif (fill_count == 4) {
+
+            (seq_no) = queue~add_create_clone_tasks(
+                4, ;; count
+                query_id, 
+                2, ;; matrix
+                profile_address, 
+                seq_no);
+
+            total_paid += send_bonus_msg(
+                "referal bounus",        ;; title
+                m, 
+                place_number, 
+                inviter_profile_address, ;; to_address 
+                50000000000,             ;; amount 50 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "admin bounus",         ;; title
+                m, 
+                place_number, 
+                admin_address,          ;; to_address 
+                50000000000,            ;; amount 50 TON
+                query_id);   
+
+            total_paid += send_bonus_msg(
+                "structure bounus",     ;; title
+                m, 
+                place_number, 
+                profile_address,        ;; to_address 
+                920000000000,           ;; amount 920 TON
+                query_id);   
+        }
+    }
+
+    return (seq_no, total_paid, queue);
+}

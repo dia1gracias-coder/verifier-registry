@@ -1,0 +1,479 @@
+#include "imports/stdlib.fc";
+#include "multi-op-codes.fc";
+#include "params.fc";
+#include "utils.fc";
+#include "multi-rewards.fc";
+#include "multi-queue.fc";
+#include "multi-security.fc";
+
+int min_tons_for_storage() asm "50000000 PUSHINT"; ;; 0.05 TON
+
+{- 
+_#_ processor: MsgAddress
+    max_tasks: uint16
+    queue_size: uint16
+    seq_no: uint32
+    fees: ^[ m1:Coins  m2:Coins  m3:Coins  m4:Coins  m5:Coins  m6:Coins ]  
+    security: ^[ admin: MsgAddress ]  
+    place_code: ^Cell
+    queue: (HashmapE 32 MultiTask) = MultiStorage;
+-}
+(slice, int, int, int, cell, cell, cell, cell) load_data() inline {
+
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_msg_addr(),     ;; processor
+        ds~load_uint(16),       ;; max_tasks        
+        ds~load_uint(16),       ;; queue_size 
+        ds~load_uint(32),       ;; seq_no 
+        ds~load_ref(),          ;; fees   
+        ds~load_ref(),          ;; security
+        ds~load_ref(),          ;; place_code
+        ds~load_dict());        ;; queue
+}
+
+
+() store_data(slice processor_address, int max_tasks, int queue_size, int seq_no, cell fees, cell security, cell place_code, cell queue) impure inline {
+
+    cell data = begin_cell()
+        .store_slice(processor_address)   
+        .store_uint(max_tasks, 16)         
+        .store_uint(queue_size, 16)   
+        .store_uint(seq_no, 32)   
+        .store_ref(fees)
+        .store_ref(security)
+        .store_ref(place_code)
+        .store_dict(queue)           
+        .end_cell();
+
+    set_data(data);
+}
+
+
+int get_price(int m) inline {
+    if (m == 1) { return 15000000000; } ;; 15 TON  
+    if (m == 2) { return 45000000000; } ;; 45 TON
+    if (m == 3) { return 100000000000; } ;; 100 TON
+    if (m == 4) { return 240000000000; } ;; 240 TON
+    if (m == 5) { return 500000000000; } ;; 500 TON    
+    if (m == 6) { return 1200000000000; } ;; 1200 TON
+    return 0;
+}
+
+
+cell build_place_initdata(int m, slice parent_address, int craeted_at, cell profiles, cell security) inline {
+
+     return begin_cell()
+        .store_slice(my_address()) 
+        .store_uint(m, 3) 
+        .store_slice(parent_address)
+        .store_uint(craeted_at, 64) 
+        .store_uint(0, 3)           ;; fill_count
+        .store_ref(profiles)
+        .store_ref(security)
+        .store_maybe_ref(null())    ;; children
+        .end_cell();
+}
+
+
+int get_fee_for(cell fees, int m) inline {
+    slice fs = fees.begin_parse();
+    repeat (m - 1) {
+        fs~load_coins();
+    }
+
+    return fs~load_coins();
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    ;; load operation code and query id (standard message format)
+    var (op, query_id) = (in_msg_body~load_op(), in_msg_body~load_query_id()); 
+
+    ;; load state
+    var (processor_address, max_tasks, queue_size, seq_no, fees, security, place_code, queue) = load_data();
+    var ( admin_address ) = parse_security(security);
+
+
+    if (op == op::deploy_place()) {
+        ;; deploy_place#609ecd5a  query_id:uint64  key:uint32  parent:MsgAddress  profiles:^PlaceProfiles = MultiInternalMsg;
+
+        throw_unless(err::unauthorized(), equal_slices_bits(sender_address, processor_address));
+
+        int msg_key = in_msg_body~load_uint(32);
+        throw_unless(err::bad_request(), msg_key > 0);
+        throw_if(err::not_found(), msg_key > seq_no);
+
+        slice msg_parent_address = in_msg_body~load_msg_addr();
+        force_chain(msg_parent_address);
+
+        cell msg_profiles = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        throw_if(err::not_found(), queue.dict_empty?());
+
+        (slice task, int found?) = queue~udict_delete_get?(32, msg_key);
+        throw_unless(err::not_found(), found?);
+
+        ;; _#_ query_id:uint64  m:Matrix  profile:MsgAddress  payload:MultiTaskPayload = MultiTask;
+        int task_query_id = task.preload_uint(64);
+
+        ;; add_child#cea08332 query_id:uint64  profiles:^PlaceProfiles = PlaceInternalMsg;
+        builder payload = begin_cell().store_ref(msg_profiles);
+
+        send_msg(
+            msg_parent_address, ;; to_address
+            0,                  
+            op::add_child(),
+            task_query_id,
+            payload,
+            bounce(),           ;; bounce back fees if the place reverts
+            64 + 16);           ;; transfer remaining inbound value; don't ignore errors, we should detect insufficient funds or wrong parent; bounce on action failure to refund fees
+
+        store_data(processor_address, max_tasks, queue_size - 1, seq_no, fees, security, place_code, queue);
+
+        return();
+    }
+
+    if (op == op::reward()) {    
+        ;; reward#d4c89207  query_id:uint64  m:Matrix  parent:MsgAddress  craeted_at:uint64  fill_count: (#<= 4)  profiles:^PlaceProfiles = MultiInternalMsg;
+        
+        int msg_m = in_msg_body~load_uint(3);
+
+        slice msg_parent_address = in_msg_body~load_msg_addr();
+        int msg_craeted_at = in_msg_body~load_uint(64);
+        cell msg_profiles = in_msg_body~load_ref();
+
+        cell place_initdata = build_place_initdata(msg_m, msg_parent_address, msg_craeted_at, msg_profiles, security);
+        cell place_stateinit = build_stateinit(place_code, place_initdata);
+        slice place_address = calc_address(place_stateinit);
+
+        throw_unless(err::unauthorized(), equal_slices_bits(sender_address, place_address));
+
+        int msg_fill_count = in_msg_body~load_uint(3);
+        in_msg_body.end_parse();
+
+        var (new_seq_no, total_paid, new_queue) = reward(msg_profiles, msg_m, msg_fill_count, query_id, admin_address, seq_no, queue);
+            
+        ;; if there are clones
+        if (new_seq_no > seq_no) {
+            int diff = new_seq_no - seq_no;
+            store_data(processor_address, max_tasks, queue_size + diff, new_seq_no, fees, security, place_code, new_queue);
+        }
+
+        int balance_before_msg = my_balance - msg_value;
+        int reserved_amount = balance_before_msg - total_paid;
+        if (reserved_amount > 0) ;; raw_reserve is applied before action phase, so we must verify sufficient funds first
+        {
+            raw_reserve(reserved_amount, 2); ;; reserve up to reserved_amount
+
+            ;; excesses#d53276db query_id:uint64 = MultiExcessesMsg;
+            send_msg(
+                processor_address,
+                0,
+                op::excesses(),
+                query_id,
+                null(),
+                nobounce(),     ;; processor may be a wallet; so we should disable bouncing
+                128 + 2);       ;; send full balance except reserve; ignore errors
+        }
+
+        return();
+    }
+
+    if (op == op::buy_place()) {   
+        ;; buy_place#179b74a8  query_id:uint64  m:Matrix  profile:Address  pos:(Maybe ^PlacePos) = MultiInternalMsg;
+
+        throw_unless(err::forbidden(), queue_size < max_tasks);
+
+        int msg_m = in_msg_body~load_uint(3);
+        throw_unless(400, msg_m > 0);
+        throw_if(400, msg_m > 6);
+
+        slice msg_profile_address = in_msg_body~load_msg_addr();
+        force_chain(msg_profile_address);
+
+        cell msg_pos = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        int price = get_price(msg_m);
+        int fee = fees.get_fee_for(msg_m);
+        throw_if(err::insufficient_funds(), msg_value < price + fee);
+
+        queue~add_create_place_task(query_id, msg_m, msg_profile_address, sender_address, msg_pos, seq_no);
+        store_data(processor_address, max_tasks, queue_size + 1, seq_no + 1, fees, security, place_code, queue);
+
+        ;; reserve all but fee
+        int balance_before_msg = my_balance - msg_value;
+        int reserved_amount = balance_before_msg + price;
+        raw_reserve(reserved_amount, 2); ;; reserve up to reserved_amount
+
+        ;; transfer fee
+        send_msg(
+            processor_address,
+            0,
+            op::excesses(),
+            query_id,
+            null(),
+            nobounce(),     ;; processor may be a wallet; so we should disable bouncing
+            128 + 2);       ;; send full balance except reserve; ignore errors
+       
+        return();
+    }
+
+    if (op == op::lock_pos()) {   
+        ;; lock_pos#6d31ad42  query_id:uint64  m:Matrix  profile:Address  pos:^PlacePos = MultiInternalMsg;
+
+        throw_unless(err::forbidden(), queue_size < max_tasks);
+
+        int msg_m = in_msg_body~load_uint(3);
+        throw_unless(400, msg_m > 0);
+        throw_if(400, msg_m > 6);
+
+        int fee = fees.get_fee_for(msg_m);
+        throw_if(err::insufficient_funds(), msg_value < fee);
+
+        slice msg_profile_address = in_msg_body~load_msg_addr();
+        force_chain(msg_profile_address);
+
+        cell msg_pos = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        queue~add_lock_pos_task(query_id, msg_m, msg_profile_address, sender_address, msg_pos, seq_no);
+        store_data(processor_address, max_tasks, queue_size + 1, seq_no + 1, fees, security, place_code, queue);
+
+        ;; transfer fee
+        send_msg(
+            processor_address,
+            0,
+            op::excesses(),
+            query_id,
+            null(),
+            nobounce(),     ;; processor may be a wallet; so we should disable bouncing
+            64 + 2);        ;; send remaining in_msg value; ignore errors
+       
+        return();
+    }
+
+    if (op == op::unlock_pos()) {   
+        ;; unlock_pos#77d27591  query_id:uint64  m:Matrix  profile:Address  pos:^PlacePos = MultiInternalMsg;
+
+        throw_unless(err::forbidden(), queue_size < max_tasks);
+
+        int msg_m = in_msg_body~load_uint(3);
+        throw_unless(400, msg_m > 0);
+        throw_if(400, msg_m > 6);
+
+        int fee = fees.get_fee_for(msg_m);
+        throw_if(err::insufficient_funds(), msg_value < fee);
+
+        slice msg_profile_address = in_msg_body~load_msg_addr();
+        force_chain(msg_profile_address);
+
+        cell msg_pos = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        queue~add_unlock_pos_task(query_id, msg_m, msg_profile_address, sender_address, msg_pos, seq_no);
+        store_data(processor_address, max_tasks, queue_size + 1, seq_no + 1, fees, security, place_code, queue);
+
+        ;; transfer fee
+        send_msg(
+            processor_address,
+            0,
+            op::excesses(),
+            query_id,
+            null(),
+            nobounce(),     ;; processor may be a wallet; so we should disable bouncing
+            64 + 2);        ;; send remaining in_msg value; ignore errors
+
+        return();
+    }
+
+    if (op == op::cancel_task()) {
+        ;; cancel_task#ba25f1e9  query_id:uint64  key:uint32 = MultiInternalMsg;
+
+        throw_unless(err::unauthorized(), equal_slices_bits(sender_address, processor_address));
+
+        int msg_key = in_msg_body~load_uint(32);
+        throw_unless(err::bad_request(), msg_key > 0);
+        throw_if(err::not_found(), msg_key > seq_no);
+
+        in_msg_body.end_parse();
+
+        throw_if(err::not_found(), queue.dict_empty?());
+        
+        (slice task, int found?) = queue~udict_delete_get?(32, msg_key);
+        throw_unless(err::not_found(), found?);
+
+        ;; _#_ query_id:uint64  m:Matrix  profile:MsgAddress  payload:MultiTaskPayload = MultiTask;
+        int task_query_id = task~load_uint(64);
+        int task_m = task~load_uint(3);
+        
+        task~load_msg_addr(); ;; skip profile_address
+      
+        int balance_before_msg = my_balance - msg_value;
+        int reserved_amount = balance_before_msg;
+        
+         ;; if taks is 'create_place'
+        if (task~load_uint(4) == 1) { 
+
+            ;; create_place#1  source:MsgAddress  pos:(Maybe ^PlacePos) = MultiTaskPayload;
+            slice source_address = task~load_msg_addr();
+
+            int price = get_price(task_m);
+            reserved_amount -= price;
+            
+            ;; refund#c135f40c  query_id:uint64 = MultiRefundMsg;
+            
+            send_msg(
+                source_address,     ;; to_address
+                price ,             ;; return only price without fees
+                op::refund(),
+                task_query_id,
+                null(),             ;; payload
+                bounce(),           ;; in case if the source was destroyed 
+                1 + 16);            ;; pay fees separately; don't ignore errors, we should detect insufficient funds; bounce on action failure to refund fees
+        }
+        
+        if (reserved_amount > 0) ;; raw_reserve is applied before sending, so we must verify sufficient funds first
+        {
+            raw_reserve(reserved_amount, 2); ;; reserve up to reserved_amount
+
+            ;; excesses#d53276db query_id:uint64 = MultiExcessesMsg;
+            send_msg(
+                processor_address,
+                0, 
+                op::excesses(),
+                query_id,
+                null(),
+                nobounce(),     ;; processor may be a wallet; so we should disable bouncing
+                128 + 2);       ;; send full balance except reserve; ignore errors
+        }
+
+        store_data(processor_address, max_tasks, queue_size - 1, seq_no, fees, security, place_code, queue);
+
+        return();
+    }
+
+    ;; auth admin
+    throw_unless(err::unauthorized(), equal_slices_bits(sender_address, admin_address));
+    
+    if (op == op::proxy()) { 
+        ;; proxy#536b3490  query_id:uint64  msg:^Cell = MultiInternalMsg;
+
+        int mode = in_msg_body~load_uint(8);
+        cell msg = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        ;; reject if +32 flag is set
+        throw_if(400, mode & 32);
+
+        raw_reserve(min_tons_for_storage(), 0);
+        send_raw_message(msg, mode); 
+        
+        return ();
+    }
+
+    if (op == op::update_fees()) {
+        ;; update_fees#f74a44af  query_id:uint64  m1:Coins  m2:Coins  m3:Coins  m4:Coins  m5:Coins  m6:Coins = MultiInternalMsg;
+
+        builder b = begin_cell();
+        repeat (6) {
+            b = b.store_coins(in_msg_body~load_coins());
+        }
+        in_msg_body.end_parse();
+        cell new_fees = b.end_cell();
+
+        store_data(processor_address, max_tasks, queue_size, seq_no, new_fees, security, place_code, queue);
+
+        return();
+    }
+
+    if (op == op::update_processor()) {
+        ;; update_processor#2a50577e  query_id:uint64  processor:MsgAddress = MultiInternalMsg;
+
+        slice new_processor_address = in_msg_body~load_msg_addr();
+        force_chain(new_processor_address);
+        in_msg_body.end_parse();
+
+        ifnot (equal_slice_bits(new_processor_address, processor_address))
+        {
+            store_data(new_processor_address, max_tasks, queue_size, seq_no, fees, security, place_code, queue);
+        }
+
+        return();
+    }
+    
+    if (op == op::update_maxtasks()) {
+        ;; update_maxtasks#54f512f6  query_id:uint64  max_tasks:uint16 = MultiInternalMsg;
+
+        int new_max_tasks = in_msg_body~load_uint(16);
+        throw_unless(err::bad_request(), new_max_tasks > 0);
+        in_msg_body.end_parse();
+
+        if (new_max_tasks != max_tasks)
+        {
+            store_data(processor_address, new_max_tasks, queue_size, seq_no, fees, security, place_code, queue);
+        }
+
+        return();
+    }
+
+    if (op == op::update_admin()) {
+        ;; update_admin#8a3447f9  query_id:uint64  admin:MsgAddress = MultiInternalMsg;
+
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        force_chain(new_admin_address);
+        in_msg_body.end_parse();
+
+        ifnot (equal_slice_bits(new_admin_address, admin_address))
+        {
+            cell new_security = serialize_security(new_admin_address);
+            store_data(processor_address, max_tasks, queue_size, seq_no, fees, new_security, place_code, queue);
+        }
+
+        return();
+    }
+
+    if (op == op::upgrade()) {
+        ;; upgrade#dbfaf817  query_id:uint64  code:^Cell  data:^Cell = MultiInternalMsg;
+
+        var code = in_msg_body~load_ref();
+        var data = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+    
+        set_code(code);
+        set_data(data);
+        
+        return();
+    }
+    
+    throw(0xffff); 
+}
+
+
+;;
+;; Get methods
+;;
+(slice, int, int, int, cell, cell, cell, cell) get_multi_data() method_id {
+    return load_data();
+}
+
+(int, slice, int) get_min_queue_task() method_id {
+    (_, _, _, _, _, _, _, cell queue) = load_data();
+    (int key, slice val, int flag) = queue.udict_get_min?(32);
+    return (key, val, flag);
+}

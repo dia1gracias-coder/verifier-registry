@@ -1,0 +1,15 @@
+(slice) parse_security(cell security) inline { 
+    ;; [ admin: MsgAddress ]
+
+    slice cs = security.begin_parse();
+    return (
+        cs~load_msg_addr()   ;; admin
+    );
+}
+
+
+cell serialize_security(slice admin_address) inline { 
+    return begin_cell()
+        .store_slice(admin_address)
+        .end_cell();
+}

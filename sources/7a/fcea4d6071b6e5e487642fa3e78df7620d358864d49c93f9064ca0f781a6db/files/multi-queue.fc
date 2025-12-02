@@ -1,0 +1,74 @@
+(cell, int) add_create_clone_tasks(cell queue, int count, int query_id, int m, slice profile_address, int seq_no) inline_ref {
+    ;; create_clone#2 = MultiTaskPayload;
+    ;; _#_ query_id:uint64  m:Matrix  profile:MsgAddress  payload: MultiTaskPayload = MultiTask;
+
+    repeat (count)
+    {   
+         builder task = begin_cell()
+            .store_uint(query_id, 64)
+            .store_uint(m, 3)
+            .store_slice(profile_address)
+            .store_uint(2, 4);                   ;; create_clone tag
+
+        seq_no += 1;
+        queue~udict_set_builder(32, seq_no, task);
+    }
+
+    return (queue, seq_no);
+}
+
+
+(cell, ()) add_create_place_task(cell queue, int query_id, int m, slice profile_address, slice sender_address, cell pos, int seq_no) inline {
+    ;; create_place#1  source:MsgAddress  pos:(Maybe ^PlacePos) = MultiTaskPayload;
+    ;; _#_ query_id:uint64  m:Matrix  profile:MsgAddress  payload: MultiTaskPayload = MultiTask;
+
+     builder task = begin_cell()
+        .store_uint(query_id, 64)
+        .store_uint(m, 3)
+        .store_slice(profile_address)
+        .store_uint(1, 4)                   ;; create_place tag
+        .store_slice(sender_address)        ;; source
+        .store_maybe_ref(pos);
+
+    queue~udict_set_builder(32, seq_no + 1, task);
+
+    return (queue, ());
+}
+
+
+(cell, ()) add_lock_pos_task(cell queue, int query_id, int m, slice profile_address, slice sender_address, cell pos, int seq_no) inline {
+    ;; lock_pos#3  source:MsgAddress  pos:^PlacePos = MultiTaskPayload;
+    ;; _#_ query_id:uint64  m:Matrix  profile:MsgAddress  payload:MultiTaskPayload = MultiTask;
+
+    builder task = begin_cell()
+        .store_uint(query_id, 64)
+        .store_uint(m, 3)
+        .store_slice(profile_address)
+        .store_uint(3, 4)                   ;; lock_pos tag
+        .store_slice(sender_address)        ;; source
+        .store_ref(pos);
+        
+
+    queue~udict_set_builder(32, seq_no + 1, task);
+
+    return (queue, ());
+}
+
+
+(cell, ()) add_unlock_pos_task(cell queue, int query_id, int m, slice profile_address, slice sender_address, cell pos, int seq_no) inline {
+    ;; unlock_pos#4  source:MsgAddress  pos:^PlacePos = MultiTaskPayload;
+    ;; _#_ query_id:uint64  m:Matrix  profile:MsgAddress  payload:MultiTaskPayload = MultiTask;
+
+    builder task = begin_cell()
+        .store_uint(query_id, 64)
+        .store_uint(m, 3)
+        .store_slice(profile_address)
+        .store_uint(4, 4)                   ;; unlock_pos tag
+        .store_slice(sender_address)        ;; source
+        .store_ref(pos);
+
+        
+    queue~udict_set_builder(32, seq_no + 1, task);
+
+    return (queue, ());
+}
