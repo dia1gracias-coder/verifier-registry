@@ -1,0 +1,38 @@
+;; Standard Library (Hybrid for FunC 0.4.6)
+
+;; Data handling
+cell get_data() asm "c4 PUSH";
+() set_data(cell c) asm "c4 POP";
+
+;; Cells & Builders
+builder begin_cell() asm "NEWC";
+cell end_cell(builder b) asm "ENDC";
+slice begin_parse(cell c) asm "CTOS";
+
+;; slice bits/empty
+(int) slice_bits(slice s) asm "SBITS";
+(int) slice_empty?(slice s) asm "SEMPTY";
+int equal_slices(slice a, slice b) asm "SDEQ";
+
+;; Loaders (load_uint ВСТРОЕН, его тут нет, но остальные нужны)
+(slice, slice) load_msg_addr(slice s) asm "LDMSGADDR";
+(slice, int) load_coins(slice s) asm "LDGRAMS";
+
+;; Builders (store_uint ВСТРОЕН, его тут нет)
+(builder) store_slice(builder b, slice s) asm "STSLICER";
+(builder) store_coins(builder b, int x) asm "STGRAMS";
+
+;; Context
+int now() asm "NOW";
+slice my_address() asm "MYADDR";
+(int) get_balance() asm "BALANCE" "FIRST";
+
+;; Messages
+() send_raw_message(cell msg, int mode) impure asm "SENDMSG";
+
+;; Math
+int min(int x, int y) asm "MIN";
+int max(int x, int y) asm "MAX";
+
+;; Helpers for Params
+(int, int) parse_std_addr(slice s) asm "REWRITESTDADDR";
