@@ -1,0 +1,99 @@
+;; Gifevo Auction Contract v1 (LAUNCH PROMO)
+;; Strategy: 0% Fee for the first month to kill competitors
+
+#include "stdlib.fc";
+#include "op-codes.fc";
+#include "params.fc";
+
+;; --- GIFEVO CEO SETTINGS ---
+const int min_bid_step = 5; ;; Шаг ставки 5%
+const int market_fee = 0;   ;; КОМИССИЯ 0% (Promo Launch)
+
+(slice, int, int, int, slice, slice) load_data() inline {
+  slice ds = get_data().begin_parse();
+  return (
+    ds~load_msg_addr(), ;; owner (seller)
+    ds~load_coins(),    ;; current_price
+    ds~load_uint(64),   ;; end_time
+    ds~load_coins(),    ;; last_bid_amount
+    ds~load_msg_addr(), ;; last_bidder_address
+    ds~load_msg_addr()  ;; mp_fee_addr (Твой кошелек)
+  );
+}
+
+() save_data(slice owner, int price, int end_time, int last_bid, slice last_bidder, slice mp_fee_addr) impure inline {
+  set_data(begin_cell()
+    .store_slice(owner)
+    .store_coins(price)
+    .store_uint(end_time, 64)
+    .store_coins(last_bid)
+    .store_slice(last_bidder)
+    .store_slice(mp_fee_addr)
+    .end_cell());
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  slice cs = in_msg_full.begin_parse();
+  if (cs~load_uint(4) & 1) { return (); }
+
+  slice sender = cs~load_msg_addr();
+  (slice owner, int price, int end_time, int last_bid, slice last_bidder, slice mp_fee_addr) = load_data();
+
+  int op = 0;
+  if (in_msg_body.slice_bits() >= 32) { op = in_msg_body~load_uint(32); }
+
+  ;; --- СТАВКА ---
+  if (op == 0) { 
+     throw_if(35, now() > end_time); 
+     
+     int min_bid = price;
+     if (last_bid > 0) { min_bid = last_bid + (last_bid * min_bid_step / 100); }
+     throw_if(36, msg_value < min_bid);
+
+     ;; Возврат денег проигравшему
+     if (last_bid > 0) {
+       var msg = begin_cell()
+         .store_uint(0x10, 6)
+         .store_slice(last_bidder)
+         .store_coins(last_bid)
+         .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+         .end_cell();
+       send_raw_message(msg, 1); 
+     }
+
+     save_data(owner, price, end_time, msg_value, sender, mp_fee_addr);
+     return ();
+  }
+
+  ;; --- ЗАВЕРШЕНИЕ ---
+  if (op == 3) {
+    throw_if(37, now() < end_time);
+    throw_if(38, last_bid == 0);
+
+    ;; При комиссии 0% fee_amount будет равен 0
+    int fee_amount = last_bid * market_fee / 100; 
+    int seller_amount = last_bid - fee_amount;
+
+    ;; 1. Отправка комиссии (если она > 0)
+    if (fee_amount > 0) {
+        var msg_fee = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(mp_fee_addr)
+            .store_coins(fee_amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+        send_raw_message(msg_fee, 1);
+    }
+
+    ;; 2. Отправка выигрыша продавцу (100% суммы при старте)
+    var msg_seller = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(owner)
+        .store_coins(seller_amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+    send_raw_message(msg_seller, 1);
+
+    return ();
+  }
+}
