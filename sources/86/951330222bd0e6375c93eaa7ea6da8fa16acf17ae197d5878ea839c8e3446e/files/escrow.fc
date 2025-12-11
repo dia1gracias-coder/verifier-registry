@@ -1,0 +1,698 @@
+;; RentChain UA Escrow Smart Contract (Hybrid Deposit + Monthly Rent)
+;; Implements secure escrow with deposit lock, monthly rent release, and Diia signatures.
+;; State Machine: CREATED -> FUNDED -> SIGNED -> ACTIVE -> REFUNDED/DISPUTED/CLOSED
+
+#include "imports/stdlib.fc";
+
+;; ========== Constants ==========
+(int) STATE_CREATED() inline { return 0; }
+(int) STATE_FUNDED() inline { return 1; }
+(int) STATE_SIGNED() inline { return 2; }
+(int) STATE_ACTIVE() inline { return 3; }
+(int) STATE_RELEASED() inline { return 4; } ;; reserved
+(int) STATE_REFUNDED() inline { return 5; }
+(int) STATE_DISPUTED() inline { return 6; }
+(int) STATE_CLOSED() inline { return 7; }
+
+;; ========== Helper Functions ==========
+
+(int) min_int(int a, int b) inline { return a < b ? a : b; }
+(int) max_int(int a, int b) inline { return a > b ? a : b; }
+
+(int) require_positive(int value) inline {
+    throw_if(1200, value <= 0);
+    return value;
+}
+
+(int) periods_from_amount(int amount, int monthly_rent) inline {
+    throw_if(1201, monthly_rent == 0);
+    throw_if(1202, amount % monthly_rent != 0);
+    return amount / monthly_rent;
+}
+
+(int) next_period_start(int start_ts, int period_seconds, int period_index) inline {
+    return start_ts + (period_seconds * period_index);
+}
+
+(int) next_period_end(int start_ts, int period_seconds, int period_index) inline {
+    return next_period_start(start_ts, period_seconds, period_index) + period_seconds;
+}
+
+;; ========== Storage Operations ==========
+
+(cell, slice, slice, slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) load_state() inline {
+    slice root = get_data().begin_parse();
+    cell config_cell = root~load_ref();
+    cell state_cell = root~load_ref();
+
+    slice config_slice = config_cell.begin_parse();
+    slice landlord = config_slice~load_msg_addr();
+    slice tenant = config_slice~load_msg_addr();
+    slice admin = config_slice~load_msg_addr();
+    int monthly_rent = config_slice~load_coins();
+    int deposit_amount = config_slice~load_coins();
+    int start_ts = config_slice~load_uint(32);
+    int period_seconds = config_slice~load_uint(32);
+    int first_lock_secs = config_slice~load_uint(32);
+    int total_months = config_slice~load_uint(16);
+    int initial_prepaid_months = config_slice~load_uint(16);
+
+    slice state_slice = state_cell.begin_parse();
+    int rent_balance = state_slice~load_coins();
+    int deposit_balance = state_slice~load_coins();
+    int move_in_ts = state_slice~load_uint(32);
+    int move_in_confirmed = state_slice~load_uint(1);
+    int landlord_move_in_confirmed = state_slice~load_uint(1);
+    int end_tenancy_requested = state_slice~load_uint(1);
+    int end_tenancy_confirmed = state_slice~load_uint(1);
+    int rent_paid_periods = state_slice~load_uint(16);
+    int rent_claimed_periods = state_slice~load_uint(16);
+    int state = state_slice~load_uint(8);
+    int tenantSigHash = state_slice~load_uint(256);
+    int landlordSigHash = state_slice~load_uint(256);
+    return (
+        config_cell,
+        landlord,
+        tenant,
+        admin,
+        monthly_rent,
+        deposit_amount,
+        rent_balance,
+        deposit_balance,
+        start_ts,
+        period_seconds,
+        first_lock_secs,
+        move_in_ts,
+        move_in_confirmed,
+        landlord_move_in_confirmed,
+        end_tenancy_requested,
+        end_tenancy_confirmed,
+        rent_paid_periods,
+        rent_claimed_periods,
+        total_months,
+        initial_prepaid_months,
+        state,
+        tenantSigHash,
+        landlordSigHash
+    );
+}
+
+() save_state(
+    cell config_cell,
+    int rent_balance,
+    int deposit_balance,
+    int move_in_ts,
+    int move_in_confirmed,
+    int landlord_move_in_confirmed,
+    int end_tenancy_requested,
+    int end_tenancy_confirmed,
+    int rent_paid_periods,
+    int rent_claimed_periods,
+    int state,
+    int tenantSigHash,
+    int landlordSigHash
+) impure inline {
+    cell state_cell =
+        begin_cell()
+            .store_coins(rent_balance)
+            .store_coins(deposit_balance)
+            .store_uint(move_in_ts, 32)
+            .store_uint(move_in_confirmed, 1)
+            .store_uint(landlord_move_in_confirmed, 1)
+            .store_uint(end_tenancy_requested, 1)
+            .store_uint(end_tenancy_confirmed, 1)
+            .store_uint(rent_paid_periods, 16)
+            .store_uint(rent_claimed_periods, 16)
+            .store_uint(state, 8)
+            .store_uint(tenantSigHash, 256)
+            .store_uint(landlordSigHash, 256)
+            .end_cell();
+
+    set_data(begin_cell().store_ref(config_cell).store_ref(state_cell).end_cell());
+}
+
+(int) is_tenant(slice sender_addr, slice tenant_addr) inline {
+    slice s = sender_addr;
+    slice t = tenant_addr;
+    int sender_wc = s~load_int(8);
+    int tenant_wc = t~load_int(8);
+    int sender_hash = s~load_uint(256);
+    int tenant_hash = t~load_uint(256);
+    return (sender_wc == tenant_wc) & (sender_hash == tenant_hash);
+}
+
+(int) is_landlord(slice sender_addr, slice landlord_addr) inline {
+    slice s = sender_addr;
+    slice l = landlord_addr;
+    int sender_wc = s~load_int(8);
+    int landlord_wc = l~load_int(8);
+    int sender_hash = s~load_uint(256);
+    int landlord_hash = l~load_uint(256);
+    return (sender_wc == landlord_wc) & (sender_hash == landlord_hash);
+}
+
+(int) is_admin(slice sender_addr, slice admin_addr) inline {
+    slice s = sender_addr;
+    slice a = admin_addr;
+    int sender_wc = s~load_int(8);
+    int admin_wc = a~load_int(8);
+    int sender_hash = s~load_uint(256);
+    int admin_hash = a~load_uint(256);
+    return (sender_wc == admin_wc) & (sender_hash == admin_hash);
+}
+
+;; ========== Contract Logic ==========
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+    slice in_msg = in_msg_full.begin_parse();
+    in_msg~load_int(4);
+    slice sender_addr = in_msg~load_msg_addr();
+
+    slice current = get_data().begin_parse();
+    int is_empty = current.slice_empty?();
+
+    if (is_empty) {
+        ;; Initialization: expect a single config cell reference
+        throw_if(100, op != 0);
+
+        cell config_cell = in_msg_body~load_ref();
+
+        ;; Validate basic config structure
+        slice cfg = config_cell.begin_parse();
+        slice landlord = cfg~load_msg_addr();
+        slice tenant = cfg~load_msg_addr();
+        slice admin = cfg~load_msg_addr();
+        int monthly_rent = require_positive(cfg~load_coins());
+        int deposit_amount = cfg~load_coins();
+        int start_ts = cfg~load_uint(32);
+        int period_seconds = require_positive(cfg~load_uint(32));
+        int first_lock_secs = cfg~load_uint(32);
+        int total_months = cfg~load_uint(16);
+        int initial_prepaid_months = cfg~load_uint(16);
+
+        ;; Basic sanity checks
+        throw_if(1203, total_months <= 0);
+        throw_if(1204, initial_prepaid_months <= 0);
+        throw_if(1205, initial_prepaid_months > total_months);
+
+        cell state_cell =
+            begin_cell()
+                .store_coins(0)
+                .store_coins(0)
+                .store_uint(0, 32)
+                .store_uint(0, 1)
+                .store_uint(0, 1)
+                .store_uint(0, 1)
+                .store_uint(0, 1)
+                .store_uint(0, 16)
+                .store_uint(0, 16)
+                .store_uint(STATE_CREATED(), 8)
+                .store_uint(0, 256)
+                .store_uint(0, 256)
+                .end_cell();
+
+        set_data(begin_cell().store_ref(config_cell).store_ref(state_cell).end_cell());
+        return ();
+    }
+
+    (cell config_cell,
+     slice landlord,
+     slice tenant,
+     slice admin,
+     int monthly_rent,
+     int deposit_amount,
+     int rent_balance,
+     int deposit_balance,
+     int start_ts,
+     int period_seconds,
+     int first_lock_secs,
+     int move_in_ts,
+     int move_in_confirmed,
+     int landlord_move_in_confirmed,
+     int end_tenancy_requested,
+     int end_tenancy_confirmed,
+     int rent_paid_periods,
+     int rent_claimed_periods,
+     int total_months,
+     int initial_prepaid_months,
+     int state,
+     int tenantSigHash,
+     int landlordSigHash) = load_state();
+
+    if (op == 1) { ;; fund
+        throw_if(101, state != STATE_CREATED());
+        throw_if(102, is_tenant(sender_addr, tenant) == 0);
+
+        int base_deposit = deposit_amount;
+        int base_rent = monthly_rent * initial_prepaid_months;
+        int required = base_deposit + base_rent;
+        throw_if(103, msg_value < required);
+
+        int extra = msg_value - required;
+        int extra_periods = 0;
+        if (extra > 0) {
+            throw_if(104, extra % monthly_rent != 0);
+            extra_periods = extra / monthly_rent;
+        }
+
+        rent_paid_periods = initial_prepaid_months + extra_periods;
+        rent_balance = monthly_rent * rent_paid_periods;
+        deposit_balance = deposit_amount;
+
+        save_state(
+            config_cell,
+            rent_balance,
+            deposit_balance,
+            move_in_ts,
+            move_in_confirmed,
+            landlord_move_in_confirmed,
+            end_tenancy_requested,
+            end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            STATE_FUNDED(),
+            tenantSigHash,
+            landlordSigHash
+        );
+        return ();
+    }
+
+    if (op == 2) { ;; submit signatures
+        throw_if(200, state != STATE_FUNDED());
+        throw_if(201, tenantSigHash != 0);
+
+        int newTenantHash = in_msg_body~load_uint(256);
+        int newLandlordHash = in_msg_body~load_uint(256);
+        throw_if(202, newTenantHash == 0);
+        throw_if(203, newLandlordHash == 0);
+
+        save_state(
+            config_cell,
+            rent_balance,
+            deposit_balance,
+            move_in_ts,
+            move_in_confirmed,
+            landlord_move_in_confirmed,
+            end_tenancy_requested,
+            end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            STATE_SIGNED(),
+            newTenantHash,
+            newLandlordHash
+        );
+        return ();
+    }
+
+    if (op == 3) { ;; tenant confirm move-in
+        throw_if(300, state != STATE_SIGNED());
+        throw_if(301, is_tenant(sender_addr, tenant) == 0);
+        throw_if(302, move_in_confirmed != 0);
+
+        int new_move_in_ts = now();
+        int both_confirmed = landlord_move_in_confirmed;
+        int new_state = both_confirmed ? STATE_ACTIVE() : state;
+
+        save_state(
+            config_cell,
+            rent_balance,
+            deposit_balance,
+            new_move_in_ts,
+            1,
+            landlord_move_in_confirmed,
+            end_tenancy_requested,
+            end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            new_state,
+            tenantSigHash,
+            landlordSigHash
+        );
+        return ();
+    }
+
+    if (op == 10) { ;; landlord confirm move-in
+        throw_if(1000, state != STATE_SIGNED());
+        throw_if(1001, is_landlord(sender_addr, landlord) == 0);
+        throw_if(1002, landlord_move_in_confirmed != 0);
+
+        int both_confirmed = move_in_confirmed;
+        int new_move_in_ts = both_confirmed ? now() : move_in_ts;
+        int new_state = both_confirmed ? STATE_ACTIVE() : state;
+
+        save_state(
+            config_cell,
+            rent_balance,
+            deposit_balance,
+            new_move_in_ts,
+            move_in_confirmed,
+            1,
+            end_tenancy_requested,
+            end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            new_state,
+            tenantSigHash,
+            landlordSigHash
+        );
+        return ();
+    }
+
+    if (op == 4) { ;; disabled legacy release
+        throw(304);
+    }
+
+    if (op == 5) { ;; refund tenant
+        throw_if(400, (state != STATE_CREATED()) & (state != STATE_FUNDED()) & (state != STATE_SIGNED()) & (state != STATE_DISPUTED()));
+        throw_if(401, (is_admin(sender_addr, admin) == 0) & (is_landlord(sender_addr, landlord) == 0) & (is_tenant(sender_addr, tenant) == 0));
+
+        int refund_amount = rent_balance + deposit_balance;
+        if (refund_amount > 0) {
+            send_raw_message(
+                begin_cell()
+                    .store_uint(0, 6)
+                    .store_slice(tenant)
+                    .store_coins(refund_amount)
+                    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 2 + 1)
+                    .end_cell(),
+                1
+            );
+        }
+
+        save_state(
+            config_cell,
+            0,
+            0,
+            move_in_ts,
+            move_in_confirmed,
+            landlord_move_in_confirmed,
+            end_tenancy_requested,
+            end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            STATE_REFUNDED(),
+            tenantSigHash,
+            landlordSigHash
+        );
+        return ();
+    }
+
+    if (op == 6) { ;; dispute
+        throw_if(500, (state != STATE_FUNDED()) & (state != STATE_SIGNED()) & (state != STATE_ACTIVE()));
+        throw_if(501, (is_tenant(sender_addr, tenant) == 0) & (is_landlord(sender_addr, landlord) == 0));
+
+        ;; Load reference for dispute reason
+        ;; The reference is in the message body after the op code
+        ;; After load_uint(32), in_msg_body should still have the reference
+        cell reason_cell = begin_cell().end_cell();
+        int refs_count = in_msg_body.slice_refs();
+        if (refs_count > 0) {
+            reason_cell = in_msg_body~load_ref();
+        }
+
+        save_state(
+            config_cell,
+            rent_balance,
+            deposit_balance,
+            move_in_ts,
+            move_in_confirmed,
+            landlord_move_in_confirmed,
+            end_tenancy_requested,
+            end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            STATE_DISPUTED(),
+            tenantSigHash,
+            landlordSigHash
+        );
+
+        send_raw_message(
+            begin_cell()
+                .store_uint(0x10, 6)
+                .store_slice(admin)
+                .store_coins(0)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 2 + 1)
+                .store_ref(
+                    begin_cell()
+                        .store_uint(0x6789abcd, 32)
+                        .store_ref(reason_cell)
+                        .end_cell()
+                )
+                .end_cell(),
+            0
+        );
+        return ();
+    }
+
+    if (op == 7) { ;; admin resolve (deposit/deposit+rent release)
+        throw_if(600, is_admin(sender_addr, admin) == 0);
+        ;; Allow admin resolution from FUNDED, SIGNED, ACTIVE, or DISPUTED
+        throw_if(601, (state != STATE_ACTIVE()) & (state != STATE_DISPUTED()) & (state != STATE_SIGNED()) & (state != STATE_FUNDED()));
+
+        int decision = in_msg_body~load_uint(8); ;; 0 = refund tenant, 1 = release landlord
+        int remaining = rent_balance + deposit_balance;
+
+        if (remaining > 0) {
+            slice recipient = decision == 0 ? tenant : landlord;
+            send_raw_message(
+                begin_cell()
+                    .store_uint(0, 6)
+                    .store_slice(recipient)
+                    .store_coins(remaining)
+                    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 2 + 1)
+                    .end_cell(),
+                1
+            );
+        }
+
+        save_state(
+            config_cell,
+            0,
+            0,
+            move_in_ts,
+            move_in_confirmed,
+            landlord_move_in_confirmed,
+            end_tenancy_requested,
+            end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            STATE_CLOSED(),
+            tenantSigHash,
+            landlordSigHash
+        );
+        return ();
+    }
+
+    if (op == 8) { ;; pay rent (additional)
+        ;; Allow additional rent payments once contract is at least FUNDED
+        throw_if(700, (state != STATE_FUNDED()) & (state != STATE_SIGNED()) & (state != STATE_ACTIVE()));
+        throw_if(701, is_tenant(sender_addr, tenant) == 0);
+        throw_if(702, msg_value <= 0);
+        throw_if(703, msg_value % monthly_rent != 0);
+
+        int extra_periods = msg_value / monthly_rent;
+        rent_paid_periods += extra_periods;
+        rent_balance += msg_value;
+
+        save_state(
+            config_cell,
+            rent_balance,
+            deposit_balance,
+            move_in_ts,
+            move_in_confirmed,
+            landlord_move_in_confirmed,
+            end_tenancy_requested,
+            end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            state,
+            tenantSigHash,
+            landlordSigHash
+        );
+        return ();
+    }
+
+    if (op == 11) { ;; end tenancy (request or confirm)
+        throw_if(1100, state != STATE_ACTIVE());
+        throw_if(1101, (is_tenant(sender_addr, tenant) == 0) & (is_landlord(sender_addr, landlord) == 0));
+
+        int is_tenant_sender = is_tenant(sender_addr, tenant);
+        int is_landlord_sender = is_landlord(sender_addr, landlord);
+
+        int new_end_tenancy_requested = end_tenancy_requested;
+        int new_end_tenancy_confirmed = end_tenancy_confirmed;
+
+        if (end_tenancy_requested == 0) {
+            ;; First party requests end tenancy
+            new_end_tenancy_requested = 1;
+        } else {
+            ;; Second party confirms end tenancy
+            if ((is_tenant_sender & (end_tenancy_requested == 1)) | (is_landlord_sender & (end_tenancy_requested == 1))) {
+                new_end_tenancy_confirmed = 1;
+            }
+        }
+
+        int should_refund = new_end_tenancy_confirmed;
+        int new_state = should_refund ? STATE_CLOSED() : state;
+
+        if (should_refund) {
+            ;; Refund deposit to tenant after 24 hours (86400 seconds)
+            ;; For now, refund immediately. In production, add time check.
+            int refund_amount = deposit_balance;
+            if (refund_amount > 0) {
+                send_raw_message(
+                    begin_cell()
+                        .store_uint(0, 6)
+                        .store_slice(tenant)
+                        .store_coins(refund_amount)
+                        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 2 + 1)
+                        .end_cell(),
+                    1
+                );
+            }
+        }
+
+        save_state(
+            config_cell,
+            rent_balance,
+            should_refund ? 0 : deposit_balance,
+            move_in_ts,
+            move_in_confirmed,
+            landlord_move_in_confirmed,
+            new_end_tenancy_requested,
+            new_end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            new_state,
+            tenantSigHash,
+            landlordSigHash
+        );
+        return ();
+    }
+
+    if (op == 9) { ;; claim monthly rent
+        throw_if(800, state != STATE_ACTIVE());
+        throw_if(801, (is_landlord(sender_addr, landlord) == 0) & (is_admin(sender_addr, admin) == 0));
+        throw_if(802, rent_claimed_periods >= rent_paid_periods);
+        throw_if(803, rent_balance < monthly_rent);
+
+        int period_index = rent_claimed_periods;
+        int period_end_ts = next_period_end(start_ts, period_seconds, period_index);
+        throw_if(804, now() < period_end_ts);
+
+        if (period_index == 0) {
+            throw_if(805, (move_in_confirmed == 0) | (landlord_move_in_confirmed == 0));
+            throw_if(806, now() < move_in_ts + first_lock_secs);
+        }
+
+        rent_balance -= monthly_rent;
+        rent_claimed_periods += 1;
+
+        send_raw_message(
+            begin_cell()
+                .store_uint(0, 6)
+                .store_slice(landlord)
+                .store_coins(monthly_rent)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 2 + 1)
+                .end_cell(),
+            1
+        );
+
+        save_state(
+            config_cell,
+            rent_balance,
+            deposit_balance,
+            move_in_ts,
+            move_in_confirmed,
+            landlord_move_in_confirmed,
+            end_tenancy_requested,
+            end_tenancy_confirmed,
+            rent_paid_periods,
+            rent_claimed_periods,
+            state,
+            tenantSigHash,
+            landlordSigHash
+        );
+        return ();
+    }
+
+    throw(999);
+}
+
+;; ========== Get Methods ==========
+
+(int, int, int, int, int, int, int) get_state() method_id {
+    (cell _config,
+     slice landlord,
+     slice tenant,
+     slice admin,
+     int monthly_rent,
+     int deposit_amount,
+     int rent_balance,
+     int deposit_balance,
+     int start_ts,
+     int period_seconds,
+     int first_lock_secs,
+     int move_in_ts,
+     int move_in_confirmed,
+     int landlord_move_in_confirmed,
+     int end_tenancy_requested,
+     int end_tenancy_confirmed,
+     int rent_paid_periods,
+     int rent_claimed_periods,
+     int total_months,
+     int initial_prepaid_months,
+     int state,
+     int tenantSigHash,
+     int landlordSigHash) = load_state();
+
+    return (
+        state,
+        rent_balance,
+        deposit_balance,
+        rent_paid_periods,
+        rent_claimed_periods,
+        tenantSigHash,
+        landlordSigHash
+    );
+}
+
+(slice, slice, slice, int, int, int) get_config() method_id {
+    (cell _config,
+     slice landlord,
+     slice tenant,
+     slice admin,
+     int monthly_rent,
+     int deposit_amount,
+     int rent_balance,
+     int deposit_balance,
+     int start_ts,
+     int period_seconds,
+     int first_lock_secs,
+     int move_in_ts,
+     int move_in_confirmed,
+     int landlord_move_in_confirmed,
+     int end_tenancy_requested,
+     int end_tenancy_confirmed,
+     int rent_paid_periods,
+     int rent_claimed_periods,
+     int total_months,
+     int initial_prepaid_months,
+     int state,
+     int tenantSigHash,
+     int landlordSigHash) = load_state();
+
+    return (
+        landlord,
+        tenant,
+        admin,
+        monthly_rent,
+        deposit_amount,
+        start_ts
+    );
+}
