@@ -1,0 +1,392 @@
+#include "stdlib.fc";
+
+const op::accept_bridge_dfa_event = "op::accept_bridge_dfa_event"c; ;; create an opcode from string using the "c" prefix, this results in 0x1500028d opcode in this case
+const op::on_accept_bridge_dfa_event = "op::on_accept_bridge_dfa_event"c; ;; create an opcode from string using the "c" prefix, this results in 0x8282ecb9 opcode in this case
+const op::reject_bridge_dfa_event = "op::reject_bridge_dfa_event"c; ;; create an opcode from string using the "c" prefix, this results in 0x1a5ad037 opcode in this case
+const op::toggle_pause = "op::toggle_pause"c; ;; create an opcode from string using the "c" prefix, this results in 0x44784c17 opcode in this case
+const op::toggle_relay = "op::toggle_relay"c; ;; create an opcode from string using the "c" prefix, this results in 0xced83c43 opcode in this case
+const op::process_bridge_dfa_event = "op::process_bridge_dfa_event"c; ;; create an opcode from string using the "c" prefix, this results in 0xea116e9d opcode in this case
+const op::set_admin = "op::set_admin"c; ;; create an opcode from string using the "c" prefix, this results in 0x4d5f2cca opcode in this case
+const op::withdraw_extra_jettons = "op::withdraw_extra_jettons"c; ;; create an opcode from string using the "c" prefix, this results in 0x6918c983 opcode in this case
+const op::withdraw_extra_ton = "op::withdraw_extra_ton"c; ;; create an opcode from string using the "c" prefix, this results in 0x3fa98bbf opcode in this case
+const op::upgrade = "op::upgrade"c; ;; create an opcode from string using the "c" prefix, this results in 0xdbfaf817 opcode in this case
+const op::transfer = 0xf8a7ea5;
+const op::transfer_notification = 0x7362d09c;
+const op::provide_wallet_address = 0x2c76b973;
+const op::take_wallet_address = 0xd1735400;
+const op::top_up = 0xd372158c;
+
+const status::pending = "status::pending"c; ;; create an status from string using the "c" prefix, this results in 0xb3b85628 opcode in this case
+const status::accepted = "status::accepted"c; ;; create an status from string using the "c" prefix, this results in 0xf17238b0 opcode in this case
+const status::rejected = "status::rejected"c; ;; create an status from string using the "c" prefix, this results in 0x53592fb opcode in this case
+const status::processed = "status::processed"c; ;; create an status from string using the "c" prefix, this results in 0x7d79ab5e opcode in this case
+
+const error::invalid_sender = 91;
+const error::bridge_dfa_event_not_found = 92;
+const error::is_paused = 93;
+
+const VERSION = 1;              ;; code version
+const JETTON_DECIMALS = 9;      ;; jetton_decimals
+const GAS_FOR_ACCEPT = 5000000;
+
+;; storage variables
+
+;; id is required to be able to create different instances of counters
+;; since addresses in TON depend on the initial state of the contract
+global int ctx_id;
+global int ctx_paused;
+global int ctx_counter;
+global slice ctx_jetton_wallet;
+global slice ctx_multisig;
+global slice ctx_admin;
+global cell ctx_relays;
+global cell ctx_bridge_dfa_events;
+global int ctx_balance_under_pending;
+
+;; load_data populates storage variables using stored data
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    ctx_id = ds~load_uint(32);
+    ctx_paused = ds~load_uint(8);
+    ctx_counter = ds~load_uint(32);
+    ctx_jetton_wallet = ds~load_msg_addr(); ;; jetton_wallet_address
+    ctx_multisig = ds~load_msg_addr(); ;; multisig_address
+    ctx_admin = ds~load_msg_addr(); ;; admin_address
+    ctx_relays = ds~load_dict(); ;; relays dictionary
+    ctx_bridge_dfa_events = ds~load_dict(); ;; bridge_dfa_events dictionary as 2D array of index*bridge_dfa_event(slice from, coins value, cell data, uint32 status)
+    ctx_balance_under_pending = ds~load_coins();
+
+    ds.end_parse();
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(ctx_id, 32)
+            .store_uint(ctx_paused, 8)
+            .store_uint(ctx_counter, 32)
+            .store_slice(ctx_jetton_wallet)
+            .store_slice(ctx_multisig)
+            .store_slice(ctx_admin)
+            .store_dict(ctx_relays)
+            .store_dict(ctx_bridge_dfa_events)
+            .store_coins(ctx_balance_under_pending)
+            .end_cell()
+    );
+}
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    load_data(); ;; here we populate the storage variables
+
+    int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+    int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
+
+    if (op == op::transfer_notification) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_jetton_wallet));
+        int value = in_msg_body~load_coins();
+        slice from = in_msg_body~load_msg_addr();
+        slice data = in_msg_body;
+        slice bridge_dfa_event = begin_cell().store_slice(from).store_coins(value).store_uint(status::pending, 32).store_slice(data).end_cell().begin_parse();
+        ctx_bridge_dfa_events~udict_set(32, ctx_counter, bridge_dfa_event);
+        ctx_balance_under_pending += value;
+        ctx_counter += 1;
+        save_data();
+        return ();
+    }
+
+    if (op == op::accept_bridge_dfa_event) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_multisig) | equal_slices_bits(sender_address, ctx_admin));
+        throw_unless(error::is_paused, ctx_paused == 0);
+        int index = in_msg_body~load_uint(32);
+        (slice bridge_dfa_event, int is_found) = ctx_bridge_dfa_events.udict_get?(32, index);
+        throw_unless(error::bridge_dfa_event_not_found, is_found);
+        slice from = bridge_dfa_event~load_msg_addr();
+        int value = bridge_dfa_event~load_coins();
+        int divisor = 1;
+        repeat (JETTON_DECIMALS - 2) {
+            divisor = divisor * 10;
+        }
+        int value_dfa = value / divisor;
+        int status = bridge_dfa_event~load_uint(32);
+        slice data = bridge_dfa_event;
+        slice accepted_bridge_dfa_event = begin_cell().store_slice(from).store_coins(value).store_uint(status::accepted, 32).store_slice(data).end_cell().begin_parse();
+        ctx_bridge_dfa_events~udict_set(32, index, accepted_bridge_dfa_event);
+        ctx_balance_under_pending -= value;
+        cell on_accept_msg_body = begin_cell()
+        .store_op(op::on_accept_bridge_dfa_event)
+        .store_query_id(query_id)
+        .store_uint(index, 32)
+        .store_coins(value_dfa)
+        .store_slice(data)
+        .end_cell();
+        cell on_accept_msg_cell = begin_cell()
+        .store_msg_flags_and_address_none(BOUNCEABLE)
+        .store_slice(my_address())
+        .store_coins(GAS_FOR_ACCEPT)
+        .store_only_body_ref(on_accept_msg_body)
+        .end_cell();
+        send_raw_message(on_accept_msg_cell, SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        cell msg_body = begin_cell()
+        .store_op(op::transfer)
+        .store_query_id(query_id)
+        .store_coins(value)
+        .store_slice(ctx_multisig)
+        .store_slice(sender_address)
+        .store_maybe_ref(begin_cell().end_cell())
+        .store_coins(0)
+        .store_maybe_ref(begin_cell().end_cell()) ;; either_forward_payload
+        .end_cell();
+        cell msg_cell = begin_cell()
+        .store_msg_flags_and_address_none(BOUNCEABLE)
+        .store_slice(ctx_jetton_wallet)
+        .store_coins(0)
+        .store_only_body_ref(msg_body)
+        .end_cell();
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        save_data();
+        return ();
+    }
+
+    if (op == op::on_accept_bridge_dfa_event) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, my_address()));
+        throw_unless(error::is_paused, ctx_paused == 0);
+        int index = in_msg_body~load_uint(32);
+        (slice bridge_dfa_event, int is_found) = ctx_bridge_dfa_events.udict_get?(32, index);
+        throw_unless(error::bridge_dfa_event_not_found, is_found);
+        return ();
+    }
+
+    if (op == op::reject_bridge_dfa_event) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_multisig) | equal_slices_bits(sender_address, ctx_admin));
+        throw_unless(error::is_paused, ctx_paused == 0);
+        int index = in_msg_body~load_uint(32);
+        (slice bridge_dfa_event, int is_found) = ctx_bridge_dfa_events.udict_get?(32, index);
+        throw_unless(error::bridge_dfa_event_not_found, is_found);
+        slice from = bridge_dfa_event~load_msg_addr();
+        int value = bridge_dfa_event~load_coins();
+        int status = bridge_dfa_event~load_uint(32);
+        slice data = bridge_dfa_event;
+        slice rejected_bridge_dfa_event = begin_cell().store_slice(from).store_coins(value).store_uint(status::rejected, 32).store_slice(data).end_cell().begin_parse();
+        ctx_bridge_dfa_events~udict_set(32, index, rejected_bridge_dfa_event);
+        ctx_balance_under_pending -= value;
+        cell msg_body = begin_cell()
+        .store_op(op::transfer)
+        .store_query_id(query_id)
+        .store_coins(value)
+        .store_slice(from)
+        .store_slice(sender_address)
+        .store_maybe_ref(begin_cell().end_cell())
+        .store_coins(0)
+        .store_maybe_ref(begin_cell().end_cell()) ;; either_forward_payload
+        .end_cell();
+        cell msg_cell = begin_cell()
+        .store_msg_flags_and_address_none(BOUNCEABLE)
+        .store_slice(ctx_jetton_wallet)
+        .store_coins(0)
+        .store_only_body_ref(msg_body)
+        .end_cell();
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        save_data();
+        return ();
+    }
+
+    if (op == op::top_up) {
+        throw_unless(error::is_paused, ctx_paused == 0);
+        cell msg_body = begin_cell()
+        .store_op(op::provide_wallet_address)
+        .store_query_id(query_id)
+        .store_slice(my_address())
+        .store_bool(0)
+        .end_cell();
+        cell msg_cell = begin_cell()
+        .store_msg_flags_and_address_none(BOUNCEABLE)
+        .store_slice(ctx_jetton_wallet)
+        .store_coins(0)
+        .store_only_body_ref(msg_body)
+        .end_cell();
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        return ();
+    }
+
+    if (op == op::take_wallet_address) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_jetton_wallet));
+        ctx_jetton_wallet = in_msg_body~load_msg_addr();
+        save_data();
+        return ();
+    }
+
+    if (op == op::toggle_relay) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_multisig));
+        slice relay_address = in_msg_body~load_msg_addr();
+        (slice existing_relay, int is_found) = ctx_relays.udict_get?(32, slice_hash(relay_address));
+        if (is_found) {
+            ctx_relays~udict_delete?(32, slice_hash(relay_address));
+        } else {
+            ctx_relays~udict_set(32, slice_hash(relay_address), relay_address);
+        }
+        save_data();
+        return ();
+    }
+
+    if (op == op::process_bridge_dfa_event) {
+        throw_unless(error::is_paused, ctx_paused == 0);
+        (slice relay, int is_relay_found) = ctx_relays.udict_get?(32, slice_hash(sender_address));
+        throw_unless(error::invalid_sender, is_relay_found);
+        int index = in_msg_body~load_uint(32);
+        (slice bridge_dfa_event, int is_found) = ctx_bridge_dfa_events.udict_get?(32, index);
+        throw_unless(error::bridge_dfa_event_not_found, is_found);
+        slice from = bridge_dfa_event~load_msg_addr();
+        int value = bridge_dfa_event~load_coins();
+        int status = bridge_dfa_event~load_uint(32);
+        slice data = bridge_dfa_event;
+        slice processed_bridge_dfa_event = begin_cell().store_slice(from).store_coins(value).store_uint(status::processed, 32).store_slice(data).end_cell().begin_parse();
+        ctx_bridge_dfa_events~udict_set(32, index, processed_bridge_dfa_event);
+        save_data();
+        return ();
+    }
+
+    if (op == op::set_admin) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_multisig));
+        throw_unless(error::is_paused, ctx_paused == 0);
+        slice new_admin = in_msg_body~load_msg_addr();
+        ctx_admin = new_admin;
+        save_data();
+        return ();
+    }
+
+    if (op == op::withdraw_extra_jettons) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_multisig));
+        throw_unless(error::is_paused, ctx_paused == 0);
+        int amount = in_msg_body~load_coins();
+        cell msg_body = begin_cell()
+        .store_op(op::transfer)
+        .store_query_id(query_id)
+        .store_coins(amount)
+        .store_slice(ctx_multisig)
+        .store_slice(sender_address)
+        .store_maybe_ref(begin_cell().end_cell())
+        .store_coins(0)
+        .store_maybe_ref(begin_cell().end_cell()) ;; either_forward_payload
+        .end_cell();
+        cell msg_cell = begin_cell()
+        .store_msg_flags_and_address_none(BOUNCEABLE)
+        .store_slice(ctx_jetton_wallet)
+        .store_coins(0)
+        .store_only_body_ref(msg_body)
+        .end_cell();
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        return ();
+    }
+
+    if (op == op::withdraw_extra_ton) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_multisig));
+        throw_unless(error::is_paused, ctx_paused == 0);
+        int amount = in_msg_body~load_coins();
+        cell msg_cell = begin_cell()
+        .store_msg_flags_and_address_none(BOUNCEABLE)
+        .store_slice(ctx_multisig)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        return ();
+    }
+
+    if (op == op::upgrade) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_multisig));
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        in_msg_body.end_parse();
+        set_data(new_data);
+        set_code(new_code);
+        set_c3(new_code.begin_parse().bless());
+        return ();
+    }
+
+    if (op == op::toggle_pause) {
+        throw_unless(error::invalid_sender, equal_slices_bits(sender_address, ctx_multisig));
+        ctx_paused = ctx_paused == 0 ? 1 : 0;
+        save_data();
+        return ();
+    }
+
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+;; get methods are a means to conveniently read contract data using, for example, HTTP APIs
+;; they are marked with method_id
+;; note that unlike in many other smart contract VMs, get methods cannot be called by other contracts
+
+int get_counter() method_id {
+    load_data();
+    return ctx_counter;
+}
+
+int get_id() method_id {
+    load_data();
+    return ctx_id;
+}
+
+int get_is_paused() method_id {
+    load_data();
+    return ctx_paused;
+}
+
+slice get_jetton_wallet() method_id {
+    load_data();
+    return ctx_jetton_wallet;
+}
+
+slice get_multisig() method_id {
+    load_data();
+    return ctx_multisig;
+}
+
+slice get_admin() method_id {
+    load_data();
+    return ctx_admin;
+}
+
+slice get_relay(int index) method_id {
+    load_data();
+    (slice relay, int is_found) = ctx_relays.udict_get?(32, index);
+    if is_found {
+        return (relay);
+    } else {
+        return address_none();
+    }
+}
+
+int get_is_relay(slice relay_address) method_id {
+    load_data();
+    (slice relay, int is_found) = ctx_relays.udict_get?(32, slice_hash(relay_address));
+    return is_found;
+}
+
+slice get_bridge_dfa_event(int index) method_id {
+    load_data();
+    (slice bridge_dfa_event, int is_found) = ctx_bridge_dfa_events.udict_get?(32, index);
+    if is_found {
+        return (bridge_dfa_event);
+    } else {
+        return "";
+    }
+}
+
+int get_balance_under_pending() method_id {
+    load_data();
+    return ctx_balance_under_pending;
+}
