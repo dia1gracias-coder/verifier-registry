@@ -1,0 +1,550 @@
+;; TSK Token minter smart contract
+;;
+;; Verifier (verifier.ton.org) – use this exact file order in the command line:
+;;   stdlib.fc  op-codes.fc  workchain.fc  tsk-token-utils.fc  gas.fc  tsk-token-minter.fc
+;; Entry point: tsk-token-minter.fc (must be last).
+
+#pragma version >=0.4.3;
+
+#include "stdlib.fc";
+#include "op-codes.fc";
+#include "workchain.fc";
+#include "tsk-token-utils.fc";
+#include "gas.fc";
+
+;; storage#_ total_supply:Coins admin_address:MsgAddress next_admin_address:MsgAddress tsk_token_wallet_code:^Cell metadata_uri:^Cell salt:uint64 total_presale_tokens:Coins tokens_sold:Coins total_ton_collected:Coins min_purchase:Coins max_purchase:Coins is_paused:int = Storage;
+(int, slice, slice, cell, cell, int, int, int, int, int, int, int) load_data() inline {
+    slice ds = get_data().begin_parse();
+    int total_supply = ds~load_coins();
+    slice admin_address = ds~load_msg_addr();
+    slice next_admin_address = ds~load_msg_addr();
+    cell tsk_token_wallet_code = ds~load_ref();
+    cell metadata_uri = ds~load_ref();
+    int salt = 0;
+    int total_presale_tokens = 0;
+    int tokens_sold = 0;
+    int total_ton_collected = 0;
+    int min_purchase = 0;
+    int max_purchase = 0;
+    int is_paused = 0;
+    if (slice_bits(ds) >= 64) {
+        salt = ds~load_uint(64);
+        if (slice_bits(ds) >= 4) {
+            total_presale_tokens = ds~load_coins();
+            if (slice_bits(ds) >= 4) {
+                tokens_sold = ds~load_coins();
+                if (slice_bits(ds) >= 4) {
+                    total_ton_collected = ds~load_coins();
+                    if (slice_bits(ds) >= 4) {
+                        min_purchase = ds~load_coins();
+                        if (slice_bits(ds) >= 4) {
+                            max_purchase = ds~load_coins();
+                            if (slice_bits(ds) >= 1) {
+                                is_paused = ds~load_uint(1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    ds.end_parse();
+    return (total_supply, admin_address, next_admin_address, tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, is_paused);
+}
+
+() save_data(int total_supply, slice admin_address, slice next_admin_address, cell tsk_token_wallet_code, cell metadata_uri, int salt, int total_presale_tokens, int tokens_sold, int total_ton_collected, int min_purchase, int max_purchase, int is_paused) impure inline {
+    set_data(
+        begin_cell()
+        .store_coins(total_supply)
+        .store_slice(admin_address)
+        .store_slice(next_admin_address)
+        .store_ref(tsk_token_wallet_code)
+        .store_ref(metadata_uri)
+        .store_uint(salt, 64)
+        .store_coins(total_presale_tokens)
+        .store_coins(tokens_sold)
+        .store_coins(total_ton_collected)
+        .store_coins(min_purchase)
+        .store_coins(max_purchase)
+        .store_uint(is_paused, 1)
+        .end_cell()
+    );
+}
+
+() send_to_tsk_token_wallet(slice to_address, cell tsk_token_wallet_code, int ton_amount, cell master_msg, int need_state_init) impure inline {
+    raw_reserve(ONE_TON / 100, RESERVE_REGULAR); ;; reserve for storage fees
+
+    cell state_init = calculate_tsk_token_wallet_state_init(to_address, my_address(), tsk_token_wallet_code);
+    slice to_wallet_address = calculate_tsk_token_wallet_address(state_init);
+
+    ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+    var msg = begin_cell()
+    .store_msg_flags_and_address_none(BOUNCEABLE)
+    .store_slice(to_wallet_address) ;; dest
+    .store_coins(ton_amount);
+
+    if (need_state_init) {
+        msg = msg.store_statinit_ref_and_body_ref(state_init, master_msg);
+    } else {
+        msg = msg.store_only_body_ref(master_msg);
+    }
+
+    send_raw_message(msg.end_cell(), SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice in_msg_full_slice = in_msg_full.begin_parse();
+    int msg_flags = in_msg_full_slice~load_msg_flags();
+
+    if (is_bounced(msg_flags)) {
+        in_msg_body~skip_bounced_prefix();
+        ;; process only mint bounces
+        ifnot (in_msg_body~load_op() == op::internal_transfer) {
+            return ();
+        }
+        in_msg_body~skip_query_id();
+        int tsk_token_amount = in_msg_body~load_coins();
+        (int total_supply, slice admin_address, slice next_admin_address, cell tsk_token_wallet_code, cell metadata_uri, int salt, int total_presale_tokens, int tokens_sold, int total_ton_collected, int min_purchase, int max_purchase, int is_paused) = load_data();
+        save_data(total_supply - tsk_token_amount, admin_address, next_admin_address, tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, is_paused);
+        return ();
+    }
+    slice sender_address = in_msg_full_slice~load_msg_addr();
+    int fwd_fee_from_in_msg = in_msg_full_slice~retrieve_fwd_fee();
+    int fwd_fee = get_original_fwd_fee(MY_WORKCHAIN, fwd_fee_from_in_msg); ;; we use message fwd_fee for estimation of forward_payload costs
+
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+
+    (int total_supply, slice admin_address, slice next_admin_address, cell tsk_token_wallet_code, cell metadata_uri, int salt, int total_presale_tokens, int tokens_sold, int total_ton_collected, int min_purchase, int max_purchase, int is_paused) = load_data();
+
+    if (op == op::mint) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        check_same_workchain(to_address);
+        int ton_amount = in_msg_body~load_coins();
+        cell master_msg = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        ;; see internal_transfer TL-B layout in tsk-token.tlb
+        slice master_msg_slice = master_msg.begin_parse();
+        throw_unless(error::invalid_op, master_msg_slice~load_op() == op::internal_transfer);
+        master_msg_slice~skip_query_id();
+        int tsk_token_amount = master_msg_slice~load_coins();
+        master_msg_slice~load_msg_addr(); ;; from_address
+        master_msg_slice~load_msg_addr(); ;; response_address
+        int forward_ton_amount = master_msg_slice~load_coins(); ;; forward_ton_amount
+        check_either_forward_payload(master_msg_slice); ;; either_forward_payload
+
+        ;; a little more than needed, it's ok since it's sent by the admin and excesses will return back
+        check_amount_is_enough_to_transfer(ton_amount, forward_ton_amount, fwd_fee);
+
+        send_to_tsk_token_wallet(to_address, tsk_token_wallet_code, ton_amount, master_msg, TRUE);
+        save_data(total_supply + tsk_token_amount, admin_address, next_admin_address, tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, is_paused);
+        return ();
+    }
+
+    if (op == op::burn_notification) {
+        ;; see burn_notification TL-B layout in tsk-token.tlb
+        int tsk_token_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        throw_unless(error::not_valid_wallet,
+            equal_slices_bits(calculate_user_tsk_token_wallet_address(from_address, my_address(), tsk_token_wallet_code), sender_address)
+        );
+        save_data(total_supply - tsk_token_amount, admin_address, next_admin_address, tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, is_paused);
+        slice response_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        if (~ is_address_none(response_address)) {
+            ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+            var msg = begin_cell()
+            .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+            .store_slice(response_address) ;; dest
+            .store_coins(0)
+            .store_prefix_only_body()
+            .store_op(op::excesses)
+            .store_query_id(query_id);
+            send_raw_message(msg.end_cell(), SEND_MODE_IGNORE_ERRORS | SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        }
+        return ();
+    }
+
+    if (op == op::provide_wallet_address) {
+        ;; see provide_wallet_address TL-B layout in tsk-token.tlb
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_bool();
+        in_msg_body.end_parse();
+
+        cell included_address = include_address?
+        ? begin_cell().store_slice(owner_address).end_cell()
+        : null();
+
+        ;; build MessageRelaxed, see TL-B layout in stdlib.fc#L733
+        var msg = begin_cell()
+        .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+        .store_slice(sender_address)
+        .store_coins(0)
+        .store_prefix_only_body()
+        .store_op(op::take_wallet_address)
+        .store_query_id(query_id);
+
+        if (is_same_workchain(owner_address)) {
+            msg = msg.store_slice(calculate_user_tsk_token_wallet_address(owner_address, my_address(), tsk_token_wallet_code));
+        } else {
+            msg = msg.store_address_none();
+        }
+
+        cell msg_cell = msg.store_maybe_ref(included_address).end_cell();
+
+        send_raw_message(msg_cell, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+        return ();
+    }
+
+    if (op == op::change_admin) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        next_admin_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+        save_data(total_supply, admin_address, next_admin_address, tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, is_paused);
+        return ();
+    }
+
+    if (op == op::claim_admin) {
+        in_msg_body.end_parse();
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, next_admin_address));
+        save_data(total_supply, next_admin_address, address_none(), tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, is_paused);
+        return ();
+    }
+
+    if (op == op::drop_admin) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        in_msg_body.end_parse();
+        save_data(total_supply, address_none(), address_none(), tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, is_paused);
+        return ();
+    }
+
+    if (op == op::change_metadata_uri) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        save_data(total_supply, admin_address, next_admin_address, tsk_token_wallet_code, begin_cell().store_slice(in_msg_body).end_cell(), salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, is_paused);
+        return ();
+    }
+
+    if (op == op::upgrade) {
+        ;; Admin only: upgrade data+code (legacy) or code-only (compat)
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        int refs = slice_refs(in_msg_body);
+        if (refs >= 2) {
+            (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+            in_msg_body.end_parse();
+            set_data(new_data);
+            set_code(new_code);
+            return ();
+        }
+        if (refs == 1) {
+            ;; Compatibility: if only code ref is provided, treat as upgrade_code
+            cell new_code = in_msg_body~load_ref();
+            in_msg_body.end_parse();
+            set_code(new_code);
+            return ();
+        }
+        throw(error::invalid_message);
+    }
+
+    if (op == op::upgrade_code) {
+        ;; Admin only: replace code in place, preserve data (no RPC fetch needed - like TskStaking)
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        throw_unless(error::invalid_message, slice_refs(in_msg_body) >= 1);
+        cell new_code = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+        set_code(new_code);
+        return ();
+    }
+
+    if (op == op::top_up) {
+        return (); ;; just accept tons
+    }
+
+    if (op == op::withdraw) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        slice to_address = in_msg_body~load_msg_addr();
+        int withdraw_amount = in_msg_body~load_coins();
+        in_msg_body.end_parse();
+        
+        check_same_workchain(to_address);
+        
+        ;; Reserve minimum balance for contract operations (0.1 TON)
+        int min_balance = ONE_TON / 10;
+        int contract_balance = pair_first(get_balance());
+        int available_balance = contract_balance - min_balance;
+        
+        throw_unless(error::balance_error, available_balance >= withdraw_amount);
+        
+        ;; Send TON to specified address
+        var msg = begin_cell()
+        .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+        .store_slice(to_address)
+        .store_coins(withdraw_amount)
+        .store_prefix_only_body()
+        .end_cell();
+        
+        send_raw_message(msg, SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        return ();
+    }
+
+    if (op == op::buy_token) {
+        ;; ============================================================
+        ;; Presale Buy Token - Tier Pricing System
+        ;; ============================================================
+        ;; Message format: op::buy_token, query_id, to_address
+        ;; Validates purchase, calculates tokens based on tier, mints to user wallet
+        
+        slice to_address = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+        check_same_workchain(to_address);
+        
+        ;; Validate presale is active
+        throw_unless(error::invalid_op, total_presale_tokens > 0);
+        throw_unless(error::contract_locked, is_paused == 0);
+        
+        ;; Get effective min/max purchase limits (use defaults if not set)
+        int effective_min = min_purchase;
+        int effective_max = max_purchase;
+        if (effective_min == 0) {
+            effective_min = ONE_TON * 3 / 10; ;; Default: 0.3 TON
+        }
+        if (effective_max == 0) {
+            effective_max = ONE_TON * 10000; ;; Default: 10,000 TON
+        }
+        
+        ;; Validate purchase amount is within limits
+        throw_unless(error::balance_error, msg_value >= effective_min);
+        throw_unless(error::balance_error, msg_value <= effective_max);
+        
+        ;; Calculate current tier based on presale progress
+        int progress = 0;
+        if (total_presale_tokens > 0) {
+            progress = (tokens_sold * 100) / total_presale_tokens;
+        }
+        
+        ;; Determine tier price based on progress percentage
+        int tier_price = 0;
+        if (progress < 25) {
+            tier_price = 5000000; ;; Tier 1: 0.005 TON per token
+        } elseif (progress < 50) {
+            tier_price = 6000000; ;; Tier 2: 0.006 TON per token
+        } elseif (progress < 75) {
+            tier_price = 7000000; ;; Tier 3: 0.007 TON per token
+        } else {
+            tier_price = 8000000; ;; Tier 4: 0.008 TON per token
+        }
+        
+        ;; Calculate tokens to mint: tokens = (msg_value * 10^9) / tier_price
+        int tokens_to_mint = (msg_value * 1000000000) / tier_price;
+        
+        ;; Ensure minimum 1 token is minted
+        if (tokens_to_mint == 0) {
+            tokens_to_mint = 1;
+        }
+        
+        ;; Validate sufficient tokens available in presale
+        throw_unless(error::balance_error, tokens_sold + tokens_to_mint <= total_presale_tokens);
+        
+        ;; Calculate TON amounts for wallet transfer
+        ;; Standard approach: always send with state_init (TRUE)
+        ;; Blockchain will ignore state_init if wallet already exists
+        int forward_amount = ONE_TON / 20; ;; 0.05 TON for forward notification
+        int ton_amount = ONE_TON / 10; ;; 0.1 TON total (covers gas + forward + storage if needed)
+        
+        ;; Verify we have enough TON in the message for transfer
+        throw_unless(error::balance_error, msg_value >= ton_amount);
+        
+        ;; Create internal_transfer message for minting
+        ;; see internal_transfer TL-B layout in tsk-token.tlb
+        cell master_msg = begin_cell()
+            .store_op(op::internal_transfer)
+            .store_query_id(0)
+            .store_coins(tokens_to_mint)
+            .store_slice(address_none()) ;; from_address (address_none for minting from minter)
+            .store_slice(sender_address) ;; response_address (who receives excesses)
+            .store_coins(forward_amount) ;; forward_ton_amount (0.05 TON for notification)
+            .store_uint(0, 1) ;; forward_payload: left (empty slice)
+            .end_cell();
+        
+        ;; Validate the internal_transfer message format (same as mint function)
+        slice master_msg_slice = master_msg.begin_parse();
+        throw_unless(error::invalid_op, master_msg_slice~load_op() == op::internal_transfer);
+        master_msg_slice~skip_query_id();
+        int tsk_token_amount = master_msg_slice~load_coins();
+        throw_unless(error::balance_error, tsk_token_amount == tokens_to_mint); ;; Verify amount matches
+        master_msg_slice~load_msg_addr(); ;; from_address
+        master_msg_slice~load_msg_addr(); ;; response_address
+        int extracted_forward_ton_amount = master_msg_slice~load_coins(); ;; forward_ton_amount
+        throw_unless(error::balance_error, extracted_forward_ton_amount == forward_amount); ;; Verify forward amount matches
+        check_either_forward_payload(master_msg_slice); ;; either_forward_payload
+        
+        ;; Check amount is enough for transfer (same as mint function)
+        ;; ton_amount is what we send to wallet, forward_amount is the forward notification amount
+        check_amount_is_enough_to_transfer(ton_amount, forward_amount, fwd_fee);
+        
+        ;; Send tokens to user wallet
+        ;; Always use TRUE for state_init - blockchain handles wallet creation automatically
+        send_to_tsk_token_wallet(to_address, tsk_token_wallet_code, ton_amount, master_msg, TRUE);
+        
+        ;; Calculate amounts for owner transfer
+        ;; After sending ton_amount to wallet, transfer 50% of remaining TON to owner
+        ;; Remaining = msg_value - ton_amount (what's left after wallet transfer)
+        int remaining_ton = msg_value - ton_amount;
+        
+        ;; Transfer 50% of remaining TON to owner (if owner address exists and amount is significant)
+        if (~ is_address_none(admin_address)) {
+            if (remaining_ton > ONE_TON / 50) {
+                int owner_amount = remaining_ton / 2; ;; 50% to owner
+                
+                if (owner_amount > ONE_TON / 100) { ;; Only send if > 0.01 TON
+                    var owner_msg = begin_cell()
+                        .store_msg_flags_and_address_none(NON_BOUNCEABLE)
+                        .store_slice(admin_address)
+                        .store_coins(owner_amount)
+                        .store_prefix_only_body()
+                        .end_cell();
+                    send_raw_message(owner_msg, SEND_MODE_PAY_FEES_SEPARATELY);
+                }
+            }
+        }
+        
+        ;; Update contract state
+        ;; total_ton_collected = full msg_value (all TON received, contract keeps the rest after owner transfer)
+        save_data(
+            total_supply + tokens_to_mint,
+            admin_address,
+            next_admin_address,
+            tsk_token_wallet_code,
+            metadata_uri,
+            salt,
+            total_presale_tokens,
+            tokens_sold + tokens_to_mint,
+            total_ton_collected + msg_value,
+            min_purchase,
+            max_purchase,
+            is_paused
+        );
+        return ();
+    }
+
+    if (op == op::update_min_max) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        int new_min = in_msg_body~load_coins();
+        int new_max = in_msg_body~load_coins();
+        in_msg_body.end_parse();
+        
+        throw_unless(error::balance_error, new_min > 0);
+        throw_unless(error::balance_error, new_max >= new_min);
+        
+        save_data(total_supply, admin_address, next_admin_address, tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, new_min, new_max, is_paused);
+        return ();
+    }
+
+    if (op == op::pause_presale) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        in_msg_body.end_parse();
+        save_data(total_supply, admin_address, next_admin_address, tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, 1);
+        return ();
+    }
+
+    if (op == op::resume_presale) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        in_msg_body.end_parse();
+        save_data(total_supply, admin_address, next_admin_address, tsk_token_wallet_code, metadata_uri, salt, total_presale_tokens, tokens_sold, total_ton_collected, min_purchase, max_purchase, 0);
+        return ();
+    }
+
+    if (op == op::initialize_presale) {
+        throw_unless(error::not_owner, equal_slices_bits(sender_address, admin_address));
+        ;; Can only initialize if presale is not already initialized
+        throw_unless(error::invalid_op, total_presale_tokens == 0);
+        
+        int presale_tokens = in_msg_body~load_coins();
+        int initial_min = in_msg_body~load_coins();
+        int initial_max = in_msg_body~load_coins();
+        in_msg_body.end_parse();
+        
+        throw_unless(error::balance_error, presale_tokens > 0);
+        throw_unless(error::balance_error, initial_min > 0);
+        throw_unless(error::balance_error, initial_max >= initial_min);
+        
+        ;; Initialize presale with provided values
+        save_data(total_supply, admin_address, next_admin_address, tsk_token_wallet_code, metadata_uri, salt, presale_tokens, 0, 0, initial_min, initial_max, 0);
+        return ();
+    }
+
+    throw(error::wrong_op);
+}
+
+cell build_content_cell(slice metadata_uri) inline {
+    cell content_dict = new_dict();
+    content_dict~set_token_snake_metadata_entry("uri"H, metadata_uri);
+    content_dict~set_token_snake_metadata_entry("decimals"H, "9");
+    return create_token_onchain_metadata(content_dict);
+}
+
+;; If stored content is full on-chain (0x00 + dict) or a ref to it, return as-is so explorer shows "on-chain". Else URI → semi-chain.
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell tsk_token_wallet_code, cell metadata_uri, int salt, int total_presale_tokens, int tokens_sold, int total_ton_collected, int min_purchase, int max_purchase, int is_paused) = load_data();
+    slice content_slice = metadata_uri.begin_parse();
+    ;; Stored as ref to content cell (from change_metadata with on-chain cell)?
+    if (slice_refs(content_slice) >= 1) {
+        cell content_cell = content_slice~load_ref();
+        slice inner = content_cell.begin_parse();
+        if (slice_bits(inner) >= 8) {
+            int prefix = inner~load_uint(8);
+            if (prefix == 0) {
+                return (total_supply, TRUE, admin_address, content_cell, tsk_token_wallet_code);
+            }
+        }
+    }
+    ;; Stored as direct on-chain cell (0x00 + dict) in deploy?
+    if (slice_bits(content_slice) >= 8) {
+        int prefix = content_slice~load_uint(8);
+        if (prefix == 0) {
+            return (total_supply, TRUE, admin_address, metadata_uri, tsk_token_wallet_code);
+        }
+    }
+    ;; External URI — build semi-chain content (uri + decimals)
+    return (total_supply, TRUE, admin_address, build_content_cell(metadata_uri.begin_parse()), tsk_token_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell tsk_token_wallet_code, cell metadata_uri, int salt, int total_presale_tokens, int tokens_sold, int total_ton_collected, int min_purchase, int max_purchase, int is_paused) = load_data();
+    return calculate_user_tsk_token_wallet_address(owner_address, my_address(), tsk_token_wallet_code);
+}
+
+slice get_next_admin_address() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell tsk_token_wallet_code, cell metadata_uri, int salt, int total_presale_tokens, int tokens_sold, int total_ton_collected, int min_purchase, int max_purchase, int is_paused) = load_data();
+    return next_admin_address;
+}
+
+(int, int, int, int) get_presale_info() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell tsk_token_wallet_code, cell metadata_uri, int salt, int total_presale_tokens, int tokens_sold, int total_ton_collected, int min_purchase, int max_purchase, int is_paused) = load_data();
+    return (total_presale_tokens, tokens_sold, total_ton_collected, total_supply);
+}
+
+(int, int) get_current_tier() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell tsk_token_wallet_code, cell metadata_uri, int salt, int total_presale_tokens, int tokens_sold, int total_ton_collected, int min_purchase, int max_purchase, int is_paused) = load_data();
+    int progress = 0;
+    int tier_price = 0;
+    if (total_presale_tokens > 0) {
+        progress = (tokens_sold * 100) / total_presale_tokens;
+        if (progress < 25) {
+            tier_price = ONE_TON / 200; ;; 0.005 TON
+        } elseif (progress < 50) {
+            tier_price = ONE_TON * 6 / 1000; ;; 0.006 TON
+        } elseif (progress < 75) {
+            tier_price = ONE_TON * 7 / 1000; ;; 0.007 TON
+        } else {
+            tier_price = ONE_TON / 125; ;; 0.008 TON
+        }
+    }
+    return (progress, tier_price);
+}
+
+(int, int, int) get_presale_settings() method_id {
+    (int total_supply, slice admin_address, slice next_admin_address, cell tsk_token_wallet_code, cell metadata_uri, int salt, int total_presale_tokens, int tokens_sold, int total_ton_collected, int min_purchase, int max_purchase, int is_paused) = load_data();
+    return (min_purchase, max_purchase, is_paused);
+}
