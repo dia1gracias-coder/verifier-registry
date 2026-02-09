@@ -1,0 +1,109 @@
+#include "workchain.fc";
+#include "op-codes.fc";
+
+const int SHARD_DEPTH = 8;
+
+cell default_dex_opcodes() inline {
+    cell dict = new_dict();
+    dict = udict_set_builder(dict, 32, STONFI_V2_SWAP_OP, begin_cell().store_uint(DEX_MASK_SWAP, 8));
+    dict = udict_set_builder(dict, 32, STONFI_V1_SWAP_OP, begin_cell().store_uint(DEX_MASK_SWAP, 8));
+    dict = udict_set_builder(dict, 32, STONFI_V2_PROVIDE_LP_OP, begin_cell().store_uint(DEX_MASK_PROVIDE_LP, 8));
+    dict = udict_set_builder(dict, 32, STONFI_SWAP_OK, begin_cell().store_uint(DEX_MASK_SWAP_OK, 8));
+    dict = udict_set_builder(dict, 32, STONFI_V2_REFUND_OK, begin_cell().store_uint(DEX_MASK_REFUND_OK, 8));
+    return dict;
+}
+
+cell default_trusted_routers() inline {
+    cell dict = new_dict();
+    ;; slice_hash of MsgAddress values:
+    ;; - STON.fi mainnet CPI router: EQCS4UEa5UaJLzOyyKieqQOQ2P9M-7kXpkO5HnP3Bv250cN3
+    ;; - STON.fi testnet CPI router: kQALh-JBBIKK7gr0o4AVf9JZnEsFndqO0qTCyT-D-yBsWk0v
+    dict = udict_set_builder(dict, 256, 0x033581cc4d9d56c5f423a220b21977effbff64248b6e39462faa040ae037ae12, begin_cell().store_uint(1, 1));
+    dict = udict_set_builder(dict, 256, 0x466ffc337248890627ffb0e77f43e31eed50db0aa65001829a7e51fba60382b1, begin_cell().store_uint(1, 1));
+    return dict;
+}
+
+cell pack_jetton_wallet_data(int balance, slice owner_address, slice jetton_master_address, slice lp_locker_address, int locked_total, cell locked_by_day, cell pending_lp, int pending_count, cell trusted_routers, cell dex_opcodes) inline {
+    return begin_cell()
+    .store_coins(balance)
+    .store_slice(owner_address)
+    .store_slice(jetton_master_address)
+    .store_slice(lp_locker_address)
+    .store_coins(locked_total)
+    .store_dict(locked_by_day)
+    .store_dict(pending_lp)
+    .store_uint(pending_count, 32)
+    .store_dict(trusted_routers)
+    .store_dict(dex_opcodes)
+    .end_cell();
+}
+
+int get_address_shard_prefix(slice address) inline {
+    {-
+    https://github.com/ton-blockchain/ton/blob/8a9ff339927b22b72819c5125428b70c406da631/crypto/block/block.tlb#L105
+    addr_std$10 anycast:(Maybe Anycast) workchain_id:int8 address:bits256  = MsgAddressInt;
+    -}
+    address~skip_bits(3 + 8); ;; skip $10 anycast:(Maybe Anycast) workchain_id:int8
+    return address.preload_uint(SHARD_DEPTH);
+}
+
+cell calculate_jetton_wallet_state_init(slice owner_address, slice jetton_master_address, cell jetton_wallet_code, slice lp_locker_address) inline {
+    {-
+    https://github.com/ton-blockchain/ton/blob/26761a1d139402ef343081810677d2582c3eff51/crypto/block/block.tlb#L144
+    _ fixed_prefix_length:(Maybe (## 5)) special:(Maybe TickTock)
+    code:(Maybe ^Cell) data:(Maybe ^Cell)
+    library:(Maybe ^Cell) = StateInit;
+  -}
+    return begin_cell()
+    .store_uint(1, 1) ;; ;; Use fixed_prefix_length;
+    .store_uint(SHARD_DEPTH, 5)
+    .store_uint(0, 1) ;;  No special
+    .store_maybe_ref(jetton_wallet_code)
+    .store_maybe_ref(
+        pack_jetton_wallet_data(
+            0, ;; balance
+            owner_address,
+            jetton_master_address,
+            lp_locker_address,
+            0, ;; locked_total
+            new_dict(), ;; locked_by_day
+            new_dict(), ;; pending_lp
+            0, ;; pending_count
+            default_trusted_routers(), ;; trusted_routers
+            default_dex_opcodes()
+        )
+    )
+    .store_uint(0, 1) ;; Empty libraries
+    .end_cell();
+}
+
+slice calculate_jetton_wallet_address(int shard_prefix, cell state_init) inline {
+    {-
+    https://github.com/ton-blockchain/ton/blob/8a9ff339927b22b72819c5125428b70c406da631/crypto/block/block.tlb#L105
+    addr_std$10 anycast:(Maybe Anycast) workchain_id:int8 address:bits256  = MsgAddressInt;
+    -}
+    int mask = (1 << (256 - SHARD_DEPTH)) - 1;
+    int prefix_less = state_init.cell_hash() & mask;
+
+    return begin_cell()
+    .store_uint(4, 3) ;; 0b100 = addr_std$10 tag; No anycast
+    .store_int(MY_WORKCHAIN, 8)
+    .store_uint(shard_prefix, SHARD_DEPTH)
+    .store_uint(prefix_less, 256 - SHARD_DEPTH)
+    .end_cell()
+    .begin_parse();
+}
+
+slice calculate_user_jetton_wallet_address(slice owner_address, slice jetton_master_address, cell jetton_wallet_code, slice lp_locker_address) inline {
+    int shard_prefix = get_address_shard_prefix(owner_address);
+    return calculate_jetton_wallet_address(shard_prefix, calculate_jetton_wallet_state_init(owner_address, jetton_master_address, jetton_wallet_code, lp_locker_address));
+}
+
+() check_either_forward_payload(slice s) impure inline {
+    if (s.preload_uint(1)) {
+        ;; forward_payload in ref
+        (int remain_bits, int remain_refs) = slice_bits_refs(s);
+        throw_unless(error::invalid_message, (remain_refs == 1) & (remain_bits == 1)); ;; we check that there is no excess in the slice
+    }
+    ;; else forward_payload in slice - arbitrary bits and refs
+}
