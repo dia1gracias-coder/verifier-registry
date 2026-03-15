@@ -1,0 +1,30 @@
+;; Pirate Token v4 - Constants
+;; Based on official TON jetton implementation
+
+;; Standard TEP-74 ops
+const int op::transfer = 0xf8a7ea5;
+const int op::transfer_notification = 0x7362d09c;
+const int op::internal_transfer = 0x178d4519;
+const int op::excesses = 0xd53276db;
+const int op::burn = 0x595f07bc;
+const int op::burn_notification = 0x7bdd97de;
+
+;; Minter ops
+const int op::mint = 21;
+const int op::change_admin = 3;
+const int op::renounce_ownership = 99;
+
+;; Custom: separate op for vesting (does NOT modify standard message format)
+const int op::vesting_transfer = 0x7a657374;
+
+;; Vesting parameters
+const int VESTING_DURATION_WEEKS = 40;
+const int WEEKLY_RELEASE_PERMILLE = 25;
+const int SECONDS_PER_WEEK = 604800;
+
+;; Errors (matching official numbering)
+const int error::not_owner = 705;
+const int error::not_enough_jettons = 706;
+const int error::unauthorized_transfer = 707;
+const int error::not_enough_unlocked = 708;
+const int error::not_enough_ton = 709;
