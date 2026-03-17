@@ -1,0 +1,69 @@
+#include "../imports/stdlib.fc";
+#include "messages.fc";
+;; Event emission: single module for EVENT_SINK, emit_event, event opcodes and wrappers.
+;; Included from mainGame.fc (stdlib etc. already in scope).
+
+;; Event opcodes (fixed 32-bit, stable for indexing)
+const int ev::keys_activated = "ev::keys_activated"c; ;; "0x99a95461"
+const int ev::jackpot_won   = "ev::jackpot_won"c; ;; "0x80e984d3"
+const int ev::keys_share    = "ev::keys_share"c; ;; "0x729f5d23"
+const int ev::pot_won       = "ev::pot_won"c; ;; "0x8d660a0d"
+const int ev::round_started = "ev::round_started"c; ;; "0x745c5a88"
+const int ev::stage_changed = "ev::stage_changed"c; ;; "0x3664e91f"
+
+;; Body: [opcode 32][query_id 64][round 16][ref payload]. Send mode 2 = IGNORE_ERRORS.
+() emit_event(int opcode, int round, cell payload) impure {
+  cell body = begin_cell()
+    .store_uint(opcode, 32)
+    .store_uint(round, 16)
+    .store_ref(payload)
+    .end_cell();
+
+  var msg = prepare_ext_out_with_op(opcode)
+          .store_ref(body);
+
+  send_raw_message(msg.end_cell(), IGNORE_ERRORS);
+}
+
+() emit_keys_activated(slice user, int amount, int keys, int round) impure {
+  cell payload = begin_cell()
+    .store_slice(user)
+    .store_coins(amount)
+    .store_coins(keys)
+  .end_cell();
+  emit_event(ev::keys_activated, round, payload);
+}
+
+() emit_jackpot_won(slice user, int win_amount, int activation_amount, int percentage_bp, int round) impure {
+  cell payload = begin_cell()
+    .store_slice(user)
+    .store_coins(win_amount)
+    .store_coins(activation_amount)
+    .store_uint(percentage_bp, 16)
+  .end_cell();
+  emit_event(ev::jackpot_won, round, payload);
+}
+
+() emit_keys_share(slice user, int amount, int round) impure {
+  cell payload = begin_cell()
+    .store_slice(user)
+    .store_coins(amount)
+  .end_cell();
+  emit_event(ev::keys_share, round, payload);
+}
+
+() emit_pot_won(slice user, int amount, int round) impure {
+  cell payload = begin_cell()
+    .store_slice(user)
+    .store_coins(amount)
+  .end_cell();
+  emit_event(ev::pot_won, round, payload);
+}
+
+() emit_round_started(int round) impure {
+  emit_event(ev::round_started, round, begin_cell().end_cell());
+}
+
+() emit_stage_changed(int round, int stage) impure {
+  emit_event(ev::stage_changed, round, begin_cell().store_uint(stage, 2).end_cell());
+}

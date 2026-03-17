@@ -1,0 +1,197 @@
+#include "params.fc";
+
+cell pack_user_round_data(
+  int total_keys,
+  int round_mask,
+  int total_round_spent,
+  int total_round_gained,
+  int prev_random_seed
+) inline {
+
+  return begin_cell()
+        .store_coins(total_keys)
+        .store_coins(round_mask)
+        .store_coins(total_round_spent)
+        .store_coins(total_round_gained)
+        .store_uint(prev_random_seed, 256)
+      .end_cell();
+}
+
+(int, int, int, int, int) unpack_user_round_data(cell user_round_data) inline {
+  slice s = user_round_data.begin_parse();
+  return (
+    s~load_coins(), ;; total_keys
+    s~load_coins(), ;; round_mask
+    s~load_coins(), ;; total_round_spent
+    s~load_coins(), ;; total_round_gained
+    s~load_uint(256) ;; prev_random_seed
+  );
+}
+
+cell pack_wallet_data(
+  int round,
+  int total_keys,
+  int round_mask,
+  int total_round_spent,
+  int total_round_gained,
+  int pending_request,
+  int stage3_status,
+  slice owner,
+  int has_referrer,
+  slice referrer,
+  slice main_game_address,
+  cell user_main_game_wallet_code,
+  int prev_random_seed,
+  int bonus_tier
+) inline {
+
+  cell wallet_data = begin_cell()
+    .store_uint(round, 16)
+    .store_ref(pack_user_round_data(
+      total_keys,
+      round_mask,
+      total_round_spent,
+      total_round_gained,
+      prev_random_seed
+    ))
+    .store_uint(pending_request, 1)
+    .store_uint(stage3_status, 2)
+    .store_slice(owner)
+    .store_uint(has_referrer, 2)
+    .store_slice(referrer)
+    .store_slice(main_game_address)
+    .store_ref(user_main_game_wallet_code)
+    .store_uint(bonus_tier, 2)
+  .end_cell();
+
+  return wallet_data;
+}
+
+{-
+  _ split_depth:(Maybe (## 5)) special:(Maybe TickTock)
+    code:(Maybe ^Cell) data:(Maybe ^Cell)
+    library:(HashmapE 256 SimpleLib) = StateInit;
+-}
+
+cell calculate_wallet_state_init(slice owner, slice master_address, cell wallet_code) inline {
+  return begin_cell()
+        .store_uint(0, 1 + 1) ;; split_depth (Maybe = 0) and special (Maybe = 0)
+        .store_maybe_ref(wallet_code)
+        .store_maybe_ref(pack_wallet_data(1, 0, 0, 0, 0, 0, 0, owner, 0, address_none(), master_address, wallet_code, 0, 0))
+        .store_uint(0, 1) ;; libraries - empty cell
+        .end_cell();
+}
+
+{-
+  addr_std$10 anycast:(Maybe Anycast)
+   workchain_id:int8 address:bits256  = MsgAddressInt;
+-}
+slice calc_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3) ;; 0x100 : $10 + anycast (Maybe = 0)
+        .store_int(workchain, 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}
+
+slice calc_user_wallet_address(slice owner, slice master_address, cell wallet_code) inline {
+  return calc_address(calculate_wallet_state_init(owner, master_address, wallet_code));
+}
+
+int is_valid_address_format(slice address) inline {
+  int addr_type = address.preload_uint(2);
+  return (addr_type == 2) | (addr_type == 3); ;; addr_std$10 or addr_var$11
+}
+
+int is_valid_workchain(slice address) inline {
+  if (is_address_none(address)) {
+    return 0;
+  }
+
+  int addr_type = address.preload_uint(2);
+  if (addr_type == 2) { ;; addr_std$10
+    (int wc, _) = parse_std_addr(address);
+    return (wc == 0) | (wc == -1); ;; mainnet or testnet
+  }
+
+  return 1; ;; addr_var$11 is always valid
+}
+
+int is_valid_referrer_address(slice address, slice owner) inline {
+  if (is_address_none(address)) {
+    return 0;
+  }
+
+  if (~ is_valid_address_format(address)) {
+    return 0;
+  }
+
+  if (~ is_valid_workchain(address)) {
+    return 0;
+  }
+
+  if (equal_slices_bits(owner, address)) {
+    return 0; ;; referrer cannot be the same as owner
+  }
+
+  return 1;
+}
+
+cell pack_stats_data(
+  int round,
+  int keys,
+  int tons,
+  int round_mask,
+  int round_start,
+  int stage_ends,
+  int time_limit,
+  slice last_key_owner
+) inline {
+  return begin_cell()
+        .store_uint(round, 16)
+        .store_coins(keys)
+        .store_coins(tons)
+        .store_coins(round_mask)
+        .store_uint(round_start, 32)
+        .store_uint(stage_ends, 32)
+        .store_uint(time_limit, 18)
+        .store_slice(last_key_owner)
+        .end_cell();
+}
+
+(int, int, int, int, int, int, int, slice) unpack_stats_data(cell stats) inline {
+  slice ss = stats.begin_parse();
+  return (
+    ss~load_uint(16), ;; round
+    ss~load_coins(), ;; keys
+    ss~load_coins(), ;; tons
+    ss~load_coins(), ;; round_mask
+    ss~load_uint(32), ;; round_start
+    ss~load_uint(32), ;; stage_ends
+    ss~load_uint(18), ;; time_limit
+    ss~load_msg_addr() ;; last_key_owner
+  );
+}
+
+cell pack_shares_data(int pot, int keys, int stake, int community, int luck, int swap) inline {
+  return begin_cell()
+        .store_coins(pot)
+        .store_coins(keys)
+        .store_coins(stake)
+        .store_coins(community)
+        .store_coins(luck)
+        .store_coins(swap)
+        .end_cell();
+}
+
+(int, int, int, int, int, int) unpack_shares_data(cell shares) inline {
+  slice s = shares.begin_parse();
+  return (
+    s~load_coins(), ;; pot
+    s~load_coins(), ;; keys
+    s~load_coins(), ;; stake
+    s~load_coins(), ;; community
+    s~load_coins(), ;; luck
+    s~load_coins() ;; swap
+  );
+}
