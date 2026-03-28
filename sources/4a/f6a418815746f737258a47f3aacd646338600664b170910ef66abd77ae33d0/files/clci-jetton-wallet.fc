@@ -1,0 +1,17 @@
+#include "stdlib.fc";
+#include "op-codes.fc";
+#include "constants.fc";
+
+cell init_wallet_data(int balance, slice owner_address, slice master_address) {
+    return begin_cell()
+            .store_coins(balance) ;; jetton_balance
+            .store_slice(owner_address) ;; owner_address
+            .store_slice(master_address) ;; master_address
+            .end_cell();
+}
+
+(int, slice, slice) load_wallet_data() {
+    slice ds = get_data().begin_parse();
+    return (ds~load_coins(), ds~load_msg_addr(), ds~load_msg_addr());
+}
+
