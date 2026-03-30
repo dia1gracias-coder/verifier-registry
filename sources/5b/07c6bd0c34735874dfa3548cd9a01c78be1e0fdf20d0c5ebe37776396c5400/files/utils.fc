@@ -1,0 +1,308 @@
+#include "opcodes.fc";
+
+const int ONE_TON = 1000000000;
+
+const int COMMISSION_ESTIMATE = ONE_TON / 10;
+const int STORAGE_ESTIMATE = ONE_TON / 100;
+const int CLIENT_STAKE = ONE_TON;
+
+const int BOUNCEABLE = 0x18;
+const int NON_BOUNCEABLE = 0x10;
+
+const int WORKCHAIN = 0;
+
+const int SEND_MODE_REGULAR = 0;
+const int SEND_MODE_PAY_FEES_SEPARETELY = 1;
+const int SEND_MODE_IGNORE_ERRORS = 2;
+const int SEND_MODE_DESTROY = 32;
+const int SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE = 64;
+const int SEND_MODE_CARRY_ALL_BALANCE = 128;
+
+const int client_state_normal = 0;
+const int client_state_closing = 1;
+const int client_state_closed = 2;
+
+const int proxy_state_normal = 0;
+const int proxy_state_closing = 1;
+const int proxy_state_closed = 2;
+
+const int worker_state_normal = 0;
+const int worker_state_closed = 2;
+
+builder create_msg(int flags, slice to_address, int value) inline {
+    return begin_cell()
+            .store_uint(flags, 6)
+            .store_slice(to_address)
+            .store_coins(value)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+}
+
+builder create_msg_ref(int flags, slice to_address, int value) inline {
+    return begin_cell()
+            .store_uint(flags, 6)
+            .store_slice(to_address)
+            .store_coins(value)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+            .store_uint(1, 1);
+}
+
+() forward_excesses(slice send_excesses_to, int query_id) impure {
+  builder msg = create_msg(NON_BOUNCEABLE, send_excesses_to, 0)
+        .store_uint(op::excesses, 32) ;; op
+        .store_uint(query_id, 64); ;; query_id
+  send_raw_message(msg.end_cell(), SEND_MODE_CARRY_ALL_BALANCE);
+  return ();
+}
+
+slice calculate_contract_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(WORKCHAIN, 8)
+                     .store_uint(cell_hash(state_init), 256)
+                     .end_cell()
+                     .begin_parse();
+}
+
+int my_balance() inline {
+    [int b, cell e] = get_balance();
+    return b;
+}
+
+[slice, slice] signed_message_unpack_and_check_signature(slice msg, int op, int query_id, int proxy_public_key) {
+  slice send_excesses_to = msg~load_msg_addr();
+  slice signature = msg~load_bits(512);
+  slice payload = msg~load_ref().begin_parse();
+  msg.end_parse();
+
+  throw_unless(error::bad_signature, check_signature(slice_hash(payload), signature, proxy_public_key));
+
+  int op_copy = payload~load_uint(32);
+  int query_id_copy = payload~load_uint(64);
+
+  throw_unless(error::signed_msg_format_mismatch, op_copy == op);
+  throw_unless(error::signed_msg_format_mismatch, query_id_copy == query_id);
+
+  return [payload, send_excesses_to];
+}
+
+;; ====== PARAMS =======
+;; 8 + 32 + 32 + 1 + 68 + 68 + 32 + 68 + 68 + 1 + 1 + 1 = 380 bits
+
+cell pack_cocoon_params(int params_version, int unique_id, int is_test, int price_per_token, int worker_fee_per_token,
+                               int prompt_tokens_price_multiplier, int cached_tokens_price_multiplier, 
+                               int completion_tokens_price_multiplier, int reasoning_tokens_price_multiplier,
+                               int proxy_delay_before_close, int client_delay_before_close,
+                               int min_proxy_stake, int min_client_stake,
+                               cell proxy_sc_code, cell worker_sc_code, cell client_sc_code) {
+  return begin_cell()
+    .store_uint(3, 8) ;; struct version
+    .store_uint(params_version, 32)
+    .store_uint(unique_id, 32)
+    .store_uint(is_test, 1)
+    .store_coins(price_per_token)
+    .store_coins(worker_fee_per_token)
+    .store_uint(prompt_tokens_price_multiplier, 32)
+    .store_uint(cached_tokens_price_multiplier, 32)
+    .store_uint(completion_tokens_price_multiplier, 32)
+    .store_uint(reasoning_tokens_price_multiplier, 32)
+    .store_uint(proxy_delay_before_close, 32)
+    .store_uint(client_delay_before_close, 32)
+    .store_coins(min_proxy_stake)
+    .store_coins(min_client_stake)
+    .store_maybe_ref(proxy_sc_code)
+    .store_maybe_ref(worker_sc_code)
+    .store_maybe_ref(client_sc_code)
+    .end_cell();
+}
+
+(int, int, int, int, int, int, int, int, int, int, int, int, int, cell, cell, cell) unpack_cocoon_params(cell data) {
+  slice cs = data.begin_parse();
+  int version = cs~load_uint(8);
+  throw_unless(error::stored_data_damaged, version == 3);
+
+  return (
+    cs~load_uint(32),    ;; params_version
+    cs~load_uint(32),    ;; unique_id
+    cs~load_uint(1),     ;; is_test
+    cs~load_coins(),     ;; price_per_token
+    cs~load_coins(),     ;; worker_fee_per_token
+    cs~load_uint(32),    ;; prompt_tokens_price_multiplier
+    cs~load_uint(32),    ;; cached_tokens_price_multiplier
+    cs~load_uint(32),    ;; completion_tokens_price_multiplier
+    cs~load_uint(32),    ;; reasoning_tokens_price_multiplier
+    cs~load_uint(32),    ;; proxy_delay_before_close
+    cs~load_uint(32),    ;; client_delay_before_close
+    cs~load_coins(),     ;; min_proxy_stake
+    cs~load_coins(),     ;; min_client_stake
+    cs~load_maybe_ref(), ;; proxy_sc_code
+    cs~load_maybe_ref(), ;; worker_sc_code
+    cs~load_maybe_ref()  ;; client_sc_code
+  );
+}
+
+cell repack_cocoon_params_without_code(cell data) {
+  (int params_version, int unique_id, int is_test, int price_per_token, int worker_fee_per_token,
+                                 int prompt_tokens_price_multiplier, int cached_tokens_price_multiplier, 
+                                 int completion_tokens_price_multiplier, int reasoning_tokens_price_multiplier,
+                                 int proxy_delay_before_close, int client_delay_before_close,
+                                 int min_proxy_stake, int min_client_stake, 
+                                 cell proxy_sc_code, cell worker_sc_code, cell client_sc_code) = unpack_cocoon_params(data);
+  return pack_cocoon_params(params_version, unique_id, is_test, price_per_token, worker_fee_per_token,
+                            prompt_tokens_price_multiplier, cached_tokens_price_multiplier, 
+                            completion_tokens_price_multiplier, reasoning_tokens_price_multiplier,
+                            proxy_delay_before_close, client_delay_before_close, min_proxy_stake, min_client_stake, 
+                            null(), null(), null());
+}
+
+;; ======  ROOT  =======
+
+
+cell pack_cocoon_root_data(slice owner_address, cell proxy_hashes, cell registered_proxies, int last_proxy_seqno, cell worker_hashes,
+                         cell model_hashes, int version, cell params) inline {
+
+  cell data = begin_cell()
+           .store_dict(proxy_hashes)
+           .store_dict(registered_proxies)
+           .store_uint(last_proxy_seqno, 32)
+           .store_dict(worker_hashes)
+           .store_dict(model_hashes)
+           .end_cell();
+
+  return begin_cell()
+           .store_slice(owner_address)
+           .store_uint(version, 32)
+           .store_ref(data)
+           .store_ref(params)
+           .end_cell();
+}
+
+(slice, cell, cell, int, cell, cell, int, cell) unpack_cocoon_root_data(slice ds) {
+  slice data = ds~load_ref().begin_parse();
+  return (
+    ds~load_msg_addr(),  ;; owner_address
+    data~load_dict(),      ;; proxy_hashes
+    data~load_dict(),      ;; registered_proxies
+    data~load_uint(32),    ;; last_proxy_seqno
+    data~load_dict(),      ;; worker_hashes
+    data~load_dict(),      ;; model_hashes 
+    ds~load_uint(32),    ;; version
+    ds~load_ref()        ;; params
+  );
+}
+
+;; ====== PROXY  =======
+;; 267 + 256 + 267 + 2 + 68 + 32 = 892
+
+cell pack_cocoon_proxy_data(slice owner_address, int proxy_public_key, slice root_address, int state, int balance, int stake, 
+                          int unlock_ts, cell params) inline {
+   return  begin_cell()
+            .store_slice(owner_address)
+            .store_uint(proxy_public_key, 256)
+            .store_slice(root_address)
+            .store_uint(state, 2)
+            .store_coins(balance)
+            .store_coins(stake)
+            .store_uint(unlock_ts, 32)
+            .store_ref(params)
+           .end_cell();
+}
+
+(slice, int, slice, int, int, int, int, cell) unpack_cocoon_proxy_data(slice ds) inline {
+  return (
+          ds~load_msg_addr(), ;; owner addr
+          ds~load_uint(256),  ;; proxy public key
+          ds~load_msg_addr(), ;; root addr
+          ds~load_uint(2),    ;; state
+          ds~load_coins(),    ;; balance
+          ds~load_coins(),    ;; stake
+          ds~load_uint(32),   ;; unlock timestamp
+          ds~load_ref()       ;; params
+  );
+}
+
+
+;; ====== WORKER =======
+
+cell pack_cocoon_worker_data(slice owner_address, slice proxy_address, int proxy_public_key, int state, int tokens, cell params) inline {
+   return  begin_cell()
+            .store_slice(owner_address)
+            .store_slice(proxy_address)
+            .store_uint(proxy_public_key, 256)
+            .store_uint(state, 2)
+            .store_uint(tokens, 64)
+            .store_ref(params)
+           .end_cell();
+}
+
+(slice, slice, int, int, int, cell) unpack_cocoon_worker_data(slice ds) inline {
+  return (
+          ds~load_msg_addr(), ;; owner addr
+          ds~load_msg_addr(), ;; proxy addr
+          ds~load_uint(256),  ;; proxy public key
+          ds~load_uint(2),    ;; state
+          ds~load_uint(64),   ;; tokens
+          ds~load_ref()       ;; params
+  );
+}
+
+cell calculate_cocoon_worker_state_init(slice owner_address, slice proxy_address, int proxy_public_key, cell params, cell worker_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(worker_code)
+          .store_dict(pack_cocoon_worker_data(owner_address, proxy_address, proxy_public_key, 0, 0, params))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_cocoon_worker_address(slice owner_address, slice proxy_address, int proxy_public_key, cell params, cell worker_code) inline {
+  return calculate_contract_address(calculate_cocoon_worker_state_init(owner_address, proxy_address, proxy_public_key, params, worker_code));
+}
+
+
+;; ====== CLIENT  =======
+
+cell pack_cocoon_client_data(slice owner_address, slice proxy_address, int proxy_public_key, int state, int balance, int stake, int tokens_used, int unlock_ts, int secret_hash, cell params) {
+   cell const_data = begin_cell()
+            .store_slice(owner_address)
+            .store_slice(proxy_address)
+            .store_uint(proxy_public_key, 256)
+            .end_cell();
+   return  begin_cell()
+            .store_uint(state, 2)
+            .store_coins(balance)
+            .store_coins(stake)
+            .store_uint(tokens_used, 64)
+            .store_uint(unlock_ts, 32)
+            .store_uint(secret_hash, 256)
+            .store_ref(const_data)
+            .store_ref(params)
+           .end_cell();
+}
+
+(slice, slice, int, int, int, int, int, int, int, cell) unpack_cocoon_client_data(slice ds) inline {
+  slice const_data = ds~load_ref().begin_parse();
+  return (
+          const_data~load_msg_addr(), ;; owner addr
+          const_data~load_msg_addr(), ;; proxy addr
+          const_data~load_uint(256),  ;; proxy public key
+          ds~load_uint(2),            ;; state
+          ds~load_coins(),            ;; balance
+          ds~load_coins(),            ;; stake
+          ds~load_uint(64),           ;; tokens
+          ds~load_uint(32),           ;; unlock time
+          ds~load_uint(256),          ;; secret_hash
+          ds~load_ref()               ;; params
+  );
+}
+
+cell calculate_cocoon_client_state_init(slice owner_address, slice proxy_address, int proxy_public_key, int min_client_stake, cell params, cell client_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(client_code)
+          .store_dict(pack_cocoon_client_data(owner_address, proxy_address, proxy_public_key, client_state_normal, 0, min_client_stake, 0, 0, 0, params))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_cocoon_client_address(slice owner_address, slice proxy_address, int proxy_public_key, int min_client_stake, cell params, cell client_code) inline {
+  return calculate_contract_address(calculate_cocoon_client_state_init(owner_address, proxy_address, proxy_public_key, min_client_stake, params, client_code));
+}

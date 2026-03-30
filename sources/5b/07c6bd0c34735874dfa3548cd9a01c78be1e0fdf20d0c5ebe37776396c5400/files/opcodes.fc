@@ -1,0 +1,82 @@
+;; common
+const int op::excesses = 0x2565934c;
+const int op::payout = 0xc59a7cd3;
+const int op::do_not_process = 0x9a1247c0;
+
+;; root control messages
+const int op::root_add_worker_type = 0xe34b1c60;
+const int op::root_del_worker_type = 0x8d94a79a;
+const int op::root_add_model_type = 0xc146134d;
+const int op::root_del_model_type = 0x92b11c18;
+const int op::root_add_proxy_type = 0x71860e80;
+const int op::root_del_proxy_type = 0x3c41d0b2;
+const int op::root_register_proxy = 0x927c7cb5;
+const int op::root_unregister_proxy = 0x6d49eaf2;
+const int op::root_update_proxy = 0x9c7924ba;
+const int op::root_change_price = 0xc52ed8d4;
+const int op::root_change_params = 0x022fa189;
+const int op::root_change_params_full = 0x9f1e69dc;
+const int op::root_upgrade_contracts = 0xa2370f61;
+const int op::root_upgrade = 0x11aefd51;
+const int op::root_reset = 0x563c1d96;
+const int op::root_upgrade_full = 0x4f7c5789;
+const int op::root_change_owner = 0xc4a1ae54;
+
+
+;; worker to proxy
+const int op::worker_proxy_request = 0x4d725d2c;
+const int op::worker_proxy_payout_request = 0x08e7d036;
+
+;; client to proxy
+const int op::client_proxy_request = 0x65448ff4;
+const int op::client_proxy_top_up = 0x5cfc6b87;
+const int op::client_proxy_register = 0xa35cb580;
+const int op::client_proxy_refund_granted = 0xc68ebc7b;
+const int op::client_proxy_refund_force = 0xf4c354c9;
+
+;; proxy control
+const int op::ext_proxy_increase_stake = 0x9713f187;
+const int op::ext_proxy_payout_request = 0x7610e6eb;
+const int op::owner_proxy_close = 0xb51d5a01;
+const int op::ext_proxy_close_request_signed = 0x636a4391;
+const int op::ext_proxy_close_complete_request_signed = 0xe511abc7;
+
+
+;; worker control
+const int op::ext_worker_payout_request_signed = 0xa040ad28;
+const int op::ext_worker_last_payout_request_signed = 0xf5f26a36;
+const int op::owner_worker_register = 0x26ed7f65;
+
+;; client control
+const int op::ext_client_top_up = 0xf172e6c2;
+const int op::ext_client_charge_signed = 0xbb63ff93;
+const int op::ext_client_grant_refund_signed = 0xefd711e1;
+const int op::owner_client_top_up_reopen = 0x29111ceb;
+const int op::owner_client_register = 0xc45f9f3b;
+const int op::owner_client_change_secret_hash = 0xa9357034;
+const int op::owner_client_change_secret_hash_and_top_up = 0x8473b408;
+const int op::owner_client_request_refund = 0xfafa6cc1;
+const int op::owner_client_increase_stake = 0x6a1f6a60;
+const int op::owner_client_withdraw = 0xda068e78; 
+
+;; wallet control
+const int op::owner_wallet_send_message = 0x9c69f376;
+
+const int error::old_message = 1000;
+const int error::low_smc_balance = 1001;
+const int error::low_balance = 1002;
+const int error::low_msg_value = 1003;
+const int error::msg_format_mismatch = 1004;
+const int error::signed_msg_format_mismatch = 1005;
+const int error::closed = 1006;
+const int error::bad_signature = 1007;
+const int error::stored_data_damaged = 1008;
+const int error::expected_owner = 1009;
+const int error::expected_message_from_owner = 1010;
+const int error::not_unlocked_yet = 1011;
+const int error::unknown_op = 1012;
+const int error::unknown_text_op = 1013;
+const int error::contract_address_mismatch = 1014;
+const int error::expected_my_address = 1015;
+
+const int error::unknown_proxy_type = 2000;
