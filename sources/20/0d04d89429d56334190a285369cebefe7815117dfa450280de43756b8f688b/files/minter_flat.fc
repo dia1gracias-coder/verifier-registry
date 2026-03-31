@@ -1,0 +1,3078 @@
+#pragma version >=0.4.4;
+;; Standard library for funC
+;;
+
+{-
+  # Tuple manipulation primitives
+  The names and the types are mostly self-explaining.
+  See [polymorhism with forall](https://ton.org/docs/#/func/functions?id=polymorphism-with-forall)
+  for more info on the polymorphic functions.
+
+  Note that currently values of atomic type `tuple` can't be cast to composite tuple type (e.g. `[int, cell]`)
+  and vise versa.
+-}
+
+{-
+  # Lisp-style lists
+
+  Lists can be represented as nested 2-elements tuples.
+  Empty list is conventionally represented as TVM `null` value (it can be obtained by calling [null()]).
+  For example, tuple `(1, (2, (3, null)))` represents list `[1, 2, 3]`. Elements of a list can be of different types.
+-}
+
+;;; Adds an element to the beginning of lisp-style list.
+forall X -> tuple cons(X head, tuple tail) asm "CONS";
+
+;;; Extracts the head and the tail of lisp-style list.
+forall X -> (X, tuple) uncons(tuple list) asm "UNCONS";
+
+;;; Extracts the tail and the head of lisp-style list.
+forall X -> (tuple, X) list_next(tuple list) asm( -> 1 0) "UNCONS";
+
+;;; Returns the head of lisp-style list.
+forall X -> X car(tuple list) asm "CAR";
+
+;;; Returns the tail of lisp-style list.
+tuple cdr(tuple list) asm "CDR";
+
+;;; Creates tuple with zero elements.
+tuple empty_tuple() asm "NIL";
+
+;;; Appends a value `x` to a `Tuple t = (x1, ..., xn)`, but only if the resulting `Tuple t' = (x1, ..., xn, x)`
+;;; is of length at most 255. Otherwise throws a type check exception.
+forall X -> tuple tpush(tuple t, X value) asm "TPUSH";
+forall X -> (tuple, ()) ~tpush(tuple t, X value) asm "TPUSH";
+
+;;; Creates a tuple of length one with given argument as element.
+forall X -> [X] single(X x) asm "SINGLE";
+
+;;; Unpacks a tuple of length one
+forall X -> X unsingle([X] t) asm "UNSINGLE";
+
+;;; Creates a tuple of length two with given arguments as elements.
+forall X, Y -> [X, Y] pair(X x, Y y) asm "PAIR";
+
+;;; Unpacks a tuple of length two
+forall X, Y -> (X, Y) unpair([X, Y] t) asm "UNPAIR";
+
+;;; Creates a tuple of length three with given arguments as elements.
+forall X, Y, Z -> [X, Y, Z] triple(X x, Y y, Z z) asm "TRIPLE";
+
+;;; Unpacks a tuple of length three
+forall X, Y, Z -> (X, Y, Z) untriple([X, Y, Z] t) asm "UNTRIPLE";
+
+;;; Creates a tuple of length four with given arguments as elements.
+forall X, Y, Z, W -> [X, Y, Z, W] tuple4(X x, Y y, Z z, W w) asm "4 TUPLE";
+
+;;; Unpacks a tuple of length four
+forall X, Y, Z, W -> (X, Y, Z, W) untuple4([X, Y, Z, W] t) asm "4 UNTUPLE";
+
+;;; Returns the first element of a tuple (with unknown element types).
+forall X -> X first(tuple t) asm "FIRST";
+
+;;; Returns the second element of a tuple (with unknown element types).
+forall X -> X second(tuple t) asm "SECOND";
+
+;;; Returns the third element of a tuple (with unknown element types).
+forall X -> X third(tuple t) asm "THIRD";
+
+;;; Returns the fourth element of a tuple (with unknown element types).
+forall X -> X fourth(tuple t) asm "3 INDEX";
+
+;;; Returns the first element of a pair tuple.
+forall X, Y -> X pair_first([X, Y] p) asm "FIRST";
+
+;;; Returns the second element of a pair tuple.
+forall X, Y -> Y pair_second([X, Y] p) asm "SECOND";
+
+;;; Returns the first element of a triple tuple.
+forall X, Y, Z -> X triple_first([X, Y, Z] p) asm "FIRST";
+
+;;; Returns the second element of a triple tuple.
+forall X, Y, Z -> Y triple_second([X, Y, Z] p) asm "SECOND";
+
+;;; Returns the third element of a triple tuple.
+forall X, Y, Z -> Z triple_third([X, Y, Z] p) asm "THIRD";
+
+
+;;; Push null element (casted to given type)
+;;; By the TVM type `Null` FunC represents absence of a value of some atomic type.
+;;; So `null` can actually have any atomic type.
+forall X -> X null() asm "PUSHNULL";
+
+;;; Moves a variable [x] to the top of the stack
+forall X -> (X, ()) ~impure_touch(X x) impure asm "NOP";
+
+
+
+;;; Returns the current Unix time as an Integer
+int now() asm "NOW";
+
+;;; Returns the internal address of the current smart contract as a Slice with a `MsgAddressInt`.
+;;; If necessary, it can be parsed further using primitives such as [parse_std_addr].
+slice my_address() asm "MYADDR";
+
+;;; Returns the balance of the smart contract as a tuple consisting of an int
+;;; (balance in nanotoncoins) and a `cell`
+;;; (a dictionary with 32-bit keys representing the balance of "extra currencies")
+;;; at the start of Computation Phase.
+;;; Note that RAW primitives such as [send_raw_message] do not update this field.
+[int, cell] get_balance() asm "BALANCE";
+
+;;; Returns the logical time of the current transaction.
+int cur_lt() asm "LTIME";
+
+;;; Returns the starting logical time of the current block.
+int block_lt() asm "BLOCKLT";
+
+;;; Computes the representation hash of a `cell` [c] and returns it as a 256-bit unsigned integer `x`.
+;;; Useful for signing and checking signatures of arbitrary entities represented by a tree of cells.
+int cell_hash(cell c) asm "HASHCU";
+
+;;; Computes the hash of a `slice s` and returns it as a 256-bit unsigned integer `x`.
+;;; The result is the same as if an ordinary cell containing only data and references from `s` had been created
+;;; and its hash computed by [cell_hash].
+int slice_hash(slice s) asm "HASHSU";
+
+;;; Computes sha256 of the data bits of `slice` [s]. If the bit length of `s` is not divisible by eight,
+;;; throws a cell underflow exception. The hash value is returned as a 256-bit unsigned integer `x`.
+int string_hash(slice s) asm "SHA256U";
+
+{-
+  # Signature checks
+-}
+
+;;; Checks the Ed25519-`signature` of a `hash` (a 256-bit unsigned integer, usually computed as the hash of some data)
+;;; using [public_key] (also represented by a 256-bit unsigned integer).
+;;; The signature must contain at least 512 data bits; only the first 512 bits are used.
+;;; The result is `−1` if the signature is valid, `0` otherwise.
+;;; Note that `CHKSIGNU` creates a 256-bit slice with the hash and calls `CHKSIGNS`.
+;;; That is, if [hash] is computed as the hash of some data, these data are hashed twice,
+;;; the second hashing occurring inside `CHKSIGNS`.
+int check_signature(int hash, slice signature, int public_key) asm "CHKSIGNU";
+
+;;; Checks whether [signature] is a valid Ed25519-signature of the data portion of `slice data` using `public_key`,
+;;; similarly to [check_signature].
+;;; If the bit length of [data] is not divisible by eight, throws a cell underflow exception.
+;;; The verification of Ed25519 signatures is the standard one,
+;;; with sha256 used to reduce [data] to the 256-bit number that is actually signed.
+int check_data_signature(slice data, slice signature, int public_key) asm "CHKSIGNS";
+
+{---
+  # Computation of boc size
+  The primitives below may be useful for computing storage fees of user-provided data.
+-}
+
+;;; Returns `(x, y, z, -1)` or `(null, null, null, 0)`.
+;;; Recursively computes the count of distinct cells `x`, data bits `y`, and cell references `z`
+;;; in the DAG rooted at `cell` [c], effectively returning the total storage used by this DAG taking into account
+;;; the identification of equal cells.
+;;; The values of `x`, `y`, and `z` are computed by a depth-first traversal of this DAG,
+;;; with a hash table of visited cell hashes used to prevent visits of already-visited cells.
+;;; The total count of visited cells `x` cannot exceed non-negative [max_cells];
+;;; otherwise the computation is aborted before visiting the `(max_cells + 1)`-st cell and
+;;; a zero flag is returned to indicate failure. If [c] is `null`, returns `x = y = z = 0`.
+(int, int, int) compute_data_size(cell c, int max_cells) impure asm "CDATASIZE";
+
+;;; Similar to [compute_data_size?], but accepting a `slice` [s] instead of a `cell`.
+;;; The returned value of `x` does not take into account the cell that contains the `slice` [s] itself;
+;;; however, the data bits and the cell references of [s] are accounted for in `y` and `z`.
+(int, int, int) slice_compute_data_size(slice s, int max_cells) impure asm "SDATASIZE";
+
+;;; A non-quiet version of [compute_data_size?] that throws a cell overflow exception (`8`) on failure.
+(int, int, int, int) compute_data_size?(cell c, int max_cells) asm "CDATASIZEQ NULLSWAPIFNOT2 NULLSWAPIFNOT";
+
+;;; A non-quiet version of [slice_compute_data_size?] that throws a cell overflow exception (8) on failure.
+(int, int, int, int) slice_compute_data_size?(cell c, int max_cells) asm "SDATASIZEQ NULLSWAPIFNOT2 NULLSWAPIFNOT";
+
+;;; Throws an exception with exit_code excno if cond is not 0 (commented since implemented in compilator)
+;; () throw_if(int excno, int cond) impure asm "THROWARGIF";
+
+{--
+  # Debug primitives
+  Only works for local TVM execution with debug level verbosity
+-}
+;;; Dumps the stack (at most the top 255 values) and shows the total stack depth.
+() dump_stack() impure asm "DUMPSTK";
+
+{-
+  # Persistent storage save and load
+-}
+
+;;; Returns the persistent contract storage cell. It can be parsed or modified with slice and builder primitives later.
+cell get_data() asm "c4 PUSH";
+
+;;; Sets `cell` [c] as persistent contract data. You can update persistent contract storage with this primitive.
+() set_data(cell c) impure asm "c4 POP";
+
+{-
+  # Continuation primitives
+-}
+;;; Usually `c3` has a continuation initialized by the whole code of the contract. It is used for function calls.
+;;; The primitive returns the current value of `c3`.
+cont get_c3() impure asm "c3 PUSH";
+
+;;; Updates the current value of `c3`. Usually, it is used for updating smart contract code in run-time.
+;;; Note that after execution of this primitive the current code
+;;; (and the stack of recursive function calls) won't change,
+;;; but any other function call will use a function from the new code.
+() set_c3(cont c) impure asm "c3 POP";
+
+;;; Transforms a `slice` [s] into a simple ordinary continuation `c`, with `c.code = s` and an empty stack and savelist.
+cont bless(slice s) impure asm "BLESS";
+
+{---
+  # Gas related primitives
+-}
+
+;;; Sets current gas limit `gl` to its maximal allowed value `gm`, and resets the gas credit `gc` to zero,
+;;; decreasing the value of `gr` by `gc` in the process.
+;;; In other words, the current smart contract agrees to buy some gas to finish the current transaction.
+;;; This action is required to process external messages, which bring no value (hence no gas) with themselves.
+;;;
+;;; For more details check [accept_message effects](https://ton.org/docs/#/smart-contracts/accept).
+() accept_message() impure asm "ACCEPT";
+
+;;; Sets current gas limit `gl` to the minimum of limit and `gm`, and resets the gas credit `gc` to zero.
+;;; If the gas consumed so far (including the present instruction) exceeds the resulting value of `gl`,
+;;; an (unhandled) out of gas exception is thrown before setting new gas limits.
+;;; Notice that [set_gas_limit] with an argument `limit ≥ 2^63 − 1` is equivalent to [accept_message].
+() set_gas_limit(int limit) impure asm "SETGASLIMIT";
+
+;;; Commits the current state of registers `c4` (“persistent data”) and `c5` (“actions”)
+;;; so that the current execution is considered “successful” with the saved values even if an exception
+;;; in Computation Phase is thrown later.
+() commit() impure asm "COMMIT";
+
+;;; Not implemented
+;;() buy_gas(int gram) impure asm "BUYGAS";
+
+;;; Computes the amount of gas that can be bought for `amount` nanoTONs,
+;;; and sets `gl` accordingly in the same way as [set_gas_limit].
+() buy_gas(int amount) impure asm "BUYGAS";
+
+;;; Computes the minimum of two integers [x] and [y].
+int min(int x, int y) asm "MIN";
+
+;;; Computes the maximum of two integers [x] and [y].
+int max(int x, int y) asm "MAX";
+
+;;; Sorts two integers.
+(int, int) minmax(int x, int y) asm "MINMAX";
+
+;;; Computes the absolute value of an integer [x].
+int abs(int x) asm "ABS";
+
+{-
+  # Slice primitives
+
+  It is said that a primitive _loads_ some data,
+  if it returns the data and the remainder of the slice
+  (so it can also be used as [modifying method](https://ton.org/docs/#/func/statements?id=modifying-methods)).
+
+  It is said that a primitive _preloads_ some data, if it returns only the data
+  (it can be used as [non-modifying method](https://ton.org/docs/#/func/statements?id=non-modifying-methods)).
+
+  Unless otherwise stated, loading and preloading primitives read the data from a prefix of the slice.
+-}
+
+
+;;; Converts a `cell` [c] into a `slice`. Notice that [c] must be either an ordinary cell,
+;;; or an exotic cell (see [TVM.pdf](https://ton-blockchain.github.io/docs/tvm.pdf), 3.1.2)
+;;; which is automatically loaded to yield an ordinary cell `c'`, converted into a `slice` afterwards.
+slice begin_parse(cell c) asm "CTOS";
+
+;;; Checks if [s] is empty. If not, throws an exception.
+() end_parse(slice s) impure asm "ENDS";
+
+;;; Loads the first reference from the slice.
+(slice, cell) load_ref(slice s) asm( -> 1 0) "LDREF";
+
+;;; Preloads the first reference from the slice.
+cell preload_ref(slice s) asm "PLDREF";
+
+  {- Functions below are commented because are implemented on compilator level for optimisation -}
+
+;;; Loads a signed [len]-bit integer from a slice [s].
+;; (slice, int) ~load_int(slice s, int len) asm(s len -> 1 0) "LDIX";
+
+;;; Loads an unsigned [len]-bit integer from a slice [s].
+;; (slice, int) ~load_uint(slice s, int len) asm( -> 1 0) "LDUX";
+
+;;; Preloads a signed [len]-bit integer from a slice [s].
+;; int preload_int(slice s, int len) asm "PLDIX";
+
+;;; Preloads an unsigned [len]-bit integer from a slice [s].
+;; int preload_uint(slice s, int len) asm "PLDUX";
+
+;;; Loads the first `0 ≤ len ≤ 1023` bits from slice [s] into a separate `slice s''`.
+;; (slice, slice) load_bits(slice s, int len) asm(s len -> 1 0) "LDSLICEX";
+
+;;; Preloads the first `0 ≤ len ≤ 1023` bits from slice [s] into a separate `slice s''`.
+;; slice preload_bits(slice s, int len) asm "PLDSLICEX";
+
+;;; Loads serialized amount of TonCoins (any unsigned integer up to `2^128 - 1`).
+(slice, int) load_grams(slice s) asm( -> 1 0) "LDGRAMS";
+(slice, int) load_coins(slice s) asm( -> 1 0) "LDGRAMS";
+
+;;; Returns all but the first `0 ≤ len ≤ 1023` bits of `slice` [s].
+slice skip_bits(slice s, int len) asm "SDSKIPFIRST";
+(slice, ()) ~skip_bits(slice s, int len) asm "SDSKIPFIRST";
+
+;;; Returns the first `0 ≤ len ≤ 1023` bits of `slice` [s].
+slice first_bits(slice s, int len) asm "SDCUTFIRST";
+
+;;; Returns all but the last `0 ≤ len ≤ 1023` bits of `slice` [s].
+slice skip_last_bits(slice s, int len) asm "SDSKIPLAST";
+(slice, ()) ~skip_last_bits(slice s, int len) asm "SDSKIPLAST";
+
+;;; Returns the last `0 ≤ len ≤ 1023` bits of `slice` [s].
+slice slice_last(slice s, int len) asm "SDCUTLAST";
+
+;;; Loads a dictionary `D` (HashMapE) from `slice` [s].
+;;; (returns `null` if `nothing` constructor is used).
+(slice, cell) load_dict(slice s) asm( -> 1 0) "LDDICT";
+
+;;; Preloads a dictionary `D` from `slice` [s].
+cell preload_dict(slice s) asm "PLDDICT";
+
+;;; Loads a dictionary as [load_dict], but returns only the remainder of the slice.
+slice skip_dict(slice s) asm "SKIPDICT";
+
+;;; Loads (Maybe ^Cell) from `slice` [s].
+;;; In other words loads 1 bit and if it is true
+;;; loads first ref and return it with slice remainder
+;;; otherwise returns `null` and slice remainder
+(slice, cell) load_maybe_ref(slice s) asm( -> 1 0) "LDOPTREF";
+
+;;; Preloads (Maybe ^Cell) from `slice` [s].
+cell preload_maybe_ref(slice s) asm "PLDOPTREF";
+
+
+;;; Returns the depth of `cell` [c].
+;;; If [c] has no references, then return `0`;
+;;; otherwise the returned value is one plus the maximum of depths of cells referred to from [c].
+;;; If [c] is a `null` instead of a cell, returns zero.
+int cell_depth(cell c) asm "CDEPTH";
+
+
+{-
+  # Slice size primitives
+-}
+
+;;; Returns the number of references in `slice` [s].
+int slice_refs(slice s) asm "SREFS";
+
+;;; Returns the number of data bits in `slice` [s].
+int slice_bits(slice s) asm "SBITS";
+
+;;; Returns both the number of data bits and the number of references in `slice` [s].
+(int, int) slice_bits_refs(slice s) asm "SBITREFS";
+
+;;; Checks whether a `slice` [s] is empty (i.e., contains no bits of data and no cell references).
+int slice_empty?(slice s) asm "SEMPTY";
+
+;;; Checks whether `slice` [s] has no bits of data.
+int slice_data_empty?(slice s) asm "SDEMPTY";
+
+;;; Checks whether `slice` [s] has no references.
+int slice_refs_empty?(slice s) asm "SREMPTY";
+
+;;; Returns the depth of `slice` [s].
+;;; If [s] has no references, then returns `0`;
+;;; otherwise the returned value is one plus the maximum of depths of cells referred to from [s].
+int slice_depth(slice s) asm "SDEPTH";
+
+{-
+  # Builder size primitives
+-}
+
+;;; Returns the number of cell references already stored in `builder` [b]
+int builder_refs(builder b) asm "BREFS";
+
+;;; Returns the number of data bits already stored in `builder` [b].
+int builder_bits(builder b) asm "BBITS";
+
+;;; Returns the depth of `builder` [b].
+;;; If no cell references are stored in [b], then returns 0;
+;;; otherwise the returned value is one plus the maximum of depths of cells referred to from [b].
+int builder_depth(builder b) asm "BDEPTH";
+
+{-
+  # Builder primitives
+  It is said that a primitive _stores_ a value `x` into a builder `b`
+  if it returns a modified version of the builder `b'` with the value `x` stored at the end of it.
+  It can be used as [non-modifying method](https://ton.org/docs/#/func/statements?id=non-modifying-methods).
+
+  All the primitives below first check whether there is enough space in the `builder`,
+  and only then check the range of the value being serialized.
+-}
+
+;;; Creates a new empty `builder`.
+builder begin_cell() asm "NEWC";
+
+;;; Converts a `builder` into an ordinary `cell`.
+cell end_cell(builder b) asm "ENDC";
+
+;;; Stores a reference to `cell` [c] into `builder` [b].
+builder store_ref(builder b, cell c) asm(c b) "STREF";
+
+;;; Stores an unsigned [len]-bit integer `x` into `b` for `0 ≤ len ≤ 256`.
+;; builder store_uint(builder b, int x, int len) asm(x b len) "STUX";
+
+;;; Stores a signed [len]-bit integer `x` into `b` for` 0 ≤ len ≤ 257`.
+;; builder store_int(builder b, int x, int len) asm(x b len) "STIX";
+
+
+;;; Stores `slice` [s] into `builder` [b]
+builder store_slice(builder b, slice s) asm "STSLICER";
+
+;;; Stores (serializes) an integer [x] in the range `0..2^128 − 1` into `builder` [b].
+;;; The serialization of [x] consists of a 4-bit unsigned big-endian integer `l`,
+;;; which is the smallest integer `l ≥ 0`, such that `x < 2^8l`,
+;;; followed by an `8l`-bit unsigned big-endian representation of [x].
+;;; If [x] does not belong to the supported range, a range check exception is thrown.
+;;;
+;;; Store amounts of TonCoins to the builder as VarUInteger 16
+builder store_grams(builder b, int x) asm "STGRAMS";
+builder store_coins(builder b, int x) asm "STGRAMS";
+
+;;; Stores dictionary `D` represented by `cell` [c] or `null` into `builder` [b].
+;;; In other words, stores a `1`-bit and a reference to [c] if [c] is not `null` and `0`-bit otherwise.
+builder store_dict(builder b, cell c) asm(c b) "STDICT";
+
+;;; Stores (Maybe ^Cell) to builder:
+;;; if cell is null store 1 zero bit
+;;; otherwise store 1 true bit and ref to cell
+builder store_maybe_ref(builder b, cell c) asm(c b) "STOPTREF";
+
+
+{-
+  # Address manipulation primitives
+  The address manipulation primitives listed below serialize and deserialize values according to the following TL-B scheme:
+  ```TL-B
+  addr_none$00 = MsgAddressExt;
+  addr_extern$01 len:(## 8) external_address:(bits len)
+               = MsgAddressExt;
+  anycast_info$_ depth:(#<= 30) { depth >= 1 }
+    rewrite_pfx:(bits depth) = Anycast;
+  addr_std$10 anycast:(Maybe Anycast)
+    workchain_id:int8 address:bits256 = MsgAddressInt;
+  addr_var$11 anycast:(Maybe Anycast) addr_len:(## 9)
+    workchain_id:int32 address:(bits addr_len) = MsgAddressInt;
+  _ _:MsgAddressInt = MsgAddress;
+  _ _:MsgAddressExt = MsgAddress;
+
+  int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+    src:MsgAddress dest:MsgAddressInt
+    value:CurrencyCollection ihr_fee:Grams fwd_fee:Grams
+    created_lt:uint64 created_at:uint32 = CommonMsgInfoRelaxed;
+  ext_out_msg_info$11 src:MsgAddress dest:MsgAddressExt
+    created_lt:uint64 created_at:uint32 = CommonMsgInfoRelaxed;
+  ```
+  A deserialized `MsgAddress` is represented by a tuple `t` as follows:
+
+  - `addr_none` is represented by `t = (0)`,
+    i.e., a tuple containing exactly one integer equal to zero.
+  - `addr_extern` is represented by `t = (1, s)`,
+    where slice `s` contains the field `external_address`. In other words, `
+    t` is a pair (a tuple consisting of two entries), containing an integer equal to one and slice `s`.
+  - `addr_std` is represented by `t = (2, u, x, s)`,
+    where `u` is either a `null` (if `anycast` is absent) or a slice `s'` containing `rewrite_pfx` (if anycast is present).
+    Next, integer `x` is the `workchain_id`, and slice `s` contains the address.
+  - `addr_var` is represented by `t = (3, u, x, s)`,
+    where `u`, `x`, and `s` have the same meaning as for `addr_std`.
+-}
+
+;;; Loads from slice [s] the only prefix that is a valid `MsgAddress`,
+;;; and returns both this prefix `s'` and the remainder `s''` of [s] as slices.
+(slice, slice) load_msg_addr(slice s) asm( -> 1 0) "LDMSGADDR";
+
+;;; Decomposes slice [s] containing a valid `MsgAddress` into a `tuple t` with separate fields of this `MsgAddress`.
+;;; If [s] is not a valid `MsgAddress`, a cell deserialization exception is thrown.
+tuple parse_addr(slice s) asm "PARSEMSGADDR";
+
+;;; Parses slice [s] containing a valid `MsgAddressInt` (usually a `msg_addr_std`),
+;;; applies rewriting from the anycast (if present) to the same-length prefix of the address,
+;;; and returns both the workchain and the 256-bit address as integers.
+;;; If the address is not 256-bit, or if [s] is not a valid serialization of `MsgAddressInt`,
+;;; throws a cell deserialization exception.
+(int, int) parse_std_addr(slice s) asm "REWRITESTDADDR";
+
+;;; A variant of [parse_std_addr] that returns the (rewritten) address as a slice [s],
+;;; even if it is not exactly 256 bit long (represented by a `msg_addr_var`).
+(int, slice) parse_var_addr(slice s) asm "REWRITEVARADDR";
+
+{-
+  # Dictionary primitives
+-}
+
+
+;;; Sets the value associated with [key_len]-bit key signed index in dictionary [dict] to [value] (cell),
+;;; and returns the resulting dictionary.
+cell idict_set_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTISETREF";
+(cell, ()) ~idict_set_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTISETREF";
+
+;;; Sets the value associated with [key_len]-bit key unsigned index in dictionary [dict] to [value] (cell),
+;;; and returns the resulting dictionary.
+cell udict_set_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTUSETREF";
+(cell, ()) ~udict_set_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTUSETREF";
+
+cell idict_get_ref(cell dict, int key_len, int index) asm(index dict key_len) "DICTIGETOPTREF";
+(cell, int) idict_get_ref?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIGETREF" "NULLSWAPIFNOT";
+(cell, int) udict_get_ref?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUGETREF" "NULLSWAPIFNOT";
+(cell, cell) idict_set_get_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTISETGETOPTREF";
+(cell, cell) udict_set_get_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTUSETGETOPTREF";
+(cell, int) idict_delete?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIDEL";
+(cell, int) udict_delete?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDEL";
+(slice, int) idict_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIGET" "NULLSWAPIFNOT";
+(slice, int) udict_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUGET" "NULLSWAPIFNOT";
+(cell, slice, int) idict_delete_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIDELGET" "NULLSWAPIFNOT";
+(cell, slice, int) udict_delete_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDELGET" "NULLSWAPIFNOT";
+(cell, (slice, int)) ~idict_delete_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIDELGET" "NULLSWAPIFNOT";
+(cell, (slice, int)) ~udict_delete_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDELGET" "NULLSWAPIFNOT";
+cell udict_set(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUSET";
+(cell, ()) ~udict_set(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUSET";
+cell idict_set(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTISET";
+(cell, ()) ~idict_set(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTISET";
+cell dict_set(cell dict, int key_len, slice index, slice value) asm(value index dict key_len) "DICTSET";
+(cell, ()) ~dict_set(cell dict, int key_len, slice index, slice value) asm(value index dict key_len) "DICTSET";
+(cell, int) udict_add?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUADD";
+(cell, int) udict_replace?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUREPLACE";
+(cell, int) idict_add?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTIADD";
+(cell, int) idict_replace?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTIREPLACE";
+cell udict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUSETB";
+(cell, ()) ~udict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUSETB";
+cell idict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTISETB";
+(cell, ()) ~idict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTISETB";
+cell dict_set_builder(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTSETB";
+(cell, ()) ~dict_set_builder(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTSETB";
+(cell, int) udict_add_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUADDB";
+(cell, int) udict_replace_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUREPLACEB";
+(cell, int) idict_add_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTIADDB";
+(cell, int) idict_replace_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTIREPLACEB";
+(cell, int, slice, int) udict_delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTUREMMIN" "NULLSWAPIFNOT2";
+(cell, (int, slice, int)) ~udict::delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTUREMMIN" "NULLSWAPIFNOT2";
+(cell, int, slice, int) idict_delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTIREMMIN" "NULLSWAPIFNOT2";
+(cell, (int, slice, int)) ~idict::delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTIREMMIN" "NULLSWAPIFNOT2";
+(cell, slice, slice, int) dict_delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTREMMIN" "NULLSWAPIFNOT2";
+(cell, (slice, slice, int)) ~dict::delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTREMMIN" "NULLSWAPIFNOT2";
+(cell, int, slice, int) udict_delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTUREMMAX" "NULLSWAPIFNOT2";
+(cell, (int, slice, int)) ~udict::delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTUREMMAX" "NULLSWAPIFNOT2";
+(cell, int, slice, int) idict_delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTIREMMAX" "NULLSWAPIFNOT2";
+(cell, (int, slice, int)) ~idict::delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTIREMMAX" "NULLSWAPIFNOT2";
+(cell, slice, slice, int) dict_delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTREMMAX" "NULLSWAPIFNOT2";
+(cell, (slice, slice, int)) ~dict::delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTREMMAX" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_min?(cell dict, int key_len) asm (-> 1 0 2) "DICTUMIN" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_max?(cell dict, int key_len) asm (-> 1 0 2) "DICTUMAX" "NULLSWAPIFNOT2";
+(int, cell, int) udict_get_min_ref?(cell dict, int key_len) asm (-> 1 0 2) "DICTUMINREF" "NULLSWAPIFNOT2";
+(int, cell, int) udict_get_max_ref?(cell dict, int key_len) asm (-> 1 0 2) "DICTUMAXREF" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_min?(cell dict, int key_len) asm (-> 1 0 2) "DICTIMIN" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_max?(cell dict, int key_len) asm (-> 1 0 2) "DICTIMAX" "NULLSWAPIFNOT2";
+(int, cell, int) idict_get_min_ref?(cell dict, int key_len) asm (-> 1 0 2) "DICTIMINREF" "NULLSWAPIFNOT2";
+(int, cell, int) idict_get_max_ref?(cell dict, int key_len) asm (-> 1 0 2) "DICTIMAXREF" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_next?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTUGETNEXT" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_nexteq?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTUGETNEXTEQ" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_prev?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTUGETPREV" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_preveq?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTUGETPREVEQ" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_next?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTIGETNEXT" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_nexteq?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTIGETNEXTEQ" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_prev?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTIGETPREV" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_preveq?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTIGETPREVEQ" "NULLSWAPIFNOT2";
+
+;;; Creates an empty dictionary, which is actually a null value. Equivalent to PUSHNULL
+cell new_dict() asm "NEWDICT";
+;;; Checks whether a dictionary is empty. Equivalent to cell_null?.
+int dict_empty?(cell c) asm "DICTEMPTY";
+
+
+{- Prefix dictionary primitives -}
+(slice, slice, slice, int) pfxdict_get?(cell dict, int key_len, slice key) asm(key dict key_len) "PFXDICTGETQ" "NULLSWAPIFNOT2";
+(cell, int) pfxdict_set?(cell dict, int key_len, slice key, slice value) asm(value key dict key_len) "PFXDICTSET";
+(cell, int) pfxdict_delete?(cell dict, int key_len, slice key) asm(key dict key_len) "PFXDICTDEL";
+
+;;; Returns the value of the global configuration parameter with integer index `i` as a `cell` or `null` value.
+cell config_param(int x) asm "CONFIGOPTPARAM";
+;;; Checks whether c is a null. Note, that FunC also has polymorphic null? built-in.
+int cell_null?(cell c) asm "ISNULL";
+
+;;; Creates an output action which would reserve exactly amount nanotoncoins (if mode = 0), at most amount nanotoncoins (if mode = 2), or all but amount nanotoncoins (if mode = 1 or mode = 3), from the remaining balance of the account. It is roughly equivalent to creating an outbound message carrying amount nanotoncoins (or b − amount nanotoncoins, where b is the remaining balance) to oneself, so that the subsequent output actions would not be able to spend more money than the remainder. Bit +2 in mode means that the external action does not fail if the specified amount cannot be reserved; instead, all remaining balance is reserved. Bit +8 in mode means `amount <- -amount` before performing any further actions. Bit +4 in mode means that amount is increased by the original balance of the current account (before the compute phase), including all extra currencies, before performing any other checks and actions. Currently, amount must be a non-negative integer, and mode must be in the range 0..15.
+() raw_reserve(int amount, int mode) impure asm "RAWRESERVE";
+;;; Similar to raw_reserve, but also accepts a dictionary extra_amount (represented by a cell or null) with extra currencies. In this way currencies other than TonCoin can be reserved.
+() raw_reserve_extra(int amount, cell extra_amount, int mode) impure asm "RAWRESERVEX";
+;;; Sends a raw message contained in msg, which should contain a correctly serialized object Message X, with the only exception that the source address is allowed to have dummy value addr_none (to be automatically replaced with the current smart contract address), and ihr_fee, fwd_fee, created_lt and created_at fields can have arbitrary values (to be rewritten with correct values during the action phase of the current transaction). Integer parameter mode contains the flags. Currently mode = 0 is used for ordinary messages; mode = 128 is used for messages that are to carry all the remaining balance of the current smart contract (instead of the value originally indicated in the message); mode = 64 is used for messages that carry all the remaining value of the inbound message in addition to the value initially indicated in the new message (if bit 0 is not set, the gas fees are deducted from this amount); mode' = mode + 1 means that the sender wants to pay transfer fees separately; mode' = mode + 2 means that any errors arising while processing this message during the action phase should be ignored. Finally, mode' = mode + 32 means that the current account must be destroyed if its resulting balance is zero. This flag is usually employed together with +128.
+() send_raw_message(cell msg, int mode) impure asm "SENDRAWMSG";
+;;; Creates an output action that would change this smart contract code to that given by cell new_code. Notice that this change will take effect only after the successful termination of the current run of the smart contract
+() set_code(cell new_code) impure asm "SETCODE";
+
+;;; Generates a new pseudo-random unsigned 256-bit integer x. The algorithm is as follows: if r is the old value of the random seed, considered as a 32-byte array (by constructing the big-endian representation of an unsigned 256-bit integer), then its sha512(r) is computed; the first 32 bytes of this hash are stored as the new value r' of the random seed, and the remaining 32 bytes are returned as the next random value x.
+int random() impure asm "RANDU256";
+;;; Generates a new pseudo-random integer z in the range 0..range−1 (or range..−1, if range < 0). More precisely, an unsigned random value x is generated as in random; then z := x * range / 2^256 is computed.
+int rand(int range) impure asm "RAND";
+;;; Returns the current random seed as an unsigned 256-bit Integer.
+int get_seed() impure asm "RANDSEED";
+;;; Sets the random seed to unsigned 256-bit seed.
+() set_seed(int x) impure asm "SETRAND";
+;;; Mixes unsigned 256-bit integer x into the random seed r by setting the random seed to sha256 of the concatenation of two 32-byte strings: the first with the big-endian representation of the old seed r, and the second with the big-endian representation of x.
+() randomize(int x) impure asm "ADDRAND";
+;;; Equivalent to randomize(cur_lt());.
+() randomize_lt() impure asm "LTIME" "ADDRAND";
+
+;;; Checks whether the data parts of two slices coinside
+int equal_slice_bits(slice a, slice b) asm "SDEQ";
+int equal_slices(slice a, slice b) asm "SDEQ";
+
+;;; Concatenates two builders
+builder store_builder(builder to, builder from) asm "STBR";
+{-
+    stdlib_ext.fc
+
+    Additional functions that are not present in stdlib.fc
+-}
+
+(int) mod(int x, int y) asm "MOD";
+(int) divc(int x, int y) asm "DIVC";
+slice preload_bits_offset(slice s, int offset, int len) asm "SDSUBSTR";
+int builder_null?(builder b) asm "ISNULL";
+(slice, slice) load_slice_ref(slice s) asm "LDREFRTOS";
+forall X -> int to_int(X x) asm "NOP";
+(slice, int) load_bool(slice s) asm(-> 1 0) "1 LDI";
+(builder) store_bool(builder b, int v) asm(v b) "1 STI";
+slice addr_none() asm "<b b{00} s, b> <s PUSHSLICE";
+cell empty_cell() asm "<b b> PUSHREF";
+slice empty_slice() asm "<b b> <s PUSHSLICE";
+forall X -> tuple tset(tuple t, int k, X x) asm(t x k) "SETINDEXVAR";
+forall X -> (tuple, ()) ~tset(tuple t, int k, X x) asm(t x k) "SETINDEXVAR";
+forall X -> (tuple, X) tpop(tuple t) asm "TPOP";
+int tlen(tuple t) asm "TLEN";
+int tlenq(tuple t) asm "QTLEN";
+slice preload_slice_offset(slice s, int offset, int len) asm "SDSUBSTR";
+(slice, slice) load_slice(slice s, int len) asm( -> 1 0) "LDSLICEX";
+forall X -> tuple _unsafe_tuple(X x) asm "NOP";
+(slice) as_slice(builder b) asm "ENDC CTOS";
+(slice, int) load_time(slice s) asm "64 LDU SWAP";
+(builder) store_time(builder b, int t) inline asm(t b) "64 STU";
+(slice, int) load_uint8(slice s) asm "8 LDU SWAP";
+(builder) store_uint8(builder b, int t) inline asm(t b) "8 STU";
+(slice, int) load_uint16(slice s) asm "16 LDU SWAP";
+(builder) store_uint16(builder b, int t) inline asm(t b) "16 STU";
+(slice, int) load_uint32(slice s) asm "32 LDU SWAP";
+(builder) store_uint32(builder b, int t) inline asm(t b) "32 STU";
+(slice, int) load_uint64(slice s) asm "64 LDU SWAP";
+(builder) store_uint64(builder b, int t) inline asm(t b) "64 STU";
+(slice, int) load_uint128(slice s) asm "128 LDU SWAP";
+(builder) store_uint128(builder b, int t) inline asm(t b) "128 STU";
+(slice, int) load_uint256(slice s) asm "256 LDU SWAP";
+(builder) store_uint256(builder b, int t) inline asm(t b) "256 STU";
+(int) equal_cells(cell a, cell b) asm "HASHCU SWAP HASHCU EQUAL"; 
+(slice, int) load_opcode(slice s) asm "32 LDU SWAP";
+(builder) store_opcode(builder b, int t) inline asm(t b) "32 STU";
+(slice, int) load_query_id(slice s) asm "64 LDU SWAP";
+(builder) store_query_id(builder b, int t) inline asm(t b) "64 STU";
+forall X -> X ~strdump_safe_not_pretty(slice value) impure asm "STRDUMP";
+forall X -> X ~dump_safe(X value) impure asm "s0 DUMP";
+(builder) begin_message(int _opcode) asm "ctx GETGLOB 4 INDEX SWAP NEWC 32 STU 64 STU";
+(slice, int) load_status(slice s) asm "8 LDU SWAP";
+(builder) store_status(builder b, int t) inline asm(t b) "8 STU";
+(int) negate(int _n) asm "NEGATE";
+(int) sub1(int _n) asm "DEC";
+(int) add1(int _n) asm "INC";
+(int) sgn(int _n) asm "SGN";
+(int, ()) ~sub1(int _n) asm "DEC";
+(int, ()) ~add1(int _n) asm "INC";
+(int, ()) ~negate(int _n) asm "NEGATE";
+(int, ()) ~sgn(int _n) asm "SGN";
+
+() set_lib(cell code, int mode) impure asm "SETLIBCODE";
+() change_lib(int code_hash, int mode) impure asm "CHANGELIB";
+forall X -> int   is_null(X x) asm "ISNULL";
+forall X -> int   is_int(X x) asm "<{ TRY:<{ 0 PUSHINT ADD DROP -1 PUSHINT }>CATCH<{ 2DROP 0 PUSHINT }> }>CONT 1 1 CALLXARGS";
+forall X -> int   is_cell(X x) asm "<{ TRY:<{ CTOS DROP -1 PUSHINT }>CATCH<{ 2DROP 0 PUSHINT }> }>CONT 1 1 CALLXARGS";
+forall X -> int   is_slice(X x) asm "<{ TRY:<{ SBITS DROP -1 PUSHINT }>CATCH<{ 2DROP 0 PUSHINT }> }>CONT 1 1 CALLXARGS";
+forall X -> int   is_tuple(X x) asm "ISTUPLE";
+int               is_nan(int _n) asm "CHKNAN";
+forall X -> cell  cast_to_cell(X x) asm "NOP";
+forall X -> slice cast_to_slice(X x) asm "NOP";
+forall X -> int   cast_to_int(X x) asm "NOP";
+forall X -> tuple cast_to_tuple(X x) asm "NOP";
+forall X -> builder cast_to_builder(X x) asm "NOP";
+
+;; TVM Upgrade 2023.07
+(cell) my_code() asm "MYCODE";
+(tuple) get_values() asm "INCOMINGVALUE";
+int storage_fees() asm "STORAGEFEES";
+(tuple) get_prev_block_info() asm "PREVBLOCKSINFOTUPLE";
+(tuple) get_last_mc_block() asm "PREVMCBLOCKS";
+(tuple) get_prev_key_block() asm "PREVKEYBLOCK";
+(int) get_global_id() asm "GLOBALID";
+(int) get_gas_consumed() asm "GASCONSUMED";
+(int) sha256_single(slice _t0) asm "1 PUSHINT HASHEXT_SHA256";
+(int) sha256_singleb(builder _t0) asm "1 PUSHINT HASHEXT_SHA256";
+(int) sha256_double(slice _t0, slice _t1) asm "2 PUSHINT HASHEXT_SHA256";
+(int) sha256_triple(slice _t0, slice _t1, slice _t2) asm "3 PUSHINT HASHEXT_SHA256";
+(int) sha512_single(slice _t0) asm "1 PUSHINT HASHEXT_SHA512";
+(int) sha512_double(slice _t0, slice _t1) asm "2 PUSHINT HASHEXT_SHA512";
+(int) sha512_triple(slice _t0, slice _t1, slice _t2) asm "3 PUSHINT HASHEXT_SHA512";
+(int) blake2b_single(slice _t0) asm "1 PUSHINT HASHEXT_BLAKE2B";
+(int) blake2b_double(slice _t0, slice _t1) asm "2 PUSHINT HASHEXT_BLAKE2B";
+(int) blake2b_triple(slice _t0, slice _t1, slice _t2) asm "3 PUSHINT HASHEXT_BLAKE2B";
+(int) keccack256_single(slice _t0) asm "1 PUSHINT HASHEXT_KECCAK256";
+(int) keccack256_double(slice _t0, slice _t1) asm "2 PUSHINT HASHEXT_KECCAK256";
+(int) keccack256_triple(slice _t0, slice _t1, slice _t2) asm "3 PUSHINT HASHEXT_KECCAK256";
+(int) keccack512_single(slice _t0) asm "1 PUSHINT HASHEXT_KECCAK512";
+(int) keccack512_double(slice _t0, slice _t1) asm "2 PUSHINT HASHEXT_KECCAK512";
+(int) keccack512_triple(slice _t0, slice _t1, slice _t2) asm "3 PUSHINT HASHEXT_KECCAK512";
+(int, int, int, int) ecrecover(int hash, int v, int r, int s) asm "ECRECOVER NULLSWAPIFNOT NULLSWAPIFNOT2";
+int send_message(cell msg, int mode) impure asm "SENDMSG";
+
+int get_compute_fee(int workchain, int gas_used) asm(gas_used workchain) "GETGASFEE";
+int get_storage_fee(int workchain, int seconds, int bits, int cells) asm(cells bits seconds workchain) "GETSTORAGEFEE";
+int get_forward_fee(int workchain, int bits, int cells) asm(cells bits workchain) "GETFORWARDFEE";
+int get_precompiled_gas_consumption() asm "GETPRECOMPILEDGAS";
+int get_simple_compute_fee(int workchain, int gas_used) asm(gas_used workchain) "GETGASFEESIMPLE";
+int get_simple_forward_fee(int workchain, int bits, int cells) asm(cells bits workchain) "GETFORWARDFEESIMPLE";
+int get_original_fwd_fee(int workchain, int fwd_fee) asm(fwd_fee workchain) "GETORIGINALFWDFEE";
+
+int my_storage_due() asm "DUEPAYMENT";
+tuple get_fee_cofigs() asm "UNPACKEDCONFIGTUPLE";
+
+(slice, ()) ~skip_maybe_ref(slice s) asm "SKIPOPTREF";
+
+int cell_level(cell c) asm "CLEVEL";
+int cell_level_mask(cell c) asm "CLEVELMASK";
+
+builder store_addr_none(builder b) asm "b{00} STSLICECONST";
+int is_bool(int x) asm "CHKBOOL";
+
+builder store_zeroes(builder b, int x) asm "STZEROES";
+builder store_ones(builder b, int x) asm "STONES";
+
+cell preload_first_ref(slice s) asm "0 PLDREFIDX";
+cell preload_second_ref(slice s) asm "1 PLDREFIDX";
+cell preload_third_ref(slice s) asm "2 PLDREFIDX";
+cell preload_fourth_ref(slice s) asm "3 PLDREFIDX";
+
+int get_ton_balance() asm "BALANCE FIRST";
+
+((int, int) -> ()) get_c2() asm "c2 PUSH";
+() set_c2(((int, int) -> ()) c) impure asm "c2 POP";
+() set_actions(cell actions) impure asm "c5 POP";
+() clean_actions() impure asm "<b b> PUSHREF c5 POP";
+cell get_actions() impure asm "c5 PUSH";
+
+cell get_config() asm "CONFIGROOT";
+
+int extract_low_bits(int value, int count) asm "MODPOW2";
+{-
+    consts.fc
+
+    Contants needed.
+-}
+
+;; Params
+
+;; Address consts
+
+const ADDR_TYPE_NONE = 0;
+const ADDR_TYPE_EXTERN = 1;
+const ADDR_TYPE_STD = 2;
+const ADDR_TYPE_VAR = 3;
+
+const HOLE_ADDRESS = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"a;
+
+const int TRUE = -1;
+const int FALSE = 0;
+const int MASTERCHAIN = -1;
+const int BASECHAIN = 0;
+
+;; Message modes. See ./msgs.fc for more
+
+;; 0b011000 tag - 0, ihr_disabled - 1, bounce - 1, bounced - 0, src = adr_none$00
+const int SEND_MSG_BOUNCEABLE = 0x18; 
+;; 0b010000 tag - 0, ihr_disabled - 1, bounce - 0, bounced - 0, src = adr_none$00
+const int SEND_MSG_NON_BOUNCEABLE = 0x10;
+
+;; MODIFIER
+const NORMAL = 0;
+const PAID_EXTERNALLY = 1;
+const IGNORE_ERRORS = 2;
+
+;; SEND MODES
+const BOUNCE_IF_FAIL = 16;
+const DESTROY_IF_ZERO = 32;
+const CARRY_REMAINING_GAS = 64;
+const CARRY_ALL_BALANCE = 128;
+
+;; SENDMSG modes
+const SUB_BALANCE_MSG = 64;
+const SUB_BALANCE_CONTRACT = 128;
+const ONLY_ESTIMATE_FEES = 1024;
+
+;; SEND MODES QUIETED
+const QDESTROY_IF_ZERO = 34;
+const QCARRY_REMAINING_GAS = 66;
+const QCARRY_ALL_BALANCE = 130;
+
+;; Contex index constants. See ./ctx.fc for more
+const IS_BOUNCED = 0;
+const SENDER = 1;
+const FWD_FEE = 2;
+const OPCODE = 3;
+const QUERY_ID = 4;
+const BALANCE = 5;
+const MSG_VALUE = 6;
+const BODY = 7;
+const RAW_MSG = 8;
+
+;; Raw reserves constants. See ./reserves.fc for more
+const RESERVE_EXACTLY    = 0;
+const RESERVE_ALL_EXCEPT = 1;
+const RESERVE_AT_MOST    = 2;
+const EXTRN_DO_NOT_FAIL  = 2;
+const BALANCE_INCREASED  = 4;
+const BALANCE_DECREASED  = 8;
+const int RESERVE_BOUNCE_ON_ACTION_FAIL = 16;
+
+;; Action tags. See ./actions.fc for more
+const SEND_MSG_ACTION_TAG = 0x0ec3c86d;
+const SET_CODE_ACTION_TAG = 0xad4de08e;
+const RESERVE_CURRENCY_ACTION_TAG = 0x36e6b809;
+const CHANGE_LIBRARY_ACTION_TAG = 0x26fa1dd4;
+
+{-
+    globs.fc
+
+    Globals needed.
+-}
+
+;; Context. See ./ctx.fc for more
+global tuple ctx;
+
+{-
+    op.fc
+
+    Common opcodes for standard contracts
+-}
+
+;; standard ft opcodes
+const int op::ft::transfer = 0xf8a7ea5;
+const int op::ft::transfer_notification = 0x7362d09c;
+const int op::ft::excesses = 0xd53276db;
+const int op::ft::burn = 0x595f07bc;
+
+;; standard ft discovery opcodes
+const int op::ft::provide_wallet_address = 0x2c76b973;
+const int op::ft::take_wallet_address = 0xd1735400;
+
+;; standard nft opcodes
+const int op::nft::transfer = 0x5fcc3d14;
+const int op::nft::ownership_assigned = 0x05138d91;
+const int op::nft::excesses = 0xd53276db;
+const int op::nft::get_static_data = 0x2fcb26a2;
+const int op::nft::report_static_data = 0x8b771735;
+
+;; standard nft royalty opcodes
+const int op::nft::get_royalty_params = 0x693d3950;
+const int op::nft::report_royalty_params = 0xa8cb00ad;
+
+;; SBT
+const int op::sbt::request_owner = 0xd0c3bfea;
+const int op::sbt::owner_info = 0x0dd607e3;
+const int op::sbt::prove_ownership = 0x04ded148;
+const int op::sbt::ownership_proof = 0x0524c7ae;
+const int op::sbt::ownership_proof_bounced = 0xc18e86d2;
+const int op::sbt::destroy = 0x1f04537a;
+const int op::sbt::revoke = 0x6f89f5e3;
+const int op::sbt::take_excess = 0xd136d3b3;
+
+;; *not* standard but can be used, as long it uses same schema
+const int op::excesses = 0xd53276db;
+
+;; special opcode, it cannot be faked from internal messages
+const int op::empty_body = -1;
+{-
+    reserves.fc
+
+    This library wraps around common modes in raw_reserve calls.
+
+    Usage: raw_reserve(specified_value | 0, mode); 
+    Modes available:
+    - RESERVE_EXACTLY                                                              = specified_value
+    - RESERVE_ALL_EXCEPT                                                           = remaining_balance - specified_value
+    - RESERVE_AT_MOST                                                              = min(specified_value, remaining_balance)
+    - RESERVE_AT_MOST + RESERVE_ALL_EXCEPT                                         = remaining_balance - min(specified_value, remaining_balance)
+    - BALANCE_INCREASED                                                            = original_balance + specified_value
+    - BALANCE_INCREASED + RESERVE_ALL_EXCEPT                                       = remaining_balance - (original_balance + specified_value)
+    - BALANCE_INCREASED + RESERVE_AT_MOST                                          = min(original_balance + specified_value, remaining_balance) = remaining_balance
+    - BALANCE_INCREASED + RESERVE_AT_MOST + RESERVE_ALL_EXCEPT                     = remaining_balance - min(original_balance + specified_value, remaining_balance)
+    - BALANCE_DECREASED + BALANCE_INCREASED                                        = original_balance - specified_value
+    - BALANCE_DECREASED + BALANCE_INCREASED + RESERVE_ALL_EXCEPT                   = remaining_balance - (original_balance - specified_value)
+    - BALANCE_DECREASED + BALANCE_INCREASED + RESERVE_AT_MOST                      = min(original_balance - specified_value, remaining_balance)
+    - BALANCE_DECREASED + BALANCE_INCREASED + RESERVE_AT_MOST + RESERVE_ALL_EXCEPT = remaining_balance - min(original_balance - specified_value, remaining_balance)
+-}
+
+() reserves::max_balance(int _balance) impure inline {
+    raw_reserve(
+        ;; user is supposed to pay storage fees, so we sum it here
+        ;; if this isn't the intended, use reserves::max_balance_nostorage
+        max((ctx.at(BALANCE) + storage_fees()) - ctx.at(MSG_VALUE), 
+            _balance
+        ), RESERVE_EXACTLY
+    );
+}
+
+() reserves::max_balance_nostorage(int _balance) impure inline {
+    raw_reserve(
+        max((ctx.at(BALANCE)) - ctx.at(MSG_VALUE), 
+            _balance
+        ), RESERVE_EXACTLY
+    );
+}
+
+() reserves::exact(int _balance) impure inline {
+    raw_reserve(_balance, RESERVE_EXACTLY);
+}
+
+() reserves::before_tx() impure inline {
+    raw_reserve(0, BALANCE_INCREASED);
+}
+{-
+    msgs.fc
+
+    This library simplify the creation of outgoing messages from a contract.
+-}
+
+() msgs::send_empty(int amount, slice to, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(0, 107)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() msgs::send_simple(int amount, slice to, cell body, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(1, 107)
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() msgs::send_bsimple(int amount, slice to, builder body, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(0, 107)
+        .store_builder(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() msgs::send_nobounce(int amount, slice to, cell body, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(1, 107)
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() msgs::send_bnobounce(int amount, slice to, builder body, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(0, 107)
+        .store_builder(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() msgs::send_with_stateinit(int amount, slice to, cell state_init, cell body, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(7, 108)
+        .store_ref(state_init)
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+() msgs::send_bwith_stateinit(int amount, slice to, cell state_init, builder body, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(6, 108)
+        .store_ref(state_init)
+        .store_builder(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+{-
+    dict.fc
+
+    This library simply the creation and manipulation of dictionaries.
+-}
+
+_ dict::set([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~udict_set(_key_len, _index, _data);
+    return [_key_len, _cell?];
+}
+
+_ dict::iset([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~idict_set(_key_len, _index, _data);
+    return [_key_len, _cell?];
+}
+
+_ dict::set_b([int, cell] cntr, builder _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~udict_set_builder(_key_len, _index, _data);
+    return [_key_len, _cell?];
+}
+
+_ dict::iset_b([int, cell] cntr, builder _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~idict_set_builder(_key_len, _index, _data);
+    return [_key_len, _cell?];
+}
+
+_ dict::iset_ref([int, cell] cntr, cell _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~idict_set_ref(_key_len, _index, _data);
+    return [_key_len, _cell?];
+}
+
+_ dict::set_ref([int, cell] cntr, cell _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~udict_set_ref(_key_len, _index, _data);
+    return [_key_len, _cell?];
+}
+
+_ dict::get([int, cell] cntr, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    (slice _data, int _found) = _cell?.udict_get?(_key_len, _index);
+    return (_data, _found);
+}
+
+_ dict::iget([int, cell] cntr, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    (slice _data, int _found) = _cell?.idict_get?(_key_len, _index);
+    return (_data, _found);
+}
+
+_ dict::get_ref([int, cell] cntr, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    (cell _data, int _found) = _cell?.udict_get_ref?(_key_len, _index);
+    return (_data, _found);
+}
+
+_ dict::iget_ref([int, cell] cntr, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    (cell _data, int _found) = _cell?.idict_get_ref?(_key_len, _index);
+    return (_data, _found);
+}
+
+_ dict::delete([int, cell] cntr, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int _deleted = _cell?~udict_delete?(_key_len, _index);
+    return ([_key_len, _cell?], _deleted);
+}
+
+_ dict::idelete([int, cell] cntr, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int _deleted = _cell?~idict_delete?(_key_len, _index);
+    return ([_key_len, _cell?], _deleted);
+}
+
+_ dict::get_key_len([int, cell] cntr) inline {
+    [int _key_len, _] = cntr; 
+    return _key_len;
+}
+
+_ dict::get_cell([int, cell] cntr) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    return _cell?;
+}
+
+_ dict::from_cell(cell _cell, int _key_len) inline {
+    return [_key_len, _cell];
+}
+
+_ ~dict::idelete([int, cell] cntr, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int _deleted = _cell?~idict_delete?(_key_len, _index);
+    return ([_key_len, _cell?], _deleted);
+}
+
+_ ~dict::delete([int, cell] cntr, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int _deleted = _cell?~udict_delete?(_key_len, _index);
+    return ([_key_len, _cell?], _deleted);
+}
+
+_ ~dict::set_ref([int, cell] cntr, cell _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~udict_set_ref(_key_len, _index, _data);
+    return ([_key_len, _cell?], ());
+}
+
+_ ~dict::iset_ref([int, cell] cntr, cell _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~idict_set_ref(_key_len, _index, _data);
+    return ([_key_len, _cell?], ());
+}
+
+_ ~dict::iset([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~idict_set(_key_len, _index, _data);
+    return ([_key_len, _cell?], ());
+}
+
+_ ~dict::set([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~udict_set(_key_len, _index, _data);
+    return ([_key_len, _cell?], ());
+}
+
+_ ~dict::iset_b([int, cell] cntr, builder _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~idict_set_builder(_key_len, _index, _data);
+    return ([_key_len, _cell?], ());
+}
+
+_ ~dict::set_b([int, cell] cntr, builder _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    _cell?~udict_set_builder(_key_len, _index, _data);
+    return ([_key_len, _cell?], ());
+}
+
+_ dict::replace([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int replaced? = _cell?~udict_replace?(_key_len, _index, _data);
+    return ([_key_len, _cell?], replaced?);
+}
+
+_ ~dict::replace([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int replaced? = _cell?~udict_replace?(_key_len, _index, _data);
+    return ([_key_len, _cell?], replaced?);
+}
+
+_ dict::ireplace([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int replaced? = _cell?~idict_replace?(_key_len, _index, _data);
+    return ([_key_len, _cell?], replaced?);
+}
+
+_ ~dict::ireplace([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int replaced? = _cell?~idict_replace?(_key_len, _index, _data);
+    return ([_key_len, _cell?], replaced?);
+}
+
+
+_ dict::add([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int added? = _cell?~udict_add?(_key_len, _index, _data);
+    return ([_key_len, _cell?], added?);
+}
+
+_ ~dict::add([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int added? = _cell?~udict_add?(_key_len, _index, _data);
+    return ([_key_len, _cell?], added?);
+}
+
+_ dict::iadd([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int added? = _cell?~idict_add?(_key_len, _index, _data);
+    return ([_key_len, _cell?], added?);
+}
+
+_ ~dict::iadd([int, cell] cntr, slice _data, int _index) inline {
+    [int _key_len, cell _cell?] = cntr; 
+    int added? = _cell?~idict_add?(_key_len, _index, _data);
+    return ([_key_len, _cell?], added?);
+}
+
+int dict::equal_raw(cell _a, cell _b) inline {
+    if (is_null(_a)) { return is_null(_b); }
+    elseif (is_null(_b)) { return false; }
+
+    return equal_cells(_a, _b);
+}
+
+int dict::equal([int, cell] cntr_a, [int, cell] cntr_b) inline {
+    [int _key_len_a, cell _cell_a?] = cntr_a;
+    [int _key_len_b, cell _cell_b?] = cntr_b;
+
+    return (_key_len_a == _key_len_b) & dict::equal_raw(_cell_a?, _cell_b?);
+}
+
+[int, cell] dict::new(int _key_len) inline {
+    return [_key_len, new_dict()];
+}
+
+{-
+    utils.fc
+
+    Various utility functions.
+-}
+
+slice utils::address_to_hex_string(int value) inline {
+    if value == 0 {
+        builder buffer = begin_cell();
+        int i = 0;
+        while (i < 64){
+            buffer = buffer.store_uint("0"u, 8);
+            i += 1;
+        }
+        return buffer.end_cell().begin_parse().preload_bits(i * 8);
+    } else {
+        int i = 0;
+    
+        int mask = 15;
+        builder buffer = begin_cell();
+
+        while (i < 64) {
+            int curr = (value & mask);
+            if(curr > 9){
+                buffer = buffer.store_uint(55 + curr, 8);
+            } else {
+                buffer = buffer.store_uint(48 + curr, 8);
+            }
+            value = value >> 4;
+            i += 1;
+        }
+
+        builder final_cell = begin_cell();
+
+        slice reversed_buffer = buffer.end_cell().begin_parse();
+    
+        i = 64;
+        while(i > 0){
+            i -= 1;
+            slice chr = reversed_buffer.preload_bits_offset(i * 8, 8);
+            final_cell = final_cell.store_slice(chr);
+        }
+        return final_cell.end_cell().begin_parse().preload_bits(512);
+    }
+}
+
+slice utils::number_to_slice(int number) inline {
+    builder text_b = begin_cell();
+    if number < 0 {
+        text_b = text_b.store_slice("-");
+        number = - number;
+    }
+    int len = 0;
+    int value = 0;
+    int mult = 1;
+    do {
+        (number, int res) = number.divmod(10);
+        value = value + (res + 48) * mult;
+        mult = mult * 256;
+        len = len + 1;
+    } until (number == 0);
+    slice text = text_b.store_uint(value, len * 8).end_cell().begin_parse();
+    return text;
+}
+
+() utils::send_custom(
+    int _amount, 
+    int _op, 
+    slice _to, 
+    int _mode
+) impure inline {
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107)
+        .store_uint(_op, 32)
+        .store_uint(ctx.at(QUERY_ID), 64)
+    .end_cell();
+    send_raw_message(msg, _mode);
+}
+
+() utils::send_excesses(
+    int _amount, 
+    slice _to, 
+    int _mode
+) impure inline {
+    utils::send_custom(_amount, op::excesses, _to, _mode);
+}
+
+(int) utils::to_coins(int _n) inline { return _n * 1000000000; }
+
+(cell) utils::merge_dicts(cell _first_dict, cell _second_dict, int _key_size) inline {
+    (int key, slice value, int is_found) = _second_dict.udict_get_min?(_key_size);
+    
+    if is_found {
+        _first_dict~udict_set(_key_size, key, value);
+    }
+
+    while (is_found) {
+        (key, value, is_found) = _second_dict.udict_get_next?(_key_size, key);
+        if is_found {
+            _first_dict~udict_set(_key_size, key, value);
+        }
+    }
+
+    return _first_dict;
+}
+
+(cell) utils::merge_idicts(cell _first_dict, cell _second_dict, int _key_size) inline {
+    (int key, slice value, int is_found) = _second_dict.idict_get_min?(_key_size);
+    
+    if is_found {
+        _first_dict~udict_set(_key_size, key, value);
+    }
+
+    while (is_found) {
+        (key, value, is_found) = _second_dict.idict_get_next?(_key_size, key);
+        if is_found {
+            _first_dict~idict_set(_key_size, key, value);
+        }
+    }
+
+    return _first_dict;
+}
+
+tuple utils::make_c7() inline {
+    return _unsafe_tuple([_unsafe_tuple([
+                    0x076ef1ea,                     ;; magic
+                    0,                              ;; actions
+                    0,                              ;; msgs_sent
+                    now(),                          ;; unixtime
+                    1,                              ;; block_lt
+                    1,                              ;; trans_lt
+                    get_seed(),                     ;; randseed
+                    pair(1000000000, null()),       ;; balance_remaining
+                    my_address(),                   ;; myself
+                    get_config()                   ;; global_config
+                ])]);
+}
+
+int utils::calc_account_hash(cell code, cell data) inline {
+    return begin_cell()
+        .store_uint(
+            ;; refs_descriptor: ref_count + ((exotic? & 1) * 8) + (mask * 32)
+            ;;                  2 refs (code + data), non-exotic, zero-mask
+            (2 << 16)
+            ;; bits_descriptor: floor (bit_count / 8) + ceil(bit_count, 8)
+            ;;                  floor (5 bits / 8) + ceil(5 bits / 8) = 0 + 1 = 1
+            | (1 << 8)
+            ;; data: [0b00110] + [0b100] = [0b00110100] = 0x34 (data + augmented bits)
+            ;;       0b00110 - data (split_depth, special, code, data, library)
+            ;;       0b100 - augmented bits (leading 1 + zeroes to make section multiple of eight)
+            | 0x34,
+            24
+        )
+        .store_uint(code.cell_depth(), 16)
+        .store_uint(data.cell_depth(), 16)
+        .store_uint(code.cell_hash(), 256)
+        .store_uint(data.cell_hash(), 256)
+        .sha256_singleb();
+}
+
+;; 0b100 = addr_std$10 tag; No anycast
+;; 8 zero bits for basechain workchain
+const slice basechain_address_slice_magic = "801_"s;
+
+slice utils::basechain_address_from_account_hash(int ac_hash) inline {
+    return begin_cell().store_slice(basechain_address_slice_magic).store_uint(ac_hash, 256).end_cell().begin_parse();
+}
+
+slice utils::basechain_address_from_code_and_data(cell code, cell data) inline {
+    return utils::basechain_address_from_account_hash(utils::calc_account_hash(code, data));
+}
+
+{-
+    contracts.fc
+
+    This library simply the creation and call of external contracts.
+-}
+
+([cell, cell, cell, slice]) contracts::empty() inline {
+    return [null(), null(), null(), null()];
+}
+
+([cell, cell, cell, slice]) contracts::from_address(slice _addr) inline {
+    return [null(), null(), null(), _addr];
+}
+
+([cell, cell, cell, slice]) contracts::from_sources(cell data, cell code) inline {
+    return [code, data, null(), null()];
+}
+
+([cell, cell, cell, slice], cell) state_init([cell, cell, cell, slice] cntr) inline {
+    [cell _code?, cell _data?, cell _state_init?, slice _addr?] = cntr; 
+
+    if _state_init?.null?() {
+        _state_init? = begin_cell()
+            .store_uint(0, 1 + 1)   ;; No split depth; No TickTock
+            .store_dict(_code?)     ;; Code
+            .store_dict(_data?)     ;; Data
+            .store_uint(0, 1)       ;; Empty libraries
+        .end_cell();
+    }
+
+    return ([_code?, _data?, _state_init?, _addr?], _state_init?);
+}
+
+([cell, cell, cell, slice], slice) address([cell, cell, cell, slice] cntr, int workchain) inline {
+    [cell _code?, cell _data?, cell _state_init?, slice _addr?] = cntr; 
+
+    if _addr?.null?() {
+        (_, _state_init?) = cntr.state_init();
+        _addr? = begin_cell().store_uint(4, 3) ;; 0b100 = addr_std$10 tag; No anycast
+            .store_int(workchain, 8)
+            .store_uint(cell_hash(_state_init?), 256)
+        .as_slice();
+    }
+
+    return ([_code?, _data?, _state_init?, _addr?], _addr?);
+}
+
+
+([cell, cell, cell, slice], slice) basechain_address([cell, cell, cell, slice] cntr) inline {
+    [cell _code?, cell _data?, cell _state_init?, slice _addr?] = cntr; 
+
+    if _addr?.null?() {
+        _addr? = utils::basechain_address_from_code_and_data(_code?, _data?);
+    }
+
+    return ([_code?, _data?, _state_init?, _addr?], _addr?);
+}
+{-
+    ctx.fc
+
+    This library helps to manage call context for incoming messages. 
+-}
+
+() ctx::init(int _my_balance, int _msg_value, cell _in_msg_full, slice _in_msg_body) impure inline {
+    slice cs = _in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    int _is_bounced = false;
+    if flags & 1 {
+        _is_bounced = true;
+        _in_msg_body~skip_bits(32); ;; 0xFFFFFFFF
+    }
+
+    slice _sender_address = cs~load_msg_addr();
+    cs~load_msg_addr();
+    cs~load_coins();
+    cs~skip_bits(1);
+    cs~load_coins();
+
+    ctx = _unsafe_tuple([
+            _is_bounced,
+            _sender_address,
+            muldiv(cs~load_coins(), 3, 2),
+            _in_msg_body~load_uint(32),
+            _in_msg_body~load_uint(64),
+            _my_balance,
+            _msg_value,
+            _in_msg_body,
+            _in_msg_full
+        ]);
+}
+
+;; returns if slice empty
+;; if empty body, sets opcode=-1 & query_id=-1, so it cannot be faked
+() ctx::init_wempty(int _my_balance, int _msg_value, cell _in_msg_full, slice _in_msg_body) impure inline {
+    slice cs = _in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    int _is_bounced = false;
+    if flags & 1 {
+        _is_bounced = true;
+        _in_msg_body~skip_bits(32); ;; 0xFFFFFFFF
+    }
+
+    slice _sender_address = cs~load_msg_addr();
+    cs~load_msg_addr();
+    cs~load_coins();
+    cs~skip_bits(1);
+    cs~load_coins();
+
+    ctx = _unsafe_tuple([
+            _is_bounced,
+            _sender_address,
+            muldiv(cs~load_coins(), 3, 2),
+            _in_msg_body.slice_empty?() ? -1 : _in_msg_body~load_uint(32),
+            _in_msg_body.slice_empty?() ? -1 : _in_msg_body~load_uint(64),
+            _my_balance,
+            _msg_value,
+            _in_msg_body, ;; could be an empty slice
+            _in_msg_full
+        ]);
+}
+{-
+    address.fc
+
+    This library provide functions for MsgAddressInt type. 
+-}
+
+
+(int) address::is_none(slice _addr) inline {
+    return equal_slices(_addr, addr_none());
+}
+
+(int) address::is_hole(slice _addr) inline {
+    return equal_slices(_addr, HOLE_ADDRESS);
+}
+
+(int) address::is_type(slice _addr, int _typ) inline {
+    return (_addr.preload_uint(2) == _typ);
+}
+
+(int) address::get_workchain(slice _addr) inline {
+    (int wc, _) = parse_std_addr(_addr);
+    return wc;
+}
+
+(int) address::get_hashpart(slice _addr) inline {
+    (_, int hp) = parse_std_addr(_addr);
+    return hp;
+}
+
+(int) address::check_workchain(slice _addr, int _wc) inline {
+    return _addr.address::get_workchain() == _wc;
+}
+
+;; DEPRECATED
+;; doest trigger error if addr is addr_none 
+(int) address::check_workchain_nofail(slice _addr, int _wc) inline {
+    if _addr.address::is_none() {
+        return true;
+    }
+    
+    return _addr.address::check_workchain(_wc);
+}
+
+(int) address::check_hashpart(slice _addr, int _hp) inline {
+    return _addr.address::get_hashpart() == _hp;
+}
+
+;; alias addr::serialize_std
+(slice) address::serialize(int _wc, int _hp) inline {
+    return begin_cell()
+        .store_uint(4, 3) ;; 0b100 = addr_std$10 tag; No anycast
+        .store_int(_wc, 8)
+        .store_uint(_hp, 256)
+    .as_slice();
+}
+
+;; addr_std$10 anycast:(Maybe Anycast) workchain_id:int8 address:bits256  = MsgAddressInt;
+(slice) address::serialize_std(int _wc, int _hp) inline {
+    return begin_cell()
+        .store_uint(4, 3) ;; 0b100
+        .store_int(_wc, 8)
+        .store_uint(_hp, 256)
+    .as_slice();
+}
+
+;; addr_var$11 anycast:(Maybe Anycast) addr_len:(## 9) workchain_id:int32 address:(bits addr_len) = MsgAddressInt;
+(slice) address::serialize_var(int _wc, int _len, int _bits) inline {
+    return begin_cell()
+        .store_uint(6, 3) ;; 0b110
+        .store_int(_len, 9)
+        .store_int(_wc, 32)
+        .store_uint(_bits, _len)
+    .as_slice();
+}
+
+;; addr_none$00 = MsgAddressExt;
+(slice) address::serialize_none() inline {
+    return addr_none();
+}
+
+;; addr_extern$01 len:(## 9) external_address:(bits len) = MsgAddressExt;
+(slice) address::serialize_ext(int _len, int _bits) inline {
+    return begin_cell()
+        .store_uint(1, 2)
+        .store_int(_len, 9)
+        .store_uint(_bits, _len)
+    .as_slice();
+}
+
+
+{-
+    cell.fc
+
+    This library provide functions for Cells. 
+-}
+
+(int) cell::is_empty(cell c) inline {
+    return c.cell_hash() == 68134197439415885698044414435951397869210496020759160419881882418413283430343;
+}
+{-
+    time.fc
+
+    This library simply the managment of time in contract.
+-}
+
+const time::SECONDS_PER_DAY = 86400; ;; 24 * 60 * 60
+const time::SECONDS_PER_HOUR = 3600; ;; 60 * 60
+const time::SECONDS_PER_MINUTE = 60;
+
+(int, int) time::add_days(int _ts, int _days) inline {
+    if _days < 0 { return (-1, false); }
+    return (_ts + (_days * time::SECONDS_PER_DAY), true);
+}
+
+(int, int) time::add_hours(int _ts, int _hours) inline {
+    if _hours < 0 { return (-1, false); }
+    return (_ts + (_hours * time::SECONDS_PER_HOUR), true);
+}
+
+(int, int) time::add_minutes(int _ts, int _minutes) inline {
+    if _minutes < 0 { return (-1, false); }
+    return (_ts + (_minutes * time::SECONDS_PER_MINUTE), true);
+}
+
+(int, int) time::sub_days(int _ts, int _days) inline {
+    if _days < 0 { return (-1, false); }
+    return (_ts - (_days * time::SECONDS_PER_DAY), true);
+}
+
+(int, int) time::sub_hours(int _ts, int _hours) inline {
+    if _hours < 0 { return (-1, false); }
+    return (_ts - (_hours * time::SECONDS_PER_HOUR), true);
+}
+
+(int, int) time::sub_minutes(int _ts, int _minutes) inline {
+    if _minutes < 0 { return (-1, false); }
+    return (_ts - (_minutes * time::SECONDS_PER_MINUTE), true);
+}
+{-
+    math.fc
+
+    This library provide functions for math. 
+-}
+
+;; internal constants
+
+const int __math::ONE_18 = 1000000000000000000; ;; 1e18
+const int __math::ONE_20 = 100000000000000000000; ;; 1e20
+const int __math::ONE_36 = 1000000000000000000000000000000000000; ;; 1e36
+const int __math::MAX_NATURAL_EXPONENT = 130000000000000000000; ;; 130e18
+const int __math::MIN_NATURAL_EXPONENT = -41000000000000000000;   ;; -41e18
+const int __math::LN_36_LOWER_BOUND = __math::ONE_18 - 100000000000000000; ;; ONE_18 - 1e17
+const int __math::LN_36_UPPER_BOUND = __math::ONE_18 + 100000000000000000; ;; ONE_18 + 1e17
+const int __math::MILD_EXPONENT_BOUND = 28948022309329048855892746252171976963317496166410141009864396001978282409984 / __math::ONE_20; ;; 2**254 / ONE_20
+const int __math::e   = 2718281828459045235;      ;; e
+const int __math::x0  = 128000000000000000000;    ;; 2ˆ7
+const int __math::a0  = 38877084059945950922200000000000000000000000000000000000; ;; eˆ(x0) (no decimals)
+const int __math::x1  = 64000000000000000000;     ;; 2ˆ6
+const int __math::a1  = 6235149080811616882910000000; ;; eˆ(x1) (no decimals)
+const int __math::x2  = 3200000000000000000000;   ;; 2ˆ5
+const int __math::a2  = 7896296018268069516100000000000000; ;; eˆ(x2)
+const int __math::x3  = 1600000000000000000000;   ;; 2ˆ4
+const int __math::a3  = 888611052050787263676000000; ;; eˆ(x3)
+const int __math::x4  = 800000000000000000000;    ;; 2ˆ3
+const int __math::a4  = 298095798704172827474000; ;; eˆ(x4)
+const int __math::x5  = 400000000000000000000;    ;; 2ˆ2
+const int __math::a5  = 5459815003314423907810;   ;; eˆ(x5)
+const int __math::x6  = 200000000000000000000;    ;; 2ˆ1
+const int __math::a6  = 738905609893065022723;    ;; eˆ(x6)
+const int __math::x7  = 100000000000000000000;    ;; 2ˆ0
+const int __math::a7  = 271828182845904523536;    ;; eˆ(x7)
+const int __math::x8  = 50000000000000000000;     ;; 2ˆ-1
+const int __math::a8  = 164872127070012814685;    ;; eˆ(x8)
+const int __math::x9  = 25000000000000000000;     ;; 2ˆ-2
+const int __math::a9  = 128402541668774148407;    ;; eˆ(x9)
+const int __math::x10 = 12500000000000000000;     ;; 2ˆ-3
+const int __math::a10 = 113314845306682631683;    ;; eˆ(x10)
+const int __math::x11 = 6250000000000000000;      ;; 2ˆ-4
+const int __math::a11 = 106449445891785942956;    ;; eˆ(x11)
+const int __math::max_pow_relative_error = 10000; ;; 10^(-14)
+
+
+;; public constants
+
+const int math::MAX_UINT8   = 0xFF; 
+const int math::MAX_UINT16  = 0xFFFF; 
+const int math::MAX_UINT32  = 0xFFFFFFFF; 
+const int math::MAX_UINT64  = 0xFFFFFFFFFFFFFFFF; 
+const int math::MAX_UINT128 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF; 
+const int math::MAX_UINT256 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF; 
+const int math::MAX_COINS   = 1329227995784915872903807060280344575; ;; 2^120 - 1
+const int math::ONE_DEC     = __math::ONE_18;         ;; 1      with 18 decimals
+const int math::E           = __math::e;              ;; e      with 18 decimals
+const int math::PI          = 3141592653589793238;  ;; pi     with 18 decimals
+const int math::PI_SQ       = 9869604401089358618;  ;; pi^2   with 18 decimals
+const int math::1_DIV_E     = 0367879441171442321;  ;; 1/e    with 18 decimals
+const int math::1_DIV_PI    = 0318309886183790671;  ;; 1/pi   with 18 decimals
+const int math::1_DIV_PI_SQ = 0101321183642337771;  ;; 1/pi^2 with 18 decimals
+
+
+;; errors
+
+const math::error::x_out_of_bounds       = 50001;
+const math::error::y_out_of_bounds       = 50002;
+const math::error::product_out_of_bounds = 50003;
+const math::error::invalid_exponent      = 50004;
+const math::error::out_of_bounds         = 50005;
+const math::error::0_base                = 50006;
+const math::error::negative_power        = 50007;
+const math::error::zero_division         = 50008;
+const math::error::invalid_input         = 50009;
+const math::error::cmplment_out_of_range = 51002;
+
+
+
+{-
+    console.fc
+
+    This library provide functions for dumping in console. 
+-}
+
+slice console::pretty_coins(int _x) inline_ref {
+    ;; should be put in debug
+    var zeros = begin_cell();
+    int rem = _x % 1000000000;
+    while rem {
+        rem *= 10;
+        rem = rem >= 1000000000 ? 0 : rem;
+        if rem {
+            zeros = zeros.store_slice("0");
+        }
+    }
+    return begin_cell()
+            .store_slice(utils::number_to_slice(_x / 1000000000))
+            .store_slice(".")
+            .store_slice(zeros.as_slice())
+            .store_slice(utils::number_to_slice(_x % 1000000000))
+        .as_slice();
+}
+
+
+slice console::pretty_fp(int _x) inline_ref {
+    ;; should be put in debug
+    var zeros = begin_cell();
+    int rem = _x % math::ONE_DEC;
+    while rem {
+        rem *= 10;
+        rem = rem >= math::ONE_DEC ? 0 : rem;
+        if rem {
+            zeros = zeros.store_slice("0");
+        }
+    }
+    return begin_cell()
+            .store_slice(utils::number_to_slice(_x / math::ONE_DEC))
+            .store_slice(".")
+            .store_slice(zeros.as_slice())
+            .store_slice(utils::number_to_slice(_x % math::ONE_DEC))
+        .as_slice();
+}
+
+;; can write at most 127 chars
+;; unsupported fields are ignored
+forall X -> () console::log(X _val) impure inline_ref {
+    tuple val = _unsafe_tuple(_val);
+    builder _txt = begin_cell();
+    int i = 0;
+    repeat(val.tlen()) {
+        if (val.at(i)).is_null() {
+            _txt = _txt.store_slice("NULL");
+        } elseif (val.at(i)).is_int() {
+            int val = cast_to_int(val.at(i));
+            _txt = _txt.store_slice(val.utils::number_to_slice());
+        } elseif (val.at(i)).is_slice() {
+            slice val = cast_to_slice(val.at(i));
+            ;; check if ascii?
+            _txt = _txt.store_slice(val);
+        } elseif (val.at(i)).is_tuple() {
+            ;; check nested types (fp, coins)
+            (slice _t, int val) = unpair(val.at(i));
+            if equal_slices(_t, "coins") {
+                _txt = _txt.store_slice(console::pretty_coins(val));
+            } elseif equal_slices(_t, "fp") {
+                _txt = _txt.store_slice(console::pretty_fp(val));
+            } else {
+                _txt = _txt.store_slice("-");
+            }            
+        } elseif (val.at(i)).is_nan() {
+            _txt = _txt.store_slice("NAN");
+        }
+
+        i += 1;
+    }
+
+    ~strdump_safe_not_pretty(_txt.as_slice());
+}
+
+_ console::log_int(int value) impure inline_ref {
+    slice text_extended = begin_cell()
+            .store_slice(utils::number_to_slice(value))
+            .as_slice();
+    ~strdump_safe_not_pretty(text_extended);
+}
+
+_ console::log_raw(slice sc) impure inline {
+    ~strdump_safe_not_pretty(sc);
+}
+
+
+{-
+    message.fc
+
+    This library simplify the creation of outgoing messages from a contract.
+-}
+
+;; struct 
+;; _raw_message:builder 
+
+_ message::new() inline {
+    return [begin_cell()];
+}
+
+;; constructor methods
+
+_ message::set_header(
+    [builder] _cntx, 
+    int _mode,
+    slice _to, 
+    int _amount
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(_mode, 6)
+        .store_slice(_to)
+        .store_coins(_amount);
+
+    return [_raw_message];
+}
+
+_ message::set_empty_body(
+    [builder] _cntx
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(0, 107);
+
+    return [_raw_message];
+}
+
+;; ref body mode
+
+_ message::set_body(
+    [builder] _cntx, 
+    cell _body 
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(1, 107)
+        .store_ref(_body);
+
+    return [_raw_message];
+}
+
+_ message::set_body_state_init(
+    [builder] _cntx, 
+    cell _state_init, 
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(7, 108)
+        .store_ref(_state_init)
+        .store_ref(_body);
+
+    return [_raw_message];
+}
+
+;; builder mode body
+
+_ message::set_bbody(
+    [builder] _cntx, 
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(0, 107)
+        .store_builder(_body);
+
+    return [_raw_message];
+}
+
+
+_ message::set_bbody_state_init(
+    [builder] _cntx, 
+    cell _state_init, 
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_builder(_body);
+
+    return [_raw_message];
+}
+
+;; slice mode body
+
+_ message::set_sbody(
+    [builder] _cntx, 
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(0, 107)
+        .store_slice(_body);
+
+    return [_raw_message];
+}
+
+_ message::set_sbody_state_init(
+    [builder] _cntx, 
+    cell _state_init, 
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_slice(_body);
+
+    return [_raw_message];
+}
+
+;; one line methods
+
+_ message::empty(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107);
+
+    return [_raw_message];
+}
+
+_ message::body(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(1, 107)
+        .store_ref(_body);
+
+    return [_raw_message];
+}
+
+_ message::body_state_init(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(7, 108)
+        .store_ref(_state_init)
+        .store_ref(_body);
+
+    return [_raw_message];
+}
+
+_ message::bbody(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107)
+        .store_builder(_body);
+
+    return [_raw_message];
+}
+
+_ message::bbody_state_init(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_builder(_body);
+
+    return [_raw_message];
+}
+
+_ message::sbody(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107)
+        .store_slice(_body);
+
+    return [_raw_message];
+}
+
+_ message::sbody_state_init(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_slice(_body);
+
+    return [_raw_message];
+}
+
+;; non bouncable messages 
+
+_ message::body_state_init_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(7, 108)
+        .store_ref(_state_init)
+        .store_ref(_body);
+
+    return [_raw_message];
+}
+
+_ message::body_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(1, 107)
+        .store_ref(_body);
+
+    return [_raw_message];
+}
+
+_ message::bbody_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107)
+        .store_builder(_body);
+
+    return [_raw_message];
+}
+
+_ message::sbody_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107)
+        .store_slice(_body);
+
+    return [_raw_message];
+}
+
+_ message::bbody_state_init_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_builder(_body);
+
+    return [_raw_message];
+}
+
+_ message::sbody_state_init_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_slice(_body);
+
+    return [_raw_message];
+}
+
+;; other methods 
+
+_ message::send(
+    [builder] _cntx, 
+    int _mode
+) impure inline {
+    [builder _raw_message] = _cntx;
+
+    send_raw_message(_raw_message.end_cell(), _mode);
+
+    return [_raw_message];
+}
+
+_ message::get_raw_message(
+    [builder] _cntx
+) impure inline {
+    [builder _raw_message] = _cntx;
+
+    return ([_raw_message], _raw_message.end_cell());
+}
+
+;; constructor as modifier methods
+
+_ ~message::set_header(
+    [builder] _cntx, 
+    int _mode,
+    slice _to, 
+    int _amount
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(_mode, 6)
+        .store_slice(_to)
+        .store_coins(_amount);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::set_empty_body(
+    [builder] _cntx
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(0, 107);
+
+    return ([_raw_message], ());
+}
+
+;; ref body mode
+
+_ ~message::set_body(
+    [builder] _cntx, 
+    cell _body 
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(1, 107)
+        .store_ref(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::set_body_state_init(
+    [builder] _cntx, 
+    cell _state_init, 
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(7, 108)
+        .store_ref(_state_init)
+        .store_ref(_body);
+
+    return ([_raw_message], ());
+}
+
+;; builder mode body
+
+_ ~message::set_bbody(
+    [builder] _cntx, 
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(0, 107)
+        .store_builder(_body);
+
+    return ([_raw_message], ());
+}
+
+
+_ ~message::set_bbody_state_init(
+    [builder] _cntx, 
+    cell _state_init, 
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_builder(_body);
+
+    return ([_raw_message], ());
+}
+
+;; slice mode body
+
+_ ~message::set_sbody(
+    [builder] _cntx, 
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(0, 107)
+        .store_slice(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::set_sbody_state_init(
+    [builder] _cntx, 
+    cell _state_init, 
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_slice(_body);
+
+    return ([_raw_message], ());
+}
+
+;; one line methods
+
+_ ~message::empty(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::body(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(1, 107)
+        .store_ref(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::body_state_init(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(7, 108)
+        .store_ref(_state_init)
+        .store_ref(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::bbody(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107)
+        .store_builder(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::bbody_state_init(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_builder(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::sbody(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107)
+        .store_slice(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::sbody_state_init(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_slice(_body);
+
+    return ([_raw_message], ());
+}
+
+;; non bouncable messages 
+
+_ ~message::body_state_init_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(7, 108)
+        .store_ref(_state_init)
+        .store_ref(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::body_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(1, 107)
+        .store_ref(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::bbody_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107)
+        .store_builder(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::sbody_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(0, 107)
+        .store_slice(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::bbody_state_init_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    builder _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_builder(_body);
+
+    return ([_raw_message], ());
+}
+
+_ ~message::sbody_state_init_nobounce(
+    [builder] _cntx, 
+    slice _to, 
+    int _amount, 
+    cell _state_init,
+    slice _body
+) inline {
+    [builder _raw_message] = _cntx;
+
+    builder _raw_message = _raw_message
+        .store_uint(SEND_MSG_NON_BOUNCEABLE, 6)
+        .store_slice(_to)
+        .store_coins(_amount)
+        .store_uint(6, 108)
+        .store_ref(_state_init)
+        .store_slice(_body);
+
+    return ([_raw_message], ());
+}
+
+;; other methods 
+
+_ ~message::send(
+    [builder] _cntx, 
+    int _mode
+) impure inline {
+    [builder _raw_message] = _cntx;
+
+    send_raw_message(_raw_message.end_cell(), _mode);
+
+    return ([_raw_message], ());
+}
+
+{-
+    actions.fc
+
+    This module contains functions for working with c5 actions.
+-}
+
+{-
+    out_list_empty$_ = OutList 0;
+    out_list$_ {n:#} prev:^(OutList n) action:OutAction = OutList (n + 1);
+-}
+cell actions::pack_out_list(tuple action_list) inline {
+    builder root = begin_cell();
+
+    int i = 0;
+    repeat (action_list.tlen()) {
+        builder out_action = action_list.at(i);
+        root = begin_cell().store_ref(root.end_cell()).store_builder(out_action);
+
+        i += 1;
+    }
+
+    return root.end_cell();
+}
+
+builder begin_action(int tag) inline {
+    return begin_cell().store_uint(tag, 32);
+}
+
+;; action_send_msg#0ec3c86d mode:(## 8) out_msg:^(MessageRelaxed Any) = OutAction;
+builder actions::send_msg(int mode, cell out_msg) inline {
+    return begin_action(SEND_MSG_ACTION_TAG).store_uint(mode, 8).store_ref(out_msg);
+}
+
+;; action_set_code#ad4de08e new_code:^Cell = OutAction;
+builder actions::set_code(cell new_code) inline {
+    return begin_action(SET_CODE_ACTION_TAG).store_ref(new_code);
+}
+
+{-
+    extra_currencies$_ dict:(HashmapE 32 (VarUInteger 32)) = ExtraCurrencyCollection;
+    currencies$_ grams:Grams other:ExtraCurrencyCollection = CurrencyCollection;
+    action_reserve_currency#36e6b809 mode:(## 8) currency:CurrencyCollection = OutAction;
+-}
+builder actions::reserve_currency(int mode, int amount) inline {
+    return begin_action(RESERVE_CURRENCY_ACTION_TAG).store_uint(mode, 8).store_coins(amount).store_dict(null());
+}
+
+builder actions::reserve_extra_currency(int mode, int ton_amount, cell extra_currency) inline {
+    return begin_action(RESERVE_CURRENCY_ACTION_TAG).store_uint(mode, 8).store_coins(ton_amount).store_dict(extra_currency);
+}
+
+{-
+    libref_hash$0 lib_hash:bits256 = LibRef;
+    libref_ref$1 library:^Cell = LibRef;
+    action_change_library#26fa1dd4 mode:(## 7) libref:LibRef = OutAction;
+-}
+builder actions::set_library(int mode, cell libref) inline {
+    return begin_action(CHANGE_LIBRARY_ACTION_TAG).store_uint((mode << 1) + 1, 8).store_ref(libref);
+}
+
+builder actions::change_library(int mode, int lib_hash) inline {
+    return begin_action(CHANGE_LIBRARY_ACTION_TAG).store_uint((mode << 1), 8).store_uint(lib_hash, 256);
+}
+
+const int __FIXED_PREFIX_LENGTH = 8;
+
+cell shard_utils::pack_prefixed_state_init(cell code, cell data) inline {
+    return begin_cell()
+    ;; fixed_prefix_length: true, prefixLength: uint5, special: false, code: true, data: true, library: false 
+        .store_uint(((32 + __FIXED_PREFIX_LENGTH) << 4) | 6, 10)
+        .store_ref(code)
+        .store_ref(data)
+        .end_cell();
+}
+
+int shard_utils::calc_account_hash(cell code, cell data) inline {
+    return begin_cell()
+    ;; d1 byte: r + 8s + 32l = 2 + 0 + 0 = 2
+    ;; d2 byte: floor(b/8) + ceil(b/8) = floor(10/8) + ceil(10/8) = 1 + 2 = 3
+    ;; Data bits (10 bits total) + padding (6 bits) = 16 bits total:
+    ;; 1 bit: Maybe=1 for fixed_prefix_length = 1
+    ;; 5 bits: fixed_prefix_length value
+    ;; 1 bit: Maybe=0 for special = 0
+    ;; 1 bit: Maybe=1 for code = 1
+    ;; 1 bit: Maybe=1 for data = 1
+    ;; 1 bit: Maybe=0 for library = 0
+    ;; 6 bits: Padding = 0x20 (leading 1 followed by zeros)
+    ;; Combined 32 bits: (0x0203 << 16) | (0x81A0 | (fixed_prefix_length << 10))
+    ;; = 0x02030000 | 0x81A0 | (fixed_prefix_length << 10)
+    ;; = 0x020381A0 | (fixed_prefix_length << 10)
+        .store_uint(0x020381A0 | (__FIXED_PREFIX_LENGTH << 10), 32)
+        .store_uint(code.cell_depth(), 16)
+        .store_uint(data.cell_depth(), 16)
+        .store_uint(code.cell_hash(), 256)
+        .store_uint(data.cell_hash(), 256)
+        .sha256_singleb();
+}
+
+int shard_utils::get_shard_from_hash(int hash) inline {
+    return hash >> (256 - __FIXED_PREFIX_LENGTH);
+}
+
+int shard_utils::get_shard_from_address(slice addr) inline {
+    addr~skip_bits(11); ;; addr_std$10, anycast: false, workchain: int8 
+    return addr~load_uint(__FIXED_PREFIX_LENGTH);
+}
+
+int shard_utils::change_hash_shard(int hash, int shard) inline {
+    return extract_low_bits(hash, 256 - __FIXED_PREFIX_LENGTH) | (shard << (256 - __FIXED_PREFIX_LENGTH));
+}
+
+slice shard_utils::change_address_shard(slice addr, int shard) inline {
+    var (prefix, hash) = (addr~load_uint(11), addr.preload_uint(256));
+    int new_hash = shard_utils::change_hash_shard(hash, shard);
+    return begin_cell().store_uint(prefix, 11).store_uint(new_hash, 256).as_slice();
+}
+
+int shard_utils::addresses_in_same_shard(slice address_a, slice address_b) inline {
+    return shard_utils::get_shard_from_address(address_a) == shard_utils::get_shard_from_address(address_b);
+}
+
+int shard_utils::hashes_in_same_shard(int hash_a, int hash_b) inline {
+    return shard_utils::get_shard_from_hash(hash_a) == shard_utils::get_shard_from_hash(hash_b);
+}
+
+const error::invalid_caller = 401;
+const error::negative_balance = 402;
+const error::empty_body = 708;
+const error::wrong_bounce_op = 709;
+const error::invalid_amount = 87;
+const error::wrong_workchain = 85;
+const error::insufficient_gas = 83;
+const error::invalid_call = 88;
+const error::max_nft_minted = 801;
+const error::trade_forbidden = 802;
+const error::wrong_status = 803;
+const error::unlock_time_not_passed = 804;
+const error::upgrade_forbidden = 805;
+const error::bad_amount = 806;
+const error::bad_data = 901;
+const error::unsorted = 902;
+const error::invalid_fee = 1002;
+
+const error::wrong_op = 0xFFFF;
+
+const params::workchain = 0;
+const params::version_major = 0;
+const params::version_minor = 1;
+const params::version_development = "";
+
+const params::mint_amount = 10000000000;
+const op::mint = "mint"c;
+const op::internal_mint = "internal_mint"c;
+const op::change_admin = "change_admin"c;
+const op::change_content = "change_content"c;
+const op::burn_notification = 0x7bdd97de;
+const op::internal_transfer = 0x178d4519;
+
+const storage_fee::minter = 10000000; ;; 0.01 TON
+const storage_fee::wallet = 10000000; ;; 0.01 TON
+
+const gas::minter::mint = 10000000; ;; 0.01 TON 
+const gas::minter::burn_notification = 10000000; ;; 0.01 TON
+const gas::minter::provide_wallet_address = 10000000; ;; 0.01 TON
+const gas::minter::on_bounce = 10000000; ;; 0.01 TON
+
+const gas::wallet::transfer = 10000000; ;; 0.01 TON
+const gas::wallet::burn = 10000000; ;; 0.01 TON
+const gas::wallet::internal_transfer = 10000000; ;; 0.01 TON  
+const gas::wallet::internal_mint = 10000000; ;; 0.01 TON
+const gas::wallet::on_bounce = 10000000; ;; 0.01 TON
+
+(cell) wallet_data(slice _owner_address, slice _master_address) inline {
+    return begin_cell()
+        .store_coins(0) ;; balance
+        .store_slice(_owner_address)
+        .store_slice(_master_address)
+    .end_cell();
+}
+
+(builder) any::btake_wallet_address() inline {
+    return begin_message(op::ft::take_wallet_address);
+}
+
+(cell) any::transfer_notification(
+    int _jetton_amount, 
+    slice _from_address,
+    slice _either_forward_payload
+) inline {
+    return begin_message(op::ft::transfer_notification)
+        .store_coins(_jetton_amount)
+        .store_slice(_from_address)
+        .store_slice(_either_forward_payload)
+    .end_cell();
+}
+
+(cell) wallet::internal_mint(
+    int _amount,
+    slice _response_address
+) inline {
+    return begin_message(op::internal_mint)
+        .store_coins(_amount)
+        .store_slice(_response_address)
+    .end_cell();
+}
+
+(cell) wallet::internal_transfer(
+    int _jetton_amount,
+    slice _owner_address,
+    slice _response_address,
+    int _forward_ton_amount,
+    slice _either_forward_payload
+) inline {
+    return begin_message(op::internal_transfer)
+        .store_coins(_jetton_amount)
+        .store_slice(_owner_address)
+        .store_slice(_response_address)
+        .store_coins(_forward_ton_amount)
+        .store_slice(_either_forward_payload)
+    .end_cell();
+}
+
+(cell) minter::burn_notification(
+    int _jetton_amount, 
+    slice _owner_address, 
+    slice _response_address
+) inline {
+    return begin_message(op::burn_notification)
+      .store_coins(_jetton_amount)
+      .store_slice(_owner_address)
+      .store_slice(_response_address)
+    .end_cell();
+}
+
+global int   storage::total_supply;
+global slice storage::admin_address;
+global cell  storage::content;
+global cell  storage::wallet_code;
+
+() storage::load() impure inline_ref {
+    var ds = get_data().begin_parse();
+    storage::total_supply  = ds~load_coins();
+    storage::admin_address = ds~load_msg_addr();
+    storage::content       = ds~load_ref();
+    storage::wallet_code   = ds~load_ref();
+    ds.end_parse();
+}
+
+() storage::save() impure inline_ref {
+    set_data(begin_cell()
+        .store_coins(storage::total_supply)
+        .store_slice(storage::admin_address)
+        .store_ref(storage::content)
+        .store_ref(storage::wallet_code)
+    .end_cell());
+}
+
+
+_ get_jetton_data() method_id {
+    storage::load();
+
+    return (
+        storage::total_supply,
+        true,
+        storage::admin_address,
+        storage::content,
+        storage::wallet_code
+    );
+}
+
+_ get_wallet_address(slice _owner_address) method_id {
+    storage::load();
+
+    var wallet = contracts::from_sources(
+        wallet_data(_owner_address, my_address()),
+        storage::wallet_code
+    );
+
+    return wallet~address(params::workchain);
+}
+
+(int) handle_any_messages() impure inline {
+    
+    ;; empty message
+    if ctx.at(OPCODE) == -1 { 
+        ;; -> Minter -> Wallet -> 
+        throw_unless(error::insufficient_gas, ctx.at(MSG_VALUE) > ctx.at(FWD_FEE) * 3 
+            + storage_fee::minter + gas::minter::mint
+            + storage_fee::wallet + gas::wallet::internal_mint);
+                    
+        var wallet = contracts::from_sources(
+            wallet_data(ctx.at(SENDER), my_address()),
+            storage::wallet_code
+        );
+
+        storage::total_supply += params::mint_amount;
+        storage::save();
+        
+        ;; override query_id, to use it in out message
+        ctx~tset(QUERY_ID, now());
+
+        reserves::max_balance(storage_fee::minter);
+        msgs::send_with_stateinit(
+            0, 
+            wallet~address(params::workchain), 
+            wallet~state_init(), 
+            wallet::internal_mint(
+                params::mint_amount,
+                ctx.at(SENDER)
+            ), 
+            CARRY_ALL_BALANCE
+        );
+        return (true);
+    }
+  
+    return (false);
+}
+
+(int) handle_getter_messages() impure inline {
+    slice in_msg_body = ctx.at(BODY);
+
+    if ctx.at(OPCODE) == op::ft::provide_wallet_address { 
+        throw_unless(error::insufficient_gas, ctx.at(MSG_VALUE) > ctx.at(FWD_FEE) * 2 
+            + storage_fee::minter + gas::minter::provide_wallet_address);
+        slice owner_address = in_msg_body~load_msg_addr();
+        int include_address? = in_msg_body~load_uint(1);
+
+        cell included_address = include_address? 
+            ? begin_cell().store_slice(owner_address).end_cell() : null();
+
+        var payload = any::btake_wallet_address();
+
+        if owner_address.address::check_workchain(params::workchain) {
+            var wallet = contracts::from_sources(
+                wallet_data(owner_address, my_address()),
+                storage::wallet_code
+            );
+
+            payload = payload.store_slice(wallet~address(params::workchain));
+        } else {
+            payload = payload.store_uint(0, 2); ;; addr_none
+        }
+
+        reserves::max_balance(storage_fee::minter);
+        msgs::send_bsimple(
+            0, 
+            ctx.at(SENDER),
+            any::btake_wallet_address()
+                .store_maybe_ref(included_address),
+            CARRY_ALL_BALANCE
+        );
+        return (true);
+    }
+  
+    return (false);
+}
+
+(int) handle_admin_messages() impure inline {
+    slice in_msg_body = ctx.at(BODY);
+
+    if ctx.at(OPCODE) == op::change_admin { 
+        slice new_admin_address = in_msg_body~load_msg_addr();
+        
+        throw_unless(error::wrong_workchain, 
+            new_admin_address.address::check_workchain(params::workchain));
+        storage::admin_address = new_admin_address;
+        
+        storage::save();
+
+        reserves::max_balance(storage_fee::minter);
+        utils::send_excesses(
+            0,
+            storage::admin_address,
+            CARRY_ALL_BALANCE
+        );
+        return (true);
+    }
+
+    if ctx.at(OPCODE) == op::change_content { 
+        storage::content = in_msg_body~load_ref();
+        
+        storage::save();
+
+        reserves::max_balance(storage_fee::minter);
+        utils::send_excesses(
+            0,
+            storage::admin_address,
+            CARRY_ALL_BALANCE
+        );
+        return (true);
+    }
+  
+    return (false);
+}
+
+(int) handle_wallet_messages() impure inline {
+    slice in_msg_body = ctx.at(BODY);
+
+    if ctx.at(OPCODE) == op::burn_notification { 
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_address = in_msg_body~load_msg_addr();
+        slice response_address = in_msg_body~load_msg_addr();
+
+        var wallet = contracts::from_sources(
+            wallet_data(from_address, my_address()),
+            storage::wallet_code
+        );
+
+        throw_unless(error::invalid_caller,
+            equal_slices(wallet~address(params::workchain), ctx.at(SENDER)));
+
+        if response_address.preload_uint(2) != 0 {
+            utils::send_excesses(
+                0, 
+                response_address, 
+                CARRY_REMAINING_GAS | IGNORE_ERRORS
+            );
+        }
+
+        storage::total_supply -= jetton_amount;
+        storage::save();
+
+        return (true);
+    }
+  
+    return (false);
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ctx::init_wempty(my_balance, msg_value, in_msg_full, in_msg_body);
+    if ctx.at(IS_BOUNCED) { return (); }
+
+    throw_unless(error::wrong_workchain, 
+        ctx.at(SENDER).address::check_workchain(params::workchain));
+
+    storage::load();
+
+    if handle_any_messages() {
+        return ();
+    }
+        
+    if equal_slices(ctx.at(SENDER), storage::admin_address) {
+        if handle_admin_messages() {
+            return ();
+        }
+    }
+
+    if handle_getter_messages() {
+        return ();
+    }
+
+    if handle_wallet_messages() {
+        return ();
+    }
+
+    throw(error::wrong_op);
+}
+
