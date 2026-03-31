@@ -1,0 +1,21 @@
+const GAS_STORAGE = ton("0.01")
+const GAS_MIN_ORDER_STORAGE = ton("0.003")
+
+const GAS_ORDER_FULL_MATCH = ton("1")
+
+const GAS_JETTON_WALLET_TRANSFER = ton("0.05")
+
+const GAS_VAULT_FACTORY_CREATE_VAULT = ton("0.03")
+const GAS_VAULT_FACTORY_INIT = ton("0.01")
+
+const GAS_VAULT_JETTON_TRANSFER = ton("0.01883")
+const GAS_VAULT_TON_TRANSFER = ton("0.1")
+
+const GAS_VAULT_WITHDRAW = ton("0.004154")
+
+const GAS_ORDER_CLOSE_ORDER = ton("0.05")
+const GAS_ORDER_INIT = ton("0.04")
+const GAS_CREATE_ORDER_JETTON = ton("0.1")
+
+const GAS_FEE_COLLECTOR_WITHDRAW = ton("0.05")
+const GAS_FEE_COLLECTOR_ADD_FEE = ton("0.001")

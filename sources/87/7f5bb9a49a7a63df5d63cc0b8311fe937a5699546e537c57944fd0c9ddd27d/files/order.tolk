@@ -1,0 +1,376 @@
+import "utils/generate_addresses.tolk"
+import "utils/fees.tolk"
+import "utils/errors.tolk"
+import "utils/op_codes.tolk"
+import "utils/types.tolk"
+import "utils/fee_calc.tolk"
+import "utils/messages.tolk"
+import "utils/const"
+
+
+struct ExchangeInfo {
+    from: Cell<JettonInfo>?
+    to: Cell<JettonInfo>?
+    amount: coins
+    priceRate: coins
+    slippage: uint30
+}
+
+struct Storage {
+    owner: address
+    vault: address
+    oppositeVault: address
+    feeInfo: Cell<FeeInfo>?
+    exchangeInfo: Cell<ExchangeInfo>
+    createdAt: uint32
+    closeFlag: bool
+}
+
+struct MatchExchangeInfo {
+    amount: coins
+    priceRate: coins
+    slippage: uint30
+    feeInfo: Cell<FeeInfo>
+}
+
+struct SuccessInfo {
+    startAmount: coins
+    amount: coins
+}
+
+struct ( 0x47ff7e25 ) MatchOrder {
+    oppositeOrderOwner: address
+    createdAt: uint32
+    amount: coins
+}
+
+struct ( 0xdfe29f63 ) InternalMatchOrder {
+    oppositeOrderOwner: address
+    matcher: address
+    matchExchangeInfo: Cell<MatchExchangeInfo>
+    createdAt: uint32
+}
+
+struct ( 0x55feb42a ) SuccessMatch {
+    oppositeOrderOwner: address
+    oppositOrderCreatedAt: uint32
+    matcher: address
+    feeInfo: Cell<FeeInfo>
+    matchExchangeInfo: Cell<SuccessInfo>
+}
+
+struct ( 0x52e80bac ) CloseOrder {}
+
+struct ( 0x2d0e1e1b ) InitOrder {
+    amount: coins
+    priceRate: coins
+    slippage: uint30
+    feeInfo: Cell<FeeInfo>
+}
+
+struct ( 0xa597947e ) CloseOrderMessageToVault {
+    orderOwner: address
+    oppositeVault: address
+    toJetton: Cell<JettonInfo>?
+    amountTransfer: coins
+    createdAtOrder: uint32
+}
+
+struct ( 0x12966c79 ) VaultTransferJetton {
+    addresses: Cell<TransferAddresses>
+    oppositeVault: address
+    toJetton: Cell<JettonInfo>?
+    amountTransfer: coins
+    createdAtOrder: uint32
+    feeInfo: Cell<FeeInfo>
+}
+
+// Simplified slippage check - returns true if within acceptable range
+fun isWithinSlippage(actual: coins, reference: coins, slippage: uint30): bool {
+    val invActual = mulDivFloor(PRICE_PRECISION, PRICE_PRECISION, actual);
+    val lower = mulDivFloor(reference, SLIPPAGE_PRECISION - slippage, SLIPPAGE_PRECISION);
+    val upper = mulDivFloor(reference, SLIPPAGE_PRECISION + slippage, SLIPPAGE_PRECISION);
+    return (invActual >= lower) && (invActual <= upper);
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell())
+}
+
+
+fun Storage.sendVaultTransferJetton(mutate self, value: coins, amount: coins, toJetton: Cell<JettonInfo>?, destination: address, feeInfo: Cell<FeeInfo>, matcher: address, sendMode: int) {
+    var addresses = TransferAddresses {
+        orderOwner: self.owner,
+        matcher: matcher,
+        counterparty: destination,
+    };
+    var transferJetton = VaultTransferJetton {
+        addresses: addresses.toCell(),
+        oppositeVault: self.oppositeVault,
+        toJetton: toJetton,
+        amountTransfer: amount,
+        createdAtOrder: self.createdAt,
+        feeInfo: feeInfo
+    };
+    sendSimpleMessage(self.vault, value, transferJetton.toCell(), sendMode);
+}
+
+
+fun Storage.sendVaultCloseOrder(self, amountTransfer: coins, value: coins, toJetton: Cell<JettonInfo>?, sendMode: int) {
+    var closeOrder = CloseOrderMessageToVault {
+        orderOwner: self.owner,
+        oppositeVault: self.oppositeVault,
+        toJetton: toJetton,
+        amountTransfer: amountTransfer,
+        createdAtOrder: self.createdAt
+    };
+    sendSimpleMessage(self.vault, value, closeOrder.toCell(), sendMode);
+}
+
+fun Storage.sendSuccessMatch(mutate self, value: coins, anotherOrder: address, startAmount: coins, amount: coins, matcher: address, sendMode: int) {
+    var successInfo = SuccessInfo {
+        startAmount: startAmount,
+        amount: amount
+    };
+    var body = SuccessMatch {
+        oppositeOrderOwner: self.owner,
+        oppositOrderCreatedAt: self.createdAt,
+        matcher: matcher,
+        feeInfo: self.feeInfo!,
+        matchExchangeInfo: successInfo.toCell()
+    };
+    sendSimpleMessage(anotherOrder, value, body.toCell(), sendMode);
+}
+
+type AllowedMessage = MatchOrder | InternalMatchOrder | CloseOrder | InitOrder | SuccessMatch
+
+fun onInternalMessage(in: InMessage) {
+    var storage = lazy Storage.fromCell(contract.getData());
+    var msg = lazy AllowedMessage.fromSlice(in.body);
+
+    match (msg) {
+        MatchOrder => {
+            assert(in.valueCoins >= GAS_ORDER_FULL_MATCH) throw ERR_INSUFFICIENT_GAS;
+            assert(storage.closeFlag == false) throw ERR_CLOSE_FLAG;
+            var exchangeInfo = storage.exchangeInfo.load();
+            assert(exchangeInfo.amount > 0) throw ERR_AMOUNT_NOT_AVAILABLE;
+            assert(msg.amount <= exchangeInfo.amount) throw ERR_INVALID_AMOUNT;
+            var generatedOrder = generateOrder(
+                storage.oppositeVault,
+                storage.vault,
+                msg.oppositeOrderOwner,
+                exchangeInfo.to,
+                exchangeInfo.from,
+                contract.getCode(),
+                msg.createdAt
+            );
+            var matchInternalExchangeInfo = MatchExchangeInfo {
+                amount: msg.amount,
+                priceRate: exchangeInfo.priceRate,
+                slippage: exchangeInfo.slippage,
+                feeInfo: storage.feeInfo!
+            };
+
+            var bodyInternalMatchOrder = InternalMatchOrder {
+                oppositeOrderOwner: storage.owner,
+                matcher: in.senderAddress,
+                matchExchangeInfo: matchInternalExchangeInfo.toCell(),
+                createdAt: storage.createdAt,
+            };
+
+            sendBouncedMessage(
+                generatedOrder.calculateAddress(),
+                0,
+                bodyInternalMatchOrder.toCell(),
+                SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE
+            );
+            exchangeInfo.amount -= msg.amount;
+            storage.exchangeInfo = exchangeInfo.toCell();
+            storage.save();
+        }
+        InternalMatchOrder => {
+            assert(storage.closeFlag == false) throw ERR_CLOSE_FLAG;
+            var exchangeInfo = storage.exchangeInfo.load();
+            var anotherOrder = generateOrder(
+                storage.oppositeVault,
+                storage.vault,
+                msg.oppositeOrderOwner,
+                exchangeInfo.to,
+                exchangeInfo.from,
+                contract.getCode(),
+                msg.createdAt
+            );
+            assert(in.senderAddress == anotherOrder.calculateAddress()) throw ERR_INVALID_SENDER;
+
+            var matchExchangeInfo = msg.matchExchangeInfo.load();
+            var matchFeeInfo = matchExchangeInfo.feeInfo.load();
+            var feeInfo = storage.feeInfo!.load();
+
+            val matchRate = addFeesToRate(matchExchangeInfo.priceRate, matchFeeInfo);
+            val myRate = addFeesToRate(exchangeInfo.priceRate, feeInfo);
+
+            assert(
+                (exchangeInfo.amount > 0)
+            ) throw ERR_AMOUNT_NOT_AVAILABLE;
+
+            assert(
+                isWithinSlippage(matchRate, exchangeInfo.priceRate, exchangeInfo.slippage) &&
+                isWithinSlippage(myRate, matchExchangeInfo.priceRate, matchExchangeInfo.slippage)
+            ) throw ERR_INVALID_SLIPPAGE;
+            
+            var anotherGetAmount = mulDivFloor(matchExchangeInfo.amount, matchExchangeInfo.priceRate, PRICE_PRECISION);
+            if (anotherGetAmount > exchangeInfo.amount) {
+                anotherGetAmount = exchangeInfo.amount;
+            }
+            var getAmount = mulDivFloor(anotherGetAmount, PRICE_PRECISION, matchExchangeInfo.priceRate);
+
+            if (anotherGetAmount == exchangeInfo.amount) {
+                reserveToncoinsOnBalance(GAS_MIN_ORDER_STORAGE, RESERVE_MODE_EXACT_AMOUNT);
+            } else {
+                reserveToncoinsOnBalance(GAS_STORAGE, RESERVE_MODE_EXACT_AMOUNT);
+            }
+
+            // send success match to order
+            storage.sendSuccessMatch(
+                in.valueCoins / 2,
+                in.senderAddress,
+                matchExchangeInfo.amount,
+                getAmount,
+                msg.matcher,
+                SEND_MODE_REGULAR,
+            );
+
+            // send vault transfer jetton
+            storage.sendVaultTransferJetton(
+                0,
+                anotherGetAmount,
+                exchangeInfo.to,
+                msg.oppositeOrderOwner,
+                matchExchangeInfo.feeInfo,
+                msg.matcher,
+                SEND_MODE_CARRY_ALL_BALANCE,
+            );
+
+            exchangeInfo.amount -= anotherGetAmount;
+            storage.exchangeInfo = exchangeInfo.toCell();
+            storage.save();
+        }
+        SuccessMatch => {
+            var exchangeInfo = storage.exchangeInfo.load();
+            var anotherOrder = generateOrder(
+                storage.oppositeVault,
+                storage.vault,
+                msg.oppositeOrderOwner,
+                exchangeInfo.to,
+                exchangeInfo.from,
+                contract.getCode(),
+                msg.oppositOrderCreatedAt
+            );
+            var generatedAnotherOrderAddress = anotherOrder.calculateAddress();
+            assert(in.senderAddress == generatedAnotherOrderAddress) throw ERR_INVALID_SENDER;
+
+            var matchExchangeInfo = msg.matchExchangeInfo.load();
+            val increaseAmount = matchExchangeInfo.startAmount - matchExchangeInfo.amount;
+
+            if ((increaseAmount == 0) && (exchangeInfo.amount == 0)) {
+                reserveToncoinsOnBalance(GAS_MIN_ORDER_STORAGE, RESERVE_MODE_EXACT_AMOUNT);
+            } else {
+                reserveToncoinsOnBalance(GAS_STORAGE, RESERVE_MODE_EXACT_AMOUNT);
+            }
+
+            storage.sendVaultTransferJetton(
+                0,
+                matchExchangeInfo.amount,
+                exchangeInfo.to,
+                msg.oppositeOrderOwner,
+                msg.feeInfo,
+                msg.matcher,
+                SEND_MODE_CARRY_ALL_BALANCE,
+            );
+
+            exchangeInfo.amount += increaseAmount;
+            storage.exchangeInfo = exchangeInfo.toCell();
+            storage.save();
+        }
+        CloseOrder => {
+            assert(in.valueCoins >= GAS_ORDER_CLOSE_ORDER) throw ERR_INSUFFICIENT_GAS;
+            reserveToncoinsOnBalance(GAS_MIN_ORDER_STORAGE, RESERVE_MODE_EXACT_AMOUNT);
+            assert(in.senderAddress == storage.owner) throw ERR_INVALID_SENDER;
+            
+            var exchangeInfo = storage.exchangeInfo.load();
+            assert((exchangeInfo.amount > 0) || (storage.closeFlag == false)) throw ERR_AMOUNT_NOT_AVAILABLE;
+
+
+            storage.sendVaultCloseOrder(
+                exchangeInfo.amount,
+                0,
+                exchangeInfo.to,
+                SEND_MODE_CARRY_ALL_BALANCE,
+            );
+
+            exchangeInfo.amount = 0;
+            storage.exchangeInfo = exchangeInfo.toCell();
+            storage.closeFlag = true;
+            storage.save();
+        }
+        InitOrder => {
+            assert(in.senderAddress == storage.vault) throw ERR_INVALID_SENDER;
+            var exchangeInfo = storage.exchangeInfo.load();
+            if (exchangeInfo.amount > 0) {
+                storage.sendVaultCloseOrder(
+                    msg.amount,
+                    0,
+                    exchangeInfo.to,
+                    SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE,
+                );
+                return;
+            }
+            reserveToncoinsOnBalance(GAS_STORAGE, RESERVE_MODE_EXACT_AMOUNT);
+            exchangeInfo.amount = msg.amount;
+            exchangeInfo.priceRate = msg.priceRate;
+            exchangeInfo.slippage = msg.slippage;
+            storage.exchangeInfo = exchangeInfo.toCell();
+            storage.feeInfo = msg.feeInfo;
+            val body = generateBodyWithComment("Order confirmed");
+            sendSimpleMessage(storage.owner, 0, body, SEND_MODE_CARRY_ALL_BALANCE);
+            storage.save();
+        }
+    }
+}
+
+type BouncedMessage = InternalMatchOrder
+
+fun onBouncedMessage(in: InMessageBounced) {
+    var storage = lazy Storage.fromCell(contract.getData());
+    val richBounceMessage = lazy RichBounceBody.fromSlice(in.bouncedBody);
+    var msg = lazy BouncedMessage.fromCell(richBounceMessage.originalBody);
+
+    match (msg) {
+        InternalMatchOrder => {
+            var msgExchangeInfo = msg.matchExchangeInfo.load();
+            var storageExchangeInfo = storage.exchangeInfo.load();
+            storageExchangeInfo.amount += msgExchangeInfo.amount;
+            storage.exchangeInfo = storageExchangeInfo.toCell();
+            storage.save();
+            if (
+                (richBounceMessage.computePhase == null)
+                ||
+                (richBounceMessage.exitCode == ERR_INVALID_SLIPPAGE)
+                ) {
+                val body = beginCell().storeUint(0, 32).storeSlice("Penalty applied").endCell();
+                sendSimpleMessage(ZERO_ADDRESS, 0, body, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+                return;
+            };
+            val body = beginCell().storeUint(OP_CODE_RETURN_MATCHER_FAILED, 32).endCell();
+            sendSimpleMessage(msg.matcher, 0, body, SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            return;   
+        }
+    }
+    return;
+}
+
+get fun getData(): (address, address, address, cell, uint32) {
+    var storage = lazy Storage.fromCell(contract.getData());
+
+    return (storage.owner, storage.vault, storage.oppositeVault, storage.exchangeInfo, storage.createdAt);
+}
