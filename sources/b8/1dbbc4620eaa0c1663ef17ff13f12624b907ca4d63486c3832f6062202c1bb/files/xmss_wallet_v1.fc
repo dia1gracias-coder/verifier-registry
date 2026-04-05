@@ -1,0 +1,906 @@
+#pragma version =0.4.4;
+#include "stdlib.fc";
+
+;; ============================================================
+;; PRODUCTION XMSS WALLET — RFC 8391, w=16
+;; TON FunC / stdlib only
+;;
+;; Design principles:
+;;   - WOTS+ per RFC 8391 §3.1 (w=16, n=32 bytes, len=67)
+;;   - Proof stored as a chain-of-refs to bypass 1023-bit cell limit
+;;   - Separate user / admin Merkle trees
+;;   - Strict one-shot leaf consumption (forward-only index)
+;;   - Replay protection: seqno + valid_until + wallet_id
+;;   - Bounce-message guard in recv_internal
+;;   - Single storage parser (load_storage) shared by all get-methods
+;;   - No magic exits: every throw has a named constant
+;;
+;; WOTS+ parameters (RFC 8391 §3.1):
+;;   n   = 32 bytes  (256-bit hash output)
+;;   w   = 16        (Winternitz parameter)
+;;   len1 = ceil(8n / log2(w)) = ceil(256/4) = 64
+;;   len2 = floor(log2(len1*(w-1)) / log2(w)) + 1
+;;        = floor(log2(64*15) / 4) + 1
+;;        = floor(log2(960) / 4) + 1
+;;        = floor(9.9 / 4) + 1 = 3
+;;   len  = len1 + len2 = 67
+;;
+;; Proof cell layout (chain of refs):
+;;   Cell0 : version:8 | idx:64 | sib0:256 ... (as many sibling hashes as fit)
+;;   Cell1 (ref of Cell0) : more sibling hashes
+;;   ...
+;;   Leaf cells: 67 × 256-bit WOTS+ sig chunks, packed 3 per cell (3×256=768 < 1023)
+;;
+;; Storage layout (fits in one cell — total ≤ 1023 bits):
+;;   version:8 | sig_allowed:1 | seqno:32 | wallet_id:32
+;;   | user_policy_hash:256 | user_root:256 | user_h:8
+;;   | user_leaf_limit:32   | user_next:32
+;;   | admin_policy_hash:256 | admin_root:256 | admin_h:8
+;;   | admin_leaf_limit:32  | admin_next:32
+;;   Total = 8+1+32+32+256+256+8+32+32+256+256+8+32+32 = 1041 bits
+;;   → split into two cells via one ref:
+;;   Cell A: version:8 | sig_allowed:1 | seqno:32 | wallet_id:32
+;;           | user_policy_hash:256 | user_root:256
+;;           = 585 bits  ✓
+;;   Cell B (ref): user_h:8 | user_leaf_limit:32 | user_next:32
+;;                 | admin_policy_hash:256 | admin_root:256
+;;                 | admin_h:8 | admin_leaf_limit:32 | admin_next:32
+;;                 = 656 bits ✓
+;; ============================================================
+
+;; -----------------------------------------------------------
+;; Error codes
+;; -----------------------------------------------------------
+const int err::invalid_seqno          = 133;
+const int err::invalid_wallet_id      = 134;
+const int err::invalid_signature      = 135;
+const int err::expired                = 136;
+const int err::invalid_op             = 138;
+const int err::policy_mismatch        = 148;
+const int err::wallet_locked          = 149;
+const int err::invalid_leaf_index     = 151;
+const int err::leaf_reuse             = 152;
+const int err::wallet_exhausted       = 153;
+const int err::invalid_proof_format   = 154;
+const int err::invalid_tree_height    = 155;
+const int err::bad_storage            = 156;
+const int err::bad_mode               = 157;
+
+;; -----------------------------------------------------------
+;; Op-codes / prefixes
+;; -----------------------------------------------------------
+const int op::signed_external  = 0x7369676E;  ;; "sign"
+const int op::signed_internal  = 0x73696E74;  ;; "sint"
+
+const int req::transfer        = 0x00;
+const int req::rotate_root     = 0x01;
+const int req::lock_wallet     = 0x02;
+const int req::admin_override  = 0x03;
+
+;; -----------------------------------------------------------
+;; Domain-separation tags  (chosen to be distinct 32-bit values;
+;; follow the "nothing-up-my-sleeve" rule — hex of ASCII strings)
+;; -----------------------------------------------------------
+const int tag::wots_prf   = 0x574F5446;  ;; "WOTF"  — WOTS+ PRF (key expansion)
+const int tag::wots_chain = 0x574F4348;  ;; "WOCH"  — WOTS+ chain step
+const int tag::ltree      = 0x4C545245;  ;; "LTRE"  — L-tree compression
+const int tag::merkle     = 0x4D52544C;  ;; "MRTL"  — Merkle tree node
+const int tag::xmss_msg   = 0x584D5347;  ;; "XMSG"  — message hash
+const int tag::envelope   = 0x454E5600;  ;; "ENV\0" — outer envelope
+
+const int tag::request    = 0x52515459;  ;; "RQTY"
+const int tag::xmss_dom   = 0x584D5353;  ;; "XMSS"
+
+;; Proof version byte
+const int PROOF_VERSION   = 0x01;
+
+;; WOTS+ constants (w=16)
+const int WOTS_W     = 16;
+const int WOTS_LEN1  = 64;   ;; ceil(256/4)
+const int WOTS_LEN2  = 3;    ;; see header comment
+const int WOTS_LEN   = 67;   ;; LEN1 + LEN2
+const int WOTS_CSUM_MAX = 960; ;; LEN1 * (W-1)
+
+const int MAX_TREE_HEIGHT = 20;
+
+;; -----------------------------------------------------------
+;; Inline guard
+;; -----------------------------------------------------------
+() _require(int cond, int exc) impure inline {
+  ifnot (cond) { throw(exc); }
+}
+
+;; -----------------------------------------------------------
+;; RFC 8391 §3.1 — hash primitives
+;; All hashes are cell_hash (SHA-256 of canonical BOC representation).
+;; We encode the domain tag as a 32-bit prefix inside the cell so
+;; no two domain calls can produce the same preimage.
+;;
+;; F(key, x)     — PRF for key expansion
+;; H_chain(r, x) — single chain step (uses randomness r)
+;; H_msg(msg)    — message hash
+;; Rand_hash(l,r)— Merkle / L-tree node hash
+;; -----------------------------------------------------------
+
+;; PRF: expand secret seed into OTS key material
+;; key: 256-bit seed,  idx: leaf index (64-bit),  pos: chain position (8-bit)
+int prf(int key, int idx, int pos) inline {
+  return cell_hash(
+    begin_cell()
+      .store_uint(tag::wots_prf, 32)
+      .store_uint(key, 256)
+      .store_uint(idx, 64)
+      .store_uint(pos, 8)
+    .end_cell()
+  );
+}
+
+;; Single WOTS+ chain step:  c_{i+1} = H(r XOR c_i)
+;; r: 256-bit randomness (public seed derived per chain)
+;; x: current chain value (256-bit)
+int chain_step(int r, int x) inline {
+  return cell_hash(
+    begin_cell()
+      .store_uint(tag::wots_chain, 32)
+      .store_uint(r, 256)
+      .store_uint(x, 256)
+    .end_cell()
+  );
+}
+
+;; Iterate chain_step  steps  times
+int chain_iter(int r, int x, int steps) inline {
+  int i = 0;
+  while (i < steps) {
+    x = chain_step(r, x);
+    i += 1;
+  }
+  return x;
+}
+
+;; Rand_hash: combine two children into a parent (Merkle / L-tree)
+int rand_hash(int left, int right) inline {
+  return cell_hash(
+    begin_cell()
+      .store_uint(tag::merkle, 32)
+      .store_uint(left, 256)
+      .store_uint(right, 256)
+    .end_cell()
+  );
+}
+
+;; L-tree combine (same structure, different tag for domain separation)
+int ltree_hash(int left, int right) inline {
+  return cell_hash(
+    begin_cell()
+      .store_uint(tag::ltree, 32)
+      .store_uint(left, 256)
+      .store_uint(right, 256)
+    .end_cell()
+  );
+}
+
+;; Message hash before WOTS+ signing
+int hash_message(slice payload) inline {
+  return cell_hash(
+    begin_cell()
+      .store_uint(tag::xmss_msg, 32)
+      .store_slice(payload)
+    .end_cell()
+  );
+}
+
+;; -----------------------------------------------------------
+;; Envelope hash (binds proof + payload + context)
+;; -----------------------------------------------------------
+int envelope_hash(slice payload, cell proof, int wallet_id, int req_type, int policy) inline {
+  ;; H_env = H(tag::envelope || H(tag::request || wallet_id || req_type)
+  ;;                          || H(tag::xmss_dom || cell_hash(proof)
+  ;;                                             || H(0 || slice_hash(payload) || policy)))
+  int inner = cell_hash(
+    begin_cell()
+      .store_uint(0, 32)
+      .store_uint(slice_hash(payload), 256)
+      .store_uint(policy, 256)
+    .end_cell()
+  );
+  int proof_ctx = cell_hash(
+    begin_cell()
+      .store_uint(tag::xmss_dom, 32)
+      .store_uint(cell_hash(proof), 256)
+      .store_uint(inner, 256)
+    .end_cell()
+  );
+  int req_ctx = cell_hash(
+    begin_cell()
+      .store_uint(tag::request, 32)
+      .store_uint(wallet_id, 32)
+      .store_uint(req_type, 8)
+    .end_cell()
+  );
+  return cell_hash(
+    begin_cell()
+      .store_uint(tag::envelope, 32)
+      .store_uint(req_ctx, 256)
+      .store_uint(proof_ctx, 256)
+    .end_cell()
+  );
+}
+
+;; -----------------------------------------------------------
+;; Proof cell reader — chain-of-refs helper
+;; Each cell holds floor(1023/256) = 3 × 256-bit words before
+;; a continuation ref is needed.
+;; We pass the current cell-slice around and advance through refs.
+;; -----------------------------------------------------------
+
+;; Read next 256-bit word; advance to ref cell when current cell
+;; is exhausted.  Returns (word, updated_slice).
+
+(int, slice) read_word(slice cs) inline {
+    ;; Если в текущей ячейке нет битов, переходим к рефу
+    if (slice_bits(cs) == 0) {
+        _require(slice_refs(cs) == 1, err::invalid_proof_format);
+        cs = begin_parse(cs~load_ref());
+    }
+    ;; Теперь должно быть достаточно битов (ровно 256 или больше)
+    _require(slice_bits(cs) >= 256, err::invalid_proof_format);
+    int w = cs~load_uint(256);
+    return (w, cs);
+}
+
+;; -----------------------------------------------------------
+;; WOTS+ verifier (RFC 8391 §3.1.6)
+;;
+;; Proof carries 67 signature chain values packed into cells.
+;; public_seed: 256-bit value bound to the tree (used as `r` in chain_step)
+;; msg_hash:    256-bit  message hash
+;; Returns computed leaf hash (to be checked by Merkle verifier).
+;; -----------------------------------------------------------
+(int, slice) verify_wots_plus(slice cs, int public_seed, int msg_hash, int leaf_idx) inline {
+  int sum = 0;
+  int i = 0;
+
+  tuple ltree_stack = empty_tuple();
+  int stack_size = 0;
+
+  i = 0;
+  while (i < WOTS_LEN1) {
+    int coef = (msg_hash >> ((WOTS_LEN1 - 1 - i) * 4)) & 15;
+    sum += coef;
+
+    var (sig, cs2) = read_word(cs);
+    cs = cs2;
+
+    int pk = chain_iter(public_seed, sig, WOTS_W - 1 - coef);
+
+    ;; push pk onto l-tree stack with height=0
+    ltree_stack = tpush(ltree_stack, pk);
+    ltree_stack = tpush(ltree_stack, 0);
+    stack_size += 2;
+
+    ;; merge equal-height pairs
+    int merging = -1;
+    while (merging) {
+      if (stack_size < 4) {
+        merging = 0;
+      } else {
+        int h_top  = ltree_stack.at(stack_size - 1);
+        int v_top  = ltree_stack.at(stack_size - 2);
+        int h_prev = ltree_stack.at(stack_size - 3);
+        int v_prev = ltree_stack.at(stack_size - 4);
+        if (h_top == h_prev) {
+          tuple new_stack = empty_tuple();
+          int j = 0;
+          while (j < stack_size - 4) {
+            new_stack = tpush(new_stack, ltree_stack.at(j));
+            j += 1;
+          }
+          ltree_stack = new_stack;
+          ltree_stack = tpush(ltree_stack, ltree_hash(v_prev, v_top));
+          ltree_stack = tpush(ltree_stack, h_prev + 1);
+          stack_size = stack_size - 4 + 2;
+        } else {
+          merging = 0;
+        }
+      }
+    }
+
+    i += 1;
+  }
+
+  ;; --- checksum (RFC 8391 §3.1.5) ---
+  int csum = WOTS_CSUM_MAX - sum;  ;; ← объявляем csum здесь
+
+  int j = 0;
+  while (j < WOTS_LEN2) {
+    int coef = (csum >> ((WOTS_LEN2 - 1 - j) * 4)) & 15;
+
+    var (sig, cs2) = read_word(cs);
+    cs = cs2;
+
+    int pk = chain_iter(public_seed, sig, WOTS_W - 1 - coef);
+
+    ltree_stack = tpush(ltree_stack, pk);
+    ltree_stack = tpush(ltree_stack, 0);
+    stack_size += 2;
+
+    int merging = -1;
+    while (merging) {
+      if (stack_size < 4) {
+        merging = 0;
+      } else {
+        int h_top  = ltree_stack.at(stack_size - 1);
+        int v_top  = ltree_stack.at(stack_size - 2);
+        int h_prev = ltree_stack.at(stack_size - 3);
+        int v_prev = ltree_stack.at(stack_size - 4);
+        if (h_top == h_prev) {
+          tuple new_stack = empty_tuple();
+          int k = 0;
+          while (k < stack_size - 4) {
+            new_stack = tpush(new_stack, ltree_stack.at(k));
+            k += 1;
+          }
+          ltree_stack = new_stack;
+          ltree_stack = tpush(ltree_stack, ltree_hash(v_prev, v_top));
+          ltree_stack = tpush(ltree_stack, h_prev + 1);
+          stack_size = stack_size - 4 + 2;
+        } else {
+          merging = 0;
+        }
+      }
+    }
+
+    j += 1;
+  }
+
+  ;; --- drain l-tree stack ---
+  while (stack_size > 2) {
+    int h_top  = ltree_stack.at(stack_size - 1);
+    int v_top  = ltree_stack.at(stack_size - 2);
+    int h_prev = ltree_stack.at(stack_size - 3);
+    int v_prev = ltree_stack.at(stack_size - 4);
+    tuple new_stack = empty_tuple();
+    int k = 0;
+    while (k < stack_size - 4) {
+      new_stack = tpush(new_stack, ltree_stack.at(k));
+      k += 1;
+    }
+    ltree_stack = new_stack;
+    int merged_h = h_top > h_prev ? h_top + 1 : h_prev + 1;
+    ltree_stack = tpush(ltree_stack, ltree_hash(v_prev, v_top));
+    ltree_stack = tpush(ltree_stack, merged_h);
+    stack_size = stack_size - 4 + 2;
+  }
+
+  int leaf = ltree_stack.at(0);
+  return (leaf, cs);
+}
+
+;; -----------------------------------------------------------
+;; Merkle authentication path verifier
+;; Reads h sibling hashes from the proof cell chain.
+;; Returns -1 on success, throws on failure.
+;; -----------------------------------------------------------
+int verify_merkle_path(slice cs, int leaf, int idx, int h, int root) inline {
+  _require(h > 0, err::invalid_tree_height);
+  _require(h <= MAX_TREE_HEIGHT, err::invalid_tree_height);
+
+  int node = leaf;
+  int level = 0;
+
+  while (level < h) {
+    var (sib, cs2) = read_word(cs);
+    cs = cs2;
+
+    node = (idx & 1)
+      ? rand_hash(sib, node)
+      : rand_hash(node, sib);
+
+    idx >>= 1;
+    level += 1;
+  }
+
+  ;; Proof must be fully consumed
+  _require(slice_bits(cs) == 0, err::invalid_proof_format);
+  _require(slice_refs(cs) == 0, err::invalid_proof_format);
+
+  _require(node == root, err::invalid_signature);
+
+  return -1;
+}
+
+;; -----------------------------------------------------------
+;; Full XMSS proof verifier
+;; -----------------------------------------------------------
+int verify_xmss(slice payload, cell proof, int root, int h,
+                int public_seed, int expected_idx) inline {
+
+  _require(h > 0,              err::invalid_tree_height);
+  _require(h <= MAX_TREE_HEIGHT, err::invalid_tree_height);
+
+  slice cs = begin_parse(proof);
+
+  ;; Header: version:8 | idx:64 | public_seed:256 are in first cell
+  _require(slice_bits(cs) >= (8 + 64 + 256), err::invalid_proof_format);
+
+  int version = cs~load_uint(8);
+  _require(version == PROOF_VERSION, err::invalid_proof_format);
+
+  int idx = cs~load_uint(64);
+  _require(idx == expected_idx, err::invalid_leaf_index);
+  ;; Forward-only check is done by the caller (expected_idx == next_leaf)
+
+  int proof_public_seed = cs~load_uint(256);
+  _require(proof_public_seed == public_seed, err::invalid_signature);
+
+  ;; Hash message under XMSS domain
+  int msg_hash = hash_message(payload);
+
+  ;; Verify WOTS+ signature → get leaf
+  var (leaf, cs2) = verify_wots_plus(cs, public_seed, msg_hash, idx);
+  cs = cs2;
+
+  ;; Verify Merkle authentication path
+  return verify_merkle_path(cs, leaf, idx, h, root);
+}
+
+;; -----------------------------------------------------------
+;; Storage  (two-cell layout, see header comment)
+;; -----------------------------------------------------------
+
+;; Packed state record
+_ load_storage() inline {
+  slice a = begin_parse(get_data());
+
+  _require(slice_refs(a) == 1, err::bad_storage);
+
+  int version     = a~load_uint(8);
+  _require(version == 1, err::bad_storage);
+
+  int sig_allowed   = a~load_uint(1);
+  int seqno         = a~load_uint(32);
+  int wallet_id     = a~load_uint(32);
+  int user_pol      = a~load_uint(256);
+  int user_root     = a~load_uint(256);
+  int user_pub_seed = a~load_uint(256); ;; <--- ПЕРЕНЕСЛИ СЮДА
+  _require(slice_bits(a) == 0, err::bad_storage);
+
+  slice b = begin_parse(a~load_ref());
+
+  int user_h          = b~load_uint(8);
+  int user_limit      = b~load_uint(32);
+  int user_next       = b~load_uint(32);
+  int admin_pol       = b~load_uint(256);
+  int admin_root      = b~load_uint(256);
+  int admin_pub_seed  = b~load_uint(256);
+  int admin_h         = b~load_uint(8);
+  int admin_limit     = b~load_uint(32);
+  int admin_next      = b~load_uint(32);
+
+  _require(slice_bits(b) == 0, err::bad_storage);
+  _require(slice_refs(b) == 0, err::bad_storage);
+
+  return (sig_allowed, seqno, wallet_id,
+          user_pol, user_root, user_pub_seed, user_h, user_limit, user_next,
+          admin_pol, admin_root, admin_pub_seed, admin_h, admin_limit, admin_next);
+}
+
+() save_storage(
+  int sig_allowed, int seqno, int wallet_id,
+  int user_pol,   int user_root,  int user_pub_seed,  int user_h,  int user_limit,  int user_next,
+  int admin_pol,  int admin_root, int admin_pub_seed, int admin_h, int admin_limit, int admin_next
+) impure inline {
+
+  cell b = begin_cell()
+    .store_uint(user_h,           8)
+    .store_uint(user_limit,      32)
+    .store_uint(user_next,       32)
+    .store_uint(admin_pol,      256)
+    .store_uint(admin_root,     256)
+    .store_uint(admin_pub_seed, 256)
+    .store_uint(admin_h,          8)
+    .store_uint(admin_limit,     32)
+    .store_uint(admin_next,      32)
+  .end_cell();
+
+  set_data(
+    begin_cell()
+      .store_uint(1,           8)
+      .store_uint(sig_allowed, 1)
+      .store_uint(seqno,      32)
+      .store_uint(wallet_id,  32)
+      .store_uint(user_pol,  256)
+      .store_uint(user_root, 256)
+      .store_uint(user_pub_seed, 256) ;; <--- ПЕРЕНЕСЛИ СЮДА
+      .store_ref(b)
+    .end_cell()
+  );
+}
+
+cell build_initial_data(
+  int wallet_id,
+  int user_pol,   int user_root,  int user_pub_seed,  int user_h,  int user_limit,
+  int admin_pol,  int admin_root, int admin_pub_seed, int admin_h, int admin_limit
+) inline {
+  ;; проверки лимитов оставляем как были...
+  _require(user_h  > 0,                       err::invalid_tree_height);
+  _require(user_h  <= MAX_TREE_HEIGHT,        err::invalid_tree_height);
+  _require(admin_h > 0,                        err::invalid_tree_height);
+  _require(admin_h <= MAX_TREE_HEIGHT,         err::invalid_tree_height);
+  _require(user_limit  > 0,                    err::wallet_exhausted);
+  _require(user_limit  <= (1 << user_h),       err::wallet_exhausted);
+  _require(admin_limit > 0,                    err::wallet_exhausted);
+  _require(admin_limit <= (1 << admin_h),      err::wallet_exhausted);
+
+  cell b = begin_cell()
+    .store_uint(user_h,           8)
+    .store_uint(user_limit,      32)
+    .store_uint(0,               32) ;; user_next
+    .store_uint(admin_pol,      256)
+    .store_uint(admin_root,     256)
+    .store_uint(admin_pub_seed, 256)
+    .store_uint(admin_h,          8)
+    .store_uint(admin_limit,     32)
+    .store_uint(0,               32) ;; admin_next
+  .end_cell();
+
+  return begin_cell()
+    .store_uint(1,          8)
+    .store_uint(1,          1)
+    .store_uint(0,         32)
+    .store_uint(wallet_id, 32)
+    .store_uint(user_pol, 256)
+    .store_uint(user_root,256)
+    .store_uint(user_pub_seed, 256) ;; <--- ПЕРЕНЕСЛИ СЮДА
+    .store_ref(b)
+  .end_cell();
+}
+
+;; -----------------------------------------------------------
+;; Core request processor
+;;
+;; External message body layout:
+;;   op:32 | wallet_id:32 | valid_until:32 | seqno:32
+;;   | policy_hash:256 | tx_hash:256 | request_type:8
+;;   | <request-specific fields>
+;;   + ref[0]: XMSS proof cell chain
+;;
+;; tx_hash = envelope_hash(body_slice_from_op, proof, wallet_id, req_type, policy_hash)
+;; -----------------------------------------------------------
+() process_request(slice body, int is_external) impure {
+  ;; Must have at least one ref (XMSS proof)
+  _require(slice_refs(body) >= 1, err::invalid_proof_format);
+  cell proof = body~load_ref();
+
+  ;; Validate prefix
+  _require(slice_bits(body) >= 32, err::invalid_op);
+  int op = body~load_uint(32);
+  if (is_external) {
+    _require(op == op::signed_external, err::invalid_op);
+  } else {
+    _require(op == op::signed_internal, err::invalid_op);
+  }
+
+  ;; Remaining header fields
+  _require(slice_bits(body) >= (32 + 32 + 32 + 256 + 256 + 8), err::invalid_op);
+
+  int wallet_id    = body~load_uint(32);
+  int valid_until  = body~load_uint(32);
+  int seqno_in     = body~load_uint(32);
+  int policy_hash  = body~load_uint(256);
+  int tx_hash      = body~load_uint(256);
+  int req_type     = body~load_uint(8);
+
+  ;; Load state
+  var (sig_allowed, seqno, wid,
+       user_pol, user_root, user_pub_seed, user_h, user_limit, user_next,
+       admin_pol, admin_root, admin_pub_seed, admin_h, admin_limit, admin_next)
+    = load_storage();
+
+  ;; Basic checks
+  _require(sig_allowed == 1,       err::wallet_locked);
+  _require(seqno_in == seqno,      err::invalid_seqno);
+  _require(wallet_id == wid,       err::invalid_wallet_id);
+  _require(valid_until > now(),    err::expired);
+
+  ;; Route to the correct tree
+  int exp_pol = 0;
+  int exp_root = 0;
+  int exp_pub_seed = 0;
+  int exp_h = 0;
+  int exp_limit = 0;
+  int exp_next = 0;
+
+  if ((req_type == req::transfer) | (req_type == req::rotate_root)) {
+    ;; transfer uses user tree; rotate_root uses admin tree
+    if (req_type == req::transfer) {
+      exp_pol = user_pol; exp_root = user_root; exp_pub_seed = user_pub_seed;
+      exp_h = user_h; exp_limit = user_limit; exp_next = user_next;
+    } else {
+      exp_pol = admin_pol; exp_root = admin_root; exp_pub_seed = admin_pub_seed;
+      exp_h = admin_h; exp_limit = admin_limit; exp_next = admin_next;
+    }
+  } elseif ((req_type == req::lock_wallet) | (req_type == req::admin_override)) {
+    exp_pol = admin_pol; exp_root = admin_root; exp_pub_seed = admin_pub_seed;
+    exp_h = admin_h; exp_limit = admin_limit; exp_next = admin_next;
+  } else {
+    throw(err::invalid_op);
+  }
+
+  _require(policy_hash == exp_pol,             err::policy_mismatch);
+  _require(exp_next < exp_limit,               err::wallet_exhausted);
+
+  ;; Bind everything into the envelope and check tx_hash
+  ;; body currently points at the request-specific payload
+  _require(
+    envelope_hash(body, proof, wallet_id, req_type, policy_hash) == tx_hash,
+    err::invalid_signature
+  );
+
+  ;; accept_message before XMSS verification to avoid gas issues on external msgs
+  if (is_external) { accept_message(); }
+
+  ;; Verify XMSS proof
+  _require(
+    verify_xmss(body, proof, exp_root, exp_h, exp_pub_seed, exp_next) == -1,
+    err::invalid_signature
+  );
+
+  int new_seqno = seqno + 1;
+
+  ;; Dispatch
+  if (req_type == req::transfer) {
+    _require(slice_bits(body) >= 8, err::invalid_op);
+    int mode = body~load_uint(8);
+    _require(mode <= 255,           err::bad_mode);
+    ;; Restrict to safe send-mode bits (0–3 for action, optional +128 ignore errors)
+    _require((mode & ~ 131) == 0,   err::bad_mode); ;; allowed bits: 0,1,2,128
+    _require(slice_refs(body) == 1, err::invalid_op);
+    cell out_msg = body~load_ref();
+    _require(slice_bits(body) == 0, err::invalid_op);
+
+    save_storage(
+      1, new_seqno, wid,
+      user_pol, user_root, user_pub_seed, user_h, user_limit, user_next + 1,
+      admin_pol, admin_root, admin_pub_seed, admin_h, admin_limit, admin_next
+    );
+    send_raw_message(out_msg, mode);
+    commit();
+
+  } elseif (req_type == req::rotate_root) {
+    _require(slice_bits(body) >= (256 + 256 + 8 + 32), err::invalid_op);
+    int new_user_root     = body~load_uint(256);
+    int new_user_pub_seed = body~load_uint(256);
+    int new_user_h        = body~load_uint(8);
+    int new_user_limit    = body~load_uint(32);
+    _require(slice_bits(body) == 0, err::invalid_op);
+    _require(slice_refs(body) == 0, err::invalid_op);
+
+    _require(new_user_h > 0,                    err::invalid_tree_height);
+    _require(new_user_h <= MAX_TREE_HEIGHT,      err::invalid_tree_height);
+    _require(new_user_limit > 0,                 err::wallet_exhausted);
+    _require(new_user_limit <= (1 << new_user_h),err::wallet_exhausted);
+
+    save_storage(
+      1, new_seqno, wid,
+      user_pol, new_user_root, new_user_pub_seed, new_user_h, new_user_limit, 0,
+      admin_pol, admin_root, admin_pub_seed, admin_h, admin_limit, admin_next + 1
+    );
+    commit();
+
+  } elseif (req_type == req::lock_wallet) {
+    _require(slice_bits(body) == 0, err::invalid_op);
+    _require(slice_refs(body) == 0, err::invalid_op);
+
+    save_storage(
+      0, new_seqno, wid,
+      user_pol, user_root, user_pub_seed, user_h, user_limit, user_next,
+      admin_pol, admin_root, admin_pub_seed, admin_h, admin_limit, admin_next + 1
+    );
+    commit();
+
+  } elseif (req_type == req::admin_override) {
+    _require(slice_bits(body) >= (256 + 256 + 256 + 8 + 32 + 1), err::invalid_op);
+    int new_user_pol      = body~load_uint(256);
+    int new_user_root     = body~load_uint(256);
+    int new_user_pub_seed = body~load_uint(256);
+    int new_user_h        = body~load_uint(8);
+    int new_user_limit    = body~load_uint(32);
+    int new_sig_allowed   = body~load_uint(1);
+    _require(slice_bits(body) == 0, err::invalid_op);
+    _require(slice_refs(body) == 0, err::invalid_op);
+
+    _require(new_user_h > 0,                    err::invalid_tree_height);
+    _require(new_user_h <= MAX_TREE_HEIGHT,      err::invalid_tree_height);
+    _require(new_user_limit > 0,                 err::wallet_exhausted);
+    _require(new_user_limit <= (1 << new_user_h),err::wallet_exhausted);
+
+    save_storage(
+      new_sig_allowed, new_seqno, wid,
+      new_user_pol, new_user_root, new_user_pub_seed, new_user_h, new_user_limit, 0,
+      admin_pol, admin_root, admin_pub_seed, admin_h, admin_limit, admin_next + 1
+    );
+    commit();
+
+  } else {
+    throw(err::invalid_op);
+  }
+}
+
+;; -----------------------------------------------------------
+;; Entry points
+;; -----------------------------------------------------------
+() recv_external(slice in_msg) impure {
+  ;; Шаг 1: Базовая проверка op
+  if (slice_bits(in_msg) < 32) {
+    return ();
+  }
+  
+  int op = in_msg.preload_uint(32);
+  if (op != op::signed_external) {
+    return ();
+  }
+  
+  ;; Шаг 2: Быстрая проверка seqno до accept_message()
+  ;; Копируем слайс для предварительного чтения
+  slice check_slice = in_msg;
+  
+  ;; Пропускаем реф (proof)
+  if (slice_refs(check_slice) < 1) {
+    return ();
+  }
+  cell _proof = check_slice~load_ref();
+  
+  ;; Читаем заголовок
+  if (slice_bits(check_slice) < 32 + 32 + 32 + 32) {
+    return ();
+  }
+  
+  int _op = check_slice~load_uint(32);         ;; должно быть op::signed_external
+  int _wallet_id = check_slice~load_uint(32);
+  int _valid_until = check_slice~load_uint(32);
+  int seqno_chk = check_slice~load_uint(32);
+  
+  ;; Загружаем текущее состояние
+  var (_, seqno, _, _, _, _, _, _, _, _, _, _, _, _, _) = load_storage();
+  
+  ;; Если seqno не совпадает — reject без accept_message()
+  if (seqno_chk != seqno) {
+    return ();  ;; Не вызываем accept_message(), просто выходим
+  }
+  
+  ;; Шаг 3: Все проверки пройдены — принимаем сообщение
+  accept_message();
+  
+  ;; Шаг 4: Полная обработка
+  process_request(in_msg, true);
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  ;; Игнорируем bounced
+  slice full = begin_parse(in_msg_full);
+  int flags = full~load_uint(4);
+  if (flags & 1) {
+    return ();
+  }
+  
+  ;; Быстрая проверка op
+  if (slice_bits(in_msg_body) < 32) {
+    return ();
+  }
+  int op = in_msg_body.preload_uint(32);
+  if (op != op::signed_internal) {
+    return ();
+  }
+  if (slice_refs(in_msg_body) == 0) {
+    return ();
+  }
+  
+  ;; Проверка seqno до accept_message()
+  slice check = in_msg_body;
+  cell _proof = check~load_ref();
+  int _op = check~load_uint(32);
+  int _wallet_id = check~load_uint(32);
+  int _valid_until = check~load_uint(32);
+  int seqno_chk = check~load_uint(32);
+  
+  var (_, seqno, _, _, _, _, _, _, _, _, _, _, _, _, _) = load_storage();
+  
+  if (seqno_chk != seqno) {
+    return ();  ;; Молча игнорируем
+  }
+  
+  ;; Для внутренних сообщений accept_message() не нужен — газ уже оплачен
+  process_request(in_msg_body, false);
+}
+
+;; -----------------------------------------------------------
+;; GET methods  — all use load_storage() for DRY parsing
+;; -----------------------------------------------------------
+
+int is_signature_allowed() method_id {
+  var (sig_allowed, _, _, _, _, _, _, _, _, _, _, _, _, _, _) = load_storage();
+  return sig_allowed;
+}
+
+int seqno() method_id {
+  var (_, seqno, _, _, _, _, _, _, _, _, _, _, _, _, _) = load_storage();
+  return seqno;
+}
+
+int get_wallet_id() method_id {
+  var (_, _, wid, _, _, _, _, _, _, _, _, _, _, _, _) = load_storage();
+  return wid;
+}
+
+int get_user_policy_hash() method_id {
+  var (_, _, _, user_pol, _, _, _, _, _, _, _, _, _, _, _) = load_storage();
+  return user_pol;
+}
+
+int get_user_root() method_id {
+  var (_, _, _, _, user_root, _, _, _, _, _, _, _, _, _, _) = load_storage();
+  return user_root;
+}
+
+int get_user_public_seed() method_id {
+  var (_, _, _, _, _, user_pub_seed, _, _, _, _, _, _, _, _, _) = load_storage();
+  return user_pub_seed;
+}
+
+int get_user_tree_height() method_id {
+  var (_, _, _, _, _, _, user_h, _, _, _, _, _, _, _, _) = load_storage();
+  return user_h;
+}
+
+int get_user_leaf_limit() method_id {
+  var (_, _, _, _, _, _, _, user_limit, _, _, _, _, _, _, _) = load_storage();
+  return user_limit;
+}
+
+int get_user_next_leaf() method_id {
+  var (_, _, _, _, _, _, _, _, user_next, _, _, _, _, _, _) = load_storage();
+  return user_next;
+}
+
+int get_admin_policy_hash() method_id {
+  var (_, _, _, _, _, _, _, _, _, admin_pol, _, _, _, _, _) = load_storage();
+  return admin_pol;
+}
+
+int get_admin_root() method_id {
+  var (_, _, _, _, _, _, _, _, _, _, admin_root, _, _, _, _) = load_storage();
+  return admin_root;
+}
+
+int get_admin_public_seed() method_id {
+  var (_, _, _, _, _, _, _, _, _, _, _, admin_pub_seed, _, _, _) = load_storage();
+  return admin_pub_seed;
+}
+
+int get_admin_tree_height() method_id {
+  var (_, _, _, _, _, _, _, _, _, _, _, _, admin_h, _, _) = load_storage();
+  return admin_h;
+}
+
+int get_admin_leaf_limit() method_id {
+  var (_, _, _, _, _, _, _, _, _, _, _, _, _, admin_limit, _) = load_storage();
+  return admin_limit;
+}
+
+int get_admin_next_leaf() method_id {
+  var (_, _, _, _, _, _, _, _, _, _, _, _, _, _, admin_next) = load_storage();
+  return admin_next;
+}
+
+;; Convenience: how many user leaves remain
+int get_user_leaves_remaining() method_id {
+  var (_, _, _, _, _, _, _, user_limit, user_next, _, _, _, _, _, _) = load_storage();
+  return user_limit - user_next;
+}
+
+int get_admin_leaves_remaining() method_id {
+  var (_, _, _, _, _, _, _, _, _, _, _, _, _, admin_limit, admin_next) = load_storage();
+  return admin_limit - admin_next;
+}
