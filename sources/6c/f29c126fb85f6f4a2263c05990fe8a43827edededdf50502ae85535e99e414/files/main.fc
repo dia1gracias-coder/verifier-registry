@@ -1,0 +1,34 @@
+#include "stdlib.fc";
+
+;; Хранилище контракта: один адрес кошелька в формате MsgAddressInt
+;; При развёртывании в c4 должен лежать сериализованный адрес
+
+;; Обработка входящих сообщений – ничего не делаем
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; игнорируем все сообщения
+}
+
+;; DNS-резолвер: для любого поддомена и любой категории возвращает
+;; DNS-запись с адресом кошелька (категория 0x9fd3)
+(int, cell) dnsresolve(slice subdomain, int category) method_id {
+    ;; загружаем адрес кошелька из постоянных данных
+    slice wallet_addr = get_data().begin_parse();
+
+    ;; формируем DNS-запись: тэг категории 0x9fd3 + ссылка на данные (адрес + флаги)
+    cell record = begin_cell()
+        .store_uint(0x9fd3, 16)               ;; категория dns_wallet_address
+        .store_ref(begin_cell()
+            .store_slice(wallet_addr)         ;; MsgAddressInt кошелька
+            .store_uint(0, 8)                 ;; флаги (всегда 0)
+            .end_cell())
+        .end_cell();
+
+    ;; flags & 1 == 1 – запись найдена
+    return (1, record);
+}
+
+;; Дополнительный get-метод для просмотра сохранённого адреса
+slice get_wallet_address() method_id {
+    return get_data().begin_parse();
+}
+
