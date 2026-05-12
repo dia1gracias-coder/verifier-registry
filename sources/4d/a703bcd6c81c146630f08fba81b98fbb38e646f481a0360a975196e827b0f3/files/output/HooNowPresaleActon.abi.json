@@ -1,0 +1,713 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "HooNowPresaleActon",
+  "author": "HooNow",
+  "version": "1.1.0",
+  "description": "HOO first-wave TON presale contract (TON + USDT, batch flush)",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferNotificationForRecipient"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 16,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 17,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 134,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetJettonWallets"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawUnsold"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawUsdt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUpTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BuyWithTon"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetTonPrice"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FlushToTreasury"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawTon"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PresaleStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingPurchase"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 31
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleData"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 14,
+      "target_ty_idx": 15
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 13
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 34
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 14,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferNotificationForRecipient",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferInitiator",
+          "ty_idx": 13
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 14,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetPaused",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 157817343,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetJettonWallets",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 967136597,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "usdtWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "hooWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawUnsold",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 3186937514,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "destination",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUpTons",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 3547469196,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawUsdt",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 3363738013,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BuyWithTon",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1248818146,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetTonPrice",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 2052792220,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "priceUsdtMicro",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FlushToTreasury",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 747523354,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawTon",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1799330430,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PresaleStorage",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 3
+        },
+        {
+          "name": "jettons",
+          "ty_idx": 3
+        },
+        {
+          "name": "jettonWalletsConfigured",
+          "ty_idx": 5
+        },
+        {
+          "name": "raisedUsdt",
+          "ty_idx": 6
+        },
+        {
+          "name": "issuedHoo",
+          "ty_idx": 6
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "pendingPurchases",
+          "ty_idx": 32
+        },
+        {
+          "name": "accumulatedUsdt",
+          "ty_idx": 6
+        },
+        {
+          "name": "accumulatedTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "tonPriceUsdtMicro",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingPurchase",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "buyer",
+          "ty_idx": 7
+        },
+        {
+          "name": "usdtAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "hooAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleData",
+      "ty_idx": 35,
+      "fields": [
+        {
+          "name": "hooMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "usdtMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "priceUsdtMicro",
+          "ty_idx": 11
+        },
+        {
+          "name": "targetPriceUsdtMicro",
+          "ty_idx": 11
+        },
+        {
+          "name": "usdtWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "hooWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "jettonWalletsConfigured",
+          "ty_idx": 5
+        },
+        {
+          "name": "allocationHooNano",
+          "ty_idx": 6
+        },
+        {
+          "name": "hardCapUsdtMicro",
+          "ty_idx": 6
+        },
+        {
+          "name": "minPurchaseUsdtMicro",
+          "ty_idx": 6
+        },
+        {
+          "name": "raisedUsdt",
+          "ty_idx": 6
+        },
+        {
+          "name": "issuedHoo",
+          "ty_idx": 6
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "accumulatedUsdt",
+          "ty_idx": 6
+        },
+        {
+          "name": "accumulatedTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "tonPriceUsdtMicro",
+          "ty_idx": 6
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 30
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 2
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 109918,
+      "name": "saleData",
+      "parameters": [],
+      "return_ty_idx": 35
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.JettonWalletsNotSet",
+      "err_code": 6061
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TonPriceNotSet",
+      "err_code": 11001
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BelowFlushThreshold",
+      "err_code": 11002
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientTon",
+      "err_code": 11003
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OnlyUnsold",
+      "err_code": 24903
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DuplicateQuery",
+      "err_code": 30841
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BelowMinPurchase",
+      "err_code": 35855
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SoldOut",
+      "err_code": 36305
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OnlyOwner",
+      "err_code": 37469
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidUsdtWallet",
+      "err_code": 47168
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ZeroHoo",
+      "err_code": 51223
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ZeroUsdt",
+      "err_code": 51224
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SalePaused",
+      "err_code": 62929
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.MissingBuyer",
+      "err_code": 63520
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.HardCapReached",
+      "err_code": 63521
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
