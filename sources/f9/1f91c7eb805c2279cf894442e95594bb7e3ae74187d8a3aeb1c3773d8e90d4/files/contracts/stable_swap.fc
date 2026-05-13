@@ -1,0 +1,93 @@
+#include "imports/stdlib.fc";
+
+#include "storage.fc";
+#include "common.fc";
+#include "get.fc";
+#include "utility.fc";
+
+#include "msgs/jetton.fc";
+#include "msgs/admin.fc";
+#include "msgs/user.fc";
+#include "msgs/external.fc";
+
+;; Entrypoints: internal admin/jetton/user handlers and external HTLC ops
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    
+    storage::load();
+
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+    in_msg_body~load_uint(64); ;; skip query_id
+
+    if op == op::transfer_notification {
+        handle_jetton_messages(in_msg_body, sender_address, msg_value);
+        return();
+    } elseif op == op::cancel_order {
+        cancel_order_int(sender_address);
+        return();
+    } elseif op == op::excesses {
+        return(); ;; accept excess TON (TEP-74 standard)
+    } else {
+        handle_admin_messages(op, sender_address, in_msg_body);
+        return();
+    }
+}
+
+() recv_external(slice in_msg_body) impure {
+    cell msg_inner = in_msg_body~load_ref();
+    slice signature = in_msg_body~load_bits(512);
+    in_msg_body.end_parse();
+    int msg_inner_hash = msg_inner.cell_hash();
+
+    storage::load();
+
+    slice msg_inner_slice = msg_inner.begin_parse();
+    int op = msg_inner_slice~load_uint(32);
+    int shift = msg_inner_slice~load_uint(13);
+    int bit_number = msg_inner_slice~load_uint(10);
+    int created_at = msg_inner_slice~load_uint(32);
+
+    throw_unless(error::invalid_signature, check_signature(msg_inner_hash, signature, storage::public_key));
+
+    verify_time_and_queryid(shift, bit_number, created_at);
+    throw_if(error::contract_paused, storage::processing == 0);
+
+    accept_message();
+
+    storage::save();
+
+    commit();
+
+    if op == op::create_order_for_cross_swap {
+        create_order(msg_inner_slice);
+        return();
+    }
+
+    if op == op::accept_order_source {
+        accept_order_source(msg_inner_slice);
+        return();
+    }
+
+    if op == op::accept_order_destination {
+        accept_order_destination(msg_inner_slice);
+        return();
+    }
+
+    if op == op::cancel_order {
+        cancel_order(msg_inner_slice);
+        return();
+    }
+
+    throw(error::wrong_op);
+}

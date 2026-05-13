@@ -1,0 +1,93 @@
+(cell) jetton_wallet::transfer_with_body( 
+    int _jetton_amount,
+    slice _to,
+    slice _response_address,
+    int _fwd_amount,
+    cell body
+) inline {
+    return begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(0, 64)
+        .store_coins(_jetton_amount)
+        .store_slice(_to) ;; to_owner_address
+        .store_slice(_response_address) ;; responseAddress
+        .store_uint(0, 1)
+        .store_coins(_fwd_amount)
+        .store_uint(1, 1)
+        .store_ref(body)
+    .end_cell();
+}
+
+() msgs::send_simple(int amount, slice to, cell body, int mode) impure inline {
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_uint(1, 107)
+        .store_ref(body)
+    .end_cell();
+    send_raw_message(msg, mode);
+}
+
+(int) calculate_commission(int amount, int commission_percentage) inline {
+    return muldiv(amount, 10000 - commission_percentage, 10000);
+}
+
+;; ----
+
+builder store_true(builder b) asm "STONE";
+builder store_zeroes(builder b, int x) asm "STZEROES";
+
+const int KEY_SIZE = 13;
+const int BIT_NUMBER_SIZE = 10;
+const int CELL_BITS_SIZE = 1023;
+
+() verify_time_and_queryid(int shift, int bit_number, int created_at) impure inline {
+    ;; ротация словарей по времени (GC старых query_id)
+    if (storage::last_clean_time < (now() - storage::timeout)) {
+        (storage::old_queries, storage::queries) = (storage::queries, null());
+        if (storage::last_clean_time < (now() - (storage::timeout * 2))) {
+            storage::old_queries = null();
+        }
+        storage::last_clean_time = now();
+    }
+
+    ;; проверка тайм‑времени query_id
+    throw_unless(error::timestamp_expired, created_at > now() - storage::timeout);
+    throw_unless(error::timestamp_in_future, created_at <= now());
+
+    ;; сначала проверяем старый словарь (old_queries)
+    (cell value, int found) = storage::old_queries.udict_get_ref?(KEY_SIZE, shift);
+    if (found) {
+        slice value_slice = value.begin_parse();
+        value_slice~skip_bits(bit_number);
+        throw_if(error::query_exists, value_slice.preload_int(1));
+    }
+
+    ;; затем текущий словарь (queries)
+    (cell value, int found) = storage::queries.udict_get_ref?(KEY_SIZE, shift);
+    builder new_value = null();
+
+    if (found) {
+        slice value_slice = value.begin_parse();
+        (slice tail, slice head) = value_slice.load_bits(bit_number);
+        throw_if(error::query_exists, tail~load_int(1));
+        new_value = begin_cell().store_slice(head).store_true().store_slice(tail);
+    } else {
+        new_value = begin_cell().store_zeroes(bit_number).store_true().store_zeroes(CELL_BITS_SIZE - bit_number - 1);
+    }
+
+    storage::queries~udict_set_ref(KEY_SIZE, shift, new_value.end_cell());
+}
+
+() emit_order_event(int event_op, int secret_hash) impure inline {
+    cell msg = begin_cell()
+        .store_uint(12, 4)                   ;; ext_out_msg_info$11 + addr_none$00
+        .store_uint(0, 2)                    ;; addr_none destination
+        .store_uint(0, 64 + 32 + 1 + 1)     ;; created_lt, created_at, init, body flags
+        .store_uint(event_op, 32)            ;; event opcode
+        .store_uint(secret_hash, 256)        ;; secret hash
+        .end_cell();
+
+    send_raw_message(msg, 0);
+}

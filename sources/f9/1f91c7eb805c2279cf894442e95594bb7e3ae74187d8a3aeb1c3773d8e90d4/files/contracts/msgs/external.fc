@@ -1,0 +1,238 @@
+() create_order(slice msg_inner_slice) impure {
+    slice user_address = msg_inner_slice~load_msg_addr();
+    slice jetton_wallet_address = msg_inner_slice~load_msg_addr();
+    int jetton_amount = msg_inner_slice~load_coins();
+
+    slice additional_data = msg_inner_slice~load_ref().begin_parse();
+    int session_key = additional_data~load_uint(256);
+    int secret_hash = additional_data~load_uint(256);
+
+    var (_, user_address_clean) = parse_std_addr(user_address);
+    var (_, found) = storage::orders.udict_get_ref?(256, user_address_clean);
+    throw_if(error::order_exists, found);
+
+
+    var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+    (slice data_pool, var found_1?) = storage::whitelist.udict_get?(256, jetton_wallet_clean);
+    throw_unless(error::not_found, found_1?);
+
+    int swap_enabled = data_pool~load_uint(2);
+    int pool_balance = data_pool~load_coins();
+    int reserve = data_pool~load_coins();
+    int commission_percentage = data_pool~load_uint(16);
+    int x = data_pool~load_coins();
+    int y = data_pool~load_coins();
+    int z = data_pool~load_coins();
+
+    throw_if(error::jetton_disabled, swap_enabled  == 0);
+
+    int available_amount = max_out_by_thresholds(pool_balance, x, y, z, reserve);
+
+    throw_if(error::insufficient_balance, available_amount < jetton_amount); 
+
+    var (storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+        256, 
+        jetton_wallet_clean, 
+        begin_cell()
+            .store_uint(swap_enabled, 2)
+            .store_coins(pool_balance)
+            .store_coins(reserve + jetton_amount)
+            .store_uint(commission_percentage, 16)
+            .store_coins(x)
+            .store_coins(y)
+            .store_coins(z)
+    );
+
+    storage::orders~udict_set_ref(
+        256, 
+        user_address_clean, 
+        begin_cell()
+            .store_uint(1, 2) ;; swap_direction: 1 = external -> TON
+            .store_slice(jetton_wallet_address)
+            .store_coins(jetton_amount)
+            .store_uint(now() + storage::dest_valid_time, 32)
+            .store_uint(session_key, 256)
+            .store_uint(secret_hash, 256)
+        .end_cell()
+    );
+
+    emit_order_event(event::order_created, secret_hash);
+    storage::save();
+    return ();
+}
+
+() accept_order_source(slice msg_inner_slice) impure {
+    slice user_address = msg_inner_slice~load_msg_addr();
+    slice secret = msg_inner_slice~load_ref().begin_parse();
+
+    slice additional_data = msg_inner_slice~load_ref().begin_parse();
+    slice user_signature = additional_data~load_bits(512);
+
+    int additional_data_hash = additional_data.slice_hash();
+    
+    int secret_hash_signed = additional_data~load_uint(256);
+
+    var (_, user_address_clean) = parse_std_addr(user_address);
+    var (data_cell, found) = storage::orders.udict_get_ref?(256, user_address_clean);
+    throw_unless(error::order_not_found, found);
+    slice data = data_cell.begin_parse();
+
+    int swap_direction = data~load_uint(2);
+    slice jetton_wallet_address = data~load_msg_addr();
+    int jetton_amount = data~load_coins();
+    int valid_time = data~load_uint(32);
+    int session_key = data~load_uint(256);
+    int secret_hash = data~load_uint(256);
+
+    throw_unless(error::param_mismatch, swap_direction == 0);
+    throw_unless(error::invalid_signature, check_signature(additional_data_hash, user_signature, session_key)); ;; user proof by session key
+    throw_unless(error::secret_hash_mismatch, secret_hash == secret_hash_signed);
+    throw_unless(error::invalid_secret, secret_hash == keccack256_single(secret));
+    throw_if(error::timestamp_expired, valid_time < now());
+
+    var (storage::orders, _) = storage::orders.udict_delete?(256, user_address_clean);
+
+    var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+    (slice data_pool, var found_1?) = storage::whitelist.udict_get?(256, jetton_wallet_clean);
+    throw_unless(error::not_found, found_1?);
+
+    int swap_enabled = data_pool~load_uint(2);
+    int pool_balance = data_pool~load_coins();
+    int reserve = data_pool~load_coins();
+    int commission_percentage = data_pool~load_uint(16);
+    int x = data_pool~load_coins();
+    int y = data_pool~load_coins();
+    int z = data_pool~load_coins();
+
+    var (storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+        256,
+        jetton_wallet_clean,
+        begin_cell()
+            .store_uint(swap_enabled, 2)
+            .store_coins(pool_balance + jetton_amount)
+            .store_coins(reserve)
+            .store_uint(commission_percentage, 16)
+            .store_coins(x)
+            .store_coins(y)
+            .store_coins(z)
+    );
+
+    emit_order_event(event::order_accepted, secret_hash);
+    storage::save();
+    return();
+}
+
+() accept_order_destination(slice msg_inner_slice) impure {
+    slice user_address = msg_inner_slice~load_msg_addr();
+    slice secret = msg_inner_slice~load_ref().begin_parse();
+
+    var (_, user_address_clean) = parse_std_addr(user_address);
+    var (data_cell, found) = storage::orders.udict_get_ref?(256, user_address_clean);
+    throw_unless(error::order_not_found, found);
+    slice data = data_cell.begin_parse();
+
+    int swap_direction = data~load_uint(2);
+    slice jetton_wallet_address = data~load_msg_addr();
+    int jetton_amount = data~load_coins();
+    int valid_time = data~load_uint(32);
+    int session_key = data~load_uint(256);
+    int secret_hash = data~load_uint(256);
+
+    throw_unless(error::param_mismatch, swap_direction == 1);
+    throw_unless(error::invalid_secret, secret_hash == keccack256_single(secret));
+    throw_if(error::timestamp_expired, valid_time < now());
+
+    var (storage::orders, _) = storage::orders.udict_delete?(256, user_address_clean);
+
+    var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+    (slice data_pool, var found_1?) = storage::whitelist.udict_get?(256, jetton_wallet_clean);
+    throw_unless(error::not_found, found_1?);
+
+    int swap_enabled = data_pool~load_uint(2);
+    int pool_balance = data_pool~load_coins();
+    int reserve = data_pool~load_coins();
+    int commission_percentage = data_pool~load_uint(16);
+    int x = data_pool~load_coins();
+    int y = data_pool~load_coins();
+    int z = data_pool~load_coins();
+
+    var (storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+        256, 
+        jetton_wallet_clean, 
+        begin_cell()
+            .store_uint(swap_enabled, 2)
+            .store_coins(pool_balance - jetton_amount)
+            .store_coins(reserve - jetton_amount)
+            .store_uint(commission_percentage, 16)
+            .store_coins(x)
+            .store_coins(y)
+            .store_coins(z)
+    );
+
+    int amount = calculate_commission(jetton_amount, commission_percentage);
+    cell body = jetton_wallet::transfer_with_body(amount, user_address, my_address(), 1, begin_cell().end_cell());
+    msgs::send_simple(ton_0_05, jetton_wallet_address, body, 0);
+
+    emit_order_event(event::order_accepted, secret_hash);
+    storage::save();
+    return();
+}
+
+() cancel_order(slice msg_inner_slice) impure inline {
+    slice user_address = msg_inner_slice~load_msg_addr();
+    var (_, user_address_clean) = parse_std_addr(user_address);
+
+    var (data_cell, found?) = storage::orders.udict_get_ref?(256, user_address_clean);
+    throw_unless(error::not_found, found?);
+    slice data = data_cell.begin_parse();
+
+    int swap_direction = data~load_uint(2);
+    slice jetton_wallet_address = data~load_msg_addr();
+    int jetton_amount = data~load_coins();
+    int valid_time = data~load_uint(32);
+    int session_key = data~load_uint(256);
+    int secret_hash = data~load_uint(256);
+
+    throw_if(error::timestamp_in_future, valid_time > now());
+
+    var (storage::orders, _) = storage::orders.udict_delete?(256, user_address_clean);
+
+    if swap_direction == 0 {
+        cell jetton_body = jetton_wallet::transfer_with_body(
+            jetton_amount,
+            user_address,
+            my_address(),
+            1, ;; 1 nano ton
+            begin_cell().end_cell()
+        );
+        msgs::send_simple(ton_0_05, jetton_wallet_address, jetton_body, 0);
+    } else {
+        var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+        var (data_pool, _) = storage::whitelist.udict_get?(256, jetton_wallet_clean);
+
+        int swap_enabled = data_pool~load_uint(2);
+        int pool_balance = data_pool~load_coins();
+        int reserve = data_pool~load_coins();
+        int commission_percentage = data_pool~load_uint(16);
+        int x = data_pool~load_coins();
+        int y = data_pool~load_coins();
+        int z = data_pool~load_coins();
+
+        var(storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+            256, 
+            jetton_wallet_clean, 
+            begin_cell()
+                .store_uint(swap_enabled, 2)
+                .store_coins(pool_balance)
+                .store_coins(reserve - jetton_amount)
+                .store_uint(commission_percentage, 16)
+                .store_coins(x)
+                .store_coins(y)
+                .store_coins(z)
+        );
+    }
+
+    emit_order_event(event::order_canceled, secret_hash);
+    storage::save();
+    return ();
+}

@@ -1,0 +1,57 @@
+() cancel_order_int(slice sender_address) impure inline {
+    var (_, sender_address_clean) = parse_std_addr(sender_address);
+
+    var (data_cell, found?) = storage::orders.udict_get_ref?(256, sender_address_clean);
+    throw_unless(error::not_found, found?);
+    slice data = data_cell.begin_parse();
+
+    int swap_direction = data~load_uint(2);
+    slice jetton_wallet_address = data~load_msg_addr();
+    int jetton_amount = data~load_coins();
+    int valid_time = data~load_uint(32);
+    int session_key = data~load_uint(256);
+    int secret_hash = data~load_uint(256);
+
+    throw_if(error::timestamp_in_future, valid_time > now());
+
+    var (storage::orders, _) = storage::orders.udict_delete?(256, sender_address_clean);
+
+    if swap_direction == 0 {
+        cell jetton_body = jetton_wallet::transfer_with_body(
+            jetton_amount,
+            sender_address,
+            my_address(),
+            1, ;; fwd_amount in nanotons for jetton wallet
+            begin_cell().end_cell()
+        );
+        msgs::send_simple(ton_0_05, jetton_wallet_address, jetton_body, 0);
+    } else {
+        var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+        var (data_pool, _) = storage::whitelist.udict_get?(256, jetton_wallet_clean);
+
+        int swap_enabled = data_pool~load_uint(2);
+        int pool_balance = data_pool~load_coins();
+        int reserve = data_pool~load_coins();
+        int commission_percentage = data_pool~load_uint(16);
+        int x = data_pool~load_coins();
+        int y = data_pool~load_coins();
+        int z = data_pool~load_coins();
+
+        var(storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+            256, 
+            jetton_wallet_clean, 
+            begin_cell()
+                .store_uint(swap_enabled, 2)
+                .store_coins(pool_balance)
+                .store_coins(reserve - jetton_amount)
+                .store_uint(commission_percentage, 16)
+                .store_coins(x)
+                .store_coins(y)
+                .store_coins(z)
+        );
+    }
+
+    emit_order_event(event::order_canceled, secret_hash);
+    storage::save();
+    return ();
+}

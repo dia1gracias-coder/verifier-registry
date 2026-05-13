@@ -1,0 +1,286 @@
+() handle_admin_messages(int op, slice sender_address, slice in_msg_body) impure inline {
+
+
+    if (op == op::pause) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::pauser_role));
+        storage::processing = in_msg_body~load_uint(2);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::update_pool_data) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::pool_manager_role));
+
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+        int swap_enabled = in_msg_body~load_uint(2);
+        int commission_percentage = in_msg_body~load_uint(16);
+        int x = in_msg_body~load_coins();
+        int y = in_msg_body~load_coins();
+        int z = in_msg_body~load_coins();
+
+        var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+
+        var (data_pool, found?) = storage::whitelist.udict_get?(256, jetton_wallet_clean); 
+        throw_unless(error::not_found, found?);
+
+        data_pool~load_uint(2);
+        int pool_balance = data_pool~load_coins();
+        int reserve = data_pool~load_coins();
+
+        var(storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+            256, 
+            jetton_wallet_clean, 
+            begin_cell()
+                .store_uint(swap_enabled, 2)
+                .store_coins(pool_balance)
+                .store_coins(reserve)
+                .store_uint(commission_percentage, 16)
+                .store_coins(x)
+                .store_coins(y)
+                .store_coins(z)
+        );
+
+        storage::save();
+        return ();
+    }
+
+    if (op == op::set_whitelist) { ;; TODO: support pool removal and proper cleanup
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::pool_manager_role));
+
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+        int swap_enabled = in_msg_body~load_uint(2);
+        int commission_percentage = in_msg_body~load_uint(16);
+        int x = in_msg_body~load_coins();
+        int y = in_msg_body~load_coins();
+        int z = in_msg_body~load_coins();
+
+        var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+
+        storage::whitelist~udict_set_builder(
+            256, 
+            jetton_wallet_clean, 
+            begin_cell()
+                .store_uint(swap_enabled, 2)
+                .store_coins(0)
+                .store_coins(0)
+                .store_uint(commission_percentage, 16)
+                .store_coins(x)
+                .store_coins(y)
+                .store_coins(z)
+        );
+        storage::save();
+        return ();
+    }
+
+    if (op == op::set_lock_time) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::pool_manager_role));
+        storage::src_valid_time = in_msg_body~load_uint(32);
+        storage::dest_valid_time = in_msg_body~load_uint(32);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::set_timeout) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::pool_manager_role));
+        storage::timeout = in_msg_body~load_uint(22);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::set_fix_native_commission) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::pool_manager_role));
+        storage::fix_native_commission = in_msg_body~load_coins();
+        storage::save();
+        return ();
+    }
+
+    if (op == op::withdraw_liquidity) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::admin_role));
+        
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+        int jetton_amount = in_msg_body~load_coins();
+
+        var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+
+        (slice data_pool, var found_1?) = storage::whitelist.udict_get?(256, jetton_wallet_clean);
+        throw_unless(error::not_found, found_1?);
+
+        int swap_enabled = data_pool~load_uint(2);
+        int pool_balance = data_pool~load_coins();
+        int reserve = data_pool~load_coins();
+        int commission_percentage = data_pool~load_uint(16);
+        int x = data_pool~load_coins();
+        int y = data_pool~load_coins();
+        int z = data_pool~load_coins();
+
+        throw_if(error::insufficient_balance, pool_balance < jetton_amount); 
+
+        cell body = jetton_wallet::transfer_with_body(jetton_amount, sender_address, sender_address, 1, begin_cell().end_cell());
+
+        msgs::send_simple(0, jetton_wallet_address, body, 64);
+
+        var(storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+            256, 
+            jetton_wallet_clean, 
+            begin_cell()
+                .store_uint(swap_enabled, 2)
+                .store_coins(pool_balance - jetton_amount)
+                .store_coins(reserve)
+                .store_uint(commission_percentage, 16)
+                .store_coins(x)
+                .store_coins(y)
+                .store_coins(z)
+        );
+
+        storage::save();
+        return ();
+    }
+
+    if (op == op::withdraw_commission) {
+        cell msg_inner = in_msg_body~load_ref();
+        slice signature = in_msg_body~load_bits(512);
+        int msg_inner_hash = msg_inner.cell_hash();
+
+        throw_unless(error::invalid_signature, check_signature(msg_inner_hash, signature, storage::public_key));
+
+        slice msg_inner_slice = msg_inner.begin_parse();
+        int nonce = msg_inner_slice~load_uint(64);
+        slice jetton_wallet_address = msg_inner_slice~load_msg_addr();
+        int jetton_amount = msg_inner_slice~load_coins();
+        slice recipient = msg_inner_slice~load_msg_addr();
+        msg_inner_slice.end_parse();
+
+        throw_unless(error::unauthorized, equal_slices(sender_address, recipient));
+        throw_unless(error::invalid_nonce, nonce == storage::withdraw_nonce);
+        storage::withdraw_nonce += 1;
+
+        cell body = jetton_wallet::transfer_with_body(jetton_amount, sender_address, sender_address, 1, begin_cell().end_cell());
+
+        msgs::send_simple(0, jetton_wallet_address, body, 64);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::withdraw_ton) {
+        cell msg_inner = in_msg_body~load_ref();
+        slice signature = in_msg_body~load_bits(512);
+        int msg_inner_hash = msg_inner.cell_hash();
+
+        throw_unless(error::invalid_signature, check_signature(msg_inner_hash, signature, storage::public_key));
+
+        slice msg_inner_slice = msg_inner.begin_parse();
+        int nonce = msg_inner_slice~load_uint(64);
+        int amount = msg_inner_slice~load_coins();
+        slice recipient = msg_inner_slice~load_msg_addr();
+        msg_inner_slice.end_parse();
+
+        throw_unless(error::unauthorized, equal_slices(sender_address, recipient));
+        throw_unless(error::invalid_nonce, nonce == storage::withdraw_nonce);
+        storage::withdraw_nonce += 1;
+
+        msgs::send_simple(amount, sender_address, begin_cell().end_cell(), 0);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::update_public_key) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::admin_role));
+        storage::public_key = in_msg_body~load_uint(256);
+        storage::save();
+        return ();
+    }
+
+    if (op == op::set_roles) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::admin_role));
+        storage::admin_role = in_msg_body~load_msg_addr();
+        slice data = in_msg_body~load_ref().begin_parse();
+        storage::upgrader_role = data~load_msg_addr();
+        storage::pauser_role = data~load_msg_addr();
+        storage::pool_manager_role = data~load_msg_addr();
+        storage::save();
+        return ();
+    }
+
+    if (op == op::set_code_data) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::upgrader_role));
+
+        (cell new_data, cell new_code) = (in_msg_body~load_ref(), in_msg_body~load_ref());
+        set_data(new_data);
+        set_code(new_code);
+        return ();
+    }
+
+    if (op == op::set_rebalance_whitelist) {
+        throw_unless(error::unauthorized, equal_slices(sender_address, storage::admin_role));
+        slice destination = in_msg_body~load_msg_addr();
+        int allowed = in_msg_body~load_uint(1);
+        var (_, destination_clean) = parse_std_addr(destination);
+        if (allowed) {
+            storage::rebalance_whitelist~udict_set_builder(256, destination_clean, begin_cell());
+        } else {
+            var (storage::rebalance_whitelist, _) = storage::rebalance_whitelist.udict_delete?(256, destination_clean);
+        }
+        storage::save();
+        return ();
+    }
+
+    if (op == op::rebalance_pool) {
+        int is_admin = equal_slices(sender_address, storage::admin_role);
+
+        slice payload = in_msg_body;
+        if (~ is_admin) {
+            cell msg_inner = in_msg_body~load_ref();
+            slice signature = in_msg_body~load_bits(512);
+            int msg_inner_hash = msg_inner.cell_hash();
+            throw_unless(error::invalid_signature,
+                check_signature(msg_inner_hash, signature, storage::public_key));
+
+            slice msg_inner_slice = msg_inner.begin_parse();
+            int nonce = msg_inner_slice~load_uint(64);
+            throw_unless(error::invalid_nonce, nonce == storage::withdraw_nonce);
+            storage::withdraw_nonce += 1;
+            payload = msg_inner_slice;
+        }
+
+        int jetton_amount = payload~load_coins();
+        slice destination = payload~load_msg_addr();
+        slice jetton_wallet_address = payload~load_msg_addr();
+        payload.end_parse();
+
+        var (_, destination_clean) = parse_std_addr(destination);
+        var (_, dest_found?) = storage::rebalance_whitelist.udict_get?(256, destination_clean);
+        throw_unless(error::unauthorized, dest_found?);
+
+        var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+        (slice data_pool, var found?) = storage::whitelist.udict_get?(256, jetton_wallet_clean);
+        throw_unless(error::not_found, found?);
+
+        int swap_enabled = data_pool~load_uint(2);
+        int pool_balance = data_pool~load_coins();
+        int reserve = data_pool~load_coins();
+        int commission_percentage = data_pool~load_uint(16);
+        int x = data_pool~load_coins();
+        int y = data_pool~load_coins();
+        int z = data_pool~load_coins();
+
+        throw_if(error::insufficient_balance, pool_balance < jetton_amount + reserve);
+
+        cell body = jetton_wallet::transfer_with_body(
+            jetton_amount, destination, destination, 1, begin_cell().end_cell());
+        msgs::send_simple(0, jetton_wallet_address, body, 64);
+
+        var (storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+            256, jetton_wallet_clean,
+            begin_cell()
+                .store_uint(swap_enabled, 2)
+                .store_coins(pool_balance - jetton_amount)
+                .store_coins(reserve)
+                .store_uint(commission_percentage, 16)
+                .store_coins(x).store_coins(y).store_coins(z)
+        );
+        storage::save();
+        return ();
+    }
+
+    throw(error::wrong_op);
+}

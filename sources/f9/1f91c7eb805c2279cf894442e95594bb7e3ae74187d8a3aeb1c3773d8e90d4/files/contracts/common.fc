@@ -1,0 +1,59 @@
+;; Error codes
+const int error::wrong_op = 0xffff;
+const int error::wrong_inner_op = 800;
+const int error::unauthorized = 801;
+const int error::not_found = 802;
+const int error::insufficient_balance = 803;
+const int error::contract_paused = 804;
+const int error::invalid_query_id = 805;
+const int error::query_exists = 806;
+const int error::invalid_signature = 807;
+const int error::jetton_disabled = 808;
+const int error::order_exists = 809;
+const int error::order_not_found = 810;
+const int error::secret_hash_mismatch = 811;
+const int error::invalid_secret = 812;
+const int error::timestamp_expired = 813; ;; valid_time < now()
+const int error::timestamp_in_future = 814; ;; valid_time > now()
+const int error::incorrect_decimal = 815; ;; only Jettons with expected decimals are supported
+const int error::param_mismatch = 816; ;; parameter mismatch (e.g. signed vs actual)
+const int error::not_enogh_ton = 817;
+const int error::invalid_nonce = 818;
+
+;; Jetton opcodes
+const int op::transfer = 0xf8a7ea5;
+const int op::transfer_notification = 0x7362d09c;
+const int op::excesses = 0xd53276db;
+
+const int inner_op::swap = 0x25938561;
+const int inner_op::deposit_liquidity = 0x83c7f499;
+const int inner_op::create_order_for_cross_swap = 0xf3855017;
+;; Internal admin/user opcodes
+const int op::pause = 0xd79a92ed;
+const int op::update_pool_data = 0x8a4857a1;
+const int op::set_whitelist = 0x93503dae;
+const int op::set_lock_time = 0xa76fe3e2;
+const int op::set_timeout = 0x7c8f9d2a;
+const int op::set_fix_native_commission = 0x24a9b666;
+const int op::withdraw_liquidity = 0xd92ff907;
+const int op::update_public_key = 0xba2c49bd;
+const int op::withdraw_commission = 0x7c1708be;
+const int op::withdraw_ton = 0x552cc3d6;
+const int op::set_roles = 0x22cfd2a1;
+const int op::set_code_data = 0xc34e3c68;
+const int op::rebalance_pool = 0x0f06f98c; ;; crc32("rebalance_pool")
+const int op::set_rebalance_whitelist = 0x5e3d99a1; ;; crc32("set_rebalance_whitelist")
+;; External HTLC opcodes
+const int op::create_order_for_cross_swap = 0x88bfeb77;
+const int op::accept_order_source = 0xb66d8b3c;
+const int op::accept_order_destination = 0xce70fe42;
+const int op::cancel_order = 0x4f0d7a23;
+;; Event opcodes
+const int event::order_created = 0x0c10e1f7;
+const int event::order_accepted = 0x59cf63ca;
+const int event::order_canceled = 0x78787344;
+
+;; TON constants (nanotons)
+const ton_0_1 = 100000000;
+const ton_0_05 = 50000000;
+const ton_0_01 = 10000000;

@@ -1,0 +1,238 @@
+;; M(A;X,Y,Z) = max(0, min{ A - X, Z + max(0, A - Y) })
+;; Threshold function used to cap outflow by pool state and limits
+(int) max_out_by_thresholds(int A, int X, int Y, int Z, int reserve) inline {
+    int t1 = max(0, A - X);       ;; max(0, A - X)
+    int t2 = max(0, A - Y);       ;; max(0, A - Y)
+    int cap = Z + t2;             ;; Z + max(0, A - Y)
+    return min(t1, cap) - reserve;          ;; min(...) - reserve
+}
+
+
+() handle_jetton_messages(slice in_msg_body, slice jetton_wallet_address, int msg_value) impure inline {
+
+    int jetton_amount = in_msg_body~load_coins();
+    slice sender_address = in_msg_body~load_msg_addr();
+
+    try {
+        slice fp_body = in_msg_body~load_ref().begin_parse(); ;; forward_payload of Jetton transfer
+        int inner_op = fp_body~load_uint(32);
+        
+        if inner_op == inner_op::swap {
+            cell msg_inner = fp_body~load_ref();
+            slice signature = fp_body~load_bits(512);
+            fp_body.end_parse();
+            int msg_inner_hash = msg_inner.cell_hash();
+
+            slice msg_inner_slice = msg_inner.begin_parse();
+
+            int shift = msg_inner_slice~load_uint(13);
+            int bit_number = msg_inner_slice~load_uint(10);
+            int created_at = msg_inner_slice~load_uint(32);
+
+            slice other_jetton_wallet_address = msg_inner_slice~load_msg_addr();
+            slice receiver_address = msg_inner_slice~load_msg_addr();
+            
+            slice user_data = msg_inner_slice~load_ref().begin_parse();
+            int signed_jetton_amount = user_data~load_coins();
+            slice signed_sender = user_data~load_msg_addr();
+            slice signed_my_jetton_wallet = user_data~load_msg_addr();
+            user_data.end_parse();
+            msg_inner_slice.end_parse();
+
+            throw_unless(error::param_mismatch, equal_slices(signed_sender, sender_address));
+            throw_unless(error::param_mismatch, signed_jetton_amount == jetton_amount);
+            throw_unless(error::param_mismatch, equal_slices(signed_my_jetton_wallet, jetton_wallet_address));
+
+            throw_if(error::contract_paused, storage::processing == 0); ;; pause check
+
+            ;; checking time amd query_id
+            verify_time_and_queryid(shift, bit_number, created_at);
+
+            ;; whitelist lookup for both pools
+            var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+            var (_, other_jetton_wallet_clean) = parse_std_addr(other_jetton_wallet_address);
+
+            ;; source pool (where jettons come from)
+            (slice data_pool_from, var found_1?) = storage::whitelist.udict_get?(256, jetton_wallet_clean);
+            throw_unless(error::not_found, found_1?);
+
+            int from_swap_enabled = data_pool_from~load_uint(2);
+            int from_pool_balance = data_pool_from~load_coins();
+            int from_reserve = data_pool_from~load_coins();
+            int from_commission_percentage = data_pool_from~load_uint(16);
+            int from_x = data_pool_from~load_coins();
+            int from_y = data_pool_from~load_coins();
+            int from_z = data_pool_from~load_coins();
+
+            ;; destination pool (where jettons go to)
+            (slice data_pool_to, var found_2?) = storage::whitelist.udict_get?(256, other_jetton_wallet_clean); 
+            throw_unless(error::not_found, found_2?);
+
+            int to_swap_enabled = data_pool_to~load_uint(2);
+            int to_pool_balance = data_pool_to~load_coins();
+            int to_reserve = data_pool_to~load_coins();
+            int to_commission_percentage = data_pool_to~load_uint(16);
+            int to_x = data_pool_to~load_coins();
+            int to_y = data_pool_to~load_coins();
+            int to_z = data_pool_to~load_coins();
+
+            throw_if(error::jetton_disabled, (from_swap_enabled  == 0) | (to_swap_enabled == 0));
+
+            ;; compute available outflow from destination pool considering reserve
+            int available_amount = max_out_by_thresholds(to_pool_balance, to_x, to_y, to_z, to_reserve);
+
+            throw_if(error::insufficient_balance, available_amount < jetton_amount); 
+
+            ;; backend signature verification
+            throw_unless(error::invalid_signature, check_signature(msg_inner_hash, signature, storage::public_key));
+
+            int amount = calculate_commission(jetton_amount, to_commission_percentage);
+            cell body = jetton_wallet::transfer_with_body(amount, receiver_address, receiver_address, 1, begin_cell().end_cell());
+
+            ;; send Jettons to receiver through destination pool wallet
+            raw_reserve(storage::fix_native_commission, 4);
+            msgs::send_simple(0, other_jetton_wallet_address, body, 128);
+
+            ;; update both pools (increase source pool, decrease destination pool)
+            var(storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+                256, 
+                jetton_wallet_clean, 
+                begin_cell()
+                    .store_uint(from_swap_enabled, 2)
+                    .store_coins(from_pool_balance + jetton_amount)
+                    .store_coins(from_reserve)
+                    .store_uint(from_commission_percentage, 16)
+                    .store_coins(from_x)
+                    .store_coins(from_y)
+                    .store_coins(from_z)
+            );
+
+            var(storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+                256, 
+                other_jetton_wallet_clean, 
+                begin_cell()
+                    .store_uint(to_swap_enabled, 2)
+                    .store_coins(to_pool_balance - amount)
+                    .store_coins(to_reserve)
+                    .store_uint(to_commission_percentage, 16)
+                    .store_coins(to_x)
+                    .store_coins(to_y)
+                    .store_coins(to_z)
+            );
+
+            storage::save();
+            return ();
+        }
+
+        if inner_op == inner_op::create_order_for_cross_swap {
+            cell msg_inner = fp_body~load_ref();
+            slice signature = fp_body~load_bits(512);
+            fp_body.end_parse();
+            int msg_inner_hash = msg_inner.cell_hash();
+
+            slice msg_inner_slice = msg_inner.begin_parse();
+            
+            int shift = msg_inner_slice~load_uint(13);
+            int bit_number = msg_inner_slice~load_uint(10);
+            int created_at = msg_inner_slice~load_uint(32);
+
+            int session_key = msg_inner_slice~load_uint(256);
+            int secret_hash = msg_inner_slice~load_uint(256);
+            
+            slice user_data = msg_inner_slice~load_ref().begin_parse();
+            int signed_ton_amount = user_data~load_coins();
+            int signed_jetton_amount = user_data~load_coins();
+            slice signed_sender = user_data~load_msg_addr();
+            slice signed_my_jetton_wallet = user_data~load_msg_addr();
+            user_data.end_parse();
+            msg_inner_slice.end_parse();
+            
+            throw_unless(error::not_enogh_ton, msg_value >= signed_ton_amount);
+            throw_unless(error::param_mismatch, equal_slices(signed_sender, sender_address));
+            throw_unless(error::param_mismatch, signed_jetton_amount == jetton_amount);
+            throw_unless(error::param_mismatch, equal_slices(signed_my_jetton_wallet, jetton_wallet_address));
+
+            throw_if(error::contract_paused, storage::processing == 0); ;; pause check
+
+            verify_time_and_queryid(shift, bit_number, created_at);
+
+            var (_, sender_address_clean) = parse_std_addr(sender_address);
+            var (_, found) = storage::orders.udict_get_ref?(256, sender_address_clean);
+            throw_if(error::order_exists, found);
+
+            var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+            var (data_pool, found_1?) = storage::whitelist.udict_get?(256, jetton_wallet_clean);
+            throw_unless(error::not_found, found_1?);
+
+            int swap_enabled = data_pool~load_uint(2);
+
+            throw_if(error::jetton_disabled, swap_enabled  == 0);
+
+            throw_unless(error::invalid_signature, check_signature(msg_inner_hash, signature, storage::public_key)); ;; backend signature
+
+            storage::orders~udict_set_ref(
+                256, 
+                sender_address_clean, 
+                begin_cell()
+                    .store_uint(0, 2)
+                    .store_slice(jetton_wallet_address)
+                    .store_coins(jetton_amount)
+                    .store_uint(now() + storage::src_valid_time, 32)
+                    .store_uint(session_key, 256)
+                    .store_uint(secret_hash, 256)
+                .end_cell()
+            );
+
+            storage::save();
+            return ();
+        }
+
+        if inner_op == inner_op::deposit_liquidity {
+            throw_unless(error::unauthorized, equal_slices(sender_address, storage::admin_role));
+
+            int decimal = fp_body~load_uint(6);
+            throw_if(error::incorrect_decimal, decimal != 6); ;; only 6‑decimals Jettons are supported
+
+            var (_, jetton_wallet_clean) = parse_std_addr(jetton_wallet_address);
+
+            (slice data_pool, var found?) = storage::whitelist.udict_get?(256, jetton_wallet_clean); 
+            throw_unless(error::not_found, found?);
+
+            int swap_enabled = data_pool~load_uint(2);
+            int pool_balance = data_pool~load_coins();
+            int reserve = data_pool~load_coins();
+            int commission_percentage = data_pool~load_uint(16);
+            int x = data_pool~load_coins();
+            int y = data_pool~load_coins();
+            int z = data_pool~load_coins();
+
+            var(storage::whitelist, _) = storage::whitelist.udict_replace_builder?(
+                256, 
+                jetton_wallet_clean, 
+                begin_cell()
+                    .store_uint(swap_enabled, 2)
+                    .store_coins(pool_balance + jetton_amount)
+                    .store_coins(reserve)
+                    .store_uint(commission_percentage, 16)
+                    .store_coins(x)
+                    .store_coins(y)
+                    .store_coins(z)
+            );
+
+            storage::save();
+            return ();
+        }
+        
+        throw(error::wrong_inner_op);
+
+    } catch(err_arg, err_code) {
+        cell jetton_body = jetton_wallet::transfer_with_body(
+            jetton_amount,
+            sender_address,
+            sender_address,
+            1, ;; fwd_amount in nanotons for jetton wallet
+            begin_cell().store_uint(0, 32).store_slice("Error occurred - contact support team ").store_number_as_slice(err_code).end_cell()
+        );
+        msgs::send_simple(0, jetton_wallet_address, jetton_body, 64);
+    }
+}

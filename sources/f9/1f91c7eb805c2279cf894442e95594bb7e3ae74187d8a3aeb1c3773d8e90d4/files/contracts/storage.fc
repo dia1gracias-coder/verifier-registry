@@ -1,0 +1,81 @@
+global int storage::public_key; ;; 256 bit -- cell
+global int storage::processing; ;; 2 bit
+global int storage::src_valid_time; ;; 32 
+global int storage::dest_valid_time; ;; 32
+global int storage::fix_native_commission; ;; 124
+global cell storage::whitelist; ;; dict: [swap_enabled, pool_balance, reserve, commission, X, Y, Z]
+global cell storage::orders; ;; dict 
+global slice storage::admin_role; ;; 264
+
+global slice storage::upgrader_role; ;; 264 -- cell 
+global slice storage::pauser_role; ;; 264 
+global slice storage::pool_manager_role; ;; 264 
+
+global int storage::last_clean_time; ;; 32 -- cell
+global int storage::timeout; ;; 22
+global int storage::withdraw_nonce; ;; 64
+global cell storage::queries; ;; dict
+global cell storage::old_queries; ;; dict
+global cell storage::rebalance_whitelist; ;; dict 256 -> empty cell (destinations allowed for rebalance)
+
+
+() storage::load() impure inline {
+    slice ds = get_data().begin_parse();
+    storage::public_key = ds~load_uint(256);
+    storage::processing = ds~load_uint(2);
+    storage::src_valid_time = ds~load_uint(32);
+    storage::dest_valid_time = ds~load_uint(32);
+    storage::fix_native_commission = ds~load_coins();
+    storage::whitelist = ds~load_dict();
+    storage::orders = ds~load_dict();
+    storage::admin_role = ds~load_msg_addr();
+
+    slice ds2 = ds~load_ref().begin_parse();
+    storage::upgrader_role = ds2~load_msg_addr();
+    storage::pauser_role = ds2~load_msg_addr();
+    storage::pool_manager_role = ds2~load_msg_addr();
+    ds2.end_parse();
+
+    slice ds3 = ds~load_ref().begin_parse();
+    storage::last_clean_time = ds3~load_uint(32);
+    storage::timeout = ds3~load_uint(22);
+    storage::withdraw_nonce = ds3~load_uint(64);
+    storage::queries = ds3~load_dict();
+    storage::old_queries = ds3~load_dict();
+    storage::rebalance_whitelist = ds3~load_dict();
+    ds3.end_parse();
+
+    ds.end_parse();
+}
+
+() storage::save() impure inline_ref {
+    set_data(
+        begin_cell() 
+            .store_uint(storage::public_key, 256)
+            .store_uint(storage::processing, 2)
+            .store_uint(storage::src_valid_time, 32)
+            .store_uint(storage::dest_valid_time, 32)
+            .store_coins(storage::fix_native_commission)
+            .store_dict(storage::whitelist)
+            .store_dict(storage::orders)
+            .store_slice(storage::admin_role)
+            .store_ref(
+                begin_cell()
+                    .store_slice(storage::upgrader_role)
+                    .store_slice(storage::pauser_role)
+                    .store_slice(storage::pool_manager_role)
+                .end_cell()
+            )
+            .store_ref(
+                begin_cell()
+                    .store_uint(storage::last_clean_time, 32)
+                    .store_uint(storage::timeout, 22)
+                    .store_uint(storage::withdraw_nonce, 64)
+                    .store_dict(storage::queries)
+                    .store_dict(storage::old_queries)
+                    .store_dict(storage::rebalance_whitelist)
+                .end_cell()
+            )
+        .end_cell()
+    );
+}
