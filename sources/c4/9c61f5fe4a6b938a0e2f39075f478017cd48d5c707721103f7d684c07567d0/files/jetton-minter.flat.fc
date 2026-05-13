@@ -1,0 +1,264 @@
+;; =====================================================================
+;; FLATTENED jetton-minter.fc — для verifier.ton.org / tonscan verify.
+;; Содержит inline-объединение imports/stdlib_func.fc, imports/op-codes.fc,
+;; imports/params.fc, imports/jetton-utils.fc и собственно jetton-minter.fc.
+;;
+;; FunC #include — текстовая склейка, поэтому bytecode из этого flat-файла
+;; биjit-в-бит идентичен оригинальной multi-file сборке.
+;; =====================================================================
+
+
+;; ====================== imports/stdlib_func.fc ======================
+;; Минимальный stdlib для func 0.4.6 — описываем только функции, которых нет
+;; в наборе встроенных. Большинство store_* и load_* для int — встроенные.
+
+slice begin_parse(cell c) asm "CTOS";
+() end_parse(slice s) impure asm "ENDS";
+
+builder begin_cell() asm "NEWC";
+cell end_cell(builder b) asm "ENDC";
+builder store_ref(builder b, cell c) asm(c b) "STREF";
+builder store_slice(builder b, slice s) asm "STSLICER";
+builder store_coins(builder b, int x) asm "STGRAMS";
+builder store_grams(builder b, int x) asm "STGRAMS";
+builder store_dict(builder b, cell c) asm(c b) "STDICT";
+
+int min(int x, int y) asm "MIN";
+int max(int x, int y) asm "MAX";
+
+(slice, slice) load_msg_addr(slice s) asm( -> 1 0) "LDMSGADDR";
+(slice, cell) load_ref(slice s) asm( -> 1 0) "LDREF";
+(slice, cell) load_dict(slice s) asm( -> 1 0) "LDDICT";
+(slice, int) load_coins(slice s) asm( -> 1 0) "LDGRAMS";
+(slice, int) load_grams(slice s) asm( -> 1 0) "LDGRAMS";
+
+(slice, ()) skip_bits(slice s, int len) asm "SDSKIPFIRST";
+
+int slice_bits(slice s) asm "SBITS";
+int slice_refs(slice s) asm "SREFS";
+int slice_empty?(slice s) asm "SEMPTY";
+int equal_slices(slice a, slice b) asm "SDEQ";
+
+(int, slice) parse_std_addr(slice s) asm "REWRITESTDADDR";
+
+cell get_data() asm "c4 PUSH";
+() set_data(cell c) impure asm "c4 POP";
+
+slice my_address() asm "MYADDR";
+int now() asm "NOW";
+
+int cell_hash(cell c) asm "HASHCU";
+
+() send_raw_message(cell msg, int mode) impure asm "SENDRAWMSG";
+() raw_reserve(int amount, int mode) impure asm "RAWRESERVE";
+
+
+;; ====================== imports/op-codes.fc ======================
+const int op::transfer = 0xf8a7ea5;
+const int op::transfer_notification = 0x7362d09c;
+const int op::internal_transfer = 0x178d4519;
+const int op::excesses = 0xd53276db;
+const int op::burn = 0x595f07bc;
+const int op::burn_notification = 0x7bdd97de;
+
+const int op::mint = 21;
+const int op::change_admin = 3;
+const int op::change_content = 4;
+
+const int op::provide_wallet_address = 0x2c76b973;
+const int op::take_wallet_address = 0xd1735400;
+
+
+;; ====================== imports/params.fc ======================
+int workchain() asm "0 PUSHINT";
+
+() force_chain(slice addr) impure {
+  (int wc, _) = parse_std_addr(addr);
+  throw_unless(333, wc == workchain());
+}
+
+
+;; ====================== imports/jetton-utils.fc ======================
+cell pack_jetton_wallet_data(int balance, slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+  return  begin_cell()
+            .store_coins(balance)
+            .store_slice(owner_address)
+            .store_slice(jetton_master_address)
+            .store_ref(jetton_wallet_code)
+          .end_cell();
+}
+
+cell calculate_jetton_wallet_state_init(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(jetton_wallet_code)
+          .store_dict(pack_jetton_wallet_data(0, owner_address, jetton_master_address, jetton_wallet_code))
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_jetton_wallet_address(cell state_init) inline {
+  return begin_cell().store_uint(4, 3)
+                     .store_int(workchain(), 8)
+                     .store_uint(cell_hash(state_init), 256)
+         .end_cell()
+         .begin_parse();
+}
+
+slice calculate_user_jetton_wallet_address(slice owner_address, slice jetton_master_address, cell jetton_wallet_code) inline {
+  return calculate_jetton_wallet_address(calculate_jetton_wallet_state_init(owner_address, jetton_master_address, jetton_wallet_code));
+}
+
+
+;; ====================== jetton-minter.fc ======================
+;; TEP-74 + TEP-89 jetton-minter (master). Standard discoverable.
+
+int fwd_fee_for_take() asm "10000000 PUSHINT"; ;; 0.01 TON
+
+(int, slice, cell, cell) load_data() inline {
+  slice ds = get_data().begin_parse();
+  return (
+    ds~load_coins(),    ;; total_supply
+    ds~load_msg_addr(), ;; admin_address
+    ds~load_ref(),      ;; content
+    ds~load_ref()       ;; jetton_wallet_code
+  );
+}
+
+() save_data(int total_supply, slice admin_address, cell content, cell jetton_wallet_code) impure inline {
+  set_data(begin_cell()
+    .store_coins(total_supply)
+    .store_slice(admin_address)
+    .store_ref(content)
+    .store_ref(jetton_wallet_code)
+    .end_cell()
+  );
+}
+
+() mint_tokens(slice to_address, cell jetton_wallet_code, int amount, cell master_msg) impure {
+  cell state_init = calculate_jetton_wallet_state_init(to_address, my_address(), jetton_wallet_code);
+  slice to_wallet_address = calculate_jetton_wallet_address(state_init);
+  var msg = begin_cell()
+    .store_uint(0x18, 6)
+    .store_slice(to_wallet_address)
+    .store_coins(amount)
+    .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+    .store_ref(state_init)
+    .store_ref(master_msg);
+  send_raw_message(msg.end_cell(), 1);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  if (in_msg_body.slice_empty?()) {
+    return ();
+  }
+
+  slice cs = in_msg_full.begin_parse();
+  int flags = cs~load_uint(4);
+
+  if (flags & 1) {
+    return ();
+  }
+
+  slice sender_address = cs~load_msg_addr();
+
+  int op = in_msg_body~load_uint(32);
+  int query_id = in_msg_body~load_uint(64);
+
+  if (op == op::mint) {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code) = load_data();
+    throw_unless(73, equal_slices(sender_address, admin_address));
+    slice to_address = in_msg_body~load_msg_addr();
+    int amount = in_msg_body~load_coins();
+    cell master_msg = in_msg_body~load_ref();
+    slice master_msg_cs = master_msg.begin_parse();
+    master_msg_cs~skip_bits(32 + 64);
+    int jetton_amount = master_msg_cs~load_coins();
+    mint_tokens(to_address, jetton_wallet_code, amount, master_msg);
+    save_data(total_supply + jetton_amount, admin_address, content, jetton_wallet_code);
+    return ();
+  }
+
+  if (op == op::burn_notification) {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code) = load_data();
+    int jetton_amount = in_msg_body~load_coins();
+    slice from_address = in_msg_body~load_msg_addr();
+    throw_unless(74,
+        equal_slices(calculate_user_jetton_wallet_address(from_address, my_address(), jetton_wallet_code), sender_address)
+    );
+    save_data(total_supply - jetton_amount, admin_address, content, jetton_wallet_code);
+    slice response_address = in_msg_body~load_msg_addr();
+    if (response_address.preload_uint(2) != 0) {
+      var msg = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(response_address)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::excesses, 32)
+        .store_uint(query_id, 64);
+      send_raw_message(msg.end_cell(), 2 + 64);
+    }
+    return ();
+  }
+
+  if (op == op::provide_wallet_address) {
+    throw_unless(75, msg_value > fwd_fee_for_take());
+    slice owner_address = in_msg_body~load_msg_addr();
+    int include_address? = in_msg_body~load_uint(1);
+    (_, _, _, cell jetton_wallet_code) = load_data();
+
+    builder reply_body = begin_cell()
+        .store_uint(op::take_wallet_address, 32)
+        .store_uint(query_id, 64)
+        .store_slice(calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code));
+    if (include_address?) {
+      reply_body = reply_body.store_uint(1, 1).store_ref(begin_cell().store_slice(owner_address).end_cell());
+    } else {
+      reply_body = reply_body.store_uint(0, 1);
+    }
+
+    var msg = begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(sender_address)
+      .store_coins(0)
+      .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_ref(reply_body.end_cell());
+    send_raw_message(msg.end_cell(), 64);
+    return ();
+  }
+
+  if (op == op::change_admin) {
+    (int total_supply, slice admin_address, cell content, cell jetton_wallet_code) = load_data();
+    throw_unless(73, equal_slices(sender_address, admin_address));
+    slice new_admin_address = in_msg_body~load_msg_addr();
+    save_data(total_supply, new_admin_address, content, jetton_wallet_code);
+    return ();
+  }
+
+  if (op == op::change_content) {
+    (int total_supply, slice admin_address, _, cell jetton_wallet_code) = load_data();
+    throw_unless(73, equal_slices(sender_address, admin_address));
+    save_data(total_supply, admin_address, in_msg_body~load_ref(), jetton_wallet_code);
+    return ();
+  }
+
+  throw(0xffff);
+}
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+  slice ds = get_data().begin_parse();
+  int total_supply = ds~load_coins();
+  slice admin_address = ds~load_msg_addr();
+  cell content = ds~load_ref();
+  cell jetton_wallet_code = ds~load_ref();
+  return (total_supply, -1, admin_address, content, jetton_wallet_code);
+}
+
+slice get_wallet_address(slice owner_address) method_id {
+  slice ds = get_data().begin_parse();
+  ds~load_coins();
+  ds~load_msg_addr();
+  ds~load_ref();
+  cell jetton_wallet_code = ds~load_ref();
+  return calculate_user_jetton_wallet_address(owner_address, my_address(), jetton_wallet_code);
+}
