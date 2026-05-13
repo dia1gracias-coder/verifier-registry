@@ -1,0 +1,507 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Treasury",
+  "author": "TreasuryFlow TON",
+  "version": "0.1.0",
+  "description": "Track A Treasury-first TON payout approval prototype",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreatePayoutProposal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ApproveProposal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecuteProposal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelProposal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayoutProposal"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "ProposalStatus"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 19
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 21
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 23,
+      "value_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalView"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "ProposalViewStatus"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "enum",
+      "name": "ProposalStatus",
+      "ty_idx": 20,
+      "encoded_as_ty_idx": 17,
+      "members": [
+        {
+          "name": "Pending",
+          "value": "0"
+        },
+        {
+          "name": "Executed",
+          "value": "1"
+        },
+        {
+          "name": "Cancelled",
+          "value": "2"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "ProposalViewStatus",
+      "ty_idx": 26,
+      "encoded_as_ty_idx": 17,
+      "members": [
+        {
+          "name": "Pending",
+          "value": "0"
+        },
+        {
+          "name": "Executable",
+          "value": "1"
+        },
+        {
+          "name": "Executed",
+          "value": "2"
+        },
+        {
+          "name": "Cancelled",
+          "value": "3"
+        },
+        {
+          "name": "Expired",
+          "value": "4"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayoutProposal",
+      "ty_idx": 19,
+      "fields": [
+        {
+          "name": "id",
+          "ty_idx": 11
+        },
+        {
+          "name": "creator",
+          "ty_idx": 7
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "status",
+          "ty_idx": 20
+        },
+        {
+          "name": "approvalCount",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalView",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "id",
+          "ty_idx": 11
+        },
+        {
+          "name": "creator",
+          "ty_idx": 7
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "status",
+          "ty_idx": 26
+        },
+        {
+          "name": "approvalCount",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "ownerCount",
+          "ty_idx": 17
+        },
+        {
+          "name": "threshold",
+          "ty_idx": 17
+        },
+        {
+          "name": "proposalSeqno",
+          "ty_idx": 11
+        },
+        {
+          "name": "feeReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "owners",
+          "ty_idx": 18
+        },
+        {
+          "name": "proposals",
+          "ty_idx": 22
+        },
+        {
+          "name": "approvals",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CreatePayoutProposal",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1414678017,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ApproveProposal",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1414678018,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "proposalId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExecuteProposal",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1414678019,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "proposalId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CancelProposal",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1414678020,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "proposalId",
+          "ty_idx": 11
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 16
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 124506,
+      "name": "owner_count",
+      "parameters": [],
+      "return_ty_idx": 17
+    },
+    {
+      "tvm_method_id": 108215,
+      "name": "threshold",
+      "parameters": [],
+      "return_ty_idx": 17
+    },
+    {
+      "tvm_method_id": 117247,
+      "name": "proposal_seqno",
+      "parameters": [],
+      "return_ty_idx": 11
+    },
+    {
+      "tvm_method_id": 118207,
+      "name": "fee_reserve",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 96472,
+      "name": "is_owner",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 84550,
+      "name": "proposal",
+      "parameters": [
+        {
+          "name": "proposalId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 25
+    },
+    {
+      "tvm_method_id": 83109,
+      "name": "has_approval",
+      "parameters": [
+        {
+          "name": "proposalId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 5
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotOwner",
+      "err_code": 128
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 129
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidOwnerCount",
+      "err_code": 130
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DuplicateOwner",
+      "err_code": 131
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidThreshold",
+      "err_code": 132
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidAmount",
+      "err_code": 134
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidExpiry",
+      "err_code": 135
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ProposalNotFound",
+      "err_code": 136
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ProposalNotPending",
+      "err_code": 137
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ProposalExpired",
+      "err_code": 138
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadyApproved",
+      "err_code": 139
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ThresholdNotReached",
+      "err_code": 140
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadyExecutable",
+      "err_code": 141
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientBalance",
+      "err_code": 142
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotCreator",
+      "err_code": 143
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
