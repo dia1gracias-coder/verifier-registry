@@ -1,0 +1,264 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "SimpleSubdomainsStorage",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "AllowedMessage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UpdateRecords"
+    },
+    {
+      "kind": "intN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UpdateNameRecords"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Name"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 17,
+      "value_ty_idx": 18
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 15
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SubdomainState"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 17,
+      "value_ty_idx": 3
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 17,
+      "value_ty_idx": 22
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Excesses"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        18
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "AllowedMessage",
+      "ty_idx": 12,
+      "target_ty_idx": 13
+    },
+    {
+      "kind": "alias",
+      "name": "Name",
+      "ty_idx": 16,
+      "target_ty_idx": 3
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "subdomains",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SubdomainState",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "name",
+          "ty_idx": 16
+        },
+        {
+          "name": "records",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UpdateRecords",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1663583452,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "prune",
+          "ty_idx": 5
+        },
+        {
+          "name": "changes",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UpdateNameRecords",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "name",
+          "ty_idx": 16
+        },
+        {
+          "name": "prune",
+          "ty_idx": 5
+        },
+        {
+          "name": "changes",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Excesses",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 21
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 25
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 123660,
+      "name": "dnsresolve",
+      "parameters": [
+        {
+          "name": "subdomain",
+          "ty_idx": 2
+        },
+        {
+          "name": "category",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 26
+    },
+    {
+      "tvm_method_id": 107159,
+      "name": "getallrecords",
+      "parameters": [],
+      "return_ty_idx": 24
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.AccessDenied",
+      "err_code": 132
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
