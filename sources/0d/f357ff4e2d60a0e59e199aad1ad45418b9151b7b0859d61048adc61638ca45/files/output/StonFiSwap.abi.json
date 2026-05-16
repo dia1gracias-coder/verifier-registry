@@ -1,0 +1,774 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "StonFiSwap",
+  "author": "OpenAI",
+  "version": "0.1.0",
+  "description": "STON.fi swap POC contract",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UpdateRoutePreset"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoutePreset"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoutePresetRoutes"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 14
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoutePresetTokens"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoutePresetTargets"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoutePresetFees"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecuteSimpleSwapWithReferral"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SwapPlan"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SwapRouteBody"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecuteCrossSwapSameRouter"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecuteCrossSwapDifferentRouters"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecuteRefundSwap"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 13,
+      "stack_type_id": 129,
+      "stack_width": 5
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransfer"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 35
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "StonFiTlbEither",
+      "type_args_ty_idx": [
+        35,
+        36
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StonFiTlbEitherLeft",
+      "type_args_ty_idx": [
+        35
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "X"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StonFiTlbEitherLeft",
+      "type_args_ty_idx": [
+        39
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StonFiTlbEitherRight",
+      "type_args_ty_idx": [
+        36
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StonFiTlbEitherRight",
+      "type_args_ty_idx": [
+        39
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 38,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 132,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 41,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 130,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "genericT",
+      "name_t": "Y"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "StonFiTlbEither",
+      "type_args_ty_idx": [
+        39,
+        44
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StonFiTlbEitherRight",
+      "type_args_ty_idx": [
+        44
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 40,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 46,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 38,
+      "struct_name": "StonFiTlbEitherLeft<RemainingBitsAndRefs>",
+      "monomorphic_fields_ty_idx": [
+        35
+      ]
+    },
+    {
+      "ty_idx": 41,
+      "struct_name": "StonFiTlbEitherRight<Cell<RemainingBitsAndRefs>>",
+      "monomorphic_fields_ty_idx": [
+        36
+      ]
+    }
+  ],
+  "alias_instantiations": [
+    {
+      "ty_idx": 37,
+      "alias_name": "StonFiTlbEither<RemainingBitsAndRefs, Cell<RemainingBitsAndRefs>>",
+      "monomorphic_target_ty_idx": 43
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "StonFiTlbEither",
+      "ty_idx": 45,
+      "target_ty_idx": 47,
+      "type_params": [
+        "X",
+        "Y"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StonFiTlbEitherLeft",
+      "ty_idx": 40,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 39
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StonFiTlbEitherRight",
+      "ty_idx": 42,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 39
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RoutePresetRoutes",
+      "ty_idx": 14,
+      "fields": [
+        {
+          "name": "sourceWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "routerWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "firstHopReceiverAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RoutePresetTokens",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "tokenWallet1Address",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RoutePresetTargets",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "secondRouterWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "receiverAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "referrerAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RoutePresetFees",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "refundAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "excessesAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "fwdGas",
+          "ty_idx": 6
+        },
+        {
+          "name": "refundFwdGas",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RoutePreset",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "routes",
+          "ty_idx": 15
+        },
+        {
+          "name": "tokens",
+          "ty_idx": 17
+        },
+        {
+          "name": "targets",
+          "ty_idx": 19
+        },
+        {
+          "name": "fees",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 32,
+      "fields": [
+        {
+          "name": "id",
+          "ty_idx": 9
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "routePreset",
+          "ty_idx": 33
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SwapRouteBody",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "minOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "receiver",
+          "ty_idx": 7
+        },
+        {
+          "name": "fwdGas",
+          "ty_idx": 6
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 25
+        },
+        {
+          "name": "refundFwdGas",
+          "ty_idx": 6
+        },
+        {
+          "name": "refundPayload",
+          "ty_idx": 25
+        },
+        {
+          "name": "refFee",
+          "ty_idx": 26
+        },
+        {
+          "name": "refAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SwapPlan",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "tokenWallet1",
+          "ty_idx": 7
+        },
+        {
+          "name": "refundAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "excessesAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "txDeadline",
+          "ty_idx": 11
+        },
+        {
+          "name": "routeBody",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransfer",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "destination",
+          "ty_idx": 7
+        },
+        {
+          "name": "responseDestination",
+          "ty_idx": 7
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 25
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 37
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExecuteSimpleSwapWithReferral",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1599733761,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "sourceWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "routerWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "swapPlan",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExecuteCrossSwapSameRouter",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1599733762,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "sourceWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "routerWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "firstPlan",
+          "ty_idx": 28
+        },
+        {
+          "name": "secondPlan",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExecuteRefundSwap",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1599733763,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "sourceWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "routerWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "swapPlan",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UpdateRoutePreset",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1599733764,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "routePreset",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExecuteCrossSwapDifferentRouters",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1599733765,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "sourceWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "routerWalletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "firstPlan",
+          "ty_idx": 28
+        },
+        {
+          "name": "secondPlan",
+          "ty_idx": 28
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 32
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 34
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 75998,
+      "name": "routePreset",
+      "parameters": [],
+      "return_ty_idx": 33
+    },
+    {
+      "tvm_method_id": 83229,
+      "name": "owner",
+      "parameters": [],
+      "return_ty_idx": 7
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotOwner",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSwapConfig",
+      "err_code": 4097
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidReferralFee",
+      "err_code": 4098
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidForwardTonAmount",
+      "err_code": 4099
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidRoutePreset",
+      "err_code": 4100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
