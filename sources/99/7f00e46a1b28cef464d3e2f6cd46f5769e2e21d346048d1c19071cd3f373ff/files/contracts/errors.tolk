@@ -1,0 +1,26 @@
+enum Errors {
+    BalanceError = 47
+    NotEnoughGas = 48
+    InvalidMessage = 49
+    InvalidOp = 72
+    NotOwner = 73
+    NotValidWallet = 74
+    WrongWorkchain = 333
+    NotAdmin = 100
+    SaleClosed = 200
+    BelowMinimum = 201
+    WalletCapExceeded = 202
+    PoolPaused = 203
+    InsufficientInventory = 204
+    NoClaimableAmount = 205
+    InvalidLevel = 206
+    InvalidPrice = 207
+    TimerNotStarted = 208
+    TimerNotMature = 209
+    BatchExists = 210
+    BatchMissing = 211
+    AlreadyClaimed = 212
+    InvalidProof = 213
+    InsufficientAttachedTon = 214
+    JettonWalletNotConfigured = 215
+}
