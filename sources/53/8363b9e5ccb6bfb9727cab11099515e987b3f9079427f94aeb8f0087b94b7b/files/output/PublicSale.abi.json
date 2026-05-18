@@ -1,0 +1,707 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "PublicSale",
+  "author": "100wan",
+  "version": "0.1.0",
+  "description": "HI V1 public sale",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BuyInstant"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BuyLocked"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimLocked"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPoolEnabled"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetConfirmedLevel"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CloseSale"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SweepProjectFund"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawSaleTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetSaleJettonWallet"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PublicSaleStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PublicSaleConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PublicSaleCounters"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PublicSaleMaps"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 6
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PurchasePosition"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 29
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingSaleTransfer"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 31
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUpTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 39
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 40,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 142,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 41,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 143,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        6,
+        6,
+        17,
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        17,
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 38,
+      "target_ty_idx": 39
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 40,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 39
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 41,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 34
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 37
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 38,
+          "client_ty_idx": 43
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUpTons",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 3547469196,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "BuyInstant",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1212743937,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BuyLocked",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1212743938,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetPoolEnabled",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1212743939,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "instantPool",
+          "ty_idx": 5
+        },
+        {
+          "name": "enabled",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CloseSale",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1212743940,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimLocked",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1212743941,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "SetConfirmedLevel",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1212743942,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "confirmedLevel",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SweepProjectFund",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1212743943,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawSaleTons",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1212743944,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetSaleJettonWallet",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1212743945,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "saleJettonWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PurchasePosition",
+      "ty_idx": 29,
+      "fields": [
+        {
+          "name": "totalLockedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "claimedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "entryLevel",
+          "ty_idx": 17
+        },
+        {
+          "name": "missedHi",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingSaleTransfer",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "kind",
+          "ty_idx": 17
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "hiAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PublicSaleConfig",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "projectFundWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PublicSaleStorage",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 24
+        },
+        {
+          "name": "counters",
+          "ty_idx": 26
+        },
+        {
+          "name": "maps",
+          "ty_idx": 33
+        },
+        {
+          "name": "oracle",
+          "ty_idx": 7
+        },
+        {
+          "name": "saleJettonWallet",
+          "ty_idx": 34
+        },
+        {
+          "name": "instantSaleEnabled",
+          "ty_idx": 5
+        },
+        {
+          "name": "lockedSaleEnabled",
+          "ty_idx": 5
+        },
+        {
+          "name": "permanentlyClosed",
+          "ty_idx": 5
+        },
+        {
+          "name": "confirmedLevel",
+          "ty_idx": 17
+        },
+        {
+          "name": "nextQueryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PublicSaleMaps",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "purchasedTon",
+          "ty_idx": 28
+        },
+        {
+          "name": "positions",
+          "ty_idx": 30
+        },
+        {
+          "name": "pendingTransfers",
+          "ty_idx": 32
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PublicSaleCounters",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "instantPoolTotalHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "lockedPoolTotalHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "instantSoldHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "lockedSoldHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "lockedClaimedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "lockedMissedHi",
+          "ty_idx": 6
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 22
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 36
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 98796,
+      "name": "buyer_state",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 44
+    },
+    {
+      "tvm_method_id": 110968,
+      "name": "sale_state",
+      "parameters": [],
+      "return_ty_idx": 45
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 49
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotAdmin",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SaleClosed",
+      "err_code": 200
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BelowMinimum",
+      "err_code": 201
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WalletCapExceeded",
+      "err_code": 202
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PoolPaused",
+      "err_code": 203
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientInventory",
+      "err_code": 204
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NoClaimableAmount",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidLevel",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientAttachedTon",
+      "err_code": 214
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.JettonWalletNotConfigured",
+      "err_code": 215
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
