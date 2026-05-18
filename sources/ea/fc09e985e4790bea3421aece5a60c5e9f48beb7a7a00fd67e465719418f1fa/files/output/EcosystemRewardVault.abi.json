@@ -1,0 +1,486 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "EcosystemRewardVault",
+  "author": "100wan",
+  "version": "0.1.0",
+  "description": "HI V1 ecosystem Merkle reward vault",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreateRewardBatch"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimReward"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetRewardJettonWallet"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EcosystemRewardStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EcosystemRewardConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RewardBatch"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 20
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingRewardTransfer"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 23
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 29,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 136,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 30,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 137,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        13,
+        6,
+        6,
+        13
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 27,
+      "target_ty_idx": 28
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 31
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 19
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 26
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 27,
+          "client_ty_idx": 32
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CreateRewardBatch",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1212744705,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "batchId",
+          "ty_idx": 11
+        },
+        {
+          "name": "root",
+          "ty_idx": 13
+        },
+        {
+          "name": "totalHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "metadataHash",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimReward",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1212744706,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "batchId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "proof",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetRewardJettonWallet",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1212744707,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "rewardJettonWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RewardBatch",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "root",
+          "ty_idx": 13
+        },
+        {
+          "name": "totalHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "claimedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "metadataHash",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingRewardTransfer",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "batchId",
+          "ty_idx": 11
+        },
+        {
+          "name": "claimant",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EcosystemRewardStorage",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 18
+        },
+        {
+          "name": "rewardJettonWallet",
+          "ty_idx": 19
+        },
+        {
+          "name": "nextQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "batches",
+          "ty_idx": 21
+        },
+        {
+          "name": "claimed",
+          "ty_idx": 22
+        },
+        {
+          "name": "pendingTransfers",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EcosystemRewardConfig",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 16
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 25
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 107138,
+      "name": "batch_state",
+      "parameters": [
+        {
+          "name": "batchId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 33
+    },
+    {
+      "tvm_method_id": 121798,
+      "name": "has_claimed",
+      "parameters": [
+        {
+          "name": "batchId",
+          "ty_idx": 11
+        },
+        {
+          "name": "claimant",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 5
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 49
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotAdmin",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientInventory",
+      "err_code": 204
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BatchExists",
+      "err_code": 210
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BatchMissing",
+      "err_code": 211
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadyClaimed",
+      "err_code": 212
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidProof",
+      "err_code": 213
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientAttachedTon",
+      "err_code": 214
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.JettonWalletNotConfigured",
+      "err_code": 215
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
