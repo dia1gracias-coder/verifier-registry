@@ -1,0 +1,498 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "CampaignWinnerVault",
+  "author": "100wan",
+  "version": "0.1.0",
+  "description": "HI campaign winner locked reward vault",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RegisterCampaignWinner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimCampaignWinner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetCampaignWinnerJettonWallet"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetConfirmedLevel"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CampaignWinnerStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CampaignWinnerConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CampaignWinnerPosition"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 22
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingCampaignWinnerTransfer"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 24
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 29
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 30,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 137,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 31,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 138,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        5,
+        16,
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        16,
+        21,
+        6
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 28,
+      "target_ty_idx": 29
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 29
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 32
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 20
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 27
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 28,
+          "client_ty_idx": 33
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetConfirmedLevel",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1212743942,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "confirmedLevel",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RegisterCampaignWinner",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1212744961,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "winner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimCampaignWinner",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1212744962,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "SetCampaignWinnerJettonWallet",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1212744963,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "winnerJettonWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CampaignWinnerPosition",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "entryLevel",
+          "ty_idx": 16
+        },
+        {
+          "name": "claimedHi",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingCampaignWinnerTransfer",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "winner",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CampaignWinnerConfig",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CampaignWinnerStorage",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 19
+        },
+        {
+          "name": "oracle",
+          "ty_idx": 7
+        },
+        {
+          "name": "winnerJettonWallet",
+          "ty_idx": 20
+        },
+        {
+          "name": "confirmedLevel",
+          "ty_idx": 16
+        },
+        {
+          "name": "winnerCount",
+          "ty_idx": 21
+        },
+        {
+          "name": "totalClaimedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "nextQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "winners",
+          "ty_idx": 23
+        },
+        {
+          "name": "pendingTransfers",
+          "ty_idx": 25
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 17
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 26
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 88612,
+      "name": "winner_state",
+      "parameters": [
+        {
+          "name": "winner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 34
+    },
+    {
+      "tvm_method_id": 127241,
+      "name": "vault_state",
+      "parameters": [],
+      "return_ty_idx": 35
+    },
+    {
+      "tvm_method_id": 116064,
+      "name": "claimable",
+      "parameters": [
+        {
+          "name": "winner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 83831,
+      "name": "confirmed_level",
+      "parameters": [],
+      "return_ty_idx": 16
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 49
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotAdmin",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NoClaimableAmount",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidLevel",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientAttachedTon",
+      "err_code": 214
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.JettonWalletNotConfigured",
+      "err_code": 215
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WinnerExists",
+      "err_code": 216
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WinnerMissing",
+      "err_code": 217
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WinnerLimitExceeded",
+      "err_code": 218
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
