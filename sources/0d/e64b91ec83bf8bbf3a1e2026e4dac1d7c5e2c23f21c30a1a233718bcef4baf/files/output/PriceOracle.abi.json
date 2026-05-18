@@ -1,0 +1,332 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "PriceOracle",
+  "author": "100wan",
+  "version": "0.1.0",
+  "description": "HI V1 price threshold oracle",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReportPrice"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmLevel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetOracleTargets"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetCampaignWinnerTarget"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PriceOracleStorage"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PriceOracleCampaignTargets"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetConfirmedLevel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SyncTeamPriceLevel"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        20,
+        9,
+        11
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "SetConfirmedLevel",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1212743942,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "confirmedLevel",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReportPrice",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1212744193,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "price",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfirmLevel",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1212744194,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "SetOracleTargets",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1212744195,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "publicSale",
+          "ty_idx": 7
+        },
+        {
+          "name": "teamVestingVault",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetCampaignWinnerTarget",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1212744196,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "campaignWinnerVault",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SyncTeamPriceLevel",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1212744449,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "confirmedLevel",
+          "ty_idx": 20
+        },
+        {
+          "name": "confirmedAt",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PriceOracleCampaignTargets",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "campaignWinnerVault",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PriceOracleStorage",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "publicSale",
+          "ty_idx": 17
+        },
+        {
+          "name": "teamVestingVault",
+          "ty_idx": 17
+        },
+        {
+          "name": "campaignTargets",
+          "ty_idx": 19
+        },
+        {
+          "name": "confirmationDelay",
+          "ty_idx": 9
+        },
+        {
+          "name": "confirmedLevel",
+          "ty_idx": 20
+        },
+        {
+          "name": "candidateLevel",
+          "ty_idx": 20
+        },
+        {
+          "name": "levelStartedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "lastPrice",
+          "ty_idx": 11
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 16
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 83831,
+      "name": "confirmed_level",
+      "parameters": [],
+      "return_ty_idx": 20
+    },
+    {
+      "tvm_method_id": 88710,
+      "name": "candidate_state",
+      "parameters": [],
+      "return_ty_idx": 23
+    },
+    {
+      "tvm_method_id": 97119,
+      "name": "threshold_for",
+      "parameters": [
+        {
+          "name": "level",
+          "ty_idx": 20
+        }
+      ],
+      "return_ty_idx": 11
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 49
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotAdmin",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidLevel",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TimerNotStarted",
+      "err_code": 208
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TimerNotMature",
+      "err_code": 209
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
