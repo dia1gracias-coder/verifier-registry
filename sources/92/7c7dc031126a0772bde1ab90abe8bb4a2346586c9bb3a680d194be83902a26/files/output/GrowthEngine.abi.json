@@ -1,0 +1,756 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "GrowthEngine",
+  "author": "100wan",
+  "version": "0.2.0",
+  "description": "HI Growth Engine",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BuyGrowth"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimGrowth"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGrowthEnabled"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGrowthConfirmedLevel"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CloseGrowthEngine"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SweepGrowthProjectFund"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawGrowthTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGrowthJettonWallet"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGrowthMigrationTarget"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferGrowthUncommittedHiToContract"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrowthEngineStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrowthEngineConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrowthMigrationConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrowthEngineCounters"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrowthEngineMaps"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 6
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PurchasePosition"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 32
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingSaleTransfer"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 34
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 30
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUpTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 42
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 43,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 143,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 44,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 144,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        6,
+        6,
+        16,
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        16,
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 41,
+      "target_ty_idx": 42
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 43,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 45
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 37
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 40
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 41,
+          "client_ty_idx": 46
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUpTons",
+      "ty_idx": 38,
+      "prefix": {
+        "prefix_num": 3547469196,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "BuyGrowth",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1212743938,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetGrowthEnabled",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1212743939,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "enabled",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CloseGrowthEngine",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1212743940,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimGrowth",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1212743941,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "SetGrowthConfirmedLevel",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1212743942,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "growthConfirmedLevel",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SweepGrowthProjectFund",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1212743943,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawGrowthTons",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1212743944,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetGrowthJettonWallet",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1212743945,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "growthJettonWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetGrowthMigrationTarget",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1212743946,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "targetContract",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferGrowthUncommittedHiToContract",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1212743947,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PurchasePosition",
+      "ty_idx": 32,
+      "fields": [
+        {
+          "name": "totalLockedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "claimedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "entryLevel",
+          "ty_idx": 16
+        },
+        {
+          "name": "missedHi",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingSaleTransfer",
+      "ty_idx": 34,
+      "fields": [
+        {
+          "name": "kind",
+          "ty_idx": 16
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "hiAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "lockedPurchaseHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "missedHi",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrowthMigrationConfig",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "migrationWallet1",
+          "ty_idx": 7
+        },
+        {
+          "name": "migrationWallet2",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrowthEngineConfig",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "projectFundWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "migration",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrowthEngineStorage",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 27
+        },
+        {
+          "name": "counters",
+          "ty_idx": 29
+        },
+        {
+          "name": "maps",
+          "ty_idx": 36
+        },
+        {
+          "name": "oracle",
+          "ty_idx": 7
+        },
+        {
+          "name": "growthJettonWallet",
+          "ty_idx": 37
+        },
+        {
+          "name": "migrationTarget",
+          "ty_idx": 37
+        },
+        {
+          "name": "growthEnabled",
+          "ty_idx": 5
+        },
+        {
+          "name": "permanentlyClosed",
+          "ty_idx": 5
+        },
+        {
+          "name": "growthConfirmedLevel",
+          "ty_idx": 16
+        },
+        {
+          "name": "nextQueryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrowthEngineMaps",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "purchasedTon",
+          "ty_idx": 31
+        },
+        {
+          "name": "positions",
+          "ty_idx": 33
+        },
+        {
+          "name": "pendingTransfers",
+          "ty_idx": 35
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrowthEngineCounters",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "growthPoolTotalHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "growthSoldHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "growthClaimedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "growthMissedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "growthMigratedHi",
+          "ty_idx": 6
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 23
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 38
+    },
+    {
+      "body_ty_idx": 39
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 98796,
+      "name": "buyer_state",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 47
+    },
+    {
+      "tvm_method_id": 107016,
+      "name": "growth_state",
+      "parameters": [],
+      "return_ty_idx": 48
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 49
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotAdmin",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SaleClosed",
+      "err_code": 200
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BelowMinimum",
+      "err_code": 201
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WalletCapExceeded",
+      "err_code": 202
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PoolPaused",
+      "err_code": 203
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientInventory",
+      "err_code": 204
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NoClaimableAmount",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidLevel",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientAttachedTon",
+      "err_code": 214
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.JettonWalletNotConfigured",
+      "err_code": 215
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
