@@ -1,0 +1,497 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "PriceOracle",
+  "author": "100wan",
+  "version": "0.2.0",
+  "description": "HI USDT price threshold oracle",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReportGrowthPrice"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmGrowthLevel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReportTeamPrice"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmTeamLevel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetOracleTargets"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetCampaignWinnerTarget"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PriceOracleStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PriceOracleTargets"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PriceOracleCampaignTargets"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 19
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PriceOracleGrowthState"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PriceOracleTeamState"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGrowthConfirmedLevel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetRewardGrowthLevel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SyncTeamPriceLevel"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        25,
+        9,
+        11
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "SetGrowthConfirmedLevel",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1212743942,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "growthConfirmedLevel",
+          "ty_idx": 25
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReportGrowthPrice",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1212744193,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "price",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfirmGrowthLevel",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1212744194,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "SetOracleTargets",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1212744195,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "growthEngine",
+          "ty_idx": 7
+        },
+        {
+          "name": "teamVestingVault",
+          "ty_idx": 7
+        },
+        {
+          "name": "merkleRewardVault",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetCampaignWinnerTarget",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1212744196,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "campaignWinnerVault",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReportTeamPrice",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1212744197,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "price",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfirmTeamLevel",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1212744198,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "SyncTeamPriceLevel",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1212744449,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "teamConfirmedLevel",
+          "ty_idx": 25
+        },
+        {
+          "name": "confirmedAt",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetRewardGrowthLevel",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1212744708,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "growthConfirmedLevel",
+          "ty_idx": 25
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PriceOracleCampaignTargets",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "campaignWinnerVault",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PriceOracleTargets",
+      "ty_idx": 19,
+      "fields": [
+        {
+          "name": "growthEngine",
+          "ty_idx": 20
+        },
+        {
+          "name": "teamVestingVault",
+          "ty_idx": 20
+        },
+        {
+          "name": "merkleRewardVault",
+          "ty_idx": 20
+        },
+        {
+          "name": "campaignTargets",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PriceOracleGrowthState",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "confirmedLevel",
+          "ty_idx": 25
+        },
+        {
+          "name": "candidateLevel",
+          "ty_idx": 25
+        },
+        {
+          "name": "levelStartedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "lastPrice",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PriceOracleTeamState",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "confirmedLevel",
+          "ty_idx": 25
+        },
+        {
+          "name": "candidateLevel",
+          "ty_idx": 25
+        },
+        {
+          "name": "levelStartedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "lastPrice",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PriceOracleStorage",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "confirmationDelay",
+          "ty_idx": 9
+        },
+        {
+          "name": "targets",
+          "ty_idx": 23
+        },
+        {
+          "name": "growth",
+          "ty_idx": 26
+        },
+        {
+          "name": "team",
+          "ty_idx": 28
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 18
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 75445,
+      "name": "growth_confirmed_level",
+      "parameters": [],
+      "return_ty_idx": 25
+    },
+    {
+      "tvm_method_id": 73432,
+      "name": "team_confirmed_level",
+      "parameters": [],
+      "return_ty_idx": 25
+    },
+    {
+      "tvm_method_id": 80708,
+      "name": "growth_candidate_state",
+      "parameters": [],
+      "return_ty_idx": 32
+    },
+    {
+      "tvm_method_id": 66345,
+      "name": "team_candidate_state",
+      "parameters": [],
+      "return_ty_idx": 32
+    },
+    {
+      "tvm_method_id": 69067,
+      "name": "growth_threshold_for",
+      "parameters": [
+        {
+          "name": "level",
+          "ty_idx": 25
+        }
+      ],
+      "return_ty_idx": 11
+    },
+    {
+      "tvm_method_id": 119040,
+      "name": "team_threshold_for",
+      "parameters": [
+        {
+          "name": "level",
+          "ty_idx": 25
+        }
+      ],
+      "return_ty_idx": 11
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 49
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotAdmin",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidLevel",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TimerNotStarted",
+      "err_code": 208
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TimerNotMature",
+      "err_code": 209
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
