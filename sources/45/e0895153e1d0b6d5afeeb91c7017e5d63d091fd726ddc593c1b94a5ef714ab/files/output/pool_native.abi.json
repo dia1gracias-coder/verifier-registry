@@ -1,0 +1,659 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "PoolNative",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DepositNative"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MergeProof"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 14
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Withdraw"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawCoreFields"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawProof"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 19
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AdminPause"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AdminUnpause"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AdminRecoverStuck"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AdminSetRevenueConfig"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolStorage"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RevenueConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DepositLog"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawLog"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "RevenueConfig",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "protocolFeeBps",
+          "ty_idx": 25
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PoolStorage",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        },
+        {
+          "name": "nextIndex",
+          "ty_idx": 9
+        },
+        {
+          "name": "nullifiersCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "currentRoot",
+          "ty_idx": 13
+        },
+        {
+          "name": "roots",
+          "ty_idx": 27
+        },
+        {
+          "name": "nullifiers",
+          "ty_idx": 27
+        },
+        {
+          "name": "commitments",
+          "ty_idx": 27
+        },
+        {
+          "name": "revenue",
+          "ty_idx": 29
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MergeProof",
+      "ty_idx": 14,
+      "fields": [
+        {
+          "name": "piA",
+          "ty_idx": 3
+        },
+        {
+          "name": "piB",
+          "ty_idx": 3
+        },
+        {
+          "name": "piC",
+          "ty_idx": 3
+        }
+      ],
+      "description": "Groth16 proof points for the merkle-update SNARK.\nSame layout as `WithdrawProof` because both use BLS12-381 compressed\nG1/G2 points, just with different verification keys."
+    },
+    {
+      "kind": "struct",
+      "name": "DepositNative",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 3738195713,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "prevRoot",
+          "ty_idx": 13
+        },
+        {
+          "name": "newRoot",
+          "ty_idx": 13
+        },
+        {
+          "name": "leafIndex",
+          "ty_idx": 9
+        },
+        {
+          "name": "mergeProof",
+          "ty_idx": 15
+        }
+      ],
+      "description": "Deposit native TON into the pool.\n\nThe depositor proves on-chain that `newRoot` is the result of inserting\n`commitment` at `leafIndex` into the tree with root `prevRoot`. The\npool checks `prevRoot == storage.currentRoot` and\n`leafIndex == storage.nextIndex`, so the only path through the deposit\nhandler is \"extend the canonical tree by exactly one paid commitment.\"\nA single paid deposit cannot register a multi-leaf attacker tree."
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawCoreFields",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "relayer",
+          "ty_idx": 7
+        },
+        {
+          "name": "fee",
+          "ty_idx": 6
+        },
+        {
+          "name": "refund",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawProof",
+      "ty_idx": 19,
+      "fields": [
+        {
+          "name": "piA",
+          "ty_idx": 3
+        },
+        {
+          "name": "piB",
+          "ty_idx": 3
+        },
+        {
+          "name": "piC",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Withdraw",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 3738195714,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "root",
+          "ty_idx": 13
+        },
+        {
+          "name": "nullifierHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "coreFields",
+          "ty_idx": 18
+        },
+        {
+          "name": "proof",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AdminPause",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 3738195953,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AdminUnpause",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 3738195954,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AdminRecoverStuck",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 3738195955,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AdminSetRevenueConfig",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 3738195956,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "protocolFeeBps",
+          "ty_idx": 25
+        }
+      ],
+      "description": "V2 only — set the treasury address + protocol fee bps. Owner-gated.\n`protocolFeeBps` is capped at MAX_FEE_BPS (200 = 2%) for trust\nminimization; users know up-front that governance cannot punitively\nraise the fee without redeploying the pool."
+    },
+    {
+      "kind": "struct",
+      "name": "DepositLog",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 3738195873,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "leafIndex",
+          "ty_idx": 9
+        },
+        {
+          "name": "timestamp",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawLog",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 3738195874,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "nullifierHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "recipientField",
+          "ty_idx": 13
+        },
+        {
+          "name": "relayerField",
+          "ty_idx": 13
+        },
+        {
+          "name": "fee",
+          "ty_idx": 6
+        },
+        {
+          "name": "timestamp",
+          "ty_idx": 11
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 26
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 117906,
+      "name": "isSpent",
+      "parameters": [
+        {
+          "name": "nh",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 68102,
+      "name": "getDenomination",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 73104,
+      "name": "getNextIndex",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 126174,
+      "name": "isPaused",
+      "parameters": [],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 121529,
+      "name": "isKnownRoot",
+      "parameters": [
+        {
+          "name": "root",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 105866,
+      "name": "getTreasury",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 100946,
+      "name": "getProtocolFeeBps",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 98174,
+      "name": "getMaxFeeBps",
+      "parameters": [],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERR_PAUSED",
+      "err_code": 100
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_NOT_OWNER",
+      "err_code": 101
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_INSUFFICIENT_GAS",
+      "err_code": 102
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_RECOVER_EXCEEDS_EXCESS",
+      "err_code": 105
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_WRONG_DENOMINATION",
+      "err_code": 200
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_DUPLICATE_COMMITMENT",
+      "err_code": 201
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_TREE_FULL",
+      "err_code": 202
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_COMMITMENT_OUT_OF_FIELD",
+      "err_code": 203
+    },
+    {
+      "kind": "enum_member",
+      "name": "VerifierErrors.InvalidInputs",
+      "err_code": 258
+    },
+    {
+      "kind": "enum_member",
+      "name": "muVerifierErrors.InvalidInputs",
+      "err_code": 258
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_UNKNOWN_ROOT",
+      "err_code": 300
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_ALREADY_SPENT",
+      "err_code": 301
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_PROOF_INVALID",
+      "err_code": 302
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_FEE_EXCEEDS_DENOM",
+      "err_code": 303
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_REFUND_NOT_ZERO_NATIVE",
+      "err_code": 304
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_NULLIFIER_OUT_OF_FIELD",
+      "err_code": 305
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_ROOT_OUT_OF_FIELD",
+      "err_code": 306
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_RECIPIENT_FIELD_OUT_OF_RANGE",
+      "err_code": 307
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_RELAYER_FIELD_OUT_OF_RANGE",
+      "err_code": 308
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_FEE_OUT_OF_FIELD",
+      "err_code": 309
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_REFUND_OUT_OF_FIELD",
+      "err_code": 310
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_BAD_GENESIS_ROOT",
+      "err_code": 502
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
