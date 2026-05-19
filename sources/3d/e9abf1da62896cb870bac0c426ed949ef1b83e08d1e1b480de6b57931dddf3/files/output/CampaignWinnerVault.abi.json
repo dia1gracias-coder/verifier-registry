@@ -1,0 +1,665 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "CampaignWinnerVault",
+  "author": "100wan",
+  "version": "0.2.0",
+  "description": "HI campaign winner growth-level reward vault",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RegisterCampaignWinner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimCampaignWinner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetCampaignWinnerJettonWallet"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGrowthConfirmedLevel"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetCampaignMigrationTargetAllowed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetCampaignMigrationTarget"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferCampaignUncommittedHiToContract"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CampaignWinnerStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CampaignWinnerConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrowthMigrationConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 22
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CampaignWinnerCounters"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CampaignWinnerMaps"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CampaignWinnerPosition"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 29
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingCampaignWinnerTransfer"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 31
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 39
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 40,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 140,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 41,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 141,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        5,
+        16,
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        16,
+        26,
+        6,
+        6
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 38,
+      "target_ty_idx": 39
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 40,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 39
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 41,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 35
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 37
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 38,
+          "client_ty_idx": 43
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetGrowthConfirmedLevel",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1212743942,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "growthConfirmedLevel",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RegisterCampaignWinner",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1212744961,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "winner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimCampaignWinner",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1212744962,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "SetCampaignWinnerJettonWallet",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1212744963,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "winnerJettonWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetCampaignMigrationTarget",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1212744964,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "targetContract",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferCampaignUncommittedHiToContract",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1212744965,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetCampaignMigrationTargetAllowed",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1212744966,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "targetContract",
+          "ty_idx": 7
+        },
+        {
+          "name": "allowed",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrowthMigrationConfig",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "migrationWallet1",
+          "ty_idx": 7
+        },
+        {
+          "name": "migrationWallet2",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CampaignWinnerPosition",
+      "ty_idx": 29,
+      "fields": [
+        {
+          "name": "entryLevel",
+          "ty_idx": 16
+        },
+        {
+          "name": "claimedHi",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingCampaignWinnerTransfer",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "kind",
+          "ty_idx": 16
+        },
+        {
+          "name": "winner",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CampaignWinnerConfig",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "migration",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CampaignWinnerStorage",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 24
+        },
+        {
+          "name": "counters",
+          "ty_idx": 27
+        },
+        {
+          "name": "maps",
+          "ty_idx": 34
+        },
+        {
+          "name": "oracle",
+          "ty_idx": 7
+        },
+        {
+          "name": "winnerJettonWallet",
+          "ty_idx": 35
+        },
+        {
+          "name": "migrationTarget",
+          "ty_idx": 35
+        },
+        {
+          "name": "growthConfirmedLevel",
+          "ty_idx": 16
+        },
+        {
+          "name": "nextQueryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CampaignWinnerCounters",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "winnerCount",
+          "ty_idx": 26
+        },
+        {
+          "name": "totalClaimedHi",
+          "ty_idx": 6
+        },
+        {
+          "name": "migratedHi",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CampaignWinnerMaps",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "winners",
+          "ty_idx": 30
+        },
+        {
+          "name": "pendingTransfers",
+          "ty_idx": 32
+        },
+        {
+          "name": "migrationAllowlist",
+          "ty_idx": 33
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 20
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 36
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 88612,
+      "name": "winner_state",
+      "parameters": [
+        {
+          "name": "winner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 44
+    },
+    {
+      "tvm_method_id": 127241,
+      "name": "vault_state",
+      "parameters": [],
+      "return_ty_idx": 45
+    },
+    {
+      "tvm_method_id": 116064,
+      "name": "claimable",
+      "parameters": [
+        {
+          "name": "winner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 75445,
+      "name": "growth_confirmed_level",
+      "parameters": [],
+      "return_ty_idx": 16
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 49
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotAdmin",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientInventory",
+      "err_code": 204
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NoClaimableAmount",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidLevel",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientAttachedTon",
+      "err_code": 214
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.JettonWalletNotConfigured",
+      "err_code": 215
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WinnerExists",
+      "err_code": 216
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WinnerMissing",
+      "err_code": 217
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WinnerLimitExceeded",
+      "err_code": 218
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.MigrationTargetNotAllowed",
+      "err_code": 220
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
