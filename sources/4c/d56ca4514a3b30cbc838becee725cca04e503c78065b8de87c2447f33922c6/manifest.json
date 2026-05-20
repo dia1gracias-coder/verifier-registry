@@ -1,0 +1,4486 @@
+{
+  "code_hash": "4cd56ca4514a3b30cbc838becee725cca04e503c78065b8de87c2447f33922c6",
+  "source_bundle_hash": "0ee9842abbe7f7a0a347c3b6c0af6f0aedc97744cd39636a5ab549bc9cbae4ff",
+  "verified_at": 1779314400,
+  "compiler": {
+    "language": "tolk",
+    "version": "1.4.0",
+    "entrypoint": "contracts/NftItem.tolk",
+    "params": {
+      "compiler_version": "1.4.0"
+    }
+  },
+  "source_map": {
+    "code_boc64": "te6ccgEBBQEAsQABFP8A9KQT9LzyyAsBAgFiAgMB9tD4kfJA7UTQ0z/6SCDHAI4cMPiSIccF8uGVAvpI1NECyMs/E/pSEvpSzMntVOD6SDAj1ywi/mHopJ0UXwT4kscF8uGR8sLF4DHXLCF+WTUUjiEzAtcLP/iSyM+FCPpSghCLdxc1zwuOyz/L//pSyYBA+wDgXwOEDwHHAAQANaEfn9qJoaZ/9JBBjgEqYOCy2tvB9JGumP6qYQAE8vQ=",
+    "symbol_types_json": {
+      "alias_instantiations": [],
+      "declarations": [
+        {
+          "fields": [
+            {
+              "name": "skipBitsNValidation",
+              "ty_idx": 5
+            }
+          ],
+          "ident_loc": [
+            0,
+            433,
+            8,
+            433,
+            19
+          ],
+          "kind": "struct",
+          "name": "PackOptions",
+          "ty_idx": 30
+        },
+        {
+          "fields": [
+            {
+              "name": "assertEndAfterReading",
+              "ty_idx": 5
+            },
+            {
+              "name": "throwIfOpcodeDoesNotMatch",
+              "ty_idx": 1
+            }
+          ],
+          "ident_loc": [
+            0,
+            445,
+            8,
+            445,
+            21
+          ],
+          "kind": "struct",
+          "name": "UnpackOptions",
+          "ty_idx": 27
+        },
+        {
+          "ident_loc": [
+            0,
+            1588,
+            6,
+            1588,
+            24
+          ],
+          "kind": "alias",
+          "name": "ExtraCurrenciesMap",
+          "target_ty_idx": 44,
+          "ty_idx": 42
+        },
+        {
+          "fields": [
+            {
+              "name": "code",
+              "ty_idx": 3
+            },
+            {
+              "name": "data",
+              "ty_idx": 3
+            }
+          ],
+          "ident_loc": [
+            0,
+            1592,
+            8,
+            1592,
+            21
+          ],
+          "kind": "struct",
+          "name": "ContractState",
+          "ty_idx": 50
+        },
+        {
+          "fields": [
+            {
+              "name": "fixedPrefixLength",
+              "ty_idx": 53
+            },
+            {
+              "name": "closeTo",
+              "ty_idx": 7
+            }
+          ],
+          "ident_loc": [
+            0,
+            1599,
+            8,
+            1599,
+            30
+          ],
+          "kind": "struct",
+          "name": "AddressShardingOptions",
+          "ty_idx": 52
+        },
+        {
+          "fields": [
+            {
+              "name": "workchain",
+              "ty_idx": 47
+            },
+            {
+              "name": "stateInit",
+              "ty_idx": 51
+            },
+            {
+              "name": "toShard",
+              "ty_idx": 54
+            }
+          ],
+          "ident_loc": [
+            0,
+            1621,
+            8,
+            1621,
+            25
+          ],
+          "kind": "struct",
+          "name": "AutoDeployAddress",
+          "ty_idx": 49
+        },
+        {
+          "encoded_as_ty_idx": 39,
+          "ident_loc": [
+            0,
+            1677,
+            6,
+            1677,
+            16
+          ],
+          "kind": "enum",
+          "members": [
+            {
+              "name": "NoBounce",
+              "value": "0"
+            },
+            {
+              "name": "Only256BitsOfBody",
+              "value": "1"
+            },
+            {
+              "name": "RichBounce",
+              "value": "2"
+            },
+            {
+              "name": "RichBounceOnlyRootCell",
+              "value": "3"
+            }
+          ],
+          "name": "BounceMode",
+          "ty_idx": 38
+        },
+        {
+          "ident_loc": [
+            0,
+            1687,
+            6,
+            1687,
+            19
+          ],
+          "kind": "alias",
+          "name": "OldBounceMode",
+          "target_ty_idx": 5,
+          "ty_idx": 40
+        },
+        {
+          "fields": [
+            {
+              "name": "bounce",
+              "ty_idx": 41
+            },
+            {
+              "name": "value",
+              "ty_idx": 46
+            },
+            {
+              "name": "dest",
+              "ty_idx": 55
+            },
+            {
+              "name": "body",
+              "ty_idx": 56
+            }
+          ],
+          "ident_loc": [
+            0,
+            1691,
+            8,
+            1691,
+            28
+          ],
+          "kind": "struct",
+          "name": "CreateMessageOptions",
+          "ty_idx": 57,
+          "type_params": [
+            "TBody"
+          ]
+        },
+        {
+          "fields": [
+            {
+              "name": "forceInline",
+              "ty_idx": 35
+            }
+          ],
+          "ident_loc": [
+            0,
+            1782,
+            8,
+            1782,
+            23
+          ],
+          "kind": "struct",
+          "name": "UnsafeBodyNoRef",
+          "ty_idx": 36,
+          "type_params": [
+            "T"
+          ]
+        },
+        {
+          "fields": [
+            {
+              "name": "messageCell",
+              "ty_idx": 3
+            }
+          ],
+          "ident_loc": [
+            0,
+            1788,
+            8,
+            1788,
+            18
+          ],
+          "kind": "struct",
+          "name": "OutMessage",
+          "ty_idx": 31
+        },
+        {
+          "ident_loc": [
+            1,
+            15,
+            6,
+            15,
+            29
+          ],
+          "kind": "alias",
+          "name": "AllowedMessageToNftItem",
+          "target_ty_idx": 22,
+          "ty_idx": 12
+        },
+        {
+          "fields": [
+            {
+              "name": "ownerAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "content",
+              "ty_idx": 24
+            }
+          ],
+          "ident_loc": [
+            4,
+            3,
+            8,
+            3,
+            31
+          ],
+          "kind": "struct",
+          "name": "NftItemInitAtDeployment",
+          "ty_idx": 28
+        },
+        {
+          "fields": [
+            {
+              "name": "queryId",
+              "ty_idx": 11
+            }
+          ],
+          "ident_loc": [
+            4,
+            39,
+            21,
+            39,
+            38
+          ],
+          "kind": "struct",
+          "name": "RequestStaticData",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 801842850
+          },
+          "ty_idx": 21
+        },
+        {
+          "fields": [
+            {
+              "name": "queryId",
+              "ty_idx": 11
+            },
+            {
+              "name": "itemIndex",
+              "ty_idx": 33
+            },
+            {
+              "name": "collectionAddress",
+              "ty_idx": 7
+            }
+          ],
+          "ident_loc": [
+            4,
+            43,
+            21,
+            43,
+            39
+          ],
+          "kind": "struct",
+          "name": "ResponseStaticData",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 2339837749
+          },
+          "ty_idx": 32
+        },
+        {
+          "fields": [
+            {
+              "name": "value",
+              "ty_idx": 16
+            }
+          ],
+          "ident_loc": [
+            4,
+            49,
+            14,
+            49,
+            27
+          ],
+          "kind": "struct",
+          "name": "PayloadInline",
+          "prefix": {
+            "prefix_len": 1,
+            "prefix_num": 0
+          },
+          "ty_idx": 17
+        },
+        {
+          "fields": [
+            {
+              "name": "value",
+              "ty_idx": 19
+            }
+          ],
+          "ident_loc": [
+            4,
+            53,
+            14,
+            53,
+            26
+          ],
+          "kind": "struct",
+          "name": "PayloadInRef",
+          "prefix": {
+            "prefix_len": 1,
+            "prefix_num": 1
+          },
+          "ty_idx": 18
+        },
+        {
+          "fields": [
+            {
+              "name": "queryId",
+              "ty_idx": 11
+            },
+            {
+              "name": "newOwnerAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "sendExcessesTo",
+              "ty_idx": 14
+            },
+            {
+              "name": "customPayload",
+              "ty_idx": 15
+            },
+            {
+              "name": "forwardTonAmount",
+              "ty_idx": 6
+            },
+            {
+              "name": "forwardPayload",
+              "ty_idx": 16
+            }
+          ],
+          "ident_loc": [
+            4,
+            68,
+            21,
+            68,
+            41
+          ],
+          "kind": "struct",
+          "name": "AskToChangeOwnership",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 1607220500
+          },
+          "ty_idx": 13
+        },
+        {
+          "fields": [
+            {
+              "name": "itemIndex",
+              "ty_idx": 11
+            },
+            {
+              "name": "collectionAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "ownerAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "content",
+              "ty_idx": 24
+            }
+          ],
+          "ident_loc": [
+            5,
+            20,
+            8,
+            20,
+            22
+          ],
+          "kind": "struct",
+          "name": "NftItemStorage",
+          "ty_idx": 23
+        },
+        {
+          "fields": [
+            {
+              "name": "itemIndex",
+              "ty_idx": 11
+            },
+            {
+              "name": "collectionAddress",
+              "ty_idx": 7
+            }
+          ],
+          "ident_loc": [
+            5,
+            27,
+            8,
+            27,
+            36
+          ],
+          "kind": "struct",
+          "name": "NftItemStorageNotInitialized",
+          "ty_idx": 25
+        },
+        {
+          "fields": [
+            {
+              "name": "isInitialized",
+              "ty_idx": 5
+            },
+            {
+              "name": "itemIndex",
+              "ty_idx": 1
+            },
+            {
+              "name": "collectionAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "ownerAddress",
+              "ty_idx": 14
+            },
+            {
+              "name": "content",
+              "ty_idx": 59
+            }
+          ],
+          "ident_loc": [
+            5,
+            32,
+            8,
+            32,
+            20
+          ],
+          "kind": "struct",
+          "name": "NftDataReply",
+          "ty_idx": 58
+        },
+        {
+          "fields": [
+            {
+              "name": "itemIndex",
+              "ty_idx": 11
+            },
+            {
+              "name": "collectionAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "rest",
+              "ty_idx": 16
+            }
+          ],
+          "ident_loc": [
+            5,
+            61,
+            8,
+            61,
+            28
+          ],
+          "kind": "struct",
+          "name": "NftItemStorageLoader",
+          "ty_idx": 26
+        }
+      ],
+      "files": [
+        {
+          "file_id": 0,
+          "file_name": "@stdlib/common.tolk",
+          "imports": [],
+          "size_chars": 75175
+        },
+        {
+          "file_id": 1,
+          "file_name": "contracts/NftItem.tolk",
+          "imports": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "size_chars": 3267
+        },
+        {
+          "file_id": 2,
+          "file_name": "contracts/errors.tolk",
+          "imports": [],
+          "size_chars": 369
+        },
+        {
+          "file_id": 3,
+          "file_name": "contracts/fees-management.tolk",
+          "imports": [],
+          "size_chars": 146
+        },
+        {
+          "file_id": 4,
+          "file_name": "contracts/messages.tolk",
+          "imports": [
+            5
+          ],
+          "size_chars": 1552
+        },
+        {
+          "file_id": 5,
+          "file_name": "contracts/types.tolk",
+          "imports": [],
+          "size_chars": 2500
+        }
+      ],
+      "functions": [
+        {
+          "end_loc": [
+            1,
+            74,
+            1,
+            74,
+            2
+          ],
+          "f_idx": 0,
+          "ident_loc": [
+            1,
+            19,
+            5,
+            19,
+            22
+          ],
+          "name": "onInternalMessage",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "in.body",
+              "ty_idx": 2
+            }
+          ],
+          "return_ty_idx": 0
+        },
+        {
+          "end_loc": [
+            5,
+            50,
+            1,
+            50,
+            2
+          ],
+          "f_idx": 1,
+          "ident_loc": [
+            5,
+            48,
+            20,
+            48,
+            32
+          ],
+          "name": "NftItemStorage.startLoading",
+          "num_params": 0,
+          "params": [],
+          "return_ty_idx": 26
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 2,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "NftItemStorageLoader.fromCell",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "packedCell",
+              "ty_idx": 3
+            },
+            {
+              "name": "options",
+              "ty_idx": 27
+            }
+          ],
+          "return_ty_idx": 26
+        },
+        {
+          "end_loc": [
+            5,
+            69,
+            1,
+            69,
+            2
+          ],
+          "f_idx": 3,
+          "ident_loc": [
+            5,
+            67,
+            26,
+            67,
+            42
+          ],
+          "name": "NftItemStorageLoader.isNotInitialized",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 26
+            }
+          ],
+          "return_ty_idx": 5
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 4,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "NftItemInitAtDeployment.fromSlice",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "rawSlice",
+              "ty_idx": 2
+            },
+            {
+              "name": "options",
+              "ty_idx": 27
+            }
+          ],
+          "return_ty_idx": 28
+        },
+        {
+          "end_loc": [
+            5,
+            54,
+            1,
+            54,
+            2
+          ],
+          "f_idx": 5,
+          "ident_loc": [
+            5,
+            52,
+            20,
+            52,
+            24
+          ],
+          "name": "NftItemStorage.save",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 23
+            }
+          ],
+          "return_ty_idx": 0
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 6,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "NftItemStorage.toCell",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 23
+            },
+            {
+              "name": "options",
+              "ty_idx": 30
+            }
+          ],
+          "return_ty_idx": 29
+        },
+        {
+          "end_loc": [
+            5,
+            78,
+            1,
+            78,
+            2
+          ],
+          "f_idx": 7,
+          "ident_loc": [
+            5,
+            71,
+            26,
+            71,
+            36
+          ],
+          "name": "NftItemStorageLoader.endLoading",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 26
+            }
+          ],
+          "return_ty_idx": 23
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 8,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "slice.loadAny<address>",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 2
+            },
+            {
+              "name": "options",
+              "ty_idx": 27
+            }
+          ],
+          "return_ty_idx": 7
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 9,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "slice.loadAny<string>",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 2
+            },
+            {
+              "name": "options",
+              "ty_idx": 27
+            }
+          ],
+          "return_ty_idx": 24
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 10,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "createMessage<UnsafeBodyNoRef<ResponseStaticData>>",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "options",
+              "ty_idx": 37
+            }
+          ],
+          "return_ty_idx": 31
+        },
+        {
+          "end_loc": [
+            1,
+            94,
+            1,
+            94,
+            2
+          ],
+          "f_idx": 11,
+          "ident_loc": [
+            1,
+            76,
+            9,
+            76,
+            21
+          ],
+          "name": "get_nft_data",
+          "num_params": 0,
+          "params": [],
+          "return_ty_idx": 58
+        }
+      ],
+      "struct_instantiations": [
+        {
+          "monomorphic_fields_ty_idx": [
+            32
+          ],
+          "struct_name": "UnsafeBodyNoRef<ResponseStaticData>",
+          "ty_idx": 34
+        },
+        {
+          "monomorphic_fields_ty_idx": [
+            41,
+            46,
+            55,
+            34
+          ],
+          "struct_name": "CreateMessageOptions<UnsafeBodyNoRef<ResponseStaticData>>",
+          "ty_idx": 37
+        }
+      ],
+      "unique_types": [
+        {
+          "kind": "void"
+        },
+        {
+          "kind": "int"
+        },
+        {
+          "kind": "slice"
+        },
+        {
+          "kind": "cell"
+        },
+        {
+          "kind": "builder"
+        },
+        {
+          "kind": "bool"
+        },
+        {
+          "kind": "coins"
+        },
+        {
+          "kind": "address"
+        },
+        {
+          "kind": "intN",
+          "n": 32
+        },
+        {
+          "kind": "uintN",
+          "n": 32
+        },
+        {
+          "kind": "intN",
+          "n": 64
+        },
+        {
+          "kind": "uintN",
+          "n": 64
+        },
+        {
+          "alias_name": "AllowedMessageToNftItem",
+          "kind": "AliasRef"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "AskToChangeOwnership"
+        },
+        {
+          "kind": "addressOpt"
+        },
+        {
+          "inner_ty_idx": 3,
+          "kind": "nullable"
+        },
+        {
+          "kind": "remaining"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "PayloadInline"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "PayloadInRef"
+        },
+        {
+          "inner_ty_idx": 16,
+          "kind": "cellOf"
+        },
+        {
+          "kind": "union",
+          "stack_width": 2,
+          "variants": [
+            {
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 133,
+              "stack_width": 1,
+              "variant_ty_idx": 17
+            },
+            {
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 134,
+              "stack_width": 1,
+              "variant_ty_idx": 18
+            }
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "RequestStaticData"
+        },
+        {
+          "kind": "union",
+          "stack_width": 7,
+          "variants": [
+            {
+              "prefix_len": 32,
+              "prefix_num": 1607220500,
+              "stack_type_id": 135,
+              "stack_width": 6,
+              "variant_ty_idx": 13
+            },
+            {
+              "prefix_len": 32,
+              "prefix_num": 801842850,
+              "stack_type_id": 136,
+              "stack_width": 1,
+              "variant_ty_idx": 21
+            }
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NftItemStorage"
+        },
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NftItemStorageNotInitialized"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NftItemStorageLoader"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "UnpackOptions"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NftItemInitAtDeployment"
+        },
+        {
+          "inner_ty_idx": 23,
+          "kind": "cellOf"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "PackOptions"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "OutMessage"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "ResponseStaticData"
+        },
+        {
+          "kind": "uintN",
+          "n": 256
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "UnsafeBodyNoRef",
+          "type_args_ty_idx": [
+            32
+          ]
+        },
+        {
+          "kind": "genericT",
+          "name_t": "T"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "UnsafeBodyNoRef",
+          "type_args_ty_idx": [
+            35
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "CreateMessageOptions",
+          "type_args_ty_idx": [
+            34
+          ]
+        },
+        {
+          "enum_name": "BounceMode",
+          "kind": "EnumRef"
+        },
+        {
+          "kind": "uintN",
+          "n": 2
+        },
+        {
+          "alias_name": "OldBounceMode",
+          "kind": "AliasRef"
+        },
+        {
+          "kind": "union",
+          "stack_width": 2,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 130,
+              "stack_width": 1,
+              "variant_ty_idx": 38
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 2,
+              "stack_width": 1,
+              "variant_ty_idx": 40
+            }
+          ]
+        },
+        {
+          "alias_name": "ExtraCurrenciesMap",
+          "kind": "AliasRef"
+        },
+        {
+          "kind": "varuintN",
+          "n": 32
+        },
+        {
+          "key_ty_idx": 8,
+          "kind": "mapKV",
+          "value_ty_idx": 43
+        },
+        {
+          "items_ty_idx": [
+            6,
+            42
+          ],
+          "kind": "tensor"
+        },
+        {
+          "kind": "union",
+          "stack_width": 3,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 17,
+              "stack_width": 1,
+              "variant_ty_idx": 6
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 137,
+              "stack_width": 2,
+              "variant_ty_idx": 45
+            }
+          ]
+        },
+        {
+          "kind": "intN",
+          "n": 8
+        },
+        {
+          "items_ty_idx": [
+            47,
+            33
+          ],
+          "kind": "tensor"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "AutoDeployAddress"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "ContractState"
+        },
+        {
+          "kind": "union",
+          "stack_width": 3,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 129,
+              "stack_width": 2,
+              "variant_ty_idx": 50
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 3,
+              "stack_width": 1,
+              "variant_ty_idx": 3
+            }
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "AddressShardingOptions"
+        },
+        {
+          "kind": "uintN",
+          "n": 5
+        },
+        {
+          "inner_ty_idx": 52,
+          "kind": "nullable",
+          "stack_type_id": 132,
+          "stack_width": 3
+        },
+        {
+          "kind": "union",
+          "stack_width": 8,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 0,
+              "stack_type_id": 8,
+              "stack_width": 1,
+              "variant_ty_idx": 7
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 1,
+              "stack_type_id": 5,
+              "stack_width": 1,
+              "variant_ty_idx": 4
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 2,
+              "stack_type_id": 138,
+              "stack_width": 2,
+              "variant_ty_idx": 48
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 3,
+              "stack_type_id": 131,
+              "stack_width": 7,
+              "variant_ty_idx": 49
+            }
+          ]
+        },
+        {
+          "kind": "genericT",
+          "name_t": "TBody"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "CreateMessageOptions",
+          "type_args_ty_idx": [
+            56
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NftDataReply"
+        },
+        {
+          "inner_ty_idx": 24,
+          "kind": "nullable"
+        }
+      ]
+    },
+    "debug_marks_json": [
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_import": [
+          0
+        ],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 0,
+        "range": [
+          1,
+          19,
+          5,
+          19,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 1,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 2,
+        "ty_idx": 2,
+        "var_name": "in.body"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 3,
+        "range": [
+          1,
+          19,
+          5,
+          19,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 4,
+        "stack": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 5,
+        "range": [
+          1,
+          19,
+          5,
+          19,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 6,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "NftItemStorage.startLoading",
+        "ir_import": [],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 7,
+        "range": [
+          1,
+          20,
+          26,
+          20,
+          55
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 8,
+        "range": [
+          5,
+          49,
+          42,
+          49,
+          60
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 9,
+        "stack": [
+          0,
+          7
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "NftItemStorageLoader.fromCell",
+        "ir_import": [
+          7,
+          8,
+          9
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 10,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "ir_slots": [
+          7
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 11,
+        "ty_idx": 3,
+        "var_name": "packedCell"
+      },
+      {
+        "ir_slots": [
+          8,
+          9
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 12,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 13,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 14,
+        "stack": [
+          0,
+          10
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 15,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 16,
+        "stack": [
+          0,
+          12,
+          10
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 17,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 18,
+        "stack": [
+          0,
+          12,
+          13,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 19,
+        "stack": [
+          0,
+          12,
+          13,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 20,
+        "stack": [
+          0,
+          12,
+          13,
+          14
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "NftItemStorageLoader.fromCell",
+        "ir_return": [
+          12,
+          13,
+          14
+        ],
+        "kind": "leave_fun",
+        "mark_id": 21,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 22,
+        "stack": [
+          0,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "NftItemStorage.startLoading",
+        "ir_return": [
+          4,
+          5,
+          6
+        ],
+        "kind": "leave_fun",
+        "mark_id": 23,
+        "range": [
+          5,
+          49,
+          5,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 24,
+        "range": [
+          1,
+          20,
+          9,
+          20,
+          23
+        ]
+      },
+      {
+        "ir_slots": [
+          15,
+          16,
+          17
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 25,
+        "ty_idx": 26,
+        "var_name": "loadingStorage"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 26,
+        "stack": [
+          0,
+          15,
+          16,
+          17
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 27,
+        "range": [
+          1,
+          21,
+          5,
+          21,
+          7
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "NftItemStorageLoader.isNotInitialized",
+        "ir_import": [
+          15,
+          16,
+          17
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 28,
+        "range": [
+          1,
+          21,
+          24,
+          21,
+          40
+        ]
+      },
+      {
+        "ir_slots": [
+          15,
+          16,
+          17
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 29,
+        "ty_idx": 26,
+        "var_name": "self"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 30,
+        "stack": [
+          0,
+          15,
+          16,
+          17,
+          17
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 31,
+        "range": [
+          5,
+          68,
+          22,
+          68,
+          29
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 32,
+        "stack": [
+          0,
+          15,
+          16,
+          17,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 33,
+        "stack": [
+          0,
+          15,
+          16,
+          17,
+          18
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "NftItemStorageLoader.isNotInitialized",
+        "ir_return": [
+          18
+        ],
+        "kind": "leave_fun",
+        "mark_id": 34,
+        "range": [
+          5,
+          68,
+          5,
+          68,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 35,
+        "range": [
+          1,
+          21,
+          5,
+          36,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 36,
+        "stack": [
+          0,
+          15,
+          16,
+          17
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 37,
+        "range": [
+          1,
+          21,
+          44,
+          36,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 38,
+        "stack": [
+          0,
+          15,
+          16
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 39,
+        "range": [
+          1,
+          23,
+          13,
+          23,
+          29
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 40,
+        "stack": [
+          0,
+          15,
+          16,
+          21
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 41,
+        "stack": [
+          0,
+          15,
+          16,
+          21,
+          16
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 42,
+        "range": [
+          1,
+          23,
+          13,
+          23,
+          65
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 43,
+        "stack": [
+          0,
+          15,
+          16,
+          23
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 44,
+        "range": [
+          1,
+          22,
+          9,
+          24,
+          41
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 45,
+        "stack": [
+          0,
+          15,
+          16
+        ]
+      },
+      {
+        "f_idx": 4,
+        "f_name": "NftItemInitAtDeployment.fromSlice",
+        "ir_import": [
+          0,
+          24,
+          25
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 46,
+        "range": [
+          1,
+          27,
+          26,
+          27,
+          68
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 47,
+        "ty_idx": 2,
+        "var_name": "rawSlice"
+      },
+      {
+        "ir_slots": [
+          24,
+          25
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 48,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 49,
+        "stack": [
+          26,
+          15,
+          16
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 50,
+        "stack": [
+          16,
+          15,
+          26
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 51,
+        "range": [
+          1,
+          27,
+          26,
+          27,
+          68
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 52,
+        "stack": [
+          16,
+          15,
+          27,
+          26
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 53,
+        "range": [
+          1,
+          27,
+          26,
+          27,
+          68
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 54,
+        "stack": [
+          16,
+          15,
+          27,
+          28,
+          26
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 55,
+        "range": [
+          1,
+          27,
+          26,
+          27,
+          68
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 56,
+        "stack": [
+          16,
+          15,
+          27,
+          28
+        ]
+      },
+      {
+        "f_idx": 4,
+        "f_name": "NftItemInitAtDeployment.fromSlice",
+        "ir_return": [
+          27,
+          28
+        ],
+        "kind": "leave_fun",
+        "mark_id": 57,
+        "range": [
+          1,
+          27,
+          26,
+          27,
+          68
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 58,
+        "range": [
+          1,
+          27,
+          13,
+          27,
+          23
+        ]
+      },
+      {
+        "ir_slots": [
+          29,
+          30
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 59,
+        "ty_idx": 28,
+        "var_name": "initParams"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 60,
+        "stack": [
+          16,
+          15,
+          29,
+          30
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 61,
+        "range": [
+          1,
+          29,
+          13,
+          29,
+          48
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 62,
+        "range": [
+          1,
+          30,
+          13,
+          30,
+          64
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 63,
+        "range": [
+          1,
+          31,
+          13,
+          31,
+          50
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 64,
+        "range": [
+          1,
+          32,
+          13,
+          32,
+          40
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 65,
+        "range": [
+          1,
+          28,
+          13,
+          28,
+          36
+        ]
+      },
+      {
+        "ir_slots": [
+          31,
+          32,
+          33,
+          34
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 66,
+        "ty_idx": 23,
+        "var_name": "storage"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 67,
+        "stack": [
+          32,
+          31,
+          33,
+          34
+        ]
+      },
+      {
+        "f_idx": 5,
+        "f_name": "NftItemStorage.save",
+        "ir_import": [
+          31,
+          32,
+          33,
+          34
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 68,
+        "range": [
+          1,
+          34,
+          17,
+          34,
+          21
+        ]
+      },
+      {
+        "ir_slots": [
+          31,
+          32,
+          33,
+          34
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 69,
+        "ty_idx": 23,
+        "var_name": "self"
+      },
+      {
+        "f_idx": 6,
+        "f_name": "NftItemStorage.toCell",
+        "ir_import": [
+          31,
+          32,
+          33,
+          34,
+          35
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 70,
+        "range": [
+          5,
+          53,
+          22,
+          53,
+          35
+        ]
+      },
+      {
+        "ir_slots": [
+          31,
+          32,
+          33,
+          34
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 71,
+        "ty_idx": 23,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          35
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 72,
+        "ty_idx": 30,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 73,
+        "range": [
+          5,
+          53,
+          22,
+          53,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 74,
+        "stack": [
+          32,
+          34,
+          33,
+          31,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 75,
+        "range": [
+          5,
+          53,
+          22,
+          53,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 76,
+        "stack": [
+          32,
+          34,
+          33,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 77,
+        "stack": [
+          33,
+          34,
+          32,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 78,
+        "range": [
+          5,
+          53,
+          22,
+          53,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 79,
+        "stack": [
+          33,
+          34,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 80,
+        "stack": [
+          34,
+          33,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 81,
+        "range": [
+          5,
+          53,
+          22,
+          53,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 82,
+        "stack": [
+          34,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 83,
+        "range": [
+          5,
+          53,
+          22,
+          53,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 84,
+        "stack": [
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 85,
+        "range": [
+          5,
+          53,
+          22,
+          53,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 86,
+        "stack": [
+          38
+        ]
+      },
+      {
+        "f_idx": 6,
+        "f_name": "NftItemStorage.toCell",
+        "ir_return": [
+          38
+        ],
+        "kind": "leave_fun",
+        "mark_id": 87,
+        "range": [
+          5,
+          53,
+          22,
+          53,
+          35
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 88,
+        "range": [
+          5,
+          53,
+          5,
+          53,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 89,
+        "stack": []
+      },
+      {
+        "f_idx": 5,
+        "f_name": "NftItemStorage.save",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 90,
+        "range": [
+          5,
+          54,
+          1,
+          54,
+          2
+        ]
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 91,
+        "range": [
+          1,
+          74,
+          1,
+          74,
+          2
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 92,
+        "stack": [
+          0,
+          15,
+          16,
+          17
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 93,
+        "stack": [
+          0,
+          39,
+          40,
+          41
+        ]
+      },
+      {
+        "f_idx": 7,
+        "f_name": "NftItemStorageLoader.endLoading",
+        "ir_import": [
+          39,
+          40,
+          41
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 94,
+        "range": [
+          1,
+          38,
+          34,
+          38,
+          44
+        ]
+      },
+      {
+        "ir_slots": [
+          39,
+          40,
+          41
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 95,
+        "ty_idx": 26,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 96,
+        "range": [
+          5,
+          73,
+          9,
+          73,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 97,
+        "range": [
+          5,
+          74,
+          9,
+          74,
+          50
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "slice.loadAny<address>",
+        "ir_import": [
+          41,
+          49,
+          50
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 98,
+        "range": [
+          5,
+          75,
+          23,
+          75,
+          42
+        ]
+      },
+      {
+        "ir_slots": [
+          41
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 99,
+        "ty_idx": 2,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          49,
+          50
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 100,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 101,
+        "stack": [
+          0,
+          39,
+          40,
+          51
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 102,
+        "range": [
+          5,
+          75,
+          23,
+          75,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 103,
+        "stack": [
+          0,
+          39,
+          40,
+          52,
+          51
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "slice.loadAny<address>",
+        "ir_return": [
+          51,
+          52
+        ],
+        "kind": "leave_fun",
+        "mark_id": 104,
+        "range": [
+          5,
+          75,
+          23,
+          75,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 105,
+        "stack": [
+          0,
+          39,
+          40,
+          52
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 106,
+        "range": [
+          5,
+          75,
+          9,
+          75,
+          42
+        ]
+      },
+      {
+        "f_idx": 9,
+        "f_name": "slice.loadAny<string>",
+        "ir_import": [
+          41,
+          53,
+          54
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 107,
+        "range": [
+          5,
+          76,
+          18,
+          76,
+          37
+        ]
+      },
+      {
+        "ir_slots": [
+          41
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 108,
+        "ty_idx": 2,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          53,
+          54
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 109,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "f_idx": 9,
+        "f_name": "slice.loadAny<string>",
+        "ir_return": [
+          55,
+          56
+        ],
+        "kind": "leave_fun",
+        "mark_id": 110,
+        "range": [
+          5,
+          76,
+          18,
+          76,
+          37
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 111,
+        "range": [
+          5,
+          76,
+          9,
+          76,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 112,
+        "stack": [
+          0,
+          45,
+          46,
+          47
+        ]
+      },
+      {
+        "f_idx": 7,
+        "f_name": "NftItemStorageLoader.endLoading",
+        "ir_return": [
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48
+        ],
+        "kind": "leave_fun",
+        "mark_id": 113,
+        "range": [
+          5,
+          72,
+          5,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 114,
+        "range": [
+          1,
+          38,
+          9,
+          38,
+          16
+        ]
+      },
+      {
+        "ir_slots": [
+          57,
+          58,
+          59,
+          60
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 115,
+        "ty_idx": 23,
+        "var_name": "storage"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 116,
+        "stack": [
+          0,
+          57,
+          58,
+          59
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 117,
+        "stack": [
+          0,
+          57,
+          58,
+          59,
+          61
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 118,
+        "range": [
+          1,
+          40,
+          9,
+          40,
+          12
+        ]
+      },
+      {
+        "ir_lazy_slice": 61,
+        "ir_slots": [
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 119,
+        "ty_idx": 12,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 120,
+        "range": [
+          1,
+          42,
+          5,
+          73,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 121,
+        "stack": [
+          0,
+          57,
+          58,
+          59,
+          61,
+          72
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 122,
+        "range": [
+          1,
+          42,
+          5,
+          73,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 123,
+        "stack": [
+          0,
+          57,
+          58,
+          59,
+          61
+        ]
+      },
+      {
+        "ir_slots": [
+          65,
+          66,
+          67,
+          68,
+          69,
+          70
+        ],
+        "kind": "smart_cast",
+        "mark_id": 124,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 125,
+        "range": [
+          1,
+          43,
+          33,
+          46,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 126,
+        "stack": [
+          59
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 127,
+        "range": [
+          1,
+          44,
+          21,
+          44,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 128,
+        "stack": [
+          59,
+          76
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 129,
+        "range": [
+          1,
+          44,
+          21,
+          44,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 130,
+        "stack": [
+          78
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 131,
+        "range": [
+          1,
+          44,
+          13,
+          44,
+          88
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 132,
+        "stack": []
+      },
+      {
+        "kind": "loc",
+        "mark_id": 133,
+        "range": [
+          1,
+          45,
+          13,
+          45,
+          51
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 134,
+        "stack": [
+          0,
+          57,
+          58,
+          59,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 135,
+        "stack": [
+          0,
+          57,
+          58,
+          61
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 136,
+        "range": [
+          1,
+          42,
+          5,
+          73,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 137,
+        "stack": [
+          0,
+          57,
+          58,
+          61,
+          72
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 138,
+        "range": [
+          1,
+          42,
+          5,
+          73,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 139,
+        "stack": [
+          0,
+          57,
+          58,
+          61
+        ]
+      },
+      {
+        "ir_slots": [
+          70
+        ],
+        "kind": "smart_cast",
+        "mark_id": 140,
+        "ty_idx": 21,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 141,
+        "range": [
+          1,
+          48,
+          30,
+          67,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 142,
+        "stack": [
+          61,
+          57,
+          58
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 143,
+        "stack": [
+          58,
+          57,
+          61
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 144,
+        "range": [
+          1,
+          49,
+          13,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 145,
+        "stack": [
+          58,
+          57,
+          83
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 146,
+        "stack": [
+          58,
+          57,
+          70
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 147,
+        "range": [
+          1,
+          50,
+          17,
+          50,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 148,
+        "range": [
+          1,
+          52,
+          17,
+          52,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 149,
+        "range": [
+          1,
+          51,
+          23,
+          51,
+          39
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 150,
+        "stack": [
+          58,
+          57,
+          70,
+          89
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 151,
+        "range": [
+          1,
+          51,
+          17,
+          51,
+          39
+        ]
+      },
+      {
+        "ir_slots": [
+          70
+        ],
+        "kind": "smart_cast",
+        "mark_id": 152,
+        "ty_idx": 21,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 153,
+        "range": [
+          1,
+          60,
+          25,
+          60,
+          45
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 154,
+        "range": [
+          1,
+          61,
+          25,
+          61,
+          64
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 155,
+        "range": [
+          1,
+          62,
+          25,
+          62,
+          69
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 156,
+        "range": [
+          1,
+          58,
+          17,
+          64,
+          18
+        ]
+      },
+      {
+        "f_idx": 10,
+        "f_name": "createMessage<UnsafeBodyNoRef<ResponseStaticData>>",
+        "ir_import": [
+          84,
+          85,
+          87,
+          86,
+          88,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          89,
+          97,
+          70,
+          57,
+          58
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 157,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          84,
+          85,
+          87,
+          86,
+          88,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          89,
+          97,
+          70,
+          57,
+          58
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 158,
+        "ty_idx": 37,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 159,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 160,
+        "stack": [
+          58,
+          57,
+          70,
+          89,
+          106
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 161,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 162,
+        "stack": [
+          58,
+          57,
+          70,
+          89,
+          106
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 163,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 164,
+        "stack": [
+          58,
+          57,
+          70,
+          106
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 165,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 166,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 167,
+        "stack": [
+          58,
+          57,
+          70,
+          106
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 168,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 169,
+        "stack": [
+          58,
+          57,
+          106
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 170,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 171,
+        "stack": [
+          58,
+          106
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 172,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 173,
+        "stack": [
+          106
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 174,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 175,
+        "stack": [
+          165
+        ]
+      },
+      {
+        "f_idx": 10,
+        "f_name": "createMessage<UnsafeBodyNoRef<ResponseStaticData>>",
+        "ir_return": [
+          165
+        ],
+        "kind": "leave_fun",
+        "mark_id": 176,
+        "range": [
+          1,
+          49,
+          30,
+          65,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 177,
+        "range": [
+          1,
+          49,
+          17,
+          49,
+          27
+        ]
+      },
+      {
+        "ir_slots": [
+          166
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 178,
+        "ty_idx": 31,
+        "var_name": "respondMsg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 179,
+        "stack": [
+          166
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 180,
+        "range": [
+          1,
+          66,
+          29,
+          66,
+          72
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 181,
+        "stack": [
+          166,
+          167
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 182,
+        "range": [
+          1,
+          66,
+          24,
+          66,
+          28
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 183,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 184,
+        "range": [
+          1,
+          74,
+          1,
+          74,
+          2
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 185,
+        "stack": [
+          0,
+          57,
+          58,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 186,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 187,
+        "range": [
+          1,
+          71,
+          46,
+          71,
+          52
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 188,
+        "stack": [
+          0,
+          168
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 189,
+        "stack": [
+          168,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 190,
+        "range": [
+          1,
+          71,
+          29,
+          71,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 191,
+        "stack": [
+          168,
+          169
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 192,
+        "range": [
+          1,
+          71,
+          13,
+          71,
+          52
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 193,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 194,
+        "range": [
+          1,
+          74,
+          1,
+          74,
+          2
+        ]
+      },
+      {
+        "f_idx": 11,
+        "f_name": "get_nft_data",
+        "ir_import": [],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 195,
+        "range": [
+          1,
+          76,
+          9,
+          76,
+          21
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 196,
+        "stack": []
+      },
+      {
+        "f_idx": 1,
+        "f_name": "NftItemStorage.startLoading",
+        "ir_import": [],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 197,
+        "range": [
+          1,
+          77,
+          26,
+          77,
+          55
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 198,
+        "range": [
+          5,
+          49,
+          42,
+          49,
+          60
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 199,
+        "stack": [
+          3
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "NftItemStorageLoader.fromCell",
+        "ir_import": [
+          3,
+          4,
+          5
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 200,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "ir_slots": [
+          3
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 201,
+        "ty_idx": 3,
+        "var_name": "packedCell"
+      },
+      {
+        "ir_slots": [
+          4,
+          5
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 202,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 203,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 204,
+        "stack": [
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 205,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 206,
+        "stack": [
+          8,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 207,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 208,
+        "stack": [
+          8,
+          9,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 209,
+        "stack": [
+          8,
+          9,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 210,
+        "stack": [
+          8,
+          9,
+          10
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "NftItemStorageLoader.fromCell",
+        "ir_return": [
+          8,
+          9,
+          10
+        ],
+        "kind": "leave_fun",
+        "mark_id": 211,
+        "range": [
+          5,
+          49,
+          12,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 212,
+        "stack": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "NftItemStorage.startLoading",
+        "ir_return": [
+          0,
+          1,
+          2
+        ],
+        "kind": "leave_fun",
+        "mark_id": 213,
+        "range": [
+          5,
+          49,
+          5,
+          49,
+          61
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 214,
+        "range": [
+          1,
+          77,
+          9,
+          77,
+          23
+        ]
+      },
+      {
+        "ir_slots": [
+          11,
+          12,
+          13
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 215,
+        "ty_idx": 26,
+        "var_name": "loadingStorage"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 216,
+        "stack": [
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 217,
+        "range": [
+          1,
+          78,
+          5,
+          78,
+          7
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "NftItemStorageLoader.isNotInitialized",
+        "ir_import": [
+          11,
+          12,
+          13
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 218,
+        "range": [
+          1,
+          78,
+          24,
+          78,
+          40
+        ]
+      },
+      {
+        "ir_slots": [
+          11,
+          12,
+          13
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 219,
+        "ty_idx": 26,
+        "var_name": "self"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 220,
+        "stack": [
+          11,
+          12,
+          13,
+          13
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 221,
+        "range": [
+          5,
+          68,
+          22,
+          68,
+          29
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 222,
+        "stack": [
+          11,
+          12,
+          13,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 223,
+        "stack": [
+          11,
+          12,
+          13,
+          14
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "NftItemStorageLoader.isNotInitialized",
+        "ir_return": [
+          14
+        ],
+        "kind": "leave_fun",
+        "mark_id": 224,
+        "range": [
+          5,
+          68,
+          5,
+          68,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 225,
+        "range": [
+          1,
+          78,
+          5,
+          84,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 226,
+        "stack": [
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 227,
+        "range": [
+          1,
+          78,
+          44,
+          84,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 228,
+        "stack": [
+          11,
+          12
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 229,
+        "range": [
+          1,
+          80,
+          28,
+          80,
+          33
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 230,
+        "stack": [
+          11,
+          12,
+          16
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 231,
+        "range": [
+          1,
+          80,
+          13,
+          80,
+          33
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 232,
+        "range": [
+          1,
+          81,
+          13,
+          81,
+          48
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 233,
+        "range": [
+          1,
+          82,
+          13,
+          82,
+          64
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 234,
+        "range": [
+          1,
+          79,
+          16,
+          83,
+          10
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 235,
+        "range": [
+          1,
+          79,
+          16,
+          83,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 236,
+        "stack": [
+          16,
+          11,
+          12,
+          17,
+          18
+        ]
+      },
+      {
+        "f_idx": 11,
+        "f_name": "get_nft_data",
+        "ir_return": [
+          16,
+          11,
+          12,
+          17,
+          18
+        ],
+        "kind": "leave_fun",
+        "mark_id": 237,
+        "range": [
+          1,
+          79,
+          9,
+          83,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 238,
+        "stack": [
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 239,
+        "stack": [
+          19,
+          20,
+          21
+        ]
+      },
+      {
+        "f_idx": 7,
+        "f_name": "NftItemStorageLoader.endLoading",
+        "ir_import": [
+          19,
+          20,
+          21
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 240,
+        "range": [
+          1,
+          86,
+          34,
+          86,
+          44
+        ]
+      },
+      {
+        "ir_slots": [
+          19,
+          20,
+          21
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 241,
+        "ty_idx": 26,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 242,
+        "range": [
+          5,
+          73,
+          9,
+          73,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 243,
+        "range": [
+          5,
+          74,
+          9,
+          74,
+          50
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "slice.loadAny<address>",
+        "ir_import": [
+          21,
+          29,
+          30
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 244,
+        "range": [
+          5,
+          75,
+          23,
+          75,
+          42
+        ]
+      },
+      {
+        "ir_slots": [
+          21
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 245,
+        "ty_idx": 2,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          29,
+          30
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 246,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 247,
+        "stack": [
+          19,
+          20,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 248,
+        "range": [
+          5,
+          75,
+          23,
+          75,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 249,
+        "stack": [
+          19,
+          20,
+          32,
+          31
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "slice.loadAny<address>",
+        "ir_return": [
+          31,
+          32
+        ],
+        "kind": "leave_fun",
+        "mark_id": 250,
+        "range": [
+          5,
+          75,
+          23,
+          75,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 251,
+        "stack": [
+          19,
+          20,
+          32,
+          21
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 252,
+        "range": [
+          5,
+          75,
+          9,
+          75,
+          42
+        ]
+      },
+      {
+        "f_idx": 9,
+        "f_name": "slice.loadAny<string>",
+        "ir_import": [
+          21,
+          33,
+          34
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 253,
+        "range": [
+          5,
+          76,
+          18,
+          76,
+          37
+        ]
+      },
+      {
+        "ir_slots": [
+          21
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 254,
+        "ty_idx": 2,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          33,
+          34
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 255,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 256,
+        "stack": [
+          19,
+          20,
+          32,
+          35
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 257,
+        "range": [
+          5,
+          76,
+          18,
+          76,
+          37
+        ]
+      },
+      {
+        "f_idx": 9,
+        "f_name": "slice.loadAny<string>",
+        "ir_return": [
+          35,
+          36
+        ],
+        "kind": "leave_fun",
+        "mark_id": 258,
+        "range": [
+          5,
+          76,
+          18,
+          76,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 259,
+        "stack": [
+          19,
+          20,
+          32,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 260,
+        "range": [
+          5,
+          76,
+          9,
+          76,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 261,
+        "stack": [
+          25,
+          26,
+          27,
+          28
+        ]
+      },
+      {
+        "f_idx": 7,
+        "f_name": "NftItemStorageLoader.endLoading",
+        "ir_return": [
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28
+        ],
+        "kind": "leave_fun",
+        "mark_id": 262,
+        "range": [
+          5,
+          72,
+          5,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 263,
+        "range": [
+          1,
+          86,
+          9,
+          86,
+          16
+        ]
+      },
+      {
+        "ir_slots": [
+          37,
+          38,
+          39,
+          40
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 264,
+        "ty_idx": 23,
+        "var_name": "storage"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 265,
+        "stack": [
+          37,
+          38,
+          39,
+          40
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 266,
+        "range": [
+          1,
+          88,
+          24,
+          88,
+          28
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 267,
+        "stack": [
+          37,
+          38,
+          39,
+          40,
+          41
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 268,
+        "range": [
+          1,
+          88,
+          9,
+          88,
+          28
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 269,
+        "range": [
+          1,
+          89,
+          9,
+          89,
+          37
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 270,
+        "range": [
+          1,
+          90,
+          9,
+          90,
+          53
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 271,
+        "range": [
+          1,
+          91,
+          9,
+          91,
+          43
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 272,
+        "range": [
+          1,
+          92,
+          9,
+          92,
+          33
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 273,
+        "stack": [
+          41,
+          37,
+          38,
+          39,
+          40
+        ]
+      },
+      {
+        "f_idx": 11,
+        "f_name": "get_nft_data",
+        "ir_return": [
+          41,
+          37,
+          38,
+          39,
+          40
+        ],
+        "kind": "leave_fun",
+        "mark_id": 274,
+        "range": [
+          1,
+          87,
+          5,
+          93,
+          6
+        ]
+      }
+    ],
+    "debug_marks_base64": "te6ccgICAbUAAQAAC10AAAIBIAABAAICASAAAwAEAgEgAA4ADwIBIAAFAAYBQ7+6D9dhbCUiP+C6dFp+J2tPyMc+SoylSMM6PnQS9ZgpZOAASgFDv2HogwUS433OJDiRyjV6XsLrXj7RlkawEfCvgLg0czO1wAAHAUO/WlDsR57PI91JSBzsbBD5v0nzHcNmJqHER/rVsOv9qznAAEECA8zAAAgACQIBWAAKAAsCAUgADAANAgEgAC4ALwIBIAAzADUCASAANQA2AgEgAD0APgIBIAAQABECASABKgErAUO/bawcD7UhfGULrXfGo5bdW9DVxgq71sopyEGcBLp1woPAABIBQ79PVSzlJYfY5UuNHSE4L4+GYlsyipZZd831lO0TeC095sAAFQIJngAAAMIAEwAUAQFYAY0BAUgBjQIDzEAAFgAXAgEgABgAGQIBIAAmACcCASAAGgAbAgEgACAAIQIBIAAcAB0CASAAHgAfAgEgAE8AUAIBIABcAF0CASAAZABlAgEgAG8AdwIBIAAiACMCASAAJAAlAgEgAHcAeAIBIACLAIwCASAAoAChAgEgAKwArQIBIAAoACkBAdoBKQIBIAAqACsCASAALAAtAgEgAMMAxAIBIADhAOICASAA7wDwAgEgAQ0BDgIBWAGBAEYCASAAMAAxAgEgAEkAVgIBIAAyAF8CASAAWgBgAgEgADQBVAIBIABfAVUCASAAZgBmAgEgADcAOAIBIAFdAWICASAAOQA6AgEgADsBowIBIAGjAXkBASAAPAAEqJACASAAPwBwAgFIAa0AdgIBIAF7AEACASABqwGrAgmcAAAA6ABCAEMCASAARABFAgEgAEcASAIBWAGDAYMCASAARgFLAgEgAYUBhQIBIAFLAEkCAUgBjwGPAgEgAU0AVwIDzEAASwBMAgHyAX8ATQIB0gGKAE4CASABgQFMAgFIAVYBVgIBIABRAFICASAAVABVAgEgAYEBgQIBIAFLAFMCASAAVwBXAgEgAFYAWQIBIABZAZICASAAVwBaAQEgAFgABKggAgEgAFoAWgEBIABbAASoMAIBIABeAGICASAAYgBjAgEgAF8BmgIBIABgAGABASAAYQAEqEgCASABmgGaAgEgAZoBWAIBIABmAVwCASAAaABpAgEgAGcAZwIBIAFeAV4CASAAagBrAgEgAG4AcgIBIAGjAGwCASAAbAGpAQEgAG0ABKigAgEgAakAdAIBIABwAHECASAAcgBzAgEgAHYBPgIBIAB0AHQCASABrwGvAQEgAHUABKjIAgEgAbEBsQIBIAB5AHkCASAAewB8AgEgAHoAegIBIAB/AH8CASAAfQB+AgEgAIMAhAIBIAB/AUECASAAgQCBAQEgAIAABKjwAQEgAIIABKkAAgEgAIUAhwIBIACHAIgBASAAhgAEqRABASAAiQEBIACKAASpGAAEqSgCASAAjQCOAgEgAJkAogIBIACPAJACASAAlQCWAgEgAJEAkQIBIACTAJMBASAAkgAEqTABASAAlAAEqUACASAAlwCXAgEgAJwAnAEBIACYAASpSAIBIACaAJsCASAAnACeAgEgAJ4AngEBIACdAASpUAEBIACfAASpYAIBIACiAKMCASAAqACuAgEgAKQApAIBIACkAKUCASAApgCmAgEgAKYAqgEBIACnAASpaAIBIACpALACASAAqgCzAQEgAKsABKl4AgEgAK4ArwIBIAC1ALYCASAAsACwAgEgALEAsgIBIACzALMCASAAswC5AgEgALkAuQEBIAC0AASpgAIBIAC3ALgCASAAvQC+AgEgALkAuwIBIAC7AL8BASAAugAEqYgBASAAvAAEqcACASAAvwC/AgEgAMEAwQEBIADAAASpyAEBIADCAASp4AIBIADFAMYCASAA0wDUAgEgAMcAyAIBIADNAM4CASAAyQDJAgEgAMsAywEBIADKAASp8AEBIADMAASqAAIBIADPAM8CASAA0QDXAQEgANAABKoYAQEgANIABKo4AgEgANUA1gIBIADbANwCASAA1wDZAgEgANkA3QEBIADYAASqQAEBIADaAASqeAIBIADdAN0CASAA3wDmAQEgAN4ABKqIAQEgAOAABKqQAgEgAOMA5AIBIADrAOsCASAA5QDoAgEgAOgA7AIBIADmAOkBASAA5wAEqpgCASAA6QDpAQEgAOoABKqwAgEgAOwA7AIBIADtAO0BASAA7gAEqsACASAA8QDyAgEgAP8BAAIBIADzAPQCASAA+QD6AgEgAPUA9QIBIAD3APcBASAA9gAEqsgBASAA+AAEquACASAA+wD7AgEgAP0BAwEBIAD8AASq8AEBIAD+AASrIAIBIAEBAQICASABBwEIAgEgAQMBBQIBIAEFAQkBASABBAAEqzgBASABBgAEq0gCASABCQELAgEgAQsBFAEBIAEKAASrWAEBIAEMAASraAIBIAEPARACASABGAEZAgEgAREBEQIBIAESARMCASABFAEUAgEgARQBFgIBIAEWARwBASABFQAEq3ABASABFwAEq4ACASABGgEbAgEgASIBIwIBIAEcAR0CASABIAEgAQEgAR4BASABHwAEq5AABKuYAQEgASEABKuoAgEgASQBJgIBIAEmAScBASABJQAEq7gBASABKAEBIAEpAASrwAAEq9ABQ793/qeolnAdPcojajbbl5ycL3a0knPFx+/dmuNUIYRSeMABLAFDv32L1nw2KMw36wCQ9Yb3K/WROJLGDqphXegcLawOW9JtwAE1AgPLwAEtAS4CAW4BLwEwAgHHAW4BbwIBIAExATICASABMwE0AgEgAUUBRgIBIAGIAU8CASABUQFSAgEgAWUBZgIJmgAAAKABNgE3AgEgAX0BfgIBIAE4ATkCASABlQGWAgEgAToBOwIBIAE8AT0BAdwBRAIBIAE+AT4CASABPwFAAgEgAbIBsgIBIAGyAUECASABQQFCAQEgAUMBASABRAAEqPgABKkIAgEgAX8BRwIBIAFJAUoCASABgQFIAgEgAYMBjAIBIAFLAUsCASABTAGOAgEgAYwBjAIBIAFNAU0BASABTgAEqBgCASABkQFQAgEgAZkBVQIBIAFTAVQCASABWwFcAgEgAVUBmgIBIAFYAZ8CASABVgFWAQEgAVcABKhQAgEgAVkBWQEBIAFaAASoYAIBIAGfAV0CASABYgFoAgEgAV4BXwEBIAFgAQEgAWEABKhwAASoeAIBIAFjAWMBASABZAAEqIACASABZwFnAgEgAWkBagIBIAFoAWgCASABbAFsAgEgAWsBdAIBIAF0AXQCASABbAGjAQEgAW0ABKiIAgEgAXABcQIBYgGnAXwCASABcgFzAgEgAXUBdgIBIAF0AXcCASABdwF3AgEgAaMBowIBIAF3AXgCASABewF7AgEgAXkBeQIBIAF5AakBASABegAEqKgCASABqQGpAQFIAawCAVgBfwGAAgEgAYcBiAEB9AGEAgEgAYEBggIBIAGDAYMCASABhQGMAQEgAYQAAdUBASABhgAEqAgCASABiQGKAgEgAZEBkQIBIAGLAY4CASABjgGSAgEgAYwBjwEBIAGNAASoEAIBIAGPAY8BASABkAAEqCgCASABkgGSAgEgAZMBkwEBIAGUAASoOAIBIAGXAZgCASABpQGmAgEgAZkBmgIBIAGfAaACASABmwGbAgEgAZ0BnQEBIAGcAASoQAEBIAGeAASoWAIBIAGhAaECASABowGpAQEgAaIABKhoAQEgAaQABKiYAgEgAacBqAIBIAGtAa4CASABqQGrAgEgAasBrwEBIAGqAASosAEBIAGsAASowAIBIAGvAbECASABsQGyAQEgAbAABKjQAQEgAbMBASABtAAEqOAABKjo"
+  },
+  "files": [
+    {
+      "path": "contracts/NftItem.tolk",
+      "content_hash": "77603bfd682ae119ffc791429cf85b758f5565d83cf346ac069e76f7efc6ae5b"
+    },
+    {
+      "path": "contracts/errors.tolk",
+      "content_hash": "af6d4d2113f6596d156609a56a370e821c414cbd6cb51f5302c0b0a90b4421b5"
+    },
+    {
+      "path": "contracts/fees-management.tolk",
+      "content_hash": "d0b08622ceca6b752d9dd39ed21843e1b9d91ecf1ee6db26511679666adf65e7"
+    },
+    {
+      "path": "contracts/messages.tolk",
+      "content_hash": "9e741c7a18363fec22b9fe7e9000077e64be20abef96483273b57ad959420c08"
+    },
+    {
+      "path": "contracts/types.tolk",
+      "content_hash": "a9ff57b3bba34608a6f0d8d2f482ab87f16342fd11bfa49413fd199a8d90423a"
+    },
+    {
+      "path": "output/NftItem.abi.json",
+      "content_hash": "e94cb3c7aaf07c8ecb63406a01794c36cae0578a24603e1f95a6003fb457f975"
+    }
+  ]
+}
