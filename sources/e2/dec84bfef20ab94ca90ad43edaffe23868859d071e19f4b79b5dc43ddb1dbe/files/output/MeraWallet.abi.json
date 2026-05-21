@@ -1,0 +1,2083 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "MeraWallet",
+  "author": "Acton User",
+  "version": "0.0.1",
+  "description": "Mera smart-wallet",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPrimary"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "RoleLevel"
+    },
+    {
+      "kind": "uintN",
+      "n": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetBackup"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetEmergency"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGuardian"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetEmergencyAgentLifetime"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetRoleTimelock"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetTargetCallPolicies"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TargetCallPolicyEntry"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CallPathPolicy"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetSelectorCallPolicies"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SelectorCallPolicyEntry"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 26
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetTargetSelectorCallPolicies"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TargetSelectorCallPolicyEntry"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 29
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetAgents"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AgentEntry"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 32
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetLifeControl"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetLifeControllers"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 7
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecuteTransaction"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "CallList"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Call"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 39
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 40
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposeTransaction"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecutePending"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferNative"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VetoPending"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClearVeto"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelPending"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetFrozenPrimary"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetFrozenBackup"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EnterSafeMode"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResetSafeMode"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmAlive"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetDirectForTest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalExecutePayload"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalVetoPrepared"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalVetoAck"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalClearVetoAck"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalCancelAck"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalAck"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MeraWalletRootStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Policies"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 22
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 22
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 42,
+      "value_ty_idx": 22
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 62
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletRestStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoleTimelocks"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 68
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AgentsState"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Agent"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 71
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 70
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LifeControl"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 23
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 74
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 67
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalInit"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalRegistered"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalRegisteredDetails"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 80
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalExecuteRequest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalVetoPrepare"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalVeto"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingTransactionVetoed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalClearVeto"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingTransactionVetoCleared"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposalCancel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingTransactionCancelled"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "SetPrimary",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 69633,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "newPrimary",
+          "ty_idx": 7
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetBackup",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 69634,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "newBackup",
+          "ty_idx": 7
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetEmergency",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 69635,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "newEmergency",
+          "ty_idx": 7
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Used for self-call path only (`_onlySelfAsEmergency`); ignored when `sender == guardian`."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetGuardian",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 69636,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "guardian",
+          "ty_idx": 7
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetEmergencyAgentLifetime",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 69637,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "lifetime",
+          "ty_idx": 9
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetRoleTimelock",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 135169,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "role",
+          "ty_idx": 14
+        },
+        {
+          "name": "delay",
+          "ty_idx": 9
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetTargetCallPolicies",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 135170,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "entries",
+          "ty_idx": 24
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetSelectorCallPolicies",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 135171,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "entries",
+          "ty_idx": 27
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetTargetSelectorCallPolicies",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 135172,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "entries",
+          "ty_idx": 30
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetAgents",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 159745,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "entries",
+          "ty_idx": 33
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetLifeControl",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 462849,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "enabled",
+          "ty_idx": 5
+        },
+        {
+          "name": "timeout",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetLifeControllers",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 462850,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "enabled",
+          "ty_idx": 5
+        },
+        {
+          "name": "controllers",
+          "ty_idx": 36
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExecuteTransaction",
+      "ty_idx": 37,
+      "prefix": {
+        "prefix_num": 331777,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "calls",
+          "ty_idx": 38
+        },
+        {
+          "name": "salt",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposeTransaction",
+      "ty_idx": 43,
+      "prefix": {
+        "prefix_num": 331778,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "calls",
+          "ty_idx": 38
+        },
+        {
+          "name": "salt",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExecutePending",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 331779,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferNative",
+      "ty_idx": 45,
+      "prefix": {
+        "prefix_num": 331780,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "checker",
+          "ty_idx": 7,
+          "description": "Must be `MERA_ADDRESS_ZERO` in v1 (optional checkers not wired)."
+        },
+        {
+          "name": "checkerData",
+          "ty_idx": 3
+        },
+        {
+          "name": "salt",
+          "ty_idx": 42
+        }
+      ],
+      "description": "Immediate native TON transfer (Solidity `MERAWalletNative.transferNative`)."
+    },
+    {
+      "kind": "struct",
+      "name": "VetoPending",
+      "ty_idx": 46,
+      "prefix": {
+        "prefix_num": 397313,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClearVeto",
+      "ty_idx": 47,
+      "prefix": {
+        "prefix_num": 397314,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CancelPending",
+      "ty_idx": 48,
+      "prefix": {
+        "prefix_num": 397315,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetFrozenPrimary",
+      "ty_idx": 49,
+      "prefix": {
+        "prefix_num": 200705,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 5
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "For self-call (`sender == wallet`); use `RoleLevel.None` when calling from a controller address."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetFrozenBackup",
+      "ty_idx": 50,
+      "prefix": {
+        "prefix_num": 200706,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 5
+        },
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "For self-call (`sender == wallet`); use `RoleLevel.None` when calling from a controller address."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EnterSafeMode",
+      "ty_idx": 51,
+      "prefix": {
+        "prefix_num": 266241,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "duration",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResetSafeMode",
+      "ty_idx": 52,
+      "prefix": {
+        "prefix_num": 266242,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "contextRole",
+          "ty_idx": 13,
+          "description": "Effective core role during self-call (Solidity transient `EXECUTION_CONTEXT_ROLE`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfirmAlive",
+      "ty_idx": 53,
+      "prefix": {
+        "prefix_num": 471041,
+        "prefix_len": 20
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "SetDirectForTest",
+      "ty_idx": 54,
+      "prefix": {
+        "prefix_num": 520193,
+        "prefix_len": 20
+      },
+      "fields": [
+        {
+          "name": "primary",
+          "ty_idx": 7
+        },
+        {
+          "name": "backup",
+          "ty_idx": 7
+        },
+        {
+          "name": "guardian",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Testnet / emulation only: set `primary` / `backup` / `guardian` without self-call timelocks."
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalInit",
+      "ty_idx": 78,
+      "prefix": {
+        "prefix_num": 10551297,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "creator",
+          "ty_idx": 7
+        },
+        {
+          "name": "creatorRole",
+          "ty_idx": 14
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "executeAfter",
+          "ty_idx": 9
+        },
+        {
+          "name": "callsCell",
+          "ty_idx": 3
+        },
+        {
+          "name": "salt",
+          "ty_idx": 42
+        }
+      ],
+      "description": "Internal messages between `MeraWallet` and `OperationStorage` (proposal shard). Spec §6.3."
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalVeto",
+      "ty_idx": 84,
+      "prefix": {
+        "prefix_num": 10551298,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "senderAddr",
+          "ty_idx": 7
+        },
+        {
+          "name": "senderRole",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalClearVeto",
+      "ty_idx": 86,
+      "prefix": {
+        "prefix_num": 10551299,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "senderAddr",
+          "ty_idx": 7
+        },
+        {
+          "name": "senderRole",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalCancel",
+      "ty_idx": 88,
+      "prefix": {
+        "prefix_num": 10551300,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "senderAddr",
+          "ty_idx": 7
+        },
+        {
+          "name": "senderRole",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalExecuteRequest",
+      "ty_idx": 82,
+      "prefix": {
+        "prefix_num": 10551301,
+        "prefix_len": 24
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalVetoPrepare",
+      "ty_idx": 83,
+      "prefix": {
+        "prefix_num": 10551302,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "vetoer",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalExecutePayload",
+      "ty_idx": 55,
+      "prefix": {
+        "prefix_num": 10551312,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "creator",
+          "ty_idx": 7
+        },
+        {
+          "name": "creatorRole",
+          "ty_idx": 14
+        },
+        {
+          "name": "executeAfter",
+          "ty_idx": 9
+        },
+        {
+          "name": "callsCell",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalAck",
+      "ty_idx": 60,
+      "prefix": {
+        "prefix_num": 10551313,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "proposalId",
+          "ty_idx": 11
+        },
+        {
+          "name": "op",
+          "ty_idx": 23
+        },
+        {
+          "name": "ok",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalCancelAck",
+      "ty_idx": 59,
+      "prefix": {
+        "prefix_num": 10551314,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "cancelledBy",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalVetoPrepared",
+      "ty_idx": 56,
+      "prefix": {
+        "prefix_num": 10551315,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "creatorRole",
+          "ty_idx": 14
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "vetoer",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalVetoAck",
+      "ty_idx": 57,
+      "prefix": {
+        "prefix_num": 10551316,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "vetoedBy",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalClearVetoAck",
+      "ty_idx": 58,
+      "prefix": {
+        "prefix_num": 10551317,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "clearedBy",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalRegistered",
+      "ty_idx": 79,
+      "prefix": {
+        "prefix_num": 14745601,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "storageAddr",
+          "ty_idx": 7
+        },
+        {
+          "name": "details",
+          "ty_idx": 81
+        }
+      ],
+      "description": "External log emitted by `MeraWallet` after a proposal storage shard is deployed."
+    },
+    {
+      "kind": "struct",
+      "name": "ProposalRegisteredDetails",
+      "ty_idx": 80,
+      "fields": [
+        {
+          "name": "creator",
+          "ty_idx": 7
+        },
+        {
+          "name": "creatorRole",
+          "ty_idx": 14
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "executeAfter",
+          "ty_idx": 9
+        },
+        {
+          "name": "callCount",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingTransactionCancelled",
+      "ty_idx": 89,
+      "prefix": {
+        "prefix_num": 14745602,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "cancelledBy",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingTransactionVetoed",
+      "ty_idx": 85,
+      "prefix": {
+        "prefix_num": 14745603,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "vetoedBy",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingTransactionVetoCleared",
+      "ty_idx": 87,
+      "prefix": {
+        "prefix_num": 14745604,
+        "prefix_len": 24
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        },
+        {
+          "name": "clearedBy",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WalletRestStorage",
+      "ty_idx": 67,
+      "fields": [
+        {
+          "name": "guardian",
+          "ty_idx": 7
+        },
+        {
+          "name": "roleTimelocks",
+          "ty_idx": 69
+        },
+        {
+          "name": "agents",
+          "ty_idx": 73
+        },
+        {
+          "name": "lifeControl",
+          "ty_idx": 76
+        },
+        {
+          "name": "operationStorageCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MeraWalletRootStorage",
+      "ty_idx": 61,
+      "fields": [
+        {
+          "name": "primary",
+          "ty_idx": 7
+        },
+        {
+          "name": "backup",
+          "ty_idx": 7
+        },
+        {
+          "name": "emergency",
+          "ty_idx": 7
+        },
+        {
+          "name": "frozenPrimary",
+          "ty_idx": 5
+        },
+        {
+          "name": "frozenBackup",
+          "ty_idx": 5
+        },
+        {
+          "name": "emergencyAgentLifetime",
+          "ty_idx": 9
+        },
+        {
+          "name": "proposalEpoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "pendingTransactionsCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "safeModeBefore",
+          "ty_idx": 9
+        },
+        {
+          "name": "safeModeUsed",
+          "ty_idx": 5
+        },
+        {
+          "name": "policies",
+          "ty_idx": 66
+        },
+        {
+          "name": "rest",
+          "ty_idx": 77
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "RoleLevel",
+      "ty_idx": 13,
+      "encoded_as_ty_idx": 14,
+      "members": [
+        {
+          "name": "None",
+          "value": "0"
+        },
+        {
+          "name": "Primary",
+          "value": "1"
+        },
+        {
+          "name": "Backup",
+          "value": "2"
+        },
+        {
+          "name": "Emergency",
+          "value": "3"
+        }
+      ],
+      "description": "Common enums for `MeraWallet` and `OperationStorage`.\nSee docs/ton-mera-spec-v1.md. Constants: `@contracts/consts`. Errors: `@contracts/errors`."
+    },
+    {
+      "kind": "struct",
+      "name": "CallPathPolicy",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "flags",
+          "ty_idx": 23
+        },
+        {
+          "name": "primaryDelay",
+          "ty_idx": 9
+        },
+        {
+          "name": "backupDelay",
+          "ty_idx": 9
+        },
+        {
+          "name": "emergencyDelay",
+          "ty_idx": 9
+        },
+        {
+          "name": "exists",
+          "ty_idx": 5,
+          "description": "When false on `setTargetSelectorCallPolicies`, removes the pair (Solidity `exists`)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TargetCallPolicyEntry",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "target",
+          "ty_idx": 7
+        },
+        {
+          "name": "policy",
+          "ty_idx": 22
+        }
+      ],
+      "description": "One upsert row for `SetTargetCallPolicies` (`target` + policy in a single struct)."
+    },
+    {
+      "kind": "struct",
+      "name": "SelectorCallPolicyEntry",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "selector",
+          "ty_idx": 9
+        },
+        {
+          "name": "policy",
+          "ty_idx": 22
+        }
+      ],
+      "description": "One upsert row for `SetSelectorCallPolicies` (`selector` = bytes4 / opcode + policy)."
+    },
+    {
+      "kind": "struct",
+      "name": "TargetSelectorCallPolicyEntry",
+      "ty_idx": 29,
+      "fields": [
+        {
+          "name": "target",
+          "ty_idx": 7
+        },
+        {
+          "name": "selector",
+          "ty_idx": 9
+        },
+        {
+          "name": "policy",
+          "ty_idx": 22
+        }
+      ],
+      "description": "One upsert row for `SetTargetSelectorCallPolicies` (target + selector + policy)."
+    },
+    {
+      "kind": "struct",
+      "name": "RoleTimelocks",
+      "ty_idx": 68,
+      "fields": [
+        {
+          "name": "primaryDelay",
+          "ty_idx": 42
+        },
+        {
+          "name": "backupDelay",
+          "ty_idx": 42
+        },
+        {
+          "name": "emergencyDelay",
+          "ty_idx": 42
+        }
+      ],
+      "description": "Default timelocks per role (seconds), Solidity `mapping(Role => uint256) roleTimelock`.\nFlat fields (not `map<RoleLevel, …>`) so `@ton/tolk-abi-to-typescript` / `@ton/core` can codegen ABI."
+    },
+    {
+      "kind": "struct",
+      "name": "Agent",
+      "ty_idx": 71,
+      "fields": [
+        {
+          "name": "roleLevel",
+          "ty_idx": 14
+        },
+        {
+          "name": "activeFrom",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AgentsState",
+      "ty_idx": 70,
+      "fields": [
+        {
+          "name": "agents",
+          "ty_idx": 72
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AgentEntry",
+      "ty_idx": 32,
+      "fields": [
+        {
+          "name": "agent",
+          "ty_idx": 7
+        },
+        {
+          "name": "roleLevelBits",
+          "ty_idx": 14
+        }
+      ],
+      "description": "One row for `SetAgents`: `roleLevelBits` 0 = remove agent; 1/2/3 = Primary/Backup/Emergency\n(matches `RoleLevel` discriminant; `uint2` avoids Acton codegen crash on enum-in-struct in messages)."
+    },
+    {
+      "kind": "struct",
+      "name": "LifeControl",
+      "ty_idx": 74,
+      "fields": [
+        {
+          "name": "enabled",
+          "ty_idx": 5
+        },
+        {
+          "name": "timeout",
+          "ty_idx": 9
+        },
+        {
+          "name": "lastAlive",
+          "ty_idx": 9
+        },
+        {
+          "name": "controllers",
+          "ty_idx": 75
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Policies",
+      "ty_idx": 62,
+      "fields": [
+        {
+          "name": "callByTarget",
+          "ty_idx": 63
+        },
+        {
+          "name": "callBySelector",
+          "ty_idx": 64
+        },
+        {
+          "name": "callByTargetSelector",
+          "ty_idx": 65
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Call",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "target",
+          "ty_idx": 7
+        },
+        {
+          "name": "value",
+          "ty_idx": 6
+        },
+        {
+          "name": "body",
+          "ty_idx": 3
+        }
+      ],
+      "description": "Single outgoing call from the wallet (`value` in nanotons)."
+    },
+    {
+      "kind": "alias",
+      "name": "CallList",
+      "ty_idx": 38,
+      "target_ty_idx": 41,
+      "description": "Serialized batch of opaque call cells. The batch size is derived on-chain from the array length."
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 61
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 37
+    },
+    {
+      "body_ty_idx": 43
+    },
+    {
+      "body_ty_idx": 44
+    },
+    {
+      "body_ty_idx": 45
+    },
+    {
+      "body_ty_idx": 46
+    },
+    {
+      "body_ty_idx": 47
+    },
+    {
+      "body_ty_idx": 48
+    },
+    {
+      "body_ty_idx": 49
+    },
+    {
+      "body_ty_idx": 50
+    },
+    {
+      "body_ty_idx": 51
+    },
+    {
+      "body_ty_idx": 52
+    },
+    {
+      "body_ty_idx": 53
+    },
+    {
+      "body_ty_idx": 54
+    },
+    {
+      "body_ty_idx": 55
+    },
+    {
+      "body_ty_idx": 56
+    },
+    {
+      "body_ty_idx": 57
+    },
+    {
+      "body_ty_idx": 58
+    },
+    {
+      "body_ty_idx": 59
+    },
+    {
+      "body_ty_idx": 60
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 3
+    },
+    {
+      "body_ty_idx": 78
+    },
+    {
+      "body_ty_idx": 82
+    },
+    {
+      "body_ty_idx": 83
+    },
+    {
+      "body_ty_idx": 84
+    },
+    {
+      "body_ty_idx": 86
+    },
+    {
+      "body_ty_idx": 88
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 79
+    },
+    {
+      "body_ty_idx": 85
+    },
+    {
+      "body_ty_idx": 87
+    },
+    {
+      "body_ty_idx": 89
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 73637,
+      "name": "targetCallPolicy",
+      "parameters": [
+        {
+          "name": "target",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 22,
+      "description": "`get fun` must stay in this file (Acton). Bodies: `MeraWalletGetters.tolk`."
+    },
+    {
+      "tvm_method_id": 120072,
+      "name": "selectorCallPolicy",
+      "parameters": [
+        {
+          "name": "selector",
+          "ty_idx": 9
+        }
+      ],
+      "return_ty_idx": 22
+    },
+    {
+      "tvm_method_id": 97800,
+      "name": "targetSelectorCallPolicy",
+      "parameters": [
+        {
+          "name": "target",
+          "ty_idx": 7
+        },
+        {
+          "name": "selector",
+          "ty_idx": 9
+        }
+      ],
+      "return_ty_idx": 22
+    },
+    {
+      "tvm_method_id": 112279,
+      "name": "primary",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 83834,
+      "name": "backup",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 129638,
+      "name": "emergency",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 69748,
+      "name": "frozenPrimary",
+      "parameters": [],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 118012,
+      "name": "frozenBackup",
+      "parameters": [],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 77896,
+      "name": "emergencyAgentLifetime",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 120689,
+      "name": "guardian",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 102727,
+      "name": "roleTimelock",
+      "parameters": [
+        {
+          "name": "role",
+          "ty_idx": 13
+        }
+      ],
+      "return_ty_idx": 42
+    },
+    {
+      "tvm_method_id": 128828,
+      "name": "roleTimelockDelay",
+      "parameters": [
+        {
+          "name": "role",
+          "ty_idx": 13
+        }
+      ],
+      "return_ty_idx": 42
+    },
+    {
+      "tvm_method_id": 92676,
+      "name": "proposalEpoch",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 114538,
+      "name": "pendingTransactionsCount",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 97756,
+      "name": "operationStorageAddress",
+      "parameters": [
+        {
+          "name": "operationId",
+          "ty_idx": 42
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 108307,
+      "name": "isLifeController",
+      "parameters": [
+        {
+          "name": "controller",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 77146,
+      "name": "agentRoleLevel",
+      "parameters": [
+        {
+          "name": "agent",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 124239,
+      "name": "agentActiveFrom",
+      "parameters": [
+        {
+          "name": "agent",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 98890,
+      "name": "safeModeBefore",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 92710,
+      "name": "safeModeUsed",
+      "parameters": [],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 113336,
+      "name": "lifeControlEnabled",
+      "parameters": [],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 94199,
+      "name": "lifeControlTimeout",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 68322,
+      "name": "lifeControlLastAlive",
+      "parameters": [],
+      "return_ty_idx": 9
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.UnauthorizedRole",
+      "err_code": 4353
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.RoleFrozen",
+      "err_code": 4354
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.SafeModeActive",
+      "err_code": 4355
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.LifeControlExpired",
+      "err_code": 4356
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.PolicyForbidden",
+      "err_code": 4609
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.PolicyDelayNotZero",
+      "err_code": 4610
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.BatchTooLarge",
+      "err_code": 4611
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.CallValueTooSmall",
+      "err_code": 4612
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.ProposalTooEarly",
+      "err_code": 5123
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.ProposalEpochMismatch",
+      "err_code": 5124
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.ProposalPayloadFromWrongStorage",
+      "err_code": 5125
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.CannotVetoOperation",
+      "err_code": 5127
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.CreatorRoleMismatch",
+      "err_code": 5130
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.NotSelfCall",
+      "err_code": 5377
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.InvalidRole",
+      "err_code": 5378
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.InvalidAddress",
+      "err_code": 5380
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.NotAllowedRoleChange",
+      "err_code": 5381
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.NotEmergency",
+      "err_code": 5382
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.TimelockDelayTooLarge",
+      "err_code": 5383
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.RoleTimelockChangeNotAuthorized",
+      "err_code": 5384
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.EmergencyAgentLifetimeTooLarge",
+      "err_code": 5385
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.LifeHeartbeatTimeoutZero",
+      "err_code": 5386
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.EmergencyMustStayLifeController",
+      "err_code": 5387
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.NotLifeController",
+      "err_code": 5388
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.NoopTargetSelectorCallPolicy",
+      "err_code": 5389
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.NotCoreController",
+      "err_code": 5390
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.NoopAgent",
+      "err_code": 5391
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.AgentRemovalNotAuthorized",
+      "err_code": 5392
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.WalletCannotBeAgent",
+      "err_code": 5393
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.AgentExpired",
+      "err_code": 5394
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.FreezeActionNotAuthorized",
+      "err_code": 5395
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.SafeModeNotAuthorized",
+      "err_code": 5396
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.SafeModeAlreadyUsed",
+      "err_code": 5397
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.SafeModeDurationOutOfRange",
+      "err_code": 5398
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.SafeModeNotUsed",
+      "err_code": 5399
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.SafeModeStillActive",
+      "err_code": 5400
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.EmergencyAgentLifetimeOverflow",
+      "err_code": 5401
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.ZeroDelayNotProposable",
+      "err_code": 5402
+    },
+    {
+      "kind": "enum_member",
+      "name": "MeraErrors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
