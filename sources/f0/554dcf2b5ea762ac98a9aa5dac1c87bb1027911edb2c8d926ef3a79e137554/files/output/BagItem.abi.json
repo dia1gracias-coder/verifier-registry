@@ -1,0 +1,552 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "BagItem",
+  "author": "piracy.ton",
+  "version": "2.0.0",
+  "description": "Child contract for one indexed TON Storage bag",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "BagItemMessage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeactivateBag"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "BagError"
+    },
+    {
+      "kind": "uintN",
+      "n": 9
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "BagItemData"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BagItemDataNotInitialized"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BagItemDataInitialized"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BagMetadata"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 17,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 130,
+          "stack_width": 2
+        },
+        {
+          "variant_ty_idx": 18,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 131,
+          "stack_width": 9
+        }
+      ],
+      "stack_width": 10
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BagRemovedEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BagDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StaticDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StorageMetadataReply"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "enum",
+      "name": "BagError",
+      "ty_idx": 14,
+      "encoded_as_ty_idx": 15,
+      "members": [
+        {
+          "name": "InsufficientValue",
+          "value": "256",
+          "description": "Attached value is below MIN_ADD_BAG_VALUE (M6)."
+        },
+        {
+          "name": "InvalidBagId",
+          "value": "257",
+          "description": "`bagId` is zero, which is never a valid TON Storage bag hash."
+        },
+        {
+          "name": "InvalidCategory",
+          "value": "258",
+          "description": "`category` is outside the supported 0..5 range."
+        },
+        {
+          "name": "MetadataTooLarge",
+          "value": "259",
+          "description": "A user-supplied metadata cell exceeds the configured size bounds (M1)."
+        },
+        {
+          "name": "IndexOutOfRange",
+          "value": "260",
+          "description": "`get_bag_address` was called with an index outside [0, nextBagIndex) (L2)."
+        },
+        {
+          "name": "NotFromRegistry",
+          "value": "270",
+          "description": "An init message for a fresh BagItem did not come from its registry."
+        },
+        {
+          "name": "NotFromUploader",
+          "value": "271",
+          "description": "A DeactivateBag message did not come from the recorded uploader."
+        },
+        {
+          "name": "AlreadyInactive",
+          "value": "272",
+          "description": "A DeactivateBag message was sent to a bag that was already deactivated.\nPrevents a double-emit of BagRemovedEvent and bounces the gas value back\nto the uploader instead of silently re-doing the no-op."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BagRemovedEvent",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 268435458,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "bagIndex",
+          "ty_idx": 11,
+          "description": "Sequential index of the deactivated bag."
+        },
+        {
+          "name": "removedBy",
+          "ty_idx": 7,
+          "description": "Address that triggered the deactivation (always the uploader)."
+        }
+      ],
+      "description": "Emitted by a BagItem when its uploader deactivates it."
+    },
+    {
+      "kind": "struct",
+      "name": "BagMetadata",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "description",
+          "ty_idx": 3,
+          "description": "Human-readable description, snake-format string cell."
+        },
+        {
+          "name": "bagSize",
+          "ty_idx": 11,
+          "description": "Total bag size in bytes."
+        },
+        {
+          "name": "filesCount",
+          "ty_idx": 9,
+          "description": "Number of files in the bag."
+        },
+        {
+          "name": "files",
+          "ty_idx": 3,
+          "description": "Dictionary cell: file index -> (name, size)."
+        },
+        {
+          "name": "pieceSize",
+          "ty_idx": 9,
+          "description": "TON Storage piece size used for transfers."
+        },
+        {
+          "name": "merkleHash",
+          "ty_idx": 19,
+          "description": "Merkle root hash for integrity verification."
+        },
+        {
+          "name": "dirName",
+          "ty_idx": 3,
+          "description": "Root directory name, snake-format string cell."
+        }
+      ],
+      "description": "TON Storage technical metadata for a bag. Carried as one ref (`Cell<...>`)\ninside AddBag, the init params and the on-chain BagItem storage."
+    },
+    {
+      "kind": "struct",
+      "name": "DeactivateBag",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1145389379,
+        "prefix_len": 32
+      },
+      "fields": [],
+      "description": "Deactivate a bag. Only the recorded uploader may send it.\n\nOpcode 0x44454143 = \"DEAC\" (DEACtivate)."
+    },
+    {
+      "kind": "alias",
+      "name": "BagItemMessage",
+      "ty_idx": 12,
+      "target_ty_idx": 13,
+      "description": "Union of every internal message a fully initialized BagItem accepts.\n(The one-shot init message uses the BagItemInitParams opcode separately.)"
+    },
+    {
+      "kind": "struct",
+      "name": "BagDataReply",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "isInitialized",
+          "ty_idx": 5,
+          "description": "Whether the bag has been initialized by the registry."
+        },
+        {
+          "name": "bagIndex",
+          "ty_idx": 11,
+          "description": "Sequential registry index (valid in both states)."
+        },
+        {
+          "name": "registryAddress",
+          "ty_idx": 7,
+          "description": "Parent registry address (valid in both states)."
+        },
+        {
+          "name": "bagId",
+          "ty_idx": 19,
+          "description": "TON Storage bag hash (0 while uninitialized)."
+        },
+        {
+          "name": "name",
+          "ty_idx": 3,
+          "description": "Bag display name cell (empty cell while uninitialized)."
+        },
+        {
+          "name": "category",
+          "ty_idx": 20,
+          "description": "Category id (0 while uninitialized)."
+        },
+        {
+          "name": "uploaderAddress",
+          "ty_idx": 7,
+          "description": "Uploader wallet (none-address while uninitialized)."
+        },
+        {
+          "name": "timestamp",
+          "ty_idx": 11,
+          "description": "Registration time (0 while uninitialized)."
+        },
+        {
+          "name": "isActive",
+          "ty_idx": 5,
+          "description": "Active status (false while uninitialized)."
+        }
+      ],
+      "description": "Identity + status reply for a bag."
+    },
+    {
+      "kind": "struct",
+      "name": "StaticDataReply",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "bagIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "registryAddress",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Static identity: (bagIndex, registryAddress). Valid in both states."
+    },
+    {
+      "kind": "struct",
+      "name": "StorageMetadataReply",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "isInitialized",
+          "ty_idx": 5,
+          "description": "True when the bag is initialized; the remaining fields are sentinels\n(empty cells / zeros) when false."
+        },
+        {
+          "name": "description",
+          "ty_idx": 3
+        },
+        {
+          "name": "bagSize",
+          "ty_idx": 11
+        },
+        {
+          "name": "filesCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "files",
+          "ty_idx": 3
+        },
+        {
+          "name": "pieceSize",
+          "ty_idx": 9
+        },
+        {
+          "name": "merkleHash",
+          "ty_idx": 19
+        },
+        {
+          "name": "dirName",
+          "ty_idx": 3
+        }
+      ],
+      "description": "TON Storage technical metadata of the bag."
+    },
+    {
+      "kind": "struct",
+      "name": "BagItemDataNotInitialized",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "bagIndex",
+          "ty_idx": 11,
+          "description": "Sequential index assigned by the registry."
+        },
+        {
+          "name": "registryAddress",
+          "ty_idx": 7,
+          "description": "Parent registry address; the only sender allowed to initialize."
+        }
+      ],
+      "description": "Pre-init shape: what the registry writes into a fresh BagItem's data so the\nitem's address is deterministically derivable from (code, index, registry)."
+    },
+    {
+      "kind": "struct",
+      "name": "BagItemDataInitialized",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "bagIndex",
+          "ty_idx": 11,
+          "description": "Sequential index assigned by the registry."
+        },
+        {
+          "name": "registryAddress",
+          "ty_idx": 7,
+          "description": "Parent registry address."
+        },
+        {
+          "name": "bagId",
+          "ty_idx": 19,
+          "description": "TON Storage bag hash."
+        },
+        {
+          "name": "name",
+          "ty_idx": 3,
+          "description": "Bag display name, snake-format string cell."
+        },
+        {
+          "name": "category",
+          "ty_idx": 20,
+          "description": "Category id, 0..5."
+        },
+        {
+          "name": "uploaderAddress",
+          "ty_idx": 7,
+          "description": "Wallet that registered the bag; only it may deactivate."
+        },
+        {
+          "name": "timestamp",
+          "ty_idx": 11,
+          "description": "Registration time (Unix seconds)."
+        },
+        {
+          "name": "isActive",
+          "ty_idx": 5,
+          "description": "Whether the bag is currently active."
+        },
+        {
+          "name": "metadata",
+          "ty_idx": 22,
+          "description": "TON Storage technical metadata, one ref."
+        }
+      ],
+      "description": "Fully initialized shape: written once when the registry's init message is\nprocessed. From then on the storage stays in this variant forever."
+    },
+    {
+      "kind": "alias",
+      "name": "BagItemData",
+      "ty_idx": 16,
+      "target_ty_idx": 23,
+      "description": "Explicit init-state discriminant. Auto-generated 1-bit `Either` prefix:\n  tag 0 -> BagItemDataNotInitialized\n  tag 1 -> BagItemDataInitialized"
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 16,
+    "storage_at_deployment_ty_idx": 17
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [
+    {
+      "body_ty_idx": 24
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 86872,
+      "name": "get_bag_data",
+      "parameters": [],
+      "return_ty_idx": 25,
+      "description": "Full identity + status of the bag."
+    },
+    {
+      "tvm_method_id": 98640,
+      "name": "get_static_data",
+      "parameters": [],
+      "return_ty_idx": 26,
+      "description": "Static identity: (bagIndex, registryAddress). Valid in both states."
+    },
+    {
+      "tvm_method_id": 123414,
+      "name": "get_storage_metadata",
+      "parameters": [],
+      "return_ty_idx": 27,
+      "description": "TON Storage technical metadata of the bag."
+    },
+    {
+      "tvm_method_id": 122058,
+      "name": "is_active",
+      "parameters": [],
+      "return_ty_idx": 5,
+      "description": "Whether the bag is currently active. False while uninitialized."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "BagError.InsufficientValue",
+      "description": "Attached value is below MIN_ADD_BAG_VALUE (M6).",
+      "err_code": 256
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.InvalidBagId",
+      "description": "`bagId` is zero, which is never a valid TON Storage bag hash.",
+      "err_code": 257
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.InvalidCategory",
+      "description": "`category` is outside the supported 0..5 range.",
+      "err_code": 258
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.MetadataTooLarge",
+      "description": "A user-supplied metadata cell exceeds the configured size bounds (M1).",
+      "err_code": 259
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.IndexOutOfRange",
+      "description": "`get_bag_address` was called with an index outside [0, nextBagIndex) (L2).",
+      "err_code": 260
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.NotFromRegistry",
+      "description": "An init message for a fresh BagItem did not come from its registry.",
+      "err_code": 270
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.NotFromUploader",
+      "description": "A DeactivateBag message did not come from the recorded uploader.",
+      "err_code": 271
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.AlreadyInactive",
+      "description": "A DeactivateBag message was sent to a bag that was already deactivated.\nPrevents a double-emit of BagRemovedEvent and bounces the gas value back\nto the uploader instead of silently re-doing the no-op.",
+      "err_code": 272
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
