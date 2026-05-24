@@ -1,0 +1,384 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "BagRegistry",
+  "author": "piracy.ton",
+  "version": "2.0.0",
+  "description": "Owner-less master registry of TON Storage bags",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "BagRegistryMessage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AddBag"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BagMetadata"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 16
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "BagError"
+    },
+    {
+      "kind": "uintN",
+      "n": 9
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BagRegistryStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BagIndexedEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BagItemInitParams"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "enum",
+      "name": "BagError",
+      "ty_idx": 18,
+      "encoded_as_ty_idx": 19,
+      "members": [
+        {
+          "name": "InsufficientValue",
+          "value": "256"
+        },
+        {
+          "name": "InvalidBagId",
+          "value": "257"
+        },
+        {
+          "name": "InvalidCategory",
+          "value": "258"
+        },
+        {
+          "name": "MetadataTooLarge",
+          "value": "259"
+        },
+        {
+          "name": "IndexOutOfRange",
+          "value": "260"
+        },
+        {
+          "name": "NotFromRegistry",
+          "value": "270"
+        },
+        {
+          "name": "NotFromUploader",
+          "value": "271"
+        },
+        {
+          "name": "AlreadyInactive",
+          "value": "272"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BagIndexedEvent",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 268435457,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "bagIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "bagId",
+          "ty_idx": 14
+        },
+        {
+          "name": "category",
+          "ty_idx": 15
+        },
+        {
+          "name": "uploader",
+          "ty_idx": 7
+        },
+        {
+          "name": "timestamp",
+          "ty_idx": 11
+        },
+        {
+          "name": "name",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BagMetadata",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "description",
+          "ty_idx": 3
+        },
+        {
+          "name": "bagSize",
+          "ty_idx": 11
+        },
+        {
+          "name": "filesCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "files",
+          "ty_idx": 3
+        },
+        {
+          "name": "pieceSize",
+          "ty_idx": 9
+        },
+        {
+          "name": "merkleHash",
+          "ty_idx": 14
+        },
+        {
+          "name": "dirName",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BagItemInitParams",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1112104777,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "bagId",
+          "ty_idx": 14
+        },
+        {
+          "name": "category",
+          "ty_idx": 15
+        },
+        {
+          "name": "uploaderAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "timestamp",
+          "ty_idx": 11
+        },
+        {
+          "name": "name",
+          "ty_idx": 3
+        },
+        {
+          "name": "metadata",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AddBag",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1094992455,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "bagId",
+          "ty_idx": 14
+        },
+        {
+          "name": "category",
+          "ty_idx": 15
+        },
+        {
+          "name": "name",
+          "ty_idx": 3
+        },
+        {
+          "name": "metadata",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "BagRegistryMessage",
+      "ty_idx": 12,
+      "target_ty_idx": 13
+    },
+    {
+      "kind": "struct",
+      "name": "BagRegistryStorage",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "nextBagIndex",
+          "ty_idx": 11,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 20
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 22
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 21
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 128253,
+      "name": "get_total",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 89450,
+      "name": "get_bag_address",
+      "parameters": [
+        {
+          "name": "bagIndex",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 130343,
+      "name": "get_balance",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 129557,
+      "name": "get_item_code",
+      "parameters": [],
+      "return_ty_idx": 3
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "BagError.InsufficientValue",
+      "err_code": 256
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.InvalidBagId",
+      "err_code": 257
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.InvalidCategory",
+      "err_code": 258
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.MetadataTooLarge",
+      "err_code": 259
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.IndexOutOfRange",
+      "err_code": 260
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.NotFromRegistry",
+      "err_code": 270
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.NotFromUploader",
+      "err_code": 271
+    },
+    {
+      "kind": "enum_member",
+      "name": "BagError.AlreadyInactive",
+      "err_code": 272
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
