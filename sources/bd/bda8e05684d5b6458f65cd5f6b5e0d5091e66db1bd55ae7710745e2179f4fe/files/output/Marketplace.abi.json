@@ -1,0 +1,186 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Marketplace",
+  "author": "SwiftParcel",
+  "version": "1.0.0",
+  "description": "Registry that deploys Order escrow contracts",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MarketplaceMessage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreateOrder"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketplaceStorage"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "MarketplaceStorage",
+      "ty_idx": 14,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "orderCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "orderCount",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CreateOrder",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 439041101,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "reward",
+          "ty_idx": 6
+        },
+        {
+          "name": "nonce",
+          "ty_idx": 11
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "description",
+          "ty_idx": 3
+        },
+        {
+          "name": "area",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "MarketplaceMessage",
+      "ty_idx": 12,
+      "target_ty_idx": 13
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 14
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 106982,
+      "name": "orderCount",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 83229,
+      "name": "owner",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 101845,
+      "name": "orderAddress",
+      "parameters": [
+        {
+          "name": "sender",
+          "ty_idx": 7
+        },
+        {
+          "name": "reward",
+          "ty_idx": 6
+        },
+        {
+          "name": "nonce",
+          "ty_idx": 11
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "description",
+          "ty_idx": 3
+        },
+        {
+          "name": "area",
+          "ty_idx": 3
+        }
+      ],
+      "return_ty_idx": 7
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "MarketplaceErrors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
