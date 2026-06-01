@@ -1,0 +1,189 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Poll",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Vote"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClosePoll"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PollStorage"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        9,
+        9
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "PollStorage",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "option0",
+          "ty_idx": 9
+        },
+        {
+          "name": "option1",
+          "ty_idx": 9
+        },
+        {
+          "name": "isClosed",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Vote",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1766682478,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "option",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClosePoll",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 336989729,
+        "prefix_len": 32
+      },
+      "fields": []
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 15
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 14
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102812,
+      "name": "results",
+      "parameters": [],
+      "return_ty_idx": 16
+    },
+    {
+      "tvm_method_id": 83229,
+      "name": "owner",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 67040,
+      "name": "calcVoterAddress",
+      "parameters": [
+        {
+          "name": "voter",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 92876,
+      "name": "isClosed",
+      "parameters": [],
+      "return_ty_idx": 5
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotOwner",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PollClosed",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
