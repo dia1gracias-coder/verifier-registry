@@ -1,0 +1,357 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "plain_subdomains",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UpdateRecords"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UpdateNameRecords"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 15,
+      "value_ty_idx": 16
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AddEditor"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RemoveEditor"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": []
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 22
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SubdomainState"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Name"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 15,
+      "value_ty_idx": 3
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 15,
+      "value_ty_idx": 24
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Excesses"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        16
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Record"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Category"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 30
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 7
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "Name",
+      "ty_idx": 25,
+      "target_ty_idx": 14
+    },
+    {
+      "kind": "alias",
+      "name": "Category",
+      "ty_idx": 31,
+      "target_ty_idx": 15
+    },
+    {
+      "kind": "struct",
+      "name": "UpdateRecords",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1663583452,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "prune",
+          "ty_idx": 5
+        },
+        {
+          "name": "changes",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UpdateNameRecords",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "name",
+          "ty_idx": 14
+        },
+        {
+          "name": "prune",
+          "ty_idx": 5
+        },
+        {
+          "name": "changes",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AddEditor",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 780936353,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "editor",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RemoveEditor",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 2069689080,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "editor",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Excesses",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "editors",
+          "ty_idx": 23
+        },
+        {
+          "name": "subdomains",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SubdomainState",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "name",
+          "ty_idx": 25
+        },
+        {
+          "name": "records",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Record",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "name",
+          "ty_idx": 25
+        },
+        {
+          "name": "category",
+          "ty_idx": 31
+        },
+        {
+          "name": "value",
+          "ty_idx": 3
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 21
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 28
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 123660,
+      "name": "dnsresolve",
+      "parameters": [
+        {
+          "name": "subdomain",
+          "ty_idx": 2
+        },
+        {
+          "name": "category",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 29
+    },
+    {
+      "tvm_method_id": 81504,
+      "name": "dnssubdomains",
+      "parameters": [],
+      "return_ty_idx": 32
+    },
+    {
+      "tvm_method_id": 80293,
+      "name": "get_owner",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 87634,
+      "name": "get_editors",
+      "parameters": [],
+      "return_ty_idx": 33
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.AccessDenied",
+      "err_code": 132
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
