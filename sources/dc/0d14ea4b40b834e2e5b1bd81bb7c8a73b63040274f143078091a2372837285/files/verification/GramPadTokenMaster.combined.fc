@@ -1,0 +1,1515 @@
+;; Standard library for funC
+;;
+
+{-
+    This file is part of TON FunC Standard Library.
+
+    FunC Standard Library is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    FunC Standard Library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Lesser General Public License for more details.
+
+-}
+
+{-
+  # Tuple manipulation primitives
+  The names and the types are mostly self-explaining.
+  See [polymorhism with forall](https://ton.org/docs/#/func/functions?id=polymorphism-with-forall)
+  for more info on the polymorphic functions.
+
+  Note that currently values of atomic type `tuple` can't be cast to composite tuple type (e.g. `[int, cell]`)
+  and vise versa.
+-}
+
+{-
+  # Lisp-style lists
+
+  Lists can be represented as nested 2-elements tuples.
+  Empty list is conventionally represented as TVM `null` value (it can be obtained by calling [null()]).
+  For example, tuple `(1, (2, (3, null)))` represents list `[1, 2, 3]`. Elements of a list can be of different types.
+-}
+
+;;; Adds an element to the beginning of lisp-style list.
+forall X -> tuple cons(X head, tuple tail) asm "CONS";
+
+;;; Extracts the head and the tail of lisp-style list.
+forall X -> (X, tuple) uncons(tuple list) asm "UNCONS";
+
+;;; Extracts the tail and the head of lisp-style list.
+forall X -> (tuple, X) list_next(tuple list) asm(-> 1 0) "UNCONS";
+
+;;; Returns the head of lisp-style list.
+forall X -> X car(tuple list) asm "CAR";
+
+;;; Returns the tail of lisp-style list.
+tuple cdr(tuple list) asm "CDR";
+
+;;; Creates tuple with zero elements.
+tuple empty_tuple() asm "NIL";
+
+;;; Appends a value `x` to a `Tuple t = (x1, ..., xn)`, but only if the resulting `Tuple t' = (x1, ..., xn, x)`
+;;; is of length at most 255. Otherwise throws a type check exception.
+forall X -> tuple tpush(tuple t, X value) asm "TPUSH";
+forall X -> (tuple, ()) ~tpush(tuple t, X value) asm "TPUSH";
+
+;;; Creates a tuple of length one with given argument as element.
+forall X -> [X] single(X x) asm "SINGLE";
+
+;;; Unpacks a tuple of length one
+forall X -> X unsingle([X] t) asm "UNSINGLE";
+
+;;; Creates a tuple of length two with given arguments as elements.
+forall X, Y -> [X, Y] pair(X x, Y y) asm "PAIR";
+
+;;; Unpacks a tuple of length two
+forall X, Y -> (X, Y) unpair([X, Y] t) asm "UNPAIR";
+
+;;; Creates a tuple of length three with given arguments as elements.
+forall X, Y, Z -> [X, Y, Z] triple(X x, Y y, Z z) asm "TRIPLE";
+
+;;; Unpacks a tuple of length three
+forall X, Y, Z -> (X, Y, Z) untriple([X, Y, Z] t) asm "UNTRIPLE";
+
+;;; Creates a tuple of length four with given arguments as elements.
+forall X, Y, Z, W -> [X, Y, Z, W] tuple4(X x, Y y, Z z, W w) asm "4 TUPLE";
+
+;;; Unpacks a tuple of length four
+forall X, Y, Z, W -> (X, Y, Z, W) untuple4([X, Y, Z, W] t) asm "4 UNTUPLE";
+
+;;; Returns the first element of a tuple (with unknown element types).
+forall X -> X first(tuple t) asm "FIRST";
+
+;;; Returns the second element of a tuple (with unknown element types).
+forall X -> X second(tuple t) asm "SECOND";
+
+;;; Returns the third element of a tuple (with unknown element types).
+forall X -> X third(tuple t) asm "THIRD";
+
+;;; Returns the fourth element of a tuple (with unknown element types).
+forall X -> X fourth(tuple t) asm "3 INDEX";
+
+;;; Returns the first element of a pair tuple.
+forall X, Y -> X pair_first([X, Y] p) asm "FIRST";
+
+;;; Returns the second element of a pair tuple.
+forall X, Y -> Y pair_second([X, Y] p) asm "SECOND";
+
+;;; Returns the first element of a triple tuple.
+forall X, Y, Z -> X triple_first([X, Y, Z] p) asm "FIRST";
+
+;;; Returns the second element of a triple tuple.
+forall X, Y, Z -> Y triple_second([X, Y, Z] p) asm "SECOND";
+
+;;; Returns the third element of a triple tuple.
+forall X, Y, Z -> Z triple_third([X, Y, Z] p) asm "THIRD";
+
+
+;;; Push null element (casted to given type)
+;;; By the TVM type `Null` FunC represents absence of a value of some atomic type.
+;;; So `null` can actually have any atomic type.
+forall X -> X null() asm "PUSHNULL";
+
+;;; Moves a variable [x] to the top of the stack
+forall X -> (X, ()) ~impure_touch(X x) impure asm "NOP";
+
+
+
+;;; Returns the current Unix time as an Integer
+int now() asm "NOW";
+
+;;; Returns the internal address of the current smart contract as a Slice with a `MsgAddressInt`.
+;;; If necessary, it can be parsed further using primitives such as [parse_std_addr].
+slice my_address() asm "MYADDR";
+
+;;; Returns the balance of the smart contract as a tuple consisting of an int
+;;; (balance in nanotoncoins) and a `cell`
+;;; (a dictionary with 32-bit keys representing the balance of "extra currencies")
+;;; at the start of Computation Phase.
+;;; Note that RAW primitives such as [send_raw_message] do not update this field.
+[int, cell] get_balance() asm "BALANCE";
+
+;;; Returns the logical time of the current transaction.
+int cur_lt() asm "LTIME";
+
+;;; Returns the starting logical time of the current block.
+int block_lt() asm "BLOCKLT";
+
+;;; Computes the representation hash of a `cell` [c] and returns it as a 256-bit unsigned integer `x`.
+;;; Useful for signing and checking signatures of arbitrary entities represented by a tree of cells.
+int cell_hash(cell c) asm "HASHCU";
+
+;;; Computes the hash of a `slice s` and returns it as a 256-bit unsigned integer `x`.
+;;; The result is the same as if an ordinary cell containing only data and references from `s` had been created
+;;; and its hash computed by [cell_hash].
+int slice_hash(slice s) asm "HASHSU";
+
+;;; Computes sha256 of the data bits of `slice` [s]. If the bit length of `s` is not divisible by eight,
+;;; throws a cell underflow exception. The hash value is returned as a 256-bit unsigned integer `x`.
+int string_hash(slice s) asm "SHA256U";
+
+{-
+  # Signature checks
+-}
+
+;;; Checks the Ed25519-`signature` of a `hash` (a 256-bit unsigned integer, usually computed as the hash of some data)
+;;; using [public_key] (also represented by a 256-bit unsigned integer).
+;;; The signature must contain at least 512 data bits; only the first 512 bits are used.
+;;; The result is `−1` if the signature is valid, `0` otherwise.
+;;; Note that `CHKSIGNU` creates a 256-bit slice with the hash and calls `CHKSIGNS`.
+;;; That is, if [hash] is computed as the hash of some data, these data are hashed twice,
+;;; the second hashing occurring inside `CHKSIGNS`.
+int check_signature(int hash, slice signature, int public_key) asm "CHKSIGNU";
+
+;;; Checks whether [signature] is a valid Ed25519-signature of the data portion of `slice data` using `public_key`,
+;;; similarly to [check_signature].
+;;; If the bit length of [data] is not divisible by eight, throws a cell underflow exception.
+;;; The verification of Ed25519 signatures is the standard one,
+;;; with sha256 used to reduce [data] to the 256-bit number that is actually signed.
+int check_data_signature(slice data, slice signature, int public_key) asm "CHKSIGNS";
+
+{---
+  # Computation of boc size
+  The primitives below may be useful for computing storage fees of user-provided data.
+-}
+
+;;; Returns `(x, y, z, -1)` or `(null, null, null, 0)`.
+;;; Recursively computes the count of distinct cells `x`, data bits `y`, and cell references `z`
+;;; in the DAG rooted at `cell` [c], effectively returning the total storage used by this DAG taking into account
+;;; the identification of equal cells.
+;;; The values of `x`, `y`, and `z` are computed by a depth-first traversal of this DAG,
+;;; with a hash table of visited cell hashes used to prevent visits of already-visited cells.
+;;; The total count of visited cells `x` cannot exceed non-negative [max_cells];
+;;; otherwise the computation is aborted before visiting the `(max_cells + 1)`-st cell and
+;;; a zero flag is returned to indicate failure. If [c] is `null`, returns `x = y = z = 0`.
+(int, int, int) compute_data_size(cell c, int max_cells) impure asm "CDATASIZE";
+
+;;; Similar to [compute_data_size?], but accepting a `slice` [s] instead of a `cell`.
+;;; The returned value of `x` does not take into account the cell that contains the `slice` [s] itself;
+;;; however, the data bits and the cell references of [s] are accounted for in `y` and `z`.
+(int, int, int) slice_compute_data_size(slice s, int max_cells) impure asm "SDATASIZE";
+
+;;; A non-quiet version of [compute_data_size?] that throws a cell overflow exception (`8`) on failure.
+(int, int, int, int) compute_data_size?(cell c, int max_cells) asm "CDATASIZEQ NULLSWAPIFNOT2 NULLSWAPIFNOT";
+
+;;; A non-quiet version of [slice_compute_data_size?] that throws a cell overflow exception (8) on failure.
+(int, int, int, int) slice_compute_data_size?(cell c, int max_cells) asm "SDATASIZEQ NULLSWAPIFNOT2 NULLSWAPIFNOT";
+
+;;; Throws an exception with exit_code excno if cond is not 0 (commented since implemented in compilator)
+;; () throw_if(int excno, int cond) impure asm "THROWARGIF";
+
+{--
+  # Debug primitives
+  Only works for local TVM execution with debug level verbosity
+-}
+;;; Dumps the stack (at most the top 255 values) and shows the total stack depth.
+() dump_stack() impure asm "DUMPSTK";
+
+{-
+  # Persistent storage save and load
+-}
+
+;;; Returns the persistent contract storage cell. It can be parsed or modified with slice and builder primitives later.
+cell get_data() asm "c4 PUSH";
+
+;;; Sets `cell` [c] as persistent contract data. You can update persistent contract storage with this primitive.
+() set_data(cell c) impure asm "c4 POP";
+
+{-
+  # Continuation primitives
+-}
+;;; Usually `c3` has a continuation initialized by the whole code of the contract. It is used for function calls.
+;;; The primitive returns the current value of `c3`.
+cont get_c3() impure asm "c3 PUSH";
+
+;;; Updates the current value of `c3`. Usually, it is used for updating smart contract code in run-time.
+;;; Note that after execution of this primitive the current code
+;;; (and the stack of recursive function calls) won't change,
+;;; but any other function call will use a function from the new code.
+() set_c3(cont c) impure asm "c3 POP";
+
+;;; Transforms a `slice` [s] into a simple ordinary continuation `c`, with `c.code = s` and an empty stack and savelist.
+cont bless(slice s) impure asm "BLESS";
+
+{---
+  # Gas related primitives
+-}
+
+;;; Sets current gas limit `gl` to its maximal allowed value `gm`, and resets the gas credit `gc` to zero,
+;;; decreasing the value of `gr` by `gc` in the process.
+;;; In other words, the current smart contract agrees to buy some gas to finish the current transaction.
+;;; This action is required to process external messages, which bring no value (hence no gas) with themselves.
+;;;
+;;; For more details check [accept_message effects](https://ton.org/docs/#/smart-contracts/accept).
+() accept_message() impure asm "ACCEPT";
+
+;;; Sets current gas limit `gl` to the minimum of limit and `gm`, and resets the gas credit `gc` to zero.
+;;; If the gas consumed so far (including the present instruction) exceeds the resulting value of `gl`,
+;;; an (unhandled) out of gas exception is thrown before setting new gas limits.
+;;; Notice that [set_gas_limit] with an argument `limit ≥ 2^63 − 1` is equivalent to [accept_message].
+() set_gas_limit(int limit) impure asm "SETGASLIMIT";
+
+;;; Commits the current state of registers `c4` (“persistent data”) and `c5` (“actions”)
+;;; so that the current execution is considered “successful” with the saved values even if an exception
+;;; in Computation Phase is thrown later.
+() commit() impure asm "COMMIT";
+
+;;; Not implemented
+;;; Computes the amount of gas that can be bought for `amount` nanoTONs,
+;;; and sets `gl` accordingly in the same way as [set_gas_limit].
+;;() buy_gas(int amount) impure asm "BUYGAS";
+
+;;; Computes the minimum of two integers [x] and [y].
+int min(int x, int y) asm "MIN";
+
+;;; Computes the maximum of two integers [x] and [y].
+int max(int x, int y) asm "MAX";
+
+;;; Sorts two integers.
+(int, int) minmax(int x, int y) asm "MINMAX";
+
+;;; Computes the absolute value of an integer [x].
+int abs(int x) asm "ABS";
+
+{-
+  # Slice primitives
+
+  It is said that a primitive _loads_ some data,
+  if it returns the data and the remainder of the slice
+  (so it can also be used as [modifying method](https://ton.org/docs/#/func/statements?id=modifying-methods)).
+
+  It is said that a primitive _preloads_ some data, if it returns only the data
+  (it can be used as [non-modifying method](https://ton.org/docs/#/func/statements?id=non-modifying-methods)).
+
+  Unless otherwise stated, loading and preloading primitives read the data from a prefix of the slice.
+-}
+
+
+;;; Converts a `cell` [c] into a `slice`. Notice that [c] must be either an ordinary cell,
+;;; or an exotic cell (see [TVM.pdf](https://ton-blockchain.github.io/docs/tvm.pdf), 3.1.2)
+;;; which is automatically loaded to yield an ordinary cell `c'`, converted into a `slice` afterwards.
+slice begin_parse(cell c) asm "CTOS";
+
+;;; Checks if [s] is empty. If not, throws an exception.
+() end_parse(slice s) impure asm "ENDS";
+
+;;; Loads the first reference from the slice.
+(slice, cell) load_ref(slice s) asm(-> 1 0) "LDREF";
+
+;;; Preloads the first reference from the slice.
+cell preload_ref(slice s) asm "PLDREF";
+
+{- Functions below are commented because are implemented on compilator level for optimisation -}
+
+;;; Loads a signed [len]-bit integer from a slice [s].
+;; (slice, int) ~load_int(slice s, int len) asm(s len -> 1 0) "LDIX";
+
+;;; Loads an unsigned [len]-bit integer from a slice [s].
+;; (slice, int) ~load_uint(slice s, int len) asm( -> 1 0) "LDUX";
+
+;;; Preloads a signed [len]-bit integer from a slice [s].
+;; int preload_int(slice s, int len) asm "PLDIX";
+
+;;; Preloads an unsigned [len]-bit integer from a slice [s].
+;; int preload_uint(slice s, int len) asm "PLDUX";
+
+;;; Loads the first `0 ≤ len ≤ 1023` bits from slice [s] into a separate `slice s''`.
+;; (slice, slice) load_bits(slice s, int len) asm(s len -> 1 0) "LDSLICEX";
+
+;;; Preloads the first `0 ≤ len ≤ 1023` bits from slice [s] into a separate `slice s''`.
+;; slice preload_bits(slice s, int len) asm "PLDSLICEX";
+
+;;; Loads serialized amount of TonCoins (any unsigned integer up to `2^120 - 1`).
+(slice, int) load_grams(slice s) asm(-> 1 0) "LDGRAMS";
+(slice, int) load_coins(slice s) asm(-> 1 0) "LDVARUINT16";
+
+(slice, int) load_varint16(slice s) asm(-> 1 0) "LDVARINT16";
+(slice, int) load_varint32(slice s) asm(-> 1 0) "LDVARINT32";
+(slice, int) load_varuint16(slice s) asm(-> 1 0) "LDVARUINT16";
+(slice, int) load_varuint32(slice s) asm(-> 1 0) "LDVARUINT32";
+
+;;; Returns all but the first `0 ≤ len ≤ 1023` bits of `slice` [s].
+slice skip_bits(slice s, int len) asm "SDSKIPFIRST";
+(slice, ()) ~skip_bits(slice s, int len) asm "SDSKIPFIRST";
+
+;;; Returns the first `0 ≤ len ≤ 1023` bits of `slice` [s].
+slice first_bits(slice s, int len) asm "SDCUTFIRST";
+
+;;; Returns all but the last `0 ≤ len ≤ 1023` bits of `slice` [s].
+slice skip_last_bits(slice s, int len) asm "SDSKIPLAST";
+(slice, ()) ~skip_last_bits(slice s, int len) asm "SDSKIPLAST";
+
+;;; Returns the last `0 ≤ len ≤ 1023` bits of `slice` [s].
+slice slice_last(slice s, int len) asm "SDCUTLAST";
+
+;;; Loads a dictionary `D` (HashMapE) from `slice` [s].
+;;; (returns `null` if `nothing` constructor is used).
+(slice, cell) load_dict(slice s) asm(-> 1 0) "LDDICT";
+
+;;; Preloads a dictionary `D` from `slice` [s].
+cell preload_dict(slice s) asm "PLDDICT";
+
+;;; Loads a dictionary as [load_dict], but returns only the remainder of the slice.
+slice skip_dict(slice s) asm "SKIPDICT";
+(slice, ()) ~skip_dict(slice s) asm "SKIPDICT";
+
+;;; Loads (Maybe ^Cell) from `slice` [s].
+;;; In other words loads 1 bit and if it is true
+;;; loads first ref and return it with slice remainder
+;;; otherwise returns `null` and slice remainder
+(slice, cell) load_maybe_ref(slice s) asm(-> 1 0) "LDOPTREF";
+
+;;; Preloads (Maybe ^Cell) from `slice` [s].
+cell preload_maybe_ref(slice s) asm "PLDOPTREF";
+
+
+;;; Returns the depth of `cell` [c].
+;;; If [c] has no references, then return `0`;
+;;; otherwise the returned value is one plus the maximum of depths of cells referred to from [c].
+;;; If [c] is a `null` instead of a cell, returns zero.
+int cell_depth(cell c) asm "CDEPTH";
+
+
+{-
+  # Slice size primitives
+-}
+
+;;; Returns the number of references in `slice` [s].
+int slice_refs(slice s) asm "SREFS";
+
+;;; Returns the number of data bits in `slice` [s].
+int slice_bits(slice s) asm "SBITS";
+
+;;; Returns both the number of data bits and the number of references in `slice` [s].
+(int, int) slice_bits_refs(slice s) asm "SBITREFS";
+
+;;; Checks whether a `slice` [s] is empty (i.e., contains no bits of data and no cell references).
+int slice_empty?(slice s) asm "SEMPTY";
+
+;;; Checks whether `slice` [s] has no bits of data.
+int slice_data_empty?(slice s) asm "SDEMPTY";
+
+;;; Checks whether `slice` [s] has no references.
+int slice_refs_empty?(slice s) asm "SREMPTY";
+
+;;; Returns the depth of `slice` [s].
+;;; If [s] has no references, then returns `0`;
+;;; otherwise the returned value is one plus the maximum of depths of cells referred to from [s].
+int slice_depth(slice s) asm "SDEPTH";
+
+{-
+  # Builder size primitives
+-}
+
+;;; Returns the number of cell references already stored in `builder` [b]
+int builder_refs(builder b) asm "BREFS";
+
+;;; Returns the number of data bits already stored in `builder` [b].
+int builder_bits(builder b) asm "BBITS";
+
+;;; Returns the depth of `builder` [b].
+;;; If no cell references are stored in [b], then returns 0;
+;;; otherwise the returned value is one plus the maximum of depths of cells referred to from [b].
+int builder_depth(builder b) asm "BDEPTH";
+
+{-
+  # Builder primitives
+  It is said that a primitive _stores_ a value `x` into a builder `b`
+  if it returns a modified version of the builder `b'` with the value `x` stored at the end of it.
+  It can be used as [non-modifying method](https://ton.org/docs/#/func/statements?id=non-modifying-methods).
+
+  All the primitives below first check whether there is enough space in the `builder`,
+  and only then check the range of the value being serialized.
+-}
+
+;;; Creates a new empty `builder`.
+builder begin_cell() asm "NEWC";
+
+;;; Converts a `builder` into an ordinary `cell`.
+cell end_cell(builder b) asm "ENDC";
+
+;;; Stores a reference to `cell` [c] into `builder` [b].
+builder store_ref(builder b, cell c) asm(c b) "STREF";
+
+;;; Stores an unsigned [len]-bit integer `x` into `b` for `0 ≤ len ≤ 256`.
+;; builder store_uint(builder b, int x, int len) asm(x b len) "STUX";
+
+;;; Stores a signed [len]-bit integer `x` into `b` for` 0 ≤ len ≤ 257`.
+;; builder store_int(builder b, int x, int len) asm(x b len) "STIX";
+
+
+;;; Stores `slice` [s] into `builder` [b]
+builder store_slice(builder b, slice s) asm(s b) "STSLICE";
+
+;;; Stores (serializes) an integer [x] in the range `0..2^120 − 1` into `builder` [b].
+;;; The serialization of [x] consists of a 4-bit unsigned big-endian integer `l`,
+;;; which is the smallest integer `l ≥ 0`, such that `x < 2^8l`,
+;;; followed by an `8l`-bit unsigned big-endian representation of [x].
+;;; If [x] does not belong to the supported range, a range check exception is thrown.
+;;;
+;;; Store amounts of TonCoins to the builder as VarUInteger 16
+builder store_grams(builder b, int x) asm "STGRAMS";
+builder store_coins(builder b, int x) asm "STVARUINT16";
+
+builder store_varint16(builder b, int x) asm "STVARINT16";
+builder store_varint32(builder b, int x) asm "STVARINT32";
+builder store_varuint16(builder b, int x) asm "STVARUINT16";
+builder store_varuint32(builder b, int x) asm "STVARUINT32";
+
+;;; Stores dictionary `D` represented by `cell` [c] or `null` into `builder` [b].
+;;; In other words, stores a `1`-bit and a reference to [c] if [c] is not `null` and `0`-bit otherwise.
+builder store_dict(builder b, cell c) asm(c b) "STDICT";
+
+;;; Stores (Maybe ^Cell) to builder:
+;;; if cell is null store 1 zero bit
+;;; otherwise store 1 true bit and ref to cell
+builder store_maybe_ref(builder b, cell c) asm(c b) "STOPTREF";
+
+
+{-
+  # Address manipulation primitives
+  The address manipulation primitives listed below serialize and deserialize values according to the following TL-B scheme:
+  ```TL-B
+  addr_none$00 = MsgAddressExt;
+  addr_extern$01 len:(## 8) external_address:(bits len)
+               = MsgAddressExt;
+  anycast_info$_ depth:(#<= 30) { depth >= 1 }
+    rewrite_pfx:(bits depth) = Anycast;
+  addr_std$10 anycast:(Maybe Anycast)
+    workchain_id:int8 address:bits256 = MsgAddressInt;
+  addr_var$11 anycast:(Maybe Anycast) addr_len:(## 9)
+    workchain_id:int32 address:(bits addr_len) = MsgAddressInt;
+  _ _:MsgAddressInt = MsgAddress;
+  _ _:MsgAddressExt = MsgAddress;
+
+  int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+    src:MsgAddress dest:MsgAddressInt
+    value:CurrencyCollection ihr_fee:Grams fwd_fee:Grams
+    created_lt:uint64 created_at:uint32 = CommonMsgInfoRelaxed;
+  ext_out_msg_info$11 src:MsgAddress dest:MsgAddressExt
+    created_lt:uint64 created_at:uint32 = CommonMsgInfoRelaxed;
+  ```
+  A deserialized `MsgAddress` is represented by a tuple `t` as follows:
+
+  - `addr_none` is represented by `t = (0)`,
+    i.e., a tuple containing exactly one integer equal to zero.
+  - `addr_extern` is represented by `t = (1, s)`,
+    where slice `s` contains the field `external_address`. In other words, `
+    t` is a pair (a tuple consisting of two entries), containing an integer equal to one and slice `s`.
+  - `addr_std` is represented by `t = (2, u, x, s)`,
+    where `u` is either a `null` (if `anycast` is absent) or a slice `s'` containing `rewrite_pfx` (if anycast is present).
+    Next, integer `x` is the `workchain_id`, and slice `s` contains the address.
+  - `addr_var` is represented by `t = (3, u, x, s)`,
+    where `u`, `x`, and `s` have the same meaning as for `addr_std`.
+-}
+
+;;; Loads from slice [s] the only prefix that is a valid `MsgAddress`,
+;;; and returns both this prefix `s'` and the remainder `s''` of [s] as slices.
+(slice, slice) load_msg_addr(slice s) asm(-> 1 0) "LDMSGADDR";
+
+;;; Decomposes slice [s] containing a valid `MsgAddress` into a `tuple t` with separate fields of this `MsgAddress`.
+;;; If [s] is not a valid `MsgAddress`, a cell deserialization exception is thrown.
+tuple parse_addr(slice s) asm "PARSEMSGADDR";
+
+;;; Parses slice [s] containing a valid `MsgAddressInt` (usually a `msg_addr_std`),
+;;; applies rewriting from the anycast (if present) to the same-length prefix of the address,
+;;; and returns both the workchain and the 256-bit address as integers.
+;;; If the address is not 256-bit, or if [s] is not a valid serialization of `MsgAddressInt`,
+;;; throws a cell deserialization exception.
+(int, int) parse_std_addr(slice s) asm "REWRITESTDADDR";
+
+;;; A variant of [parse_std_addr] that returns the (rewritten) address as a slice [s],
+;;; even if it is not exactly 256 bit long (represented by a `msg_addr_var`).
+(int, slice) parse_var_addr(slice s) asm "REWRITEVARADDR";
+
+{-
+  # Dictionary primitives
+-}
+
+
+;;; Sets the value associated with [key_len]-bit key signed index in dictionary [dict] to [value] (cell),
+;;; and returns the resulting dictionary.
+cell idict_set_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTISETREF";
+(cell, ()) ~idict_set_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTISETREF";
+
+;;; Sets the value associated with [key_len]-bit key unsigned index in dictionary [dict] to [value] (cell),
+;;; and returns the resulting dictionary.
+cell udict_set_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTUSETREF";
+(cell, ()) ~udict_set_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTUSETREF";
+
+cell idict_get_ref(cell dict, int key_len, int index) asm(index dict key_len) "DICTIGETOPTREF";
+(cell, int) idict_get_ref?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIGETREF" "NULLSWAPIFNOT";
+(cell, int) udict_get_ref?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUGETREF" "NULLSWAPIFNOT";
+(cell, cell) idict_set_get_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTISETGETOPTREF";
+(cell, cell) udict_set_get_ref(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTUSETGETOPTREF";
+(cell, int) idict_delete?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIDEL";
+(cell, int) udict_delete?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDEL";
+(slice, int) idict_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIGET" "NULLSWAPIFNOT";
+(slice, int) udict_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUGET" "NULLSWAPIFNOT";
+(cell, slice, int) idict_delete_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIDELGET" "NULLSWAPIFNOT";
+(cell, slice, int) udict_delete_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDELGET" "NULLSWAPIFNOT";
+(cell, (slice, int)) ~idict_delete_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIDELGET" "NULLSWAPIFNOT";
+(cell, (slice, int)) ~udict_delete_get?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDELGET" "NULLSWAPIFNOT";
+(cell, cell, int) idict_delete_get_ref?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIDELGETREF" "NULLSWAPIFNOT";
+(cell, cell, int) udict_delete_get_ref?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDELGETREF" "NULLSWAPIFNOT";
+(cell, (cell, int)) ~idict_delete_get_ref?(cell dict, int key_len, int index) asm(index dict key_len) "DICTIDELGETREF" "NULLSWAPIFNOT";
+(cell, (cell, int)) ~udict_delete_get_ref?(cell dict, int key_len, int index) asm(index dict key_len) "DICTUDELGETREF" "NULLSWAPIFNOT";
+cell udict_set(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUSET";
+(cell, ()) ~udict_set(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUSET";
+cell idict_set(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTISET";
+(cell, ()) ~idict_set(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTISET";
+cell dict_set(cell dict, int key_len, slice index, slice value) asm(value index dict key_len) "DICTSET";
+(cell, ()) ~dict_set(cell dict, int key_len, slice index, slice value) asm(value index dict key_len) "DICTSET";
+(cell, int) udict_add?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUADD";
+(cell, int) udict_replace?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUREPLACE";
+(cell, int) udict_replace_ref?(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTUREPLACEREF";
+(cell, slice, int) udict_replaceget?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUREPLACEGET" "NULLSWAPIFNOT";
+(cell, cell, int) udict_replaceget_ref?(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTUREPLACEGETREF" "NULLSWAPIFNOT";
+(cell, (slice, int)) ~udict_replaceget?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTUREPLACEGET" "NULLSWAPIFNOT";
+(cell, (cell, int)) ~udict_replaceget_ref?(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTUREPLACEGETREF" "NULLSWAPIFNOT";
+(cell, int) idict_add?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTIADD";
+(cell, int) idict_replace?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTIREPLACE";
+(cell, int) idict_replace_ref?(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTIREPLACEREF";
+(cell, slice, int) idict_replaceget?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTIREPLACEGET" "NULLSWAPIFNOT";
+(cell, cell, int) idict_replaceget_ref?(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTIREPLACEGETREF" "NULLSWAPIFNOT";
+(cell, (slice, int)) ~idict_replaceget?(cell dict, int key_len, int index, slice value) asm(value index dict key_len) "DICTIREPLACEGET" "NULLSWAPIFNOT";
+(cell, (cell, int)) ~idict_replaceget_ref?(cell dict, int key_len, int index, cell value) asm(value index dict key_len) "DICTIREPLACEGETREF" "NULLSWAPIFNOT";
+cell udict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUSETB";
+(cell, ()) ~udict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUSETB";
+cell idict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTISETB";
+(cell, ()) ~idict_set_builder(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTISETB";
+cell dict_set_builder(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTSETB";
+(cell, ()) ~dict_set_builder(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTSETB";
+(cell, int) dict_replace_builder?(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTREPLACEB";
+(cell, builder, int) dict_replaceget_builder?(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTREPLACEGETB" "NULLSWAPIFNOT";
+(cell, slice, int) dict_replaceget?(cell dict, int key_len, slice index, slice value) asm(value index dict key_len) "DICTREPLACEGET" "NULLSWAPIFNOT";
+(cell, (builder, int)) ~dict_replaceget_builder?(cell dict, int key_len, slice index, builder value) asm(value index dict key_len) "DICTREPLACEGETB" "NULLSWAPIFNOT";
+(cell, (slice, int)) ~dict_replaceget?(cell dict, int key_len, slice index, slice value) asm(value index dict key_len) "DICTREPLACEGET" "NULLSWAPIFNOT";
+(cell, int) udict_add_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUADDB";
+(cell, int) udict_replace_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUREPLACEB";
+(cell, builder, int) udict_replaceget_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUREPLACEGETB" "NULLSWAPIFNOT";
+(cell, (builder, int)) ~udict_replaceget_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTUREPLACEGETB" "NULLSWAPIFNOT";
+(cell, int) idict_add_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTIADDB";
+(cell, int) idict_replace_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTIREPLACEB";
+(cell, builder, int) idict_replaceget_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTIREPLACEGETB" "NULLSWAPIFNOT";
+(cell, (builder, int)) ~idict_replaceget_builder?(cell dict, int key_len, int index, builder value) asm(value index dict key_len) "DICTIREPLACEGETB" "NULLSWAPIFNOT";
+(cell, int, slice, int) udict_delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTUREMMIN" "NULLSWAPIFNOT2";
+(cell, (int, slice, int)) ~udict::delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTUREMMIN" "NULLSWAPIFNOT2";
+(cell, int, slice, int) idict_delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTIREMMIN" "NULLSWAPIFNOT2";
+(cell, (int, slice, int)) ~idict::delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTIREMMIN" "NULLSWAPIFNOT2";
+(cell, slice, slice, int) dict_delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTREMMIN" "NULLSWAPIFNOT2";
+(cell, (slice, slice, int)) ~dict::delete_get_min(cell dict, int key_len) asm(-> 0 2 1 3) "DICTREMMIN" "NULLSWAPIFNOT2";
+(cell, int, slice, int) udict_delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTUREMMAX" "NULLSWAPIFNOT2";
+(cell, (int, slice, int)) ~udict::delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTUREMMAX" "NULLSWAPIFNOT2";
+(cell, int, slice, int) idict_delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTIREMMAX" "NULLSWAPIFNOT2";
+(cell, (int, slice, int)) ~idict::delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTIREMMAX" "NULLSWAPIFNOT2";
+(cell, slice, slice, int) dict_delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTREMMAX" "NULLSWAPIFNOT2";
+(cell, (slice, slice, int)) ~dict::delete_get_max(cell dict, int key_len) asm(-> 0 2 1 3) "DICTREMMAX" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_min?(cell dict, int key_len) asm (-> 1 0 2) "DICTUMIN" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_max?(cell dict, int key_len) asm (-> 1 0 2) "DICTUMAX" "NULLSWAPIFNOT2";
+(int, cell, int) udict_get_min_ref?(cell dict, int key_len) asm (-> 1 0 2) "DICTUMINREF" "NULLSWAPIFNOT2";
+(int, cell, int) udict_get_max_ref?(cell dict, int key_len) asm (-> 1 0 2) "DICTUMAXREF" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_min?(cell dict, int key_len) asm (-> 1 0 2) "DICTIMIN" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_max?(cell dict, int key_len) asm (-> 1 0 2) "DICTIMAX" "NULLSWAPIFNOT2";
+(int, cell, int) idict_get_min_ref?(cell dict, int key_len) asm (-> 1 0 2) "DICTIMINREF" "NULLSWAPIFNOT2";
+(int, cell, int) idict_get_max_ref?(cell dict, int key_len) asm (-> 1 0 2) "DICTIMAXREF" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_next?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTUGETNEXT" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_nexteq?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTUGETNEXTEQ" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_prev?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTUGETPREV" "NULLSWAPIFNOT2";
+(int, slice, int) udict_get_preveq?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTUGETPREVEQ" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_next?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTIGETNEXT" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_nexteq?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTIGETNEXTEQ" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_prev?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTIGETPREV" "NULLSWAPIFNOT2";
+(int, slice, int) idict_get_preveq?(cell dict, int key_len, int pivot) asm(pivot dict key_len -> 1 0 2) "DICTIGETPREVEQ" "NULLSWAPIFNOT2";
+
+;;; Creates an empty dictionary, which is actually a null value. Equivalent to PUSHNULL
+cell new_dict() asm "NEWDICT";
+;;; Checks whether a dictionary is empty. Equivalent to cell_null?.
+int dict_empty?(cell c) asm "DICTEMPTY";
+
+
+{- Prefix dictionary primitives -}
+(slice, slice, slice, int) pfxdict_get?(cell dict, int key_len, slice key) asm(key dict key_len) "PFXDICTGETQ" "NULLSWAPIFNOT2";
+(cell, int) pfxdict_set?(cell dict, int key_len, slice key, slice value) asm(value key dict key_len) "PFXDICTSET";
+(cell, int) pfxdict_delete?(cell dict, int key_len, slice key) asm(key dict key_len) "PFXDICTDEL";
+
+;;; Returns the value of the global configuration parameter with integer index `i` as a `cell` or `null` value.
+cell config_param(int x) asm "CONFIGOPTPARAM";
+;;; Checks whether c is a null. Note, that FunC also has polymorphic null? built-in.
+int cell_null?(cell c) asm "ISNULL";
+
+;;; Creates an output action which would reserve exactly amount nanotoncoins (if mode = 0), at most amount nanotoncoins (if mode = 2), or all but amount nanotoncoins (if mode = 1 or mode = 3), from the remaining balance of the account. It is roughly equivalent to creating an outbound message carrying amount nanotoncoins (or b − amount nanotoncoins, where b is the remaining balance) to oneself, so that the subsequent output actions would not be able to spend more money than the remainder. Bit +2 in mode means that the external action does not fail if the specified amount cannot be reserved; instead, all remaining balance is reserved. Bit +8 in mode means `amount <- -amount` before performing any further actions. Bit +4 in mode means that amount is increased by the original balance of the current account (before the compute phase), including all extra currencies, before performing any other checks and actions. Currently, amount must be a non-negative integer, and mode must be in the range 0..15.
+() raw_reserve(int amount, int mode) impure asm "RAWRESERVE";
+;;; Similar to raw_reserve, but also accepts a dictionary extra_amount (represented by a cell or null) with extra currencies. In this way currencies other than TonCoin can be reserved.
+() raw_reserve_extra(int amount, cell extra_amount, int mode) impure asm "RAWRESERVEX";
+;;; Sends a raw message contained in msg, which should contain a correctly serialized object Message X, with the only exception that the source address is allowed to have dummy value addr_none (to be automatically replaced with the current smart contract address), and ihr_fee, fwd_fee, created_lt and created_at fields can have arbitrary values (to be rewritten with correct values during the action phase of the current transaction). Integer parameter mode contains the flags. Currently mode = 0 is used for ordinary messages; mode = 128 is used for messages that are to carry all the remaining balance of the current smart contract (instead of the value originally indicated in the message); mode = 64 is used for messages that carry all the remaining value of the inbound message in addition to the value initially indicated in the new message (if bit 0 is not set, the gas fees are deducted from this amount); mode' = mode + 1 means that the sender wants to pay transfer fees separately; mode' = mode + 2 means that any errors arising while processing this message during the action phase should be ignored. Finally, mode' = mode + 32 means that the current account must be destroyed if its resulting balance is zero. This flag is usually employed together with +128.
+() send_raw_message(cell msg, int mode) impure asm "SENDRAWMSG";
+;;; Creates an output action that would change this smart contract code to that given by cell new_code. Notice that this change will take effect only after the successful termination of the current run of the smart contract
+() set_code(cell new_code) impure asm "SETCODE";
+
+;;; Generates a new pseudo-random unsigned 256-bit integer x. The algorithm is as follows: if r is the old value of the random seed, considered as a 32-byte array (by constructing the big-endian representation of an unsigned 256-bit integer), then its sha512(r) is computed; the first 32 bytes of this hash are stored as the new value r' of the random seed, and the remaining 32 bytes are returned as the next random value x.
+int random() impure asm "RANDU256";
+;;; Generates a new pseudo-random integer z in the range 0..range−1 (or range..−1, if range < 0). More precisely, an unsigned random value x is generated as in random; then z := x * range / 2^256 is computed.
+int rand(int range) impure asm "RAND";
+;;; Returns the current random seed as an unsigned 256-bit Integer.
+int get_seed() impure asm "RANDSEED";
+;;; Sets the random seed to unsigned 256-bit seed.
+() set_seed(int x) impure asm "SETRAND";
+;;; Mixes unsigned 256-bit integer x into the random seed r by setting the random seed to sha256 of the concatenation of two 32-byte strings: the first with the big-endian representation of the old seed r, and the second with the big-endian representation of x.
+() randomize(int x) impure asm "ADDRAND";
+;;; Equivalent to randomize(cur_lt());.
+() randomize_lt() impure asm "LTIME" "ADDRAND";
+
+;;; Checks whether the data parts of two slices coinside
+int equal_slices_bits(slice a, slice b) asm "SDEQ";
+;;; Checks whether b is a null. Note, that FunC also has polymorphic null? built-in.
+int builder_null?(builder b) asm "ISNULL";
+;;; Concatenates two builders
+builder store_builder(builder to, builder from) asm "STBR";
+builder store_builder_ref(builder to, builder from) asm "STBREFR";
+
+;; CUSTOM:
+
+;; TVM UPGRADE 2023-07 https://docs.ton.org/learn/tvm-instructions/tvm-upgrade-2023-07
+;; In mainnet since 20 Dec 2023 https://t.me/tonblockchain/226
+
+;;; Retrieves code of smart-contract from c7
+cell my_code() asm "MYCODE";
+
+;;; Creates an output action and returns a fee for creating a message. Mode has the same effect as in the case of SENDRAWMSG
+int send_message(cell msg, int mode) impure asm "SENDMSG";
+
+int gas_consumed() asm "GASCONSUMED";
+
+;; TVM V6 https://github.com/ton-blockchain/ton/blob/testnet/doc/GlobalVersions.md#version-6
+
+int get_compute_fee(int workchain, int gas_used) asm(gas_used workchain) "GETGASFEE";
+int get_storage_fee(int workchain, int seconds, int bits, int cells) asm(cells bits seconds workchain) "GETSTORAGEFEE";
+int get_forward_fee(int workchain, int bits, int cells) asm(cells bits workchain) "GETFORWARDFEE";
+int get_precompiled_gas_consumption() asm "GETPRECOMPILEDGAS";
+
+int get_simple_compute_fee(int workchain, int gas_used) asm(gas_used workchain) "GETGASFEESIMPLE";
+int get_simple_forward_fee(int workchain, int bits, int cells) asm(cells bits workchain) "GETFORWARDFEESIMPLE";
+int get_original_fwd_fee(int workchain, int fwd_fee) asm(fwd_fee workchain) "GETORIGINALFWDFEE";
+int my_storage_due() asm "DUEPAYMENT";
+
+tuple get_fee_configs() asm "UNPACKEDCONFIGTUPLE";
+
+;;; Quiet versions of ~load_uint. Returns (null, 0) if load has failed and (x, -1) on success
+(slice, (int, int)) ~load_uint_quiet(slice s, int len) asm( -> 1 0 2) "LDUXQ NULLROTRIFNOT";
+
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; GramPadToken_GramPadTokenMaster.headers.fc
+;;
+;; Header files for GramPadTokenMaster
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_store_address_opt
+builder __tact_store_address_opt(builder b, slice address) inline;
+
+;; __tact_not_null
+forall X -> X __tact_not_null(X x) impure inline;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $JettonTransferInternal$_store
+builder $JettonTransferInternal$_store(builder build_0, (int, int, slice, slice, int, slice) v) inline;
+
+;; $JettonTransferInternal$_store_cell
+cell $JettonTransferInternal$_store_cell((int, int, slice, slice, int, slice) v, builder b) inline;
+
+;; $JettonTransferInternal$_load_bounced
+(slice, ((int, int))) $JettonTransferInternal$_load_bounced(slice sc_0) inline;
+
+;; $JettonExcesses$_store
+builder $JettonExcesses$_store(builder build_0, (int) v) inline;
+
+;; $JettonExcesses$_store_cell
+cell $JettonExcesses$_store_cell((int) v, builder b) inline;
+
+;; $GramPadTokenMaster$_store
+builder $GramPadTokenMaster$_store(builder build_0, (slice, cell, int, int) v) inline;
+
+;; $GramPadTokenMaster$_load
+(slice, ((slice, cell, int, int))) $GramPadTokenMaster$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $StdAddress$_get_workchain
+_ $StdAddress$_get_workchain((int, int) v) inline;
+
+;; $JettonMasterData$_to_external
+(int, int, slice, cell, cell) $JettonMasterData$_to_external(((int, int, slice, cell, cell)) v) inline;
+
+;; $GramPadTokenWallet$init$_store
+builder $GramPadTokenWallet$init$_store(builder build_0, (int, slice, slice) v) inline;
+
+;; $GramPadTokenMaster$init$_load
+(slice, ((slice, cell))) $GramPadTokenMaster$init$_load(slice sc_0) inline;
+
+;; $GramPadTokenMaster$_contract_init
+(slice, cell, int, int) $GramPadTokenMaster$_contract_init(slice $initialHolder, cell $jettonContent) impure inline;
+
+;; $GramPadTokenMaster$_contract_load
+(slice, cell, int, int) $GramPadTokenMaster$_contract_load() impure inline;
+
+;; $GramPadTokenMaster$_contract_store
+() $GramPadTokenMaster$_contract_store((slice, cell, int, int) v) impure inline;
+
+;; $Cell$_fun_asSlice
+slice $Cell$_fun_asSlice(cell $self) impure inline;
+
+;; $global_newAddress
+slice $global_newAddress(int $chain, int $hash) impure inline;
+
+;; $global_contractAddressExt
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline;
+
+;; $global_contractAddress
+slice $global_contractAddress((cell, cell) $s) impure inline;
+
+;; $BasechainAddress$_constructor_hash
+((int)) $BasechainAddress$_constructor_hash(int $hash) inline;
+
+;; $global_emptyBasechainAddress
+(int) $global_emptyBasechainAddress() impure inline;
+
+;; $global_newBasechainAddress
+(int) $global_newBasechainAddress(int $hash) impure inline;
+
+;; $global_contractBasechainAddress
+(int) $global_contractBasechainAddress((cell, cell) $s) impure inline;
+
+;; $Builder$_fun_storeBasechainAddress
+builder $Builder$_fun_storeBasechainAddress(builder $self, (int) $address) impure inline;
+
+;; $global_makeTakeWalletAddressMessage
+cell $global_makeTakeWalletAddressMessage((int) $targetWallet, (int, slice, int) $msg) impure inline;
+
+;; $GramPadTokenWallet$_init_child
+(cell, cell) $GramPadTokenWallet$_init_child(int $balance, slice $owner, slice $minter) inline;
+
+;; $global_getGramxWalletInit
+(cell, cell) $global_getGramxWalletInit(slice $owner) impure inline;
+
+;; $GramPadTokenWallet$_code_child
+cell $GramPadTokenWallet$_code_child() inline;
+
+;; $JettonMasterData$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode
+((int, int, slice, cell, cell)) $JettonMasterData$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode(int $totalSupply, int $mintable, slice $adminAddress, cell $jettonContent, cell $jettonWalletCode) inline;
+
+;; $GramPadTokenMaster$_fun_get_jetton_data
+((slice, cell, int, int), (int, int, slice, cell, cell)) $GramPadTokenMaster$_fun_get_jetton_data((slice, cell, int, int) $self) impure inline;
+
+;; $GramPadTokenMaster$_fun_get_wallet_address
+((slice, cell, int, int), slice) $GramPadTokenMaster$_fun_get_wallet_address((slice, cell, int, int) $self, slice $ownerAddress) impure inline;
+
+;; $GramPadTokenMaster$_fun_is_initialized
+((slice, cell, int, int), int) $GramPadTokenMaster$_fun_is_initialized((slice, cell, int, int) $self) impure inline;
+
+;; $DeployParameters$_constructor_value_bounce_mode_body_init
+((int, cell, int, int, (cell, cell))) $DeployParameters$_constructor_value_bounce_mode_body_init(int $value, int $bounce, int $mode, cell $body, (cell, cell) $init) inline;
+
+;; $JettonTransferInternal$_constructor_queryId_amount_sender_responseDestination_forwardTonAmount_forwardPayload
+((int, int, slice, slice, int, slice)) $JettonTransferInternal$_constructor_queryId_amount_sender_responseDestination_forwardTonAmount_forwardPayload(int $queryId, int $amount, slice $sender, slice $responseDestination, int $forwardTonAmount, slice $forwardPayload) inline;
+
+;; $MessageParameters$_constructor_body_to_value_mode
+((int, cell, int, slice, int)) $MessageParameters$_constructor_body_to_value_mode(cell $body, slice $to, int $value, int $mode) inline;
+
+;; $MessageParameters$_constructor_to_body_value_bounce_mode
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_body_value_bounce_mode(slice $to, cell $body, int $value, int $bounce, int $mode) inline;
+
+;; $JettonExcesses$_constructor_queryId
+((int)) $JettonExcesses$_constructor_queryId(int $queryId) inline;
+
+
+;; GramPadToken_GramPadTokenMaster.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(slice, slice) __tact_load_address_opt(slice cs) asm """
+
+            b{00} SDBEGINSQ
+            IF:<{
+              PUSHNULL
+            }>ELSE<{
+              LDMSGADDR
+              SWAP
+            }>
+
+""";
+
+builder __tact_store_addr_none(builder b) asm "b{00} STSLICECONST";
+
+builder __tact_store_address_opt(builder b, slice address) inline {
+    if (null?(address)) {
+        return __tact_store_addr_none(b);
+    } else {
+        return b.store_slice(address);
+    }
+}
+
+forall X -> X __tact_not_null(X x) impure inline {
+    throw_if(128, null?(x)); return x;
+}
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_contractHash(cell $code, cell $data) impure asm """
+    s0 PUSH HASHCU // `data` hash
+    s2 PUSH HASHCU // `code` hash
+    SWAP2
+    CDEPTH         // `data` depth
+    SWAP
+    CDEPTH         // `code` depth
+    131380 INT     // (2 << 16) | (1 << 8) | 0x34
+
+    // Group 2: Composition of the Builder
+    NEWC
+    24 STU  // store refs_descriptor | bits_descriptor | data
+    16 STU  // store depth_descriptor for `code`
+    16 STU  // store depth_descriptor for `data`
+    256 STU // store `code` hash
+    256 STU // store `data` hash
+
+    // Group 3: SHA256 hash of the resulting Builder
+    ONE HASHEXT_SHA256
+""";
+
+slice $Slice$_fun_asAddressUnsafe(slice $self) impure asm "NOP";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+slice $Cell$_fun_asSlice(cell $self) impure inline {
+    var ($self) = $self;
+    return $Cell$_fun_beginParse($self);
+}
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+slice $global_newAddress(int $chain, int $hash) impure inline {
+    return $Slice$_fun_asAddressUnsafe($Cell$_fun_asSlice($Builder$_fun_endCell(store_uint(store_int(store_uint($global_beginCell(), 4, 3), $chain, 8), $hash, 256))));
+}
+
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline {
+    int $hash = $global_contractHash($code, $data);
+    return $global_newAddress($chain, $hash);
+}
+
+slice $global_contractAddress((cell, cell) $s) impure inline {
+    var (($s'code, $s'data)) = $s;
+    return $global_contractAddressExt(0, $s'code, $s'data);
+}
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_deploy((int, cell, int, int, (cell, cell)) $params) impure asm """
+    4 1 BLKPUSH // pushes 2 copies of `init.code` and `init.data`
+    HASHCU // `init.data` hash
+    SWAP
+    HASHCU // `init.code` hash
+    SWAP2
+    CDEPTH // `init.data` depth
+    SWAP
+    CDEPTH // `init.code` depth
+
+    // Group 2: Calculating destination address
+    // For almost identical logic and instructions,
+    // see comments inside `contractHash()` function in contract.tact
+    131380 INT // (2 << 16) | (1 << 8) | 0x34
+    NEWC
+    24 STU
+    16 STU
+    16 STU
+    256 STU
+    256 STU
+    ONE HASHEXT_SHA256 // obtains hash part (account id) of the address
+    // → Stack state
+    // s0: destAddr(hash part)
+    // s1: `init.data`
+    // s2: `init.code`
+    // s3 and below: `bounce`, `value`, `body`, `mode`
+
+    // Group 3: Building a message (CommonMsgInfoRelaxed)
+    s3 XCHG0           // swaps `bounce` with destAddr(hash part)
+    NEWC
+    b{01} STSLICECONST // store tag = $0 and ihr_disabled = true
+    1 STI              // store `bounce`
+    s1 s2 XCHG         // swap `init.data` with `init.code`, placing code on s1
+    STREF              // store `init.code`
+    STREF              // store `init.data`
+    // Inline StateInit:
+    b{00010000000000} STSLICECONST
+    // 0 + 00 + 10 + 0 + 00000000
+    // 1) 0 - bounced = false
+    // 2) 00 - src = addr_none
+    // 3) 10 - tag of addr_std (part of dest)
+    // 4) 0 - Maybe Anycast = false
+    // 5) 00000000 - workchain_id (part of dest)
+    //
+    256 STU     // store destAddr(hash part)
+    SWAP        // Builder on top, `value` below
+    STGRAMS     // store `value`
+    105 PUSHINT // 1 + 4 + 4 + 64 + 32
+    STZEROES    // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+
+    // Group 4: Continue building a message (CommonMsgInfoRelaxed into MessageRelaxed)
+    // Remaining bits of MessageRelaxed:
+    b{1000110} STSLICECONST
+    // 10 + 0 + 0 + 1 + 1 + 0
+    // 10 - Maybe (Either StateInit ^StateInit) = true false
+    // 0 - split_depth:(Maybe (## 5)) = false
+    // 0 = special:(Maybe TickTock) = false
+    // 1 = code:(Maybe ^Cell) = true
+    // 1 = data:(Maybe ^Cell) = true
+    // 0 = library:(Maybe ^Cell) = false
+    //
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC   // finalize the message
+    // → Stack state
+    // s0: Cell
+    // s1: params.`mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG
+""";
+
+(int, int) $global_parseStdAddress(slice $slice) impure asm """
+    REWRITESTDADDR
+""";
+
+(int) $global_emptyBasechainAddress() impure inline {
+    return $BasechainAddress$_constructor_hash(null());
+}
+
+(int) $global_newBasechainAddress(int $hash) impure inline {
+    return $BasechainAddress$_constructor_hash($hash);
+}
+
+(int) $global_contractBasechainAddress((cell, cell) $s) impure inline {
+    var (($s'code, $s'data)) = $s;
+    int $hash = $global_contractHash($s'code, $s'data);
+    return $global_newBasechainAddress($hash);
+}
+
+() $global_forceBasechain(slice $address) impure asm """
+    REWRITESTDADDR DROP 138 THROWIF
+""";
+
+builder $Builder$_fun_storeMaybeRef(cell $cell, builder $self) impure asm """
+    STOPTREF
+""";
+
+builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
+    STSLICER
+""";
+
+builder $Builder$_fun_storeBasechainAddress(builder $self, (int) $address) impure inline {
+    var ($self) = $self;
+    var (($address'hash)) = $address;
+    if (null?($address'hash)) {
+        return store_uint($self, 0, 2);
+    }
+    return store_uint(store_uint($self, 1024, 11), __tact_not_null($address'hash), 256);
+}
+
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+;; GramPadToken_GramPadTokenMaster.constants.fc
+;; Slice UzH+0DZRgSDH80VyZTd0XFkpuOofo3uZsrtY9wJnFUE=
+slice __gen_slice_slice_5331fed036518120c7f345726537745c5929b8ea1fa37b99b2bb58f702671541() asm """
+    B{b5ee9c72410101010003000001088597e2ff} B>boc <s PUSHSLICE
+""";
+
+;; GramPadToken_GramPadTokenMaster.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_body_to_value_mode(cell $body, slice $to, int $value, int $mode) inline {
+    return ($mode, $body, $value, $to, true);
+}
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_body_value_bounce_mode(slice $to, cell $body, int $value, int $bounce, int $mode) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: DeployParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 bounce:bool init:StateInit{code:^cell,data:^cell} = DeployParameters
+;;
+
+((int, cell, int, int, (cell, cell))) $DeployParameters$_constructor_value_bounce_mode_body_init(int $value, int $bounce, int $mode, cell $body, (cell, cell) $init) inline {
+    return ($mode, $body, $value, $bounce, $init);
+}
+
+;;
+;; Type: StdAddress
+;; TLB: _ workchain:int8 address:uint256 = StdAddress
+;;
+
+_ $StdAddress$_get_workchain((int, int) v) inline {
+    var (v'workchain, v'address) = v;
+    return v'workchain;
+}
+
+;;
+;; Type: BasechainAddress
+;; TLB: _ hash:Maybe int257 = BasechainAddress
+;;
+
+((int)) $BasechainAddress$_constructor_hash(int $hash) inline {
+    return ($hash);
+}
+
+;;
+;; Type: JettonMasterData
+;; TLB: _ totalSupply:int257 mintable:bool adminAddress:address jettonContent:^cell jettonWalletCode:^cell = JettonMasterData
+;;
+
+(int, int, slice, cell, cell) $JettonMasterData$_to_external(((int, int, slice, cell, cell)) v) inline {
+    var (v'totalSupply, v'mintable, v'adminAddress, v'jettonContent, v'jettonWalletCode) = v; 
+    return (v'totalSupply, v'mintable, v'adminAddress, v'jettonContent, v'jettonWalletCode);
+}
+
+((int, int, slice, cell, cell)) $JettonMasterData$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode(int $totalSupply, int $mintable, slice $adminAddress, cell $jettonContent, cell $jettonWalletCode) inline {
+    return ($totalSupply, $mintable, $adminAddress, $jettonContent, $jettonWalletCode);
+}
+
+;;
+;; Type: JettonTransferInternal
+;; Header: 0x178d4519
+;; TLB: jetton_transfer_internal#178d4519 queryId:uint64 amount:coins sender:address responseDestination:address forwardTonAmount:coins forwardPayload:remainder<slice> = JettonTransferInternal
+;;
+
+builder $JettonTransferInternal$_store(builder build_0, (int, int, slice, slice, int, slice) v) inline {
+    var (v'queryId, v'amount, v'sender, v'responseDestination, v'forwardTonAmount, v'forwardPayload) = v;
+    build_0 = store_uint(build_0, 395134233, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    build_0 = build_0.store_varuint16(v'amount);
+    build_0 = build_0.store_slice(v'sender);
+    build_0 = __tact_store_address_opt(build_0, v'responseDestination);
+    build_0 = build_0.store_varuint16(v'forwardTonAmount);
+    build_0 = build_0.store_slice(v'forwardPayload);
+    return build_0;
+}
+
+cell $JettonTransferInternal$_store_cell((int, int, slice, slice, int, slice) v, builder b) inline {
+    return $JettonTransferInternal$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $JettonTransferInternal$_load_bounced(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'amount = sc_0~load_varuint16();
+    return (sc_0, (v'queryId, v'amount));
+}
+
+((int, int, slice, slice, int, slice)) $JettonTransferInternal$_constructor_queryId_amount_sender_responseDestination_forwardTonAmount_forwardPayload(int $queryId, int $amount, slice $sender, slice $responseDestination, int $forwardTonAmount, slice $forwardPayload) inline {
+    return ($queryId, $amount, $sender, $responseDestination, $forwardTonAmount, $forwardPayload);
+}
+
+;;
+;; Type: JettonExcesses
+;; Header: 0xd53276db
+;; TLB: jetton_excesses#d53276db queryId:uint64 = JettonExcesses
+;;
+
+builder $JettonExcesses$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 3576854235, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $JettonExcesses$_store_cell((int) v, builder b) inline {
+    return $JettonExcesses$_store(b, v).end_cell();
+}
+
+((int)) $JettonExcesses$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: GramPadTokenWallet
+;; TLB: _ balance:coins owner:address minter:address = GramPadTokenWallet
+;;
+
+builder $GramPadTokenWallet$init$_store(builder build_0, (int, slice, slice) v) inline {
+    var (v'balance, v'owner, v'minter) = v;
+    build_0 = build_0.store_varuint16(v'balance);
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_slice(v'minter);
+    return build_0;
+}
+
+cell $GramPadTokenWallet$_child_get_code() impure asm """
+    B{b5ee9c7201020c010003ef000228ff008e88f4a413f4bcf2c80bed5320e303ed43d901020033a65ec0bb51343e803e903e9015481b04fe0a9518cc148c1b0d2001f83001d072d721d200d200fa4021103450666f04f86102f862ed44d0fa00fa40fa4055206c13048e53028020d7217021d749c21f9430d31f01de208210178d4519ba8e1630d33ffa00596c21a002c855205afa0212cecec9ed54e082107bdd97deba8e15d33ffa00596c21a002c855205afa0212cecec9ed54e05f04e003035402d70d1ff2e0822182100f8a7ea5bae302218210178d4519bae302018210595f07bcbae3025f04f2c08204050601fc31d33ffa00fa40d72c01916d93fa4001e201f40431fa0023fa4430f2d08a8200cbfbf84229c705f2f45164a18200cff821c2fff2f42620d70b00c0018e13d74b820092b801c0019301c001923170e2f2f49130e2f8416f2425b8a454143281101906fa40fa0071d721fa00fa00306c6170f83a12a85240a081290470f8360702fe31d33ffa00fa40d72c01916d93fa4001e201fa00705349f82ac855215afa0212cecec9f842fa44315920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400206ef2d08001ba9b8200a4f3f8422ac705f2f4df5164a0f8416f2421f8276f1021a127c200963c1059385f06e30d048208989680b60972090a01fcd33ffa00d72c01916d93fa4001e231820080a0f84226c705f2f45131a18200cff821c2fff2f4f8416f2454132381385104fa40fa0071d721fa00fa00306c6170f83a811a2c70f836aa00a012bcf2f47080405414367f07c8553082107bdd97de5005cb1f13cb3f01fa02ce01206e9430cf84809201cee2c92604431350550b01feaa00a08208989680a0bcf2f450547080407f2a4613509ac855508210178d45195007cb1f15cb3f5003fa02ce01206e9430cf84809201cee201fa02cec9525328f82ac855215afa0212cecec910561024103610261045102410235f41f90001f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f9040003c8cf8580080050ca0012cccccf884008cbff01fa028069cf40cf8634f400c901fb0002c855205afa0212cecec9ed5400ae5531fa40fa0071d721fa00fa00306c6170f83a5240a012a17170294913508bc8553082107362d09c5005cb1f13cb3f01fa02cecec9290447135066441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00414000b0fb02236eb39320c2009170e28e3803206ef2d0808100827004c8018210d53276db58cb1fcb3fc91024103512441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0093135f03e202c855205afa0212cecec9ed54004e441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0002c855205afa0212cecec9ed54} B>boc PUSHREF
+""";
+
+(cell, cell) $GramPadTokenWallet$_init_child(int $balance, slice $owner, slice $minter) inline {
+    ;; Build init code cell
+
+    ;; Contract Code: GramPadTokenWallet
+    cell init_code = $GramPadTokenWallet$_child_get_code();
+
+
+    builder b = begin_cell();
+    b = $GramPadTokenWallet$init$_store(b, ($balance, $owner, $minter));
+    return (init_code, b.end_cell());
+}
+
+cell $GramPadTokenWallet$_code_child() inline {
+    return $GramPadTokenWallet$_child_get_code();
+}
+
+;;
+;; Type: GramPadTokenMaster
+;; TLB: _ initialHolder:address jettonContent:^cell initialized:bool totalSupply:coins = GramPadTokenMaster
+;;
+
+builder $GramPadTokenMaster$_store(builder build_0, (slice, cell, int, int) v) inline {
+    var (v'initialHolder, v'jettonContent, v'initialized, v'totalSupply) = v;
+    build_0 = build_0.store_slice(v'initialHolder);
+    build_0 = build_0.store_ref(v'jettonContent);
+    build_0 = build_0.store_int(v'initialized, 1);
+    build_0 = build_0.store_varuint16(v'totalSupply);
+    return build_0;
+}
+
+(slice, ((slice, cell, int, int))) $GramPadTokenMaster$_load(slice sc_0) inline {
+    var v'initialHolder = sc_0~load_msg_addr();
+    var v'jettonContent = sc_0~load_ref();
+    var v'initialized = sc_0~load_int(1);
+    var v'totalSupply = sc_0~load_varuint16();
+    return (sc_0, (v'initialHolder, v'jettonContent, v'initialized, v'totalSupply));
+}
+
+(slice, ((slice, cell))) $GramPadTokenMaster$init$_load(slice sc_0) inline {
+    var v'initialHolder = sc_0~load_msg_addr();
+    var v'jettonContent = sc_0~load_ref();
+    return (sc_0, (v'initialHolder, v'jettonContent));
+}
+
+(slice, cell, int, int) $GramPadTokenMaster$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$GramPadTokenMaster$_load();
+    }
+    else {
+        (slice $initialHolder, cell $jettonContent) = $sc~$GramPadTokenMaster$init$_load();
+        $sc.end_parse();
+        return $GramPadTokenMaster$_contract_init($initialHolder, $jettonContent);
+    }
+}
+
+() $GramPadTokenMaster$_contract_store((slice, cell, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $GramPadTokenMaster$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract GramPadTokenMaster functions
+;;
+
+(slice, cell, int, int) $GramPadTokenMaster$_contract_init(slice $initialHolder, cell $jettonContent) impure inline {
+    var (($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply)) = (null(), null(), null(), null());
+    $self'initialHolder = $initialHolder;
+    $self'jettonContent = $jettonContent;
+    $self'initialized = false;
+    $self'totalSupply = 1000000000000000000;
+    return ($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply);
+}
+
+cell $global_makeTakeWalletAddressMessage((int) $targetWallet, (int, slice, int) $msg) impure inline {
+    var (($targetWallet'hash)) = $targetWallet;
+    var (($msg'queryId, $msg'ownerAddress, $msg'includeAddress)) = $msg;
+    return $Builder$_fun_endCell($Builder$_fun_storeMaybeRef(($msg'includeAddress ? $Builder$_fun_endCell($Builder$_fun_storeAddress($global_beginCell(), $msg'ownerAddress)) : null()), $Builder$_fun_storeBasechainAddress(store_uint(store_uint($global_beginCell(), 3513996288, 32), $msg'queryId, 64), ($targetWallet'hash))));
+}
+
+(cell, cell) $global_getGramxWalletInit(slice $owner) impure inline {
+    return $GramPadTokenWallet$_init_child(0, $owner, $global_myAddress());
+}
+
+((slice, cell, int, int), (int, int, slice, cell, cell)) $GramPadTokenMaster$_fun_get_jetton_data((slice, cell, int, int) $self) impure inline {
+    var (($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply)) = $self;
+    var $fresh$ret_5 = $JettonMasterData$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode($self'totalSupply, false, $self'initialHolder, $self'jettonContent, $GramPadTokenWallet$_code_child());
+    return (($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply), $fresh$ret_5);
+}
+
+((slice, cell, int, int), slice) $GramPadTokenMaster$_fun_get_wallet_address((slice, cell, int, int) $self, slice $ownerAddress) impure inline {
+    var (($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply)) = $self;
+    var $fresh$ret_6 = $global_contractAddress($global_getGramxWalletInit($ownerAddress));
+    return (($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply), $fresh$ret_6);
+}
+
+((slice, cell, int, int), int) $GramPadTokenMaster$_fun_is_initialized((slice, cell, int, int) $self) impure inline {
+    var (($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply)) = $self;
+    var $fresh$ret_7 = $self'initialized;
+    return (($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply), $fresh$ret_7);
+}
+
+;;
+;; Get methods of a Contract GramPadTokenMaster
+;;
+
+_ %get_jetton_data() method_id(106029) {
+    var self = $GramPadTokenMaster$_contract_load();
+    var res = self~$GramPadTokenMaster$_fun_get_jetton_data();
+    return $JettonMasterData$_to_external(res);
+}
+
+_ %get_wallet_address(slice $ownerAddress) method_id(103289) {
+    slice $ownerAddress = $ownerAddress;
+    var self = $GramPadTokenMaster$_contract_load();
+    var res = self~$GramPadTokenMaster$_fun_get_wallet_address($ownerAddress);
+    return res;
+}
+
+_ %is_initialized() method_id(94011) {
+    var self = $GramPadTokenMaster$_contract_load();
+    var res = self~$GramPadTokenMaster$_fun_is_initialized();
+    return res;
+}
+
+;;
+;; Routing of a Contract GramPadTokenMaster
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply) = $GramPadTokenMaster$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) {
+        ;; Skip 0xFFFFFFFF prefix of a bounced message
+        in_msg~skip_bits(32);
+        int op = 0;
+        if (slice_bits(in_msg) >= 32) {
+            op = in_msg~load_uint(32);
+        }
+        ;; Bounced handler for JettonTransferInternal message
+        if (op == 0x178d4519) {
+            var ($msg'queryId, $msg'amount) = in_msg~$JettonTransferInternal$_load_bounced();
+            if (($msg'amount == 1000000000000000000)) {
+                $self'initialized = false;
+            }
+            $GramPadTokenMaster$_contract_store(($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply));
+            return ();
+        }
+        
+        return ();
+    }
+    var op = in_msg~load_opcode_internal();
+    ;; Receive DeployToken message
+    if (op == 0x946a98b6) {
+        var $msg'queryId = in_msg~load_uint(64);
+        throw_unless(7046, (~ $self'initialized));
+        $global_forceBasechain($self'initialHolder);
+        throw_unless(18402, ($Context$_get_value(__tact_context_get()) >= 500000000));
+        $self'initialized = true;
+        $global_nativeReserve(10000000, 2);
+        $global_deploy($DeployParameters$_constructor_value_bounce_mode_body_init(100000000, true, 17, $JettonTransferInternal$_store_cell($JettonTransferInternal$_constructor_queryId_amount_sender_responseDestination_forwardTonAmount_forwardPayload($msg'queryId, 1000000000000000000, $self'initialHolder, $self'initialHolder, 0, __gen_slice_slice_5331fed036518120c7f345726537745c5929b8ea1fa37b99b2bb58f702671541()), begin_cell()), $global_getGramxWalletInit($self'initialHolder)));
+        $GramPadTokenMaster$_contract_store(($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply));
+        return ();
+    }
+    
+    ;; Receive ProvideWalletAddress message
+    if (op == 0x2c76b973) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'ownerAddress = in_msg~load_msg_addr();
+        var $msg'includeAddress = in_msg~load_int(1);
+        int $ownerWorkchain = $StdAddress$_get_workchain($global_parseStdAddress($Address$_fun_asSlice($msg'ownerAddress)));
+        var ($targetWallet'hash) = (($ownerWorkchain == 0) ? $global_contractBasechainAddress($global_getGramxWalletInit($msg'ownerAddress)) : $global_emptyBasechainAddress());
+        $global_message($MessageParameters$_constructor_body_to_value_mode($global_makeTakeWalletAddressMessage(($targetWallet'hash), ($msg'queryId, $msg'ownerAddress, $msg'includeAddress)), __tact_context_get_sender(), 0, 64));
+        $GramPadTokenMaster$_contract_store(($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply));
+        return ();
+    }
+    
+    ;; Receive JettonBurnNotification message
+    if (op == 0x7bdd97de) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_varuint16();
+        var $msg'sender = in_msg~load_msg_addr();
+        var $msg'responseDestination = in_msg~__tact_load_address_opt();
+        var ($messageSender'workchain, $messageSender'address) = $global_parseStdAddress($Address$_fun_asSlice(__tact_context_get_sender()));
+        var ($expectedWallet'hash) = $global_contractBasechainAddress($global_getGramxWalletInit($msg'sender));
+        throw_unless(34393, ( (($messageSender'workchain == 0)) ? (($messageSender'address == __tact_not_null($expectedWallet'hash))) : (false) ));
+        throw_unless(26218, ($msg'amount <= $self'totalSupply));
+        $self'totalSupply = $self'totalSupply - $msg'amount;
+        if ((~ null?($msg'responseDestination))) {
+            $global_message($MessageParameters$_constructor_to_body_value_bounce_mode(__tact_not_null($msg'responseDestination), $JettonExcesses$_store_cell($JettonExcesses$_constructor_queryId($msg'queryId), begin_cell()), 0, false, 66));
+        }
+        $GramPadTokenMaster$_contract_store(($self'initialHolder, $self'jettonContent, $self'initialized, $self'totalSupply));
+        return ();
+    }
+    
+    ;; Throw if not handled
+    throw(130);
+}
+
+
+() __tact_selector_hack_asm() impure asm """
+@atend @ 1 {
+        execute current@ context@ current!
+        {
+            // The core idea of this function is to save gas by avoiding unnecessary dict jump, when recv_internal/recv_external is called
+            // We want to extract recv_internal/recv_external from the dict and select needed function
+            // not by jumping to the needed function by it's index, but by using usual IF statements.
+
+            }END> b> // Close previous builder, now we have a cell of previous code on top of the stack
+
+            <{ // Start of the new code builder
+                SETCP0
+                // Swap the new code builder with the previous code, now we have previous code on top of the stack
+                swap
+                // Transform cell to slice and load first ref from the previous code, now we have the dict on top of the stack
+                <s ref@
+
+                // Extract the recv_internal from the dict
+                dup 0 swap @procdictkeylen idict@ { "internal shortcut error" abort } ifnot
+                swap
+
+                // Delete the recv_internal from the dict
+                0 swap @procdictkeylen idict- drop
+                // Delete the recv_external from the dict (it's okay if it's not there)
+                -1 swap @procdictkeylen idict- drop
+                // Delete the __tact_selector_hack from the dict
+                65535 swap @procdictkeylen idict- drop
+
+                // Bring the code builder from the bottom of the stack
+                // because if recv_external extraction is optional, and the number of elements on the stack is not fixed
+                depth 1- roll
+                // Swap with the dict from which we extracted recv_internal and (maybe) recv_external
+                swap
+
+                // Check if the dict is empty
+                dup null?
+                // Store a copy of this flag in the bottom of the stack
+                dup depth 1- -roll
+                {
+                    // If the dict is empty, just drop it (it will be null if it's empty)
+                    drop
+                }
+                {
+                    // If the dict is not empty, prepare continuation to be stored in c3
+                    <{
+                        // Save this dict as first ref in this continuation, it will be pushed in runtime by DICTPUSHCONST
+                        swap @procdictkeylen DICTPUSHCONST
+                        // Jump to the needed function by it's index
+                        DICTIGETJMPZ
+                        // If such key is not found, throw 11 along with the key as an argument
+                        11 THROWARG
+                    }> PUSHCONT
+                    // Store the continuation in c3
+                    c3 POP
+                } cond
+
+                // Function id is on top of the (runtime) stack
+                DUP IFNOTJMP:<{
+                    // place recv_internal here
+                    DROP swap @addop
+                }>
+
+                // Bring back the flag, indicating if the dict is empty or not from the bottom of the stack
+                depth 1- roll
+                {
+                    // If the dict is empty, throw 11
+                    11 THROWARG
+                }
+                {
+                    // If the dict is not empty, jump to continuation from c3
+                    c3 PUSH JMPX
+                } cond
+            }> b>
+        } : }END>c
+        current@ context! current!
+    } does @atend !
+""";
+
+() __tact_selector_hack() method_id(65535) {
+    return __tact_selector_hack_asm();
+}
