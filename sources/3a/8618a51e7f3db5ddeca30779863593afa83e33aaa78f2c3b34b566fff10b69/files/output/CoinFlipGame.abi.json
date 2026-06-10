@@ -1,0 +1,523 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "CoinFlipGame",
+  "author": "TON Coin Flip",
+  "version": "0.1.0",
+  "description": "Single coin-flip game: escrow, commit-reveal, payouts",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JoinGame"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Reveal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimTimeout"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelGame"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GameStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GameConfig"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GameConfigExt"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EvGameJoined"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EvGameSettled"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EvGameTimedOut"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EvGameCancelled"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GameData"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "GameConfigExt",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GameConfig",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "gameId",
+          "ty_idx": 11
+        },
+        {
+          "name": "factory",
+          "ty_idx": 7
+        },
+        {
+          "name": "creator",
+          "ty_idx": 7
+        },
+        {
+          "name": "stake",
+          "ty_idx": 6
+        },
+        {
+          "name": "aSideHeads",
+          "ty_idx": 5
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 19
+        },
+        {
+          "name": "revealTimeout",
+          "ty_idx": 9
+        },
+        {
+          "name": "joinDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "ext",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GameStorage",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 22
+        },
+        {
+          "name": "status",
+          "ty_idx": 23
+        },
+        {
+          "name": "opponent",
+          "ty_idx": 24
+        },
+        {
+          "name": "seedB",
+          "ty_idx": 13
+        },
+        {
+          "name": "revealDeadline",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GameData",
+      "ty_idx": 29,
+      "fields": [
+        {
+          "name": "gameId",
+          "ty_idx": 11
+        },
+        {
+          "name": "factory",
+          "ty_idx": 7
+        },
+        {
+          "name": "creator",
+          "ty_idx": 7
+        },
+        {
+          "name": "stake",
+          "ty_idx": 6
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "aSideHeads",
+          "ty_idx": 5
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 19
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "joinDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "status",
+          "ty_idx": 23
+        },
+        {
+          "name": "opponent",
+          "ty_idx": 24
+        },
+        {
+          "name": "seedB",
+          "ty_idx": 13
+        },
+        {
+          "name": "revealDeadline",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JoinGame",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 3237085185,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "seedB",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Reveal",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 3237085186,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "secretA",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimTimeout",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 3237085187,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "CancelGame",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 3237085188,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "EvGameJoined",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 3237871618,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "gameId",
+          "ty_idx": 11
+        },
+        {
+          "name": "opponent",
+          "ty_idx": 7
+        },
+        {
+          "name": "seedB",
+          "ty_idx": 13
+        },
+        {
+          "name": "revealDeadline",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EvGameSettled",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 3237871619,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "gameId",
+          "ty_idx": 11
+        },
+        {
+          "name": "coinIsHeads",
+          "ty_idx": 5
+        },
+        {
+          "name": "winner",
+          "ty_idx": 7
+        },
+        {
+          "name": "payout",
+          "ty_idx": 6
+        },
+        {
+          "name": "fee",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EvGameTimedOut",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 3237871620,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "gameId",
+          "ty_idx": 11
+        },
+        {
+          "name": "winner",
+          "ty_idx": 7
+        },
+        {
+          "name": "payout",
+          "ty_idx": 6
+        },
+        {
+          "name": "fee",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EvGameCancelled",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 3237871621,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "gameId",
+          "ty_idx": 11
+        },
+        {
+          "name": "refund",
+          "ty_idx": 6
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 17
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 121383,
+      "name": "gameData",
+      "parameters": [],
+      "return_ty_idx": 29
+    },
+    {
+      "tvm_method_id": 126344,
+      "name": "gameStatus",
+      "parameters": [],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotCreator",
+      "err_code": 101
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SelfPlayNotAllowed",
+      "err_code": 106
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongState",
+      "err_code": 107
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.JoinDeadlinePassed",
+      "err_code": 108
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.EscrowUnderfunded",
+      "err_code": 109
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.CommitmentMismatch",
+      "err_code": 110
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RevealDeadlinePassed",
+      "err_code": 111
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RevealDeadlineNotReached",
+      "err_code": 112
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
