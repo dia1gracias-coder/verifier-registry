@@ -1,0 +1,485 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "CoinFlipFactory",
+  "author": "TON Coin Flip",
+  "version": "0.2.0",
+  "description": "Coin-flip platform: creates per-game escrow contracts, holds platform params",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreateGame"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetFee"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetLimits"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetTreasury"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGameCode"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposeAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelAdminTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryGov"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EvGameCreated"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GovernanceData"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "FactoryGov",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "pendingAdmin",
+          "ty_idx": 25
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryStorage",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "gov",
+          "ty_idx": 26
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 15
+        },
+        {
+          "name": "minStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "maxStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "joinTimeout",
+          "ty_idx": 9
+        },
+        {
+          "name": "revealTimeout",
+          "ty_idx": 9
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "gamesCount",
+          "ty_idx": 11
+        },
+        {
+          "name": "gameCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GovernanceData",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "pendingAdmin",
+          "ty_idx": 25
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CreateGame",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 3237019649,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "stake",
+          "ty_idx": 6
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "aSideHeads",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetFee",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 3237019650,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "feeBps",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetLimits",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 3237019651,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "minStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "maxStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "joinTimeout",
+          "ty_idx": 9
+        },
+        {
+          "name": "revealTimeout",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetTreasury",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 3237019652,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetPaused",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 3237019653,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetGameCode",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 3237019654,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "code",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposeAdmin",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 3237019655,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "newAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimAdmin",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 3237019656,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "CancelAdminTransfer",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 3237019657,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "EvGameCreated",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 3237871617,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "gameId",
+          "ty_idx": 11
+        },
+        {
+          "name": "game",
+          "ty_idx": 7
+        },
+        {
+          "name": "creator",
+          "ty_idx": 7
+        },
+        {
+          "name": "stake",
+          "ty_idx": 6
+        },
+        {
+          "name": "joinDeadline",
+          "ty_idx": 9
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 23
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [
+    {
+      "body_ty_idx": 27
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 107504,
+      "name": "factoryData",
+      "parameters": [],
+      "return_ty_idx": 23
+    },
+    {
+      "tvm_method_id": 100798,
+      "name": "gamesCount",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 71736,
+      "name": "governance",
+      "parameters": [],
+      "return_ty_idx": 28
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotAdmin",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.GamePaused",
+      "err_code": 102
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidStake",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.FeeTooHigh",
+      "err_code": 105
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidLimits",
+      "err_code": 113
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotPendingAdmin",
+      "err_code": 114
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NoPendingAdmin",
+      "err_code": 115
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
