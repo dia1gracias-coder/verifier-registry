@@ -1,0 +1,527 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "StakeVault",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StakeDeposit"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StakeRequestUnbond"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StakeWithdraw"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StakeKeeperWithdraw"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StakeSlash"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReceiptTopUp"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VaultStorage"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VaultConfig"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SlashConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReceiptMint"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReceiptBurn"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VaultState"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "ReceiptMint",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1397443335,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReceiptBurn",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 1397443334,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReceiptTopUp",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1397443328,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SlashConfig",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "redundancyPool",
+          "ty_idx": 7
+        },
+        {
+          "name": "splitChallengerBps",
+          "ty_idx": 22
+        },
+        {
+          "name": "splitRedundancyBps",
+          "ty_idx": 22
+        },
+        {
+          "name": "splitBurnBps",
+          "ty_idx": 22
+        },
+        {
+          "name": "splitTreasuryBps",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "VaultConfig",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "minStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "unbondingPeriod",
+          "ty_idx": 9
+        },
+        {
+          "name": "challengeWindow",
+          "ty_idx": 9
+        },
+        {
+          "name": "keeperGrace",
+          "ty_idx": 9
+        },
+        {
+          "name": "keeperBountyBps",
+          "ty_idx": 22
+        },
+        {
+          "name": "slasher",
+          "ty_idx": 7
+        },
+        {
+          "name": "receiptWalletCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "slash",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "VaultStorage",
+      "ty_idx": 19,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "staked",
+          "ty_idx": 6
+        },
+        {
+          "name": "unbondingAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "unbondingAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "totalSupply",
+          "ty_idx": 6
+        },
+        {
+          "name": "bindingHash",
+          "ty_idx": 20
+        },
+        {
+          "name": "config",
+          "ty_idx": 25
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StakeDeposit",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1397443329,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StakeRequestUnbond",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1397443330,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StakeWithdraw",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1397443331,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StakeKeeperWithdraw",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1397443332,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StakeSlash",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1397443333,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "reason",
+          "ty_idx": 17
+        },
+        {
+          "name": "challenger",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "VaultState",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "staked",
+          "ty_idx": 6
+        },
+        {
+          "name": "unbondingAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "unbondingAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "totalSupply",
+          "ty_idx": 6
+        },
+        {
+          "name": "eligible",
+          "ty_idx": 5
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 19
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 18
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 103269,
+      "name": "get_vault_state",
+      "parameters": [],
+      "return_ty_idx": 28
+    },
+    {
+      "tvm_method_id": 80293,
+      "name": "get_owner",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 91632,
+      "name": "get_binding_hash",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 111293,
+      "name": "get_receipt_wallet_address",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 69178,
+      "name": "is_eligible",
+      "parameters": [],
+      "return_ty_idx": 5
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_OWNER",
+      "err_code": 132
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_ENOUGH_GAS",
+      "err_code": 137
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_SLASHER",
+      "err_code": 200
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOTHING_TO_UNBOND",
+      "err_code": 201
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_UNBOND_IN_PROGRESS",
+      "err_code": 202
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_COOLDOWN_NOT_ELAPSED",
+      "err_code": 203
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NO_UNBONDING",
+      "err_code": 204
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_KEEPER_TOO_EARLY",
+      "err_code": 205
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_SLASH_EXCEEDS_STAKE",
+      "err_code": 206
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_SPLIT",
+      "err_code": 207
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_OP",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
