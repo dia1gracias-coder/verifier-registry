@@ -1,0 +1,288 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "JobEscrow",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowSettle"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 6
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowRefund"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowTopUp"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowTerms"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowState"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "EscrowTerms",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "expectedHash",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowStorage",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "requester",
+          "ty_idx": 7
+        },
+        {
+          "name": "arbiter",
+          "ty_idx": 7
+        },
+        {
+          "name": "escrowAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "settled",
+          "ty_idx": 5
+        },
+        {
+          "name": "terms",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowSettle",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1163084546,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "resultHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "winner",
+          "ty_idx": 7
+        },
+        {
+          "name": "winnerAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "platformFee",
+          "ty_idx": 6
+        },
+        {
+          "name": "participants",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowRefund",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1163084547,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowTopUp",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1163084544,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowState",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "escrowAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "settled",
+          "ty_idx": 5
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 17
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 105076,
+      "name": "get_escrow_state",
+      "parameters": [],
+      "return_ty_idx": 20
+    },
+    {
+      "tvm_method_id": 99806,
+      "name": "get_requester",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 70616,
+      "name": "get_expected_hash",
+      "parameters": [],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_ARBITER",
+      "err_code": 222
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_HASH_MISMATCH",
+      "err_code": 223
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_ALREADY_SETTLED",
+      "err_code": 224
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_TIMEOUT_NOT_REACHED",
+      "err_code": 225
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_PAYOUT_EXCEEDS_ESCROW",
+      "err_code": 226
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_OP",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
