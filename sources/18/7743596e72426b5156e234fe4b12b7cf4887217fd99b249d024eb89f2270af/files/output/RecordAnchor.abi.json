@@ -1,0 +1,431 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "RecordAnchor",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AnchorSubmitRoot"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AnchorOpenDispute"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MerkleStep"
+    },
+    {
+      "kind": "uintN",
+      "n": 1
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AnchorResolveDispute"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AnchorStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DisputeInfo"
+    },
+    {
+      "kind": "uintN",
+      "n": 2
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AnchorConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AnchorState"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 21,
+      "stack_type_id": 133,
+      "stack_width": 6
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "MerkleStep",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "dir",
+          "ty_idx": 16
+        },
+        {
+          "name": "sibling",
+          "ty_idx": 13
+        },
+        {
+          "name": "next",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AnchorConfig",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "minStakeWeight",
+          "ty_idx": 6
+        },
+        {
+          "name": "disputeBondMin",
+          "ty_idx": 6
+        },
+        {
+          "name": "verdictAuthority",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DisputeInfo",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "challenger",
+          "ty_idx": 7
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "leaf",
+          "ty_idx": 13
+        },
+        {
+          "name": "bond",
+          "ty_idx": 6
+        },
+        {
+          "name": "status",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AnchorStorage",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "currentEpoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "lastRoot",
+          "ty_idx": 13
+        },
+        {
+          "name": "nextDisputeId",
+          "ty_idx": 9
+        },
+        {
+          "name": "disputes",
+          "ty_idx": 23
+        },
+        {
+          "name": "config",
+          "ty_idx": 25
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AnchorSubmitRoot",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1095648001,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "root",
+          "ty_idx": 13
+        },
+        {
+          "name": "prevRoot",
+          "ty_idx": 13
+        },
+        {
+          "name": "stakeWeight",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AnchorOpenDispute",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1095648002,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "epoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "leaf",
+          "ty_idx": 13
+        },
+        {
+          "name": "claimedRoot",
+          "ty_idx": 13
+        },
+        {
+          "name": "proof",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AnchorResolveDispute",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1095648003,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "disputeId",
+          "ty_idx": 9
+        },
+        {
+          "name": "upheld",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AnchorState",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "currentEpoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "lastRoot",
+          "ty_idx": 13
+        },
+        {
+          "name": "nextDisputeId",
+          "ty_idx": 9
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 20
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 19
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 77020,
+      "name": "get_anchor_state",
+      "parameters": [],
+      "return_ty_idx": 26
+    },
+    {
+      "tvm_method_id": 95366,
+      "name": "get_dispute",
+      "parameters": [
+        {
+          "name": "disputeId",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 27
+    },
+    {
+      "tvm_method_id": 114529,
+      "name": "verify_inclusion",
+      "parameters": [
+        {
+          "name": "leaf",
+          "ty_idx": 1
+        },
+        {
+          "name": "root",
+          "ty_idx": 1
+        },
+        {
+          "name": "proof",
+          "ty_idx": 18
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 87955,
+      "name": "compute_root",
+      "parameters": [
+        {
+          "name": "leaf",
+          "ty_idx": 1
+        },
+        {
+          "name": "proof",
+          "ty_idx": 18
+        }
+      ],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_BAD_PREV_ROOT",
+      "err_code": 240
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_EPOCH_REGRESSION",
+      "err_code": 241
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INSUFFICIENT_ANCHOR_STAKE",
+      "err_code": 242
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_BAD_INCLUSION_PROOF",
+      "err_code": 243
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_DISPUTE_BOND_TOO_LOW",
+      "err_code": 244
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NO_SUCH_DISPUTE",
+      "err_code": 245
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_VERDICT_AUTHORITY",
+      "err_code": 246
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_OP",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
