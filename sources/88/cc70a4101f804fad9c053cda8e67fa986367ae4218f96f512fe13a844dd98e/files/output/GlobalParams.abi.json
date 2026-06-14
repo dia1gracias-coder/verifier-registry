@@ -1,0 +1,407 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "GlobalParams",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UpdateParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EcoParams"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UpdateAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetBlocklisted"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GlobalParamsStorage"
+    },
+    {
+      "kind": "uintN",
+      "n": 1
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 19,
+      "value_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ParamsUpdated"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GlobalParamsView"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "EcoParams",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "platformFeeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "surchargeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "participationCommissionBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "slashWrongBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "slashCheatBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "slashDowntimeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "slashEquivocationBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "splitChallengerBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "splitRedundancyBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "splitBurnBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "splitTreasuryBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "minStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "minStakeInternal",
+          "ty_idx": 6
+        },
+        {
+          "name": "minStakeSensitive",
+          "ty_idx": 6
+        },
+        {
+          "name": "stakeCap",
+          "ty_idx": 6
+        },
+        {
+          "name": "unbondingSecs",
+          "ty_idx": 9
+        },
+        {
+          "name": "challengeWindowSecs",
+          "ty_idx": 9
+        },
+        {
+          "name": "nPublic",
+          "ty_idx": 15
+        },
+        {
+          "name": "nDefault",
+          "ty_idx": 15
+        },
+        {
+          "name": "nMax",
+          "ty_idx": 15
+        },
+        {
+          "name": "quorum",
+          "ty_idx": 15
+        },
+        {
+          "name": "checksumMin",
+          "ty_idx": 15
+        },
+        {
+          "name": "wQualityBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "wStakeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "wPriceBps",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GlobalParamsStorage",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "params",
+          "ty_idx": 16
+        },
+        {
+          "name": "blocklist",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UpdateParams",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1196441857,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "feeRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "params",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UpdateAdmin",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1196441858,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetBlocklisted",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1196441859,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "subject",
+          "ty_idx": 19
+        },
+        {
+          "name": "blocked",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ParamsUpdated",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "platformFeeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "minStake",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GlobalParamsView",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "params",
+          "ty_idx": 16
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 20
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [
+    {
+      "body_ty_idx": 23
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 115150,
+      "name": "get_params",
+      "parameters": [],
+      "return_ty_idx": 24
+    },
+    {
+      "tvm_method_id": 113142,
+      "name": "get_admin",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 87866,
+      "name": "get_fee_recipient",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 114007,
+      "name": "get_blocklisted",
+      "parameters": [
+        {
+          "name": "subject",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 5
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_ADMIN",
+      "err_code": 260
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_PARAMS_OUT_OF_BOUNDS",
+      "err_code": 261
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_OP",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
