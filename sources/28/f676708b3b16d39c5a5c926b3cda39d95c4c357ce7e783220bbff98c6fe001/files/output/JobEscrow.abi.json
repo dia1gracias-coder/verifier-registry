@@ -1,0 +1,404 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "JobEscrow",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowSettle"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 6
+    },
+    {
+      "kind": "uintN",
+      "n": 1
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 15
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowRefund"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowTopUp"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowClaim"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowTerms"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowPayout"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EscrowState"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "EscrowTerms",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "expectedHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "candidatesHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "paramsVersion",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowStorage",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "requester",
+          "ty_idx": 7
+        },
+        {
+          "name": "arbiter",
+          "ty_idx": 7
+        },
+        {
+          "name": "escrowAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "settled",
+          "ty_idx": 5
+        },
+        {
+          "name": "terms",
+          "ty_idx": 22
+        },
+        {
+          "name": "pending",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowSettle",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1163084546,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "resultHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "winner",
+          "ty_idx": 7
+        },
+        {
+          "name": "winnerAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "platformFee",
+          "ty_idx": 6
+        },
+        {
+          "name": "participants",
+          "ty_idx": 14
+        },
+        {
+          "name": "candidates",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowRefund",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1163084547,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowTopUp",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1163084544,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowClaim",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1163084548,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowPayout",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1163084549,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EscrowState",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "escrowAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "settled",
+          "ty_idx": 5
+        },
+        {
+          "name": "paramsVersion",
+          "ty_idx": 9
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 20
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 23
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 105076,
+      "name": "get_escrow_state",
+      "parameters": [],
+      "return_ty_idx": 24
+    },
+    {
+      "tvm_method_id": 78030,
+      "name": "get_params_version",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 99806,
+      "name": "get_requester",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 70616,
+      "name": "get_expected_hash",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 106989,
+      "name": "get_candidates_hash",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 100182,
+      "name": "get_pending",
+      "parameters": [
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "ErrCode.NOT_ARBITER",
+      "err_code": 222
+    },
+    {
+      "kind": "enum_member",
+      "name": "ErrCode.HASH_MISMATCH",
+      "err_code": 223
+    },
+    {
+      "kind": "enum_member",
+      "name": "ErrCode.ALREADY_SETTLED",
+      "err_code": 224
+    },
+    {
+      "kind": "enum_member",
+      "name": "ErrCode.TIMEOUT_NOT_REACHED",
+      "err_code": 225
+    },
+    {
+      "kind": "enum_member",
+      "name": "ErrCode.PAYOUT_EXCEEDS_ESCROW",
+      "err_code": 226
+    },
+    {
+      "kind": "enum_member",
+      "name": "ErrCode.NOT_OWNER_SIG",
+      "err_code": 280
+    },
+    {
+      "kind": "enum_member",
+      "name": "ErrCode.SETTLE_POLICY_MISMATCH",
+      "err_code": 281
+    },
+    {
+      "kind": "enum_member",
+      "name": "ErrCode.TOO_MANY_PARTICIPANTS",
+      "err_code": 282
+    },
+    {
+      "kind": "enum_member",
+      "name": "ErrCode.INVALID_OP",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
