@@ -1,0 +1,545 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "NftCollection",
+  "author": "Pirate Station",
+  "version": "1.0",
+  "description": "Pirate Station NFT Collection with public mint. TEP-62 and TEP-64 compatible",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Mint"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AdminMint"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestRoyaltyParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeCollectionAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeCollectionContent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionContent"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeMintPrice"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawFunds"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftCollectionStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoyaltyParams"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftItemInitAtDeployment"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseRoyaltyParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OffchainMetadataReply"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 30
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MintDataReply"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "NftItemInitAtDeployment",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "content",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Mint",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1298755188,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AdminMint",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 7,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestRoyaltyParams",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1765620048,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeCollectionAdmin",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 3,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newAdminAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeCollectionContent",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 4,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newContent",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeMintPrice",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 5,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newMintPrice",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawFunds",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 6,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseRoyaltyParams",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 2831876269,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "royaltyParams",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RoyaltyParams",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "numerator",
+          "ty_idx": 24
+        },
+        {
+          "name": "denominator",
+          "ty_idx": 24
+        },
+        {
+          "name": "royaltyAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionContent",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "collectionMetadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "commonContent",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftCollectionStorage",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "adminAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "content",
+          "ty_idx": 19
+        },
+        {
+          "name": "nftItemCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "royaltyParams",
+          "ty_idx": 25
+        },
+        {
+          "name": "mintPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "maxSupply",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionDataReply",
+      "ty_idx": 29,
+      "fields": [
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "collectionMetadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "adminAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MintDataReply",
+      "ty_idx": 32,
+      "fields": [
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "maxSupply",
+          "ty_idx": 1
+        },
+        {
+          "name": "mintPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "adminAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OffchainMetadataReply",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "string",
+          "ty_idx": 18
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 22
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102491,
+      "name": "get_collection_data",
+      "parameters": [],
+      "return_ty_idx": 29
+    },
+    {
+      "tvm_method_id": 92067,
+      "name": "get_nft_address_by_index",
+      "parameters": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 85719,
+      "name": "royalty_params",
+      "parameters": [],
+      "return_ty_idx": 23
+    },
+    {
+      "tvm_method_id": 68445,
+      "name": "get_nft_content",
+      "parameters": [
+        {
+          "name": "_itemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "individualNftContent",
+          "ty_idx": 18
+        }
+      ],
+      "return_ty_idx": 31
+    },
+    {
+      "tvm_method_id": 73144,
+      "name": "get_mint_data",
+      "parameters": [],
+      "return_ty_idx": 32
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.TooSmallRestAmount",
+      "err_code": 402
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromAdmin",
+      "err_code": 403
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SoldOut",
+      "err_code": 600
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientPayment",
+      "err_code": 601
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
