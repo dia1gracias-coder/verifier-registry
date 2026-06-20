@@ -1,0 +1,476 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "LmsrMarketMaker",
+  "author": "Hossein Boustani",
+  "version": "0.1.0",
+  "description": "LMSR Market Maker for TON Prediction Market - automated pricing and trade execution",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Pause"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Resume"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Close"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeFee"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeFunding"
+    },
+    {
+      "kind": "intN",
+      "n": 128
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawFees"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SellTrade"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketStorage"
+    },
+    {
+      "kind": "uintN",
+      "n": 128
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketState"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 17
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 27
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 25
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "MarketConfig",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "conditionRegistry",
+          "ty_idx": 7
+        },
+        {
+          "name": "collateralToken",
+          "ty_idx": 7
+        },
+        {
+          "name": "jettonWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "conditionIds",
+          "ty_idx": 3
+        },
+        {
+          "name": "outcomeSlotCounts",
+          "ty_idx": 3
+        }
+      ],
+      "description": "Market configuration stored in a separate cell reference"
+    },
+    {
+      "kind": "struct",
+      "name": "MarketState",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "positionBalances",
+          "ty_idx": 26
+        },
+        {
+          "name": "positionIds",
+          "ty_idx": 28
+        },
+        {
+          "name": "accumulatedFees",
+          "ty_idx": 21
+        }
+      ],
+      "description": "Market state data stored in a separate cell reference"
+    },
+    {
+      "kind": "struct",
+      "name": "MarketStorage",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "atomicOutcomeSlotCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "funding",
+          "ty_idx": 21
+        },
+        {
+          "name": "fee",
+          "ty_idx": 11
+        },
+        {
+          "name": "stage",
+          "ty_idx": 22
+        },
+        {
+          "name": "config",
+          "ty_idx": 24
+        },
+        {
+          "name": "state",
+          "ty_idx": 29
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Pause",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 19,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Resume",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 20,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Close",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 21,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeFee",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 22,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newFee",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeFunding",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 23,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "fundingChange",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawFees",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 24,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SellTrade",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 18,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "outcomeTokenAmounts",
+          "ty_idx": 3
+        },
+        {
+          "name": "minCollateralReturn",
+          "ty_idx": 6
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 20
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 83229,
+      "name": "owner",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 96565,
+      "name": "stage",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 90219,
+      "name": "funding",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 90467,
+      "name": "calcMarginalPrice",
+      "parameters": [
+        {
+          "name": "outcomeIndex",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1,
+      "description": "Compute the marginal price for a given outcome index.\nprice_i = exp(q_i / b) / sum(exp(q_j / b)) for all j\nUses the offset technique in log2 space (same as lmsrCost) to prevent overflow.\nReturns price in Q64.64 format."
+    },
+    {
+      "tvm_method_id": 74139,
+      "name": "getNetCost",
+      "parameters": [
+        {
+          "name": "tradeAmounts",
+          "ty_idx": 3
+        }
+      ],
+      "return_ty_idx": 1,
+      "description": "Compute the net cost of a trade without executing it.\nTakes a trade amounts cell (array of int64 values) and returns net cost in raw token units."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.NotOwner",
+      "err_code": 300
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.MarketAlreadyInitialized",
+      "err_code": 301
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.ZeroFunding",
+      "err_code": 302
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.MarketNotRunning",
+      "err_code": 303
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.MarketNotPaused",
+      "err_code": 304
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.MarketClosed",
+      "err_code": 305
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.InvalidTradeAmounts",
+      "err_code": 306
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.CollateralLimitExceeded",
+      "err_code": 307
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.InsufficientCollateral",
+      "err_code": 308
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.ZeroFundingChange",
+      "err_code": 309
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.InsufficientGas",
+      "err_code": 310
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 400
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "MarketErrors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
