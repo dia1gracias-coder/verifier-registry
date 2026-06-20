@@ -1,0 +1,402 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "ConditionRegistry",
+  "author": "Hossein Boustani",
+  "version": "0.1.0",
+  "description": "Condition Registry for TON Prediction Market - manages conditions, positions, split/merge/redeem",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PrepareCondition"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReportPayouts"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MergePositions"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RedeemPositions"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RegistryStorage"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 3
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 6
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        7,
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "RegistryStorage",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "jettonWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "conditions",
+          "ty_idx": 19
+        },
+        {
+          "name": "balances",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PrepareCondition",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "oracle",
+          "ty_idx": 7
+        },
+        {
+          "name": "questionId",
+          "ty_idx": 13
+        },
+        {
+          "name": "outcomeSlotCount",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReportPayouts",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 2,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "questionId",
+          "ty_idx": 13
+        },
+        {
+          "name": "payoutCount",
+          "ty_idx": 14
+        },
+        {
+          "name": "payouts",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MergePositions",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 4,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "collateralToken",
+          "ty_idx": 7
+        },
+        {
+          "name": "parentCollectionId",
+          "ty_idx": 13
+        },
+        {
+          "name": "conditionId",
+          "ty_idx": 13
+        },
+        {
+          "name": "partitionCount",
+          "ty_idx": 14
+        },
+        {
+          "name": "partition",
+          "ty_idx": 3
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RedeemPositions",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 5,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "collateralToken",
+          "ty_idx": 7
+        },
+        {
+          "name": "parentCollectionId",
+          "ty_idx": 13
+        },
+        {
+          "name": "conditionId",
+          "ty_idx": 13
+        },
+        {
+          "name": "indexSetCount",
+          "ty_idx": 14
+        },
+        {
+          "name": "indexSets",
+          "ty_idx": 3
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 18
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 83229,
+      "name": "owner",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 108939,
+      "name": "get_condition",
+      "parameters": [
+        {
+          "name": "conditionId",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 21
+    },
+    {
+      "tvm_method_id": 110284,
+      "name": "compute_condition_id",
+      "parameters": [
+        {
+          "name": "oracle",
+          "ty_idx": 2
+        },
+        {
+          "name": "questionId",
+          "ty_idx": 1
+        },
+        {
+          "name": "outcomeSlotCount",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 110727,
+      "name": "compute_collection_id",
+      "parameters": [
+        {
+          "name": "parentCollectionId",
+          "ty_idx": 1
+        },
+        {
+          "name": "conditionId",
+          "ty_idx": 1
+        },
+        {
+          "name": "indexSet",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 124037,
+      "name": "compute_position_id",
+      "parameters": [
+        {
+          "name": "collateralToken",
+          "ty_idx": 2
+        },
+        {
+          "name": "collectionId",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.InvalidOutcomeCount",
+      "err_code": 200
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.ConditionAlreadyExists",
+      "err_code": 201
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.ConditionNotFound",
+      "err_code": 202
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.ConditionAlreadyResolved",
+      "err_code": 203
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.AllZeroPayouts",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.InvalidPartition",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.InsufficientBalance",
+      "err_code": 207
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.ConditionNotResolved",
+      "err_code": 208
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.InvalidIndexSet",
+      "err_code": 209
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.InsufficientGas",
+      "err_code": 210
+    },
+    {
+      "kind": "enum_member",
+      "name": "RegistryErrors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
