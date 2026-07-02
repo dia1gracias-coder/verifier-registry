@@ -1,0 +1,15 @@
+;; TONCO (Algebra V3 fork) op-codes used by the graduation locker.
+;; Values verified against @toncodex/sdk ContractOpcodes (testnet 1.0.43).
+
+;; Pool: start a burn/collect. Sent BY THE POSITION-NFT OWNER to the pool.
+;; body: op(32) query_id(64) nft_index(64) liquidity2Burn(128) tickLower(24) tickUpper(24)
+;; liquidity2Burn = 0 -> collect accrued fees only, principal untouched.
+int op::poolv3_start_burn() asm "0x530b5f2c PUSHINT";
+
+;; TEP-62 NFT item -> new owner, on transfer completion.
+int op::nft_ownership_assigned() asm "0x05138d91 PUSHINT";
+
+;; TEP-62 NFT transfer (0x5fcc3d14). The locker DELIBERATELY has NO handler that
+;; ever EMITS this towards the NFT item — that is what makes the NFT un-removable.
+;; Declared only for documentation / negative tests.
+int op::nft_transfer() asm "0x5fcc3d14 PUSHINT";

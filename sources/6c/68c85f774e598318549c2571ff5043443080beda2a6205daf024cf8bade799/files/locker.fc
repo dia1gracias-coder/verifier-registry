@@ -1,0 +1,207 @@
+;; ============================================================================
+;; TONCO Graduation LOCKER
+;; ----------------------------------------------------------------------------
+;; Holds the TONCO Position-NFT minted at graduation so that the liquidity it
+;; represents is locked AWAY FROM THE TOKEN CREATOR forever, while swap fees keep
+;; accruing and are forwarded to an immutable recipient.
+;;
+;; RUG-PROOFNESS IS STRUCTURAL, not a promise. This contract physically has:
+;;   * NO handler that emits an NFT transfer (op 0x5fcc3d14) toward the NFT item
+;;     -> the Position NFT can never leave this locker.
+;;   * NO burn with liquidity2Burn > 0 -> principal liquidity can never be pulled.
+;;     The only burn it can emit hard-codes liquidity2Burn = 0 (fees only).
+;;   * NO setter for the fee recipient -> fee destination is fixed at deploy.
+;;   * NO admin / upgrade / set_code path -> nobody gains privileged access.
+;;
+;; The only value-bearing actions it can take are:
+;;   1. COLLECT (permissionless): emit POOLV3_START_BURN(liquidity2Burn=0) so the
+;;      pool pays accrued fees back to this locker (the NFT owner).
+;;   2. SWEEP_JETTON / FORWARD: any jettons or TON that land here are swept to
+;;      fee_recipient. The destination is ALWAYS the immutable fee_recipient, so
+;;      sweep is permissionless and an arbitrary caller can never redirect fees.
+;;
+;; NOTE on collect routing: TONCO pays burn/fee proceeds to the NFT OWNER (this
+;; locker), and the router's jetton pay-out carries forward_ton_amount = 0, so the
+;; locker's jetton wallet does NOT emit a transfer_notification. Fees therefore
+;; accumulate in the locker's jetton wallet and are delivered onward with the
+;; permissionless SWEEP_JETTON op (caller passes the jetton-wallet addr + amount,
+;; read off-chain). TON-side proceeds arrive as plain messages and self-sweep.
+;;
+;; See memory [[locker-spec]] / [[tonco-graduation]].
+;; ============================================================================
+
+#include "imports/stdlib.fc";
+#include "imports/op-codes.fc";
+#include "imports/tonco-op-codes.fc";
+
+;; ===== Locker op codes =====
+const int OP_COLLECT      = 0x636f6c6c;   ;; "coll" — permissionless fee-collection trigger
+const int OP_SWEEP_JETTON = 0x73776a74;   ;; "swjt" — permissionless: push a jetton balance to fee_recipient
+
+;; ===== Gas =====
+int min_ton_storage() asm "150000000 PUSHINT";  ;; 0.15 TON kept for storage rent (freeze safety)
+
+;; ===== Storage =====
+;; storage#_ inited:uint1 nft_index:uint64 tick_lower:int32 tick_upper:int32
+;;           nft_item:MsgAddress pool:MsgAddress fee_recipient:MsgAddress = Storage;
+global int   inited;
+global int   nft_index;
+global int   tick_lower;
+global int   tick_upper;
+global slice nft_item_address;
+global slice pool_address;
+global slice fee_recipient;
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    inited            = ds~load_uint(1);
+    nft_index         = ds~load_uint(64);
+    tick_lower        = ds~load_int(32);
+    tick_upper        = ds~load_int(32);
+    nft_item_address  = ds~load_msg_addr();
+    pool_address      = ds~load_msg_addr();
+    fee_recipient     = ds~load_msg_addr();
+}
+
+() save_data() impure {
+    set_data(begin_cell()
+        .store_uint(inited, 1)
+        .store_uint(nft_index, 64)
+        .store_int(tick_lower, 32)
+        .store_int(tick_upper, 32)
+        .store_slice(nft_item_address)
+        .store_slice(pool_address)
+        .store_slice(fee_recipient)
+        .end_cell());
+}
+
+;; ===== Helpers =====
+
+;; Sweep all free balance (above storage rent) to the immutable fee recipient.
+() sweep_ton_to_recipient() impure {
+    raw_reserve(min_ton_storage(), 2);   ;; reserve AT MOST 0.15 -> never fails on a low balance
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)            ;; nobounce
+        .store_slice(fee_recipient)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+    send_raw_message(msg, 128 + 2);     ;; carry all remaining balance; IGNORE_ERRORS so a
+                                        ;; near-empty top-up (nothing to forward) can't abort
+}
+
+;; Trigger a fees-only collect: POOLV3_START_BURN with liquidity2Burn HARD-CODED 0.
+;; Carries the remaining inbound value (mode 64) so the caller funds the multi-hop
+;; burn; this locker keeps its storage reserve untouched.
+() emit_collect() impure {
+    cell body = begin_cell()
+        .store_uint(op::poolv3_start_burn(), 32)
+        .store_uint(0, 64)              ;; query_id
+        .store_uint(nft_index, 64)
+        .store_uint(0, 128)             ;; liquidity2Burn = 0  <-- principal NEVER withdrawn
+        .store_int(tick_lower, 24)
+        .store_int(tick_upper, 24)
+        .end_cell();
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)            ;; bounceable
+        .store_slice(pool_address)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body)
+        .end_cell();
+    send_raw_message(msg, 64);          ;; carry remaining inbound value
+}
+
+;; Forward a received jetton balance onward to fee_recipient. `jetton_wallet` is
+;; the locker's own jetton wallet (the sender of the transfer_notification).
+() forward_jetton(slice jetton_wallet, int jetton_amount) impure {
+    cell body = begin_cell()
+        .store_uint(op::transfer(), 32)     ;; TEP-74 jetton transfer 0xf8a7ea5
+        .store_uint(0, 64)                  ;; query_id
+        .store_coins(jetton_amount)
+        .store_slice(fee_recipient)         ;; destination = immutable recipient
+        .store_slice(fee_recipient)         ;; response/excess -> recipient
+        .store_uint(0, 1)                   ;; no custom payload
+        .store_coins(0)                     ;; forward_ton_amount
+        .store_uint(0, 1)                   ;; empty forward payload
+        .end_cell();
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)                ;; bounceable
+        .store_slice(jetton_wallet)
+        .store_coins(0)
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(body)
+        .end_cell();
+    send_raw_message(msg, 64);              ;; carry remaining inbound value
+}
+
+;; ===== Entry point =====
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {                        ;; bounced — ignore
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    load_data();
+
+    ;; Empty body = plain TON top-up / unwrapped pTON fee leg -> sweep to recipient.
+    if (in_msg_body.slice_empty?()) {
+        sweep_ton_to_recipient();
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    ;; --- NFT arrived: mark locked. Only the configured NFT item may set this. ---
+    if (op == op::nft_ownership_assigned()) {
+        throw_unless(401, equal_slice_bits(sender_address, nft_item_address));
+        inited = 1;
+        save_data();
+        return ();
+    }
+
+    ;; --- Permissionless collect: emit fees-only START_BURN to the pool. ---
+    if (op == OP_COLLECT) {
+        throw_unless(402, inited);          ;; nothing to collect until NFT is held
+        emit_collect();
+        return ();
+    }
+
+    ;; --- Permissionless sweep: push a jetton balance held by this locker onward
+    ;;     to the immutable fee_recipient. The destination is fixed in code, so the
+    ;;     caller-supplied wallet/amount can only ever move fees TO fee_recipient. ---
+    if (op == OP_SWEEP_JETTON) {
+        slice jetton_wallet = in_msg_body~load_msg_addr();
+        int   amount        = in_msg_body~load_coins();
+        forward_jetton(jetton_wallet, amount);
+        return ();
+    }
+
+    ;; --- Jetton fee received with a notification: forward it to the recipient. ---
+    if (op == op::transfer_notification()) {
+        int jetton_amount = in_msg_body~load_coins();
+        ;; sender_address is this locker's jetton wallet for that jetton.
+        forward_jetton(sender_address, jetton_amount);
+        return ();
+    }
+
+    ;; --- Jetton wallet excesses / any other inbound value -> sweep TON. ---
+    if (op == op::excesses()) {
+        sweep_ton_to_recipient();
+        return ();
+    }
+
+    ;; Unknown op carrying value: still keep funds flowing to the recipient,
+    ;; never trap value in the locker. No branch can ever move the NFT or principal.
+    sweep_ton_to_recipient();
+}
+
+;; ===== Getters =====
+(int, int, int, int, slice, slice, slice) get_locker_data() method_id {
+    load_data();
+    return (inited, nft_index, tick_lower, tick_upper,
+            nft_item_address, pool_address, fee_recipient);
+}
