@@ -1,0 +1,415 @@
+;; PumpFun Factory / Launchpad
+;;
+;; Deploys one bonding_curve (jetton master) per launched token.
+;; Holds the bonding_curve code, jetton_wallet code and the default curve config,
+;; so every token launched shares the same vetted code and economic parameters.
+
+#include "imports/stdlib.fc";
+#include "imports/op-codes.fc";
+#include "imports/params.fc";
+
+const int OP_CREATE_TOKEN  = 0x6372746b;  ;; "crtk"
+const int OP_TOKEN_CREATED = 0x746f6b21;  ;; "tok!"  (reply to creator)
+const int OP_WITHDRAW      = 0x77697464;  ;; "witd"  (admin pulls collected fees)
+const int OP_GRADUATE      = 0x67726164;  ;; "grad"  (curve -> factory -> orchestrator relay)
+
+int deploy_curve_value() asm "100000000 PUSHINT"; ;; 0.1 TON seeded into a new curve
+
+;; ===== Storage =====
+;; storage#_ token_count:uint64 admin:MsgAddress platform:MsgAddress creation_fee:Coins
+;;           bonding_curve_code:^Cell jetton_wallet_code:^Cell
+;;           config:^[ virtual_ton:uint128 curve_supply:uint128 pool_standard:uint128
+;;                     migration_fee:uint128 fee_bps:uint16 ]
+;; pool_standard = the Standard-tier pool liquidity; Fast = /2, Deep = *5/2 (see
+;;   pool_for_grad_tier). The collect target = pool + migration_fee.
+
+global int   token_count;
+global slice admin_address;
+global slice platform_address;
+global int   creation_fee;
+global cell  bonding_curve_code;
+global cell  jetton_wallet_code;
+global cell  orchestrator_code;  ;; per-token graduation orchestrator (Model B)
+global cell  locker_code;        ;; per-token TONCO graduation locker (injected into orchestrator)
+global int   cfg_virtual_ton;
+global int   cfg_curve_supply;
+global int   cfg_pool_standard;   ;; Standard-tier pool liquidity (Fast=/2, Deep=*5/2)
+global int   cfg_migration_fee;   ;; fixed migration fee skimmed to platform at graduation
+global int   cfg_fee_bps;
+global slice tonco_router;             ;; trusted TONCO router (injected into orchestrator)
+global slice tonco_pton_router_wallet; ;; trusted pTON router wallet (injected into orchestrator)
+global cell  tokens_dict;       ;; id(uint64) -> ^[ address:slice ]
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+    token_count        = ds~load_uint(64);
+    admin_address      = ds~load_msg_addr();
+    platform_address   = ds~load_msg_addr();
+    creation_fee       = ds~load_coins();
+    slice codes = ds~load_ref().begin_parse();
+    bonding_curve_code = codes~load_ref();
+    jetton_wallet_code = codes~load_ref();
+    orchestrator_code  = codes~load_ref();
+    locker_code        = codes~load_ref();
+    slice c = ds~load_ref().begin_parse();
+    cfg_virtual_ton    = c~load_uint(128);
+    cfg_curve_supply   = c~load_uint(128);
+    cfg_pool_standard  = c~load_uint(128);
+    cfg_migration_fee  = c~load_uint(128);
+    cfg_fee_bps        = c~load_uint(16);
+    slice tc = c~load_ref().begin_parse();
+    tonco_router             = tc~load_msg_addr();
+    tonco_pton_router_wallet = tc~load_msg_addr();
+    tokens_dict        = ds~load_dict();
+}
+
+() save_data() impure {
+    cell cfg = begin_cell()
+        .store_uint(cfg_virtual_ton, 128)
+        .store_uint(cfg_curve_supply, 128)
+        .store_uint(cfg_pool_standard, 128)
+        .store_uint(cfg_migration_fee, 128)
+        .store_uint(cfg_fee_bps, 16)
+        .store_ref(begin_cell()
+            .store_slice(tonco_router)
+            .store_slice(tonco_pton_router_wallet)
+            .end_cell())
+        .end_cell();
+    cell codes = begin_cell()
+        .store_ref(bonding_curve_code)
+        .store_ref(jetton_wallet_code)
+        .store_ref(orchestrator_code)
+        .store_ref(locker_code)
+        .end_cell();
+    set_data(begin_cell()
+        .store_uint(token_count, 64)
+        .store_slice(admin_address)
+        .store_slice(platform_address)
+        .store_coins(creation_fee)
+        .store_ref(codes)
+        .store_ref(cfg)
+        .store_dict(tokens_dict)
+        .end_cell());
+}
+
+;; ===== Orchestrator address derivation (must mirror orchestrator load_data) =====
+;; init data = { factory:MsgAddress, curve_id:uint64, configured:uint1=0,
+;;               config:^[ router pton_router_wallet platform ^jetton_wallet_code ^locker_code ] }
+;; platform is injected here (immutable) so the orchestrator's locker fee_recipient can
+;; never be set from a message body (audit CRITICAL Attack B).
+cell orchestrator_state_init(int id) inline {
+    cell config = begin_cell()
+        .store_slice(tonco_router)
+        .store_slice(tonco_pton_router_wallet)
+        .store_slice(platform_address)
+        .store_ref(jetton_wallet_code)
+        .store_ref(locker_code)
+        .end_cell();
+    cell data = begin_cell()
+        .store_slice(my_address())
+        .store_uint(id, 64)
+        .store_uint(0, 1)
+        .store_ref(config)
+        .end_cell();
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_dict(orchestrator_code)
+        .store_dict(data)
+        .store_uint(0, 1)
+        .end_cell();
+}
+
+slice orchestrator_address_by_id(int id) inline {
+    cell state_init = orchestrator_state_init(id);
+    return begin_cell().store_uint(4, 3)
+                       .store_int(workchain(), 8)
+                       .store_uint(cell_hash(state_init), 256)
+                       .end_cell().begin_parse();
+}
+
+;; fee tier enum is chosen by the creator: 0 = 0.5%, 1 = 1% (default). Clamp anything
+;; non-zero to 1 so the stored enum is always exactly 0 or 1 (TON max-1% compliance).
+int clamp_fee_tier(int tier) inline {
+    if (tier == 0) { return 0; }
+    return 1;
+}
+
+;; graduation-threshold enum chosen by the creator: 0 = Fast, 1 = Standard (default),
+;; 2 = Deep. Clamp into {0,1,2}; anything else falls back to Standard.
+int clamp_grad_tier(int tier) inline {
+    if (tier == 0) { return 0; }
+    if (tier == 2) { return 2; }
+    return 1;
+}
+
+;; pool liquidity for a graduation tier (Fast = half, Deep = 2.5x the Standard pool).
+int pool_for_grad_tier(int tier) inline {
+    if (tier == 0) { return cfg_pool_standard / 2; }       ;; Fast
+    if (tier == 2) { return cfg_pool_standard * 5 / 2; }   ;; Deep
+    return cfg_pool_standard;                              ;; Standard (default)
+}
+
+;; total TON the curve must collect before graduating = pool liquidity + migration fee.
+int graduation_ton_for_tier(int tier) inline {
+    return pool_for_grad_tier(tier) + cfg_migration_fee;
+}
+
+;; sha256("description") — the TEP-64 on-chain metadata key for the description field.
+const int META_KEY_DESCRIPTION = 0xc9046f7a37ad0ea7cee73355984fa5428982f8b37c8f7bcec91f7ac71a7cd104;
+
+;; Inject a platform provenance label into the on-chain (TEP-64) jetton metadata so the
+;; token's origin is visible in explorers (Tonviewer/Tonscan). We PREPEND
+;; "Launched on pumpfun.wtf - " to the description (creating it if the creator left it
+;; empty). name / symbol / image / decimals are left EXACTLY as the creator set them.
+;; This runs inside the shared address-derivation path, so the predicted address (via
+;; get_token_address) and the deployed curve stay identical.
+cell inject_platform_label(cell content) inline {
+    slice cs = content.begin_parse();
+    int prefix = cs~load_uint(8);          ;; 0x00 = on-chain metadata layout
+    cell dict = cs~load_dict();
+
+    ;; new description = snake("Launched on pumpfun.wtf - " + <existing description>)
+    builder desc = begin_cell()
+        .store_uint(0, 8)                  ;; snake prefix
+        .store_slice("Launched on pumpfun.wtf - ");
+    (cell old_desc, int found) = dict.udict_get_ref?(256, META_KEY_DESCRIPTION);
+    if (found) {
+        slice ods = old_desc.begin_parse();
+        ods~skip_bits(8);                  ;; drop the creator's snake prefix byte
+        desc = desc.store_ref(begin_cell().store_slice(ods).end_cell());
+    }
+    dict~udict_set_ref(256, META_KEY_DESCRIPTION, desc.end_cell());
+
+    return begin_cell().store_uint(prefix, 8).store_dict(dict).end_cell();
+}
+
+;; ===== Curve address derivation (must mirror bonding_curve storage layout) =====
+cell build_curve_data(int id, slice creator, cell content, int fee_tier, int grad_tier) inline {
+    fee_tier  = clamp_fee_tier(fee_tier);
+    grad_tier = clamp_grad_tier(grad_tier);
+    content   = inject_platform_label(content);   ;; stamp provenance (both create + predict)
+    cell addrs = begin_cell()
+        .store_slice(my_address())        ;; factory
+        .store_slice(creator)
+        .store_slice(platform_address)    ;; immutable platform_fee_address
+        .end_cell();
+    cell reserves = begin_cell()
+        .store_uint(cfg_virtual_ton, 128) ;; ton_reserve starts at the virtual offset
+        .store_uint(cfg_virtual_ton, 128) ;; virtual_ton
+        .store_uint(cfg_curve_supply, 128);; token_reserve
+        .store_uint(graduation_ton_for_tier(grad_tier), 128) ;; collect target = pool + migration
+        .end_cell();
+    cell cv = begin_cell()
+        .store_uint(id, 64)
+        .store_uint(0, 1)                 ;; graduated
+        .store_uint(fee_tier, 8)          ;; creator-chosen fee tier enum
+        .store_uint(grad_tier, 8)         ;; creator-chosen graduation-threshold enum
+        .store_coins(cfg_migration_fee)   ;; fixed migration fee skimmed at graduation
+        .store_slice(orchestrator_address_by_id(id)) ;; graduation_dest
+        .store_ref(addrs)
+        .store_ref(reserves)
+        .end_cell();
+    return begin_cell()
+        .store_coins(0)                   ;; total_supply
+        .store_slice(creator)             ;; admin
+        .store_ref(content)
+        .store_ref(jetton_wallet_code)
+        .store_ref(cv)
+        .end_cell();
+}
+
+cell build_curve_state_init(int id, slice creator, cell content, int fee_tier, int grad_tier) inline {
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_dict(bonding_curve_code)
+        .store_dict(build_curve_data(id, creator, content, fee_tier, grad_tier))
+        .store_uint(0, 1)
+        .end_cell();
+}
+
+slice curve_address_by_state(cell state_init) inline {
+    return begin_cell().store_uint(4, 3)
+                       .store_int(workchain(), 8)
+                       .store_uint(cell_hash(state_init), 256)
+                       .end_cell().begin_parse();
+}
+
+() create_token(slice creator, int msg_value, int query_id, cell content, int fee_tier, int grad_tier) impure {
+    throw_unless(101, msg_value >= creation_fee + deploy_curve_value());
+
+    int id = token_count;
+    cell state_init = build_curve_state_init(id, creator, content, fee_tier, grad_tier);
+    slice curve_addr = curve_address_by_state(state_init);
+
+    ;; deploy the new curve, seed it with deploy_curve_value for storage
+    cell deploy = begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(curve_addr)
+        .store_coins(deploy_curve_value())
+        .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+        .store_ref(state_init)
+        .store_ref(begin_cell().end_cell()) ;; empty body
+        .end_cell();
+    send_raw_message(deploy, 1);
+
+    ;; collect the creation fee to the platform
+    if (creation_fee > 0) {
+        cell feemsg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(platform_address)
+            .store_coins(creation_fee)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+        send_raw_message(feemsg, 1);
+    }
+
+    ;; reply to the creator with the new token address + id
+    cell reply = begin_cell()
+        .store_uint(0x10, 6)
+        .store_slice(creator)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(OP_TOKEN_CREATED, 32)
+        .store_uint(query_id, 64)
+        .store_uint(id, 64)
+        .store_slice(curve_addr)
+        .end_cell();
+    send_raw_message(reply, 1);
+
+    ;; record the new token in the registry so the frontend can enumerate tokens
+    tokens_dict~udict_set_ref(64, id, begin_cell().store_slice(curve_addr).end_cell());
+
+    token_count = id + 1;
+    save_data();
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    load_data();
+
+    if (op == OP_CREATE_TOKEN) {
+        cell content = in_msg_body~load_ref();
+        ;; optional trailing fee tier enum (0 = 0.5%, 1 = 1%); default 1% if omitted
+        int fee_tier = (in_msg_body.slice_bits() >= 8) ? in_msg_body~load_uint(8) : 1;
+        ;; optional trailing graduation tier enum (0 Fast / 1 Standard / 2 Deep); default Standard
+        int grad_tier = (in_msg_body.slice_bits() >= 8) ? in_msg_body~load_uint(8) : 1;
+        create_token(sender_address, msg_value, query_id, content, fee_tier, grad_tier);
+        return ();
+    }
+    ;; --- Graduation relay: a curve hands off; we authenticate it against our registry
+    ;;     and forward to its orchestrator. This is the trust anchor for the orchestrator,
+    ;;     which only accepts OP_GRADUATE from us (audit CRITICAL Attack A/B). ---
+    if (op == OP_GRADUATE) {
+        int in_curve_id  = in_msg_body~load_uint(64);
+        int in_lp_tokens = in_msg_body~load_coins();
+        slice in_creator = in_msg_body~load_msg_addr();
+
+        ;; sender MUST be the curve we registered for this id — no spoofing
+        (cell rec, int found) = tokens_dict.udict_get_ref?(64, in_curve_id);
+        throw_unless(120, found);
+        slice rcs = rec.begin_parse();
+        slice registered_curve = rcs~load_msg_addr();
+        throw_unless(121, equal_slice_bits(sender_address, registered_curve));
+
+        ;; relay to the orchestrator with the VERIFIED curve address; platform is the
+        ;; orchestrator's own immutable config value, so we don't pass it here.
+        cell body = begin_cell()
+            .store_uint(OP_GRADUATE, 32)
+            .store_uint(query_id, 64)
+            .store_coins(in_lp_tokens)
+            .store_slice(sender_address)   ;; verified curve
+            .store_slice(in_creator)
+            .end_cell();
+        ;; Attach the orchestrator's state_init so the FIRST graduation deploys it in the
+        ;; same tx (it is NOT deployed at token creation; a real-buyer graduation can fire
+        ;; before any keeper has touched it — without init the handoff would land on an
+        ;; uninitialized account and the funds would strand). Idempotent: if the orchestrator
+        ;; is already active the init is ignored. (See memory orchestrator-predeploy-bug.)
+        cell si = orchestrator_state_init(in_curve_id);
+        cell msg = begin_cell()
+            .store_uint(0x10, 6)           ;; nobounce — orchestrator must keep the funds
+            .store_slice(orchestrator_address_by_id(in_curve_id))
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32) ;; extra-currencies + ihr_fee + fwd_fee + created_lt + created_at
+            .store_uint(1, 1)              ;; init present (Maybe)
+            .store_uint(1, 1)              ;; init as ref (Either)
+            .store_uint(1, 1)              ;; body as ref (Either)
+            .store_ref(si)
+            .store_ref(body)
+            .end_cell();
+        send_raw_message(msg, 64);         ;; carry the inbound graduation value onward
+        return ();
+    }
+    if (op == OP_WITHDRAW) {
+        throw_unless(73, equal_slice_bits(sender_address, admin_address));
+        int amount = in_msg_body~load_coins();
+        cell msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(admin_address)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+        send_raw_message(msg, 1);
+        return ();
+    }
+    throw(0xffff);
+}
+
+;; ===== Get methods =====
+(int, slice, slice, int) get_factory_data() method_id {
+    load_data();
+    return (token_count, admin_address, platform_address, creation_fee);
+}
+
+(int, int, int, int, int) get_curve_config() method_id {
+    load_data();
+    return (cfg_virtual_ton, cfg_curve_supply, cfg_pool_standard, cfg_migration_fee, cfg_fee_bps);
+}
+
+;; resolved collect target (pool + migration) for a graduation tier enum
+int get_graduation_ton(int grad_tier) method_id {
+    load_data();
+    return graduation_ton_for_tier(clamp_grad_tier(grad_tier));
+}
+
+(cell, cell) get_codes() method_id {
+    load_data();
+    return (bonding_curve_code, jetton_wallet_code);
+}
+
+cell get_orchestrator_code() method_id {
+    load_data();
+    return orchestrator_code;
+}
+
+;; deterministic graduation orchestrator address for a token id
+slice get_orchestrator_address(int id) method_id {
+    load_data();
+    return orchestrator_address_by_id(id);
+}
+
+;; deterministic address of a token given its id, creator, metadata, fee tier and grad tier
+slice get_token_address(int id, slice creator, cell content, int fee_tier, int grad_tier) method_id {
+    load_data();
+    return curve_address_by_state(build_curve_state_init(id, creator, content, fee_tier, grad_tier));
+}
+
+;; address of an already-created token by its id (from the registry)
+slice get_token_addr(int id) method_id {
+    load_data();
+    (cell c, int found) = tokens_dict.udict_get_ref?(64, id);
+    throw_unless(404, found);
+    return c.begin_parse();
+}
