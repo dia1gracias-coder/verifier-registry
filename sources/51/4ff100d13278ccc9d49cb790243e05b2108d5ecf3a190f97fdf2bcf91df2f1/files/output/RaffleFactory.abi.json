@@ -1,0 +1,367 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "RaffleFactory",
+  "author": "OpenRaff",
+  "version": "0.1.0",
+  "description": "OpenRaff factory: deploys immutable raffle instances",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreateRaffle"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RaffleConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Beacon"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Prize"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 17
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 14
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetParams"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryStorage"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        1,
+        7,
+        1,
+        7
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EvRaffleCreated"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "Prize",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "title",
+          "ty_idx": 3
+        },
+        {
+          "name": "metadata",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Beacon",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "chainHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "genesisTime",
+          "ty_idx": 9
+        },
+        {
+          "name": "period",
+          "ty_idx": 9
+        },
+        {
+          "name": "publicKey",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RaffleConfig",
+      "ty_idx": 14,
+      "fields": [
+        {
+          "name": "organizer",
+          "ty_idx": 7
+        },
+        {
+          "name": "ticketPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "softCap",
+          "ty_idx": 6
+        },
+        {
+          "name": "hardCap",
+          "ty_idx": 6
+        },
+        {
+          "name": "saleStart",
+          "ty_idx": 9
+        },
+        {
+          "name": "saleDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "metadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "beacon",
+          "ty_idx": 16
+        },
+        {
+          "name": "prizes",
+          "ty_idx": 18
+        },
+        {
+          "name": "paymentJetton",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryStorage",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "protocolFeeBps",
+          "ty_idx": 24
+        },
+        {
+          "name": "drawTimeout",
+          "ty_idx": 9
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "raffleCount",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CreateRaffle",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 4026531841,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "organizerPubkey",
+          "ty_idx": 13
+        },
+        {
+          "name": "config",
+          "ty_idx": 20
+        },
+        {
+          "name": "publishers",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetParams",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 4026531842,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "protocolFeeBps",
+          "ty_idx": 24
+        },
+        {
+          "name": "drawTimeout",
+          "ty_idx": 9
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EvRaffleCreated",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 3758096385,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "raffleId",
+          "ty_idx": 11
+        },
+        {
+          "name": "instance",
+          "ty_idx": 7
+        },
+        {
+          "name": "organizer",
+          "ty_idx": 7
+        },
+        {
+          "name": "paymentJetton",
+          "ty_idx": 19
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 25
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 23
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [
+    {
+      "body_ty_idx": 27
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 107504,
+      "name": "factoryData",
+      "parameters": [],
+      "return_ty_idx": 26
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 262
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidConfig",
+      "err_code": 269
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotOwner",
+      "err_code": 270
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
