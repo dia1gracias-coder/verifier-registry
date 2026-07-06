@@ -1,0 +1,1035 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "MarketplaceFactory",
+  "author": "Grapes Marketplace",
+  "version": "0.1.0",
+  "description": "Factory for deterministic per-listing Telegram Gift NFT sale contracts",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryCreateSale"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleParties"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleTerms"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactorySetCreatePaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactorySetFeeConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryDepositNft"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryDepositCompleted"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryRecoverPendingNft"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftOwnershipAssigned"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MarketTlbEither",
+      "type_args_ty_idx": [
+        3,
+        25
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherLeft",
+      "type_args_ty_idx": [
+        3
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "X"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherLeft",
+      "type_args_ty_idx": [
+        28
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherRight",
+      "type_args_ty_idx": [
+        25
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherRight",
+      "type_args_ty_idx": [
+        28
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 27,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 30,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 134,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "genericT",
+      "name_t": "Y"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MarketTlbEither",
+      "type_args_ty_idx": [
+        28,
+        33
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherRight",
+      "type_args_ty_idx": [
+        33
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 29,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 35,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftExcesses"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryPendingDeposit"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "FactoryPendingStage"
+    },
+    {
+      "kind": "uintN",
+      "n": 3
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 39
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 42
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleRequestDeposit"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftTransfer"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MarketTlbMaybe",
+      "type_args_ty_idx": [
+        25
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbNone"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbJust",
+      "type_args_ty_idx": [
+        25
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbJust",
+      "type_args_ty_idx": [
+        28
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 47,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 135,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 48,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 146,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MarketTlbMaybe",
+      "type_args_ty_idx": [
+        28
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 47,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 49,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "addressOpt"
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 27,
+      "struct_name": "MarketTlbEitherLeft<cell>",
+      "monomorphic_fields_ty_idx": [
+        3
+      ]
+    },
+    {
+      "ty_idx": 30,
+      "struct_name": "MarketTlbEitherRight<Cell<cell>>",
+      "monomorphic_fields_ty_idx": [
+        25
+      ]
+    },
+    {
+      "ty_idx": 48,
+      "struct_name": "MarketTlbJust<Cell<cell>>",
+      "monomorphic_fields_ty_idx": [
+        25
+      ]
+    }
+  ],
+  "alias_instantiations": [
+    {
+      "ty_idx": 26,
+      "alias_name": "MarketTlbEither<cell, Cell<cell>>",
+      "monomorphic_target_ty_idx": 32
+    },
+    {
+      "ty_idx": 46,
+      "alias_name": "MarketTlbMaybe<Cell<cell>>",
+      "monomorphic_target_ty_idx": 50
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "MarketTlbEither",
+      "ty_idx": 34,
+      "target_ty_idx": 36,
+      "type_params": [
+        "X",
+        "Y"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MarketTlbEitherLeft",
+      "ty_idx": 29,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MarketTlbEitherRight",
+      "ty_idx": 31,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "MarketTlbMaybe",
+      "ty_idx": 51,
+      "target_ty_idx": 52,
+      "type_params": [
+        "X"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MarketTlbNone",
+      "ty_idx": 47,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "MarketTlbJust",
+      "ty_idx": 49,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "FactoryPendingStage",
+      "ty_idx": 40,
+      "encoded_as_ty_idx": 41,
+      "members": [
+        {
+          "name": "WaitingSaleReady",
+          "value": "1"
+        },
+        {
+          "name": "TransferringToSale",
+          "value": "2"
+        },
+        {
+          "name": "TransferFailedToSale",
+          "value": "3"
+        },
+        {
+          "name": "RecoveringToSeller",
+          "value": "4"
+        },
+        {
+          "name": "RecoveryFailedToSeller",
+          "value": "5"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryPendingDeposit",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "seller",
+          "ty_idx": 7
+        },
+        {
+          "name": "expectedSale",
+          "ty_idx": 7
+        },
+        {
+          "name": "terms",
+          "ty_idx": 18
+        },
+        {
+          "name": "transferQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "recoveryQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "stage",
+          "ty_idx": 40
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryStorage",
+      "ty_idx": 38,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 16
+        },
+        {
+          "name": "defaultLifetimeSeconds",
+          "ty_idx": 9
+        },
+        {
+          "name": "createPaused",
+          "ty_idx": 5
+        },
+        {
+          "name": "nextSaleId",
+          "ty_idx": 11
+        },
+        {
+          "name": "saleCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "pendingDeposits",
+          "ty_idx": 43
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleParties",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "seller",
+          "ty_idx": 7
+        },
+        {
+          "name": "nftItem",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleTerms",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "price",
+          "ty_idx": 6
+        },
+        {
+          "name": "feeWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 16
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryCreateSale",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1196573523,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parties",
+          "ty_idx": 14
+        },
+        {
+          "name": "terms",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactorySetCreatePaused",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1196443203,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactorySetFeeConfig",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1196443205,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "feeWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryDepositNft",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1195787342,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parties",
+          "ty_idx": 14
+        },
+        {
+          "name": "terms",
+          "ty_idx": 18
+        },
+        {
+          "name": "factoryRefundBudget",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryDepositCompleted",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1195787331,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "nftItem",
+          "ty_idx": 7
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryRecoverPendingNft",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1195790926,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "nftItem",
+          "ty_idx": 7
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleRequestDeposit",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 1196642884,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 17
+        },
+        {
+          "name": "factoryRefundBudget",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftOwnershipAssigned",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 85167505,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "prevOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftTransfer",
+      "ty_idx": 45,
+      "prefix": {
+        "prefix_num": 1607220500,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "responseDestination",
+          "ty_idx": 7
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 46
+        },
+        {
+          "name": "forwardAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftExcesses",
+      "ty_idx": 37,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 38
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 37
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 44
+    },
+    {
+      "body_ty_idx": 45
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 83229,
+      "name": "owner",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 103528,
+      "name": "feeWallet",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 80005,
+      "name": "feeBps",
+      "parameters": [],
+      "return_ty_idx": 16
+    },
+    {
+      "tvm_method_id": 85841,
+      "name": "defaultLifetimeSeconds",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 75375,
+      "name": "createPaused",
+      "parameters": [],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 124559,
+      "name": "nextSaleId",
+      "parameters": [],
+      "return_ty_idx": 11
+    },
+    {
+      "tvm_method_id": 97103,
+      "name": "pendingDepositStage",
+      "parameters": [
+        {
+          "name": "nftItem",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 53
+    },
+    {
+      "tvm_method_id": 112981,
+      "name": "pendingDepositSeller",
+      "parameters": [
+        {
+          "name": "nftItem",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 54
+    },
+    {
+      "tvm_method_id": 84825,
+      "name": "calculateSaleAddress",
+      "parameters": [
+        {
+          "name": "seller",
+          "ty_idx": 7
+        },
+        {
+          "name": "nftItem",
+          "ty_idx": 7
+        },
+        {
+          "name": "price",
+          "ty_idx": 6
+        },
+        {
+          "name": "feeWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 16
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 17
+        }
+      ],
+      "return_ty_idx": 7
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFactoryOwner",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.FactoryCreatePaused",
+      "err_code": 101
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidFeeBps",
+      "err_code": 102
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidPrice",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidExpiry",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidIntentHash",
+      "err_code": 105
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidFeeConfig",
+      "err_code": 106
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PendingDepositExists",
+      "err_code": 107
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PendingDepositMissing",
+      "err_code": 108
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongPendingDeposit",
+      "err_code": 109
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RecoveryNotAllowed",
+      "err_code": 110
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotSeller",
+      "err_code": 200
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongNftMarker",
+      "err_code": 207
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientReserve",
+      "err_code": 212
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongFactoryDeposit",
+      "err_code": 213
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
