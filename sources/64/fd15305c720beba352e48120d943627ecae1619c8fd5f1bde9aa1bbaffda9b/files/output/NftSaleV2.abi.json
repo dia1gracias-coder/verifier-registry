@@ -1,0 +1,1236 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "NftSaleV2",
+  "author": "Grapes Marketplace",
+  "version": "0.2.0",
+  "description": "Per-listing Telegram Gift NFT sale contract with fixed-native and live-USD quote pricing",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleRequestDeposit"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2BuyFixed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2BuyLive"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2LiveQuote"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2LiveQuoteScope"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2LiveQuoteListing"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 19
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2LiveQuotePricing"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 16
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleCancel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleRetryTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleRefundBuy"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftOwnershipAssigned"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MarketTlbEither",
+      "type_args_ty_idx": [
+        3,
+        29
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherLeft",
+      "type_args_ty_idx": [
+        3
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "X"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherLeft",
+      "type_args_ty_idx": [
+        32
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherRight",
+      "type_args_ty_idx": [
+        29
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherRight",
+      "type_args_ty_idx": [
+        32
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 31,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 134,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 34,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 135,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "genericT",
+      "name_t": "Y"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MarketTlbEither",
+      "type_args_ty_idx": [
+        32,
+        37
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbEitherRight",
+      "type_args_ty_idx": [
+        37
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 33,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 39,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftExcesses"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2Storage"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleParties"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 44
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2Terms"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2PricingPolicy"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 47
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 46
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleV2Settlement"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 51
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftTransfer"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MarketTlbMaybe",
+      "type_args_ty_idx": [
+        29
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbNone"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbJust",
+      "type_args_ty_idx": [
+        29
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketTlbJust",
+      "type_args_ty_idx": [
+        32
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 56,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 133,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 57,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 146,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MarketTlbMaybe",
+      "type_args_ty_idx": [
+        32
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 56,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 58,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryV2DepositNft"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryDepositCompleted"
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 31,
+      "struct_name": "MarketTlbEitherLeft<cell>",
+      "monomorphic_fields_ty_idx": [
+        3
+      ]
+    },
+    {
+      "ty_idx": 34,
+      "struct_name": "MarketTlbEitherRight<Cell<cell>>",
+      "monomorphic_fields_ty_idx": [
+        29
+      ]
+    },
+    {
+      "ty_idx": 57,
+      "struct_name": "MarketTlbJust<Cell<cell>>",
+      "monomorphic_fields_ty_idx": [
+        29
+      ]
+    }
+  ],
+  "alias_instantiations": [
+    {
+      "ty_idx": 30,
+      "alias_name": "MarketTlbEither<cell, Cell<cell>>",
+      "monomorphic_target_ty_idx": 36
+    },
+    {
+      "ty_idx": 55,
+      "alias_name": "MarketTlbMaybe<Cell<cell>>",
+      "monomorphic_target_ty_idx": 59
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "MarketTlbEither",
+      "ty_idx": 38,
+      "target_ty_idx": 40,
+      "type_params": [
+        "X",
+        "Y"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MarketTlbEitherLeft",
+      "ty_idx": 33,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 32
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MarketTlbEitherRight",
+      "ty_idx": 35,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 32
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "MarketTlbMaybe",
+      "ty_idx": 60,
+      "target_ty_idx": 61,
+      "type_params": [
+        "X"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MarketTlbNone",
+      "ty_idx": 56,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "MarketTlbJust",
+      "ty_idx": 58,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 32
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleParties",
+      "ty_idx": 44,
+      "fields": [
+        {
+          "name": "seller",
+          "ty_idx": 7
+        },
+        {
+          "name": "nftItem",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2PricingPolicy",
+      "ty_idx": 47,
+      "fields": [
+        {
+          "name": "pricingMode",
+          "ty_idx": 43
+        },
+        {
+          "name": "networkId",
+          "ty_idx": 9
+        },
+        {
+          "name": "fixedPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "usdPriceMicro",
+          "ty_idx": 11
+        },
+        {
+          "name": "rateScale",
+          "ty_idx": 9
+        },
+        {
+          "name": "oraclePublicKey",
+          "ty_idx": 13
+        },
+        {
+          "name": "minPriceNano",
+          "ty_idx": 6
+        },
+        {
+          "name": "maxPriceNano",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2Terms",
+      "ty_idx": 46,
+      "fields": [
+        {
+          "name": "pricing",
+          "ty_idx": 48
+        },
+        {
+          "name": "feeWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 49
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2Settlement",
+      "ty_idx": 51,
+      "fields": [
+        {
+          "name": "buyer",
+          "ty_idx": 52
+        },
+        {
+          "name": "refundRecipient",
+          "ty_idx": 52
+        },
+        {
+          "name": "refundBudget",
+          "ty_idx": 6
+        },
+        {
+          "name": "nftTransferQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "settlementPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "payoutDone",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2Storage",
+      "ty_idx": 42,
+      "fields": [
+        {
+          "name": "factory",
+          "ty_idx": 7
+        },
+        {
+          "name": "saleId",
+          "ty_idx": 11
+        },
+        {
+          "name": "state",
+          "ty_idx": 43
+        },
+        {
+          "name": "parties",
+          "ty_idx": 45
+        },
+        {
+          "name": "terms",
+          "ty_idx": 50
+        },
+        {
+          "name": "settlement",
+          "ty_idx": 53
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryV2DepositNft",
+      "ty_idx": 62,
+      "prefix": {
+        "prefix_num": 1194476622,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parties",
+          "ty_idx": 45
+        },
+        {
+          "name": "terms",
+          "ty_idx": 50
+        },
+        {
+          "name": "factoryRefundBudget",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryDepositCompleted",
+      "ty_idx": 63,
+      "prefix": {
+        "prefix_num": 1195787331,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "nftItem",
+          "ty_idx": 7
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleRequestDeposit",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1196642884,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "factoryRefundBudget",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2BuyFixed",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1194477144,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "buyerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "expectedPriceNano",
+          "ty_idx": 6
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2LiveQuoteScope",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "networkId",
+          "ty_idx": 9
+        },
+        {
+          "name": "factory",
+          "ty_idx": 7
+        },
+        {
+          "name": "sale",
+          "ty_idx": 7
+        },
+        {
+          "name": "buyer",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2LiveQuoteListing",
+      "ty_idx": 19,
+      "fields": [
+        {
+          "name": "seller",
+          "ty_idx": 7
+        },
+        {
+          "name": "nftItem",
+          "ty_idx": 7
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "usdPriceMicro",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2LiveQuotePricing",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "rateUsdPerGramMicro",
+          "ty_idx": 11
+        },
+        {
+          "name": "priceNano",
+          "ty_idx": 6
+        },
+        {
+          "name": "issuedAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "quoteId",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2LiveQuote",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "scope",
+          "ty_idx": 18
+        },
+        {
+          "name": "listing",
+          "ty_idx": 20
+        },
+        {
+          "name": "pricing",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleV2BuyLive",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1194478674,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "quote",
+          "ty_idx": 23
+        },
+        {
+          "name": "signature",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleCancel",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1196639052,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleRetryTransfer",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1196642900,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleRefundBuy",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 1196642886,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "marketplaceIntentHash",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftOwnershipAssigned",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 85167505,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "prevOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 30
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftTransfer",
+      "ty_idx": 54,
+      "prefix": {
+        "prefix_num": 1607220500,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "responseDestination",
+          "ty_idx": 7
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 55
+        },
+        {
+          "name": "forwardAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 30
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftExcesses",
+      "ty_idx": 41,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 42
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 41
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 54
+    },
+    {
+      "body_ty_idx": 62
+    },
+    {
+      "body_ty_idx": 63
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 82386,
+      "name": "factory",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 116220,
+      "name": "saleId",
+      "parameters": [],
+      "return_ty_idx": 11
+    },
+    {
+      "tvm_method_id": 123671,
+      "name": "seller",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 71452,
+      "name": "nftItem",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 124773,
+      "name": "pricingMode",
+      "parameters": [],
+      "return_ty_idx": 43
+    },
+    {
+      "tvm_method_id": 108026,
+      "name": "networkId",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 123436,
+      "name": "fixedPrice",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 105723,
+      "name": "usdPriceMicro",
+      "parameters": [],
+      "return_ty_idx": 11
+    },
+    {
+      "tvm_method_id": 100395,
+      "name": "oraclePublicKey",
+      "parameters": [],
+      "return_ty_idx": 13
+    },
+    {
+      "tvm_method_id": 72088,
+      "name": "rateScale",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 103867,
+      "name": "minPriceNano",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 118812,
+      "name": "maxPriceNano",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 103528,
+      "name": "feeWallet",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 80005,
+      "name": "feeBps",
+      "parameters": [],
+      "return_ty_idx": 49
+    },
+    {
+      "tvm_method_id": 102272,
+      "name": "expiresAt",
+      "parameters": [],
+      "return_ty_idx": 11
+    },
+    {
+      "tvm_method_id": 75514,
+      "name": "marketplaceIntentHash",
+      "parameters": [],
+      "return_ty_idx": 13
+    },
+    {
+      "tvm_method_id": 77589,
+      "name": "state",
+      "parameters": [],
+      "return_ty_idx": 43
+    },
+    {
+      "tvm_method_id": 86012,
+      "name": "buyer",
+      "parameters": [],
+      "return_ty_idx": 52
+    },
+    {
+      "tvm_method_id": 69421,
+      "name": "nftTransferQueryId",
+      "parameters": [],
+      "return_ty_idx": 11
+    },
+    {
+      "tvm_method_id": 77778,
+      "name": "settlementPrice",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 100733,
+      "name": "payoutDone",
+      "parameters": [],
+      "return_ty_idx": 5
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidPrice",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotSeller",
+      "err_code": 200
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SaleNotActive",
+      "err_code": 201
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SaleExpired",
+      "err_code": 202
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SaleNotExpired",
+      "err_code": 203
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PriceMismatch",
+      "err_code": 204
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongNftSender",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongNftMarker",
+      "err_code": 207
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongNftResponse",
+      "err_code": 208
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadySettled",
+      "err_code": 209
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BuyerMismatch",
+      "err_code": 210
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotBuyer",
+      "err_code": 211
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientReserve",
+      "err_code": 212
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidPricingMode",
+      "err_code": 214
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidQuote",
+      "err_code": 215
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.QuoteExpired",
+      "err_code": 216
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.QuoteNotActive",
+      "err_code": 217
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSignature",
+      "err_code": 218
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.QuotePriceMismatch",
+      "err_code": 219
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
