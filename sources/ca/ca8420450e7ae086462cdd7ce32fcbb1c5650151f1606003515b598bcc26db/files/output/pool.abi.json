@@ -1,0 +1,953 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Pool",
+  "author": "ZKResistor",
+  "version": "2.0.0",
+  "description": "ZK mixer pool (jetton). Proof binds recipient by construction; sender of withdraw tx receives RELAYER_REIMBURSEMENT.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "PoolConfirmPoolDeployment"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmPoolDeployment"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "InitWalletBinding"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TakeWalletAddress"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransferNotification"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Withdraw"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ZkProof"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "G1Point"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "G2Point"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "PoolSparseSetUpdateProof"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SparseSetUpdateProof"
+    },
+    {
+      "kind": "uintN",
+      "n": 247
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 26
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolIdentity"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 31
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MerkleState"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 19
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SparseSetRoots"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 38,
+      "value_ty_idx": 19
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 36
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 34
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolDeployConfirmed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProvideWalletAddress"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolReadyEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DepositEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SparseSetEventUpdate"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 46
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawalAcceptedEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "ConfirmPoolDeployment",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1179665152,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PoolDeployConfirmed",
+      "ty_idx": 42,
+      "prefix": {
+        "prefix_num": 1179665153,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonMaster",
+          "ty_idx": 33
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "PoolSparseSetUpdateProof",
+      "ty_idx": 26,
+      "target_ty_idx": 27,
+      "description": "Canonical proof root. `siblings` is a packed chain ordered by increasing\ntree level; its exact shape is validated by `sparseSetApplyUpdate`."
+    },
+    {
+      "kind": "alias",
+      "name": "PoolConfirmPoolDeployment",
+      "ty_idx": 12,
+      "target_ty_idx": 13
+    },
+    {
+      "kind": "struct",
+      "name": "PoolIdentity",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "jettonMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "factory",
+          "ty_idx": 7
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "identity",
+          "ty_idx": 32
+        },
+        {
+          "name": "jettonWallet",
+          "ty_idx": 33
+        },
+        {
+          "name": "relayerReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "merkle",
+          "ty_idx": 41
+        },
+        {
+          "name": "withdrawalCount",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SparseSetRoots",
+      "ty_idx": 36,
+      "fields": [
+        {
+          "name": "commitmentBucketCount",
+          "ty_idx": 37,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "nullifierBucketCount",
+          "ty_idx": 37,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "commitmentSeenRoots",
+          "ty_idx": 39
+        },
+        {
+          "name": "nullifierSpentRoots",
+          "ty_idx": 39
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SparseSetEventUpdate",
+      "ty_idx": 46,
+      "fields": [
+        {
+          "name": "bucketId",
+          "ty_idx": 38
+        },
+        {
+          "name": "newRoot",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MerkleState",
+      "ty_idx": 34,
+      "fields": [
+        {
+          "name": "nextIndex",
+          "ty_idx": 9
+        },
+        {
+          "name": "currentRoot",
+          "ty_idx": 19
+        },
+        {
+          "name": "rootHistory",
+          "ty_idx": 35,
+          "default_value": {
+            "kind": "shapedTuple",
+            "items": []
+          }
+        },
+        {
+          "name": "sparseSets",
+          "ty_idx": 40
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransferNotification",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "fromUser",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Withdraw",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1265568593,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "clientQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "root",
+          "ty_idx": 19
+        },
+        {
+          "name": "nullifierHash",
+          "ty_idx": 19
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "proof",
+          "ty_idx": 25
+        },
+        {
+          "name": "nullifierSetProof",
+          "ty_idx": 29
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "InitWalletBinding",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 2696986817,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProvideWalletAddress",
+      "ty_idx": 43,
+      "prefix": {
+        "prefix_num": 745978227,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "includeAddress",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TakeWalletAddress",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 3513996288,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "walletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "rest",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PoolReadyEvent",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 14610434,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "jettonWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DepositEvent",
+      "ty_idx": 45,
+      "prefix": {
+        "prefix_num": 14585938,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "leafIndex",
+          "ty_idx": 9
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 19
+        },
+        {
+          "name": "newRoot",
+          "ty_idx": 19
+        },
+        {
+          "name": "fromUser",
+          "ty_idx": 7
+        },
+        {
+          "name": "sparseUpdate",
+          "ty_idx": 47
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawalAcceptedEvent",
+      "ty_idx": 48,
+      "prefix": {
+        "prefix_num": 7437628,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "clientQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "nullifierHash",
+          "ty_idx": 19
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "payout",
+          "ty_idx": 6
+        },
+        {
+          "name": "sparseUpdate",
+          "ty_idx": 47
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransfer",
+      "ty_idx": 49,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "destination",
+          "ty_idx": 7
+        },
+        {
+          "name": "responseDestination",
+          "ty_idx": 7
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 50,
+          "default_value": {
+            "kind": "null"
+          }
+        },
+        {
+          "name": "forwardAmount",
+          "ty_idx": 6,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 50,
+          "default_value": {
+            "kind": "null"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ZkProof",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "proofA",
+          "ty_idx": 22
+        },
+        {
+          "name": "proofB",
+          "ty_idx": 24
+        },
+        {
+          "name": "proofC",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "G1Point",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "raw",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "G2Point",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "raw",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SparseSetUpdateProof",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "expectedRoot",
+          "ty_idx": 19
+        },
+        {
+          "name": "siblingBitmap",
+          "ty_idx": 28
+        },
+        {
+          "name": "siblings",
+          "ty_idx": 3
+        }
+      ],
+      "description": "Canonical proof root. `siblings` is a packed chain ordered by increasing\ntree level; its exact shape is validated by `sparseSetApplyUpdate`."
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 30
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 42
+    },
+    {
+      "body_ty_idx": 43
+    },
+    {
+      "body_ty_idx": 49
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 44
+    },
+    {
+      "body_ty_idx": 45
+    },
+    {
+      "body_ty_idx": 48
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 113118,
+      "name": "jettonMaster",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 82386,
+      "name": "factory",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 90133,
+      "name": "jettonWallet",
+      "parameters": [],
+      "return_ty_idx": 33
+    },
+    {
+      "tvm_method_id": 130873,
+      "name": "denomination",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 86586,
+      "name": "currentRoot",
+      "parameters": [],
+      "return_ty_idx": 19
+    },
+    {
+      "tvm_method_id": 70866,
+      "name": "nextIndex",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 114879,
+      "name": "relayerReserve",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 93276,
+      "name": "rentRunway",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 86149,
+      "name": "sparseRoot",
+      "parameters": [
+        {
+          "name": "domain",
+          "ty_idx": 9
+        },
+        {
+          "name": "bucketId",
+          "ty_idx": 38
+        }
+      ],
+      "return_ty_idx": 19
+    },
+    {
+      "tvm_method_id": 113066,
+      "name": "withdrawalCount",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 86776,
+      "name": "treeDepth",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 91499,
+      "name": "previewInsertProof",
+      "parameters": [
+        {
+          "name": "oldRoot",
+          "ty_idx": 19
+        },
+        {
+          "name": "newRoot",
+          "ty_idx": 19
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 19
+        },
+        {
+          "name": "leafIndex",
+          "ty_idx": 9
+        },
+        {
+          "name": "proofA",
+          "ty_idx": 2
+        },
+        {
+          "name": "proofB",
+          "ty_idx": 2
+        },
+        {
+          "name": "proofC",
+          "ty_idx": 2
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 130009,
+      "name": "previewWithdrawProof",
+      "parameters": [
+        {
+          "name": "root",
+          "ty_idx": 19
+        },
+        {
+          "name": "nullifierHash",
+          "ty_idx": 19
+        },
+        {
+          "name": "recipientField",
+          "ty_idx": 19
+        },
+        {
+          "name": "proofA",
+          "ty_idx": 2
+        },
+        {
+          "name": "proofB",
+          "ty_idx": 2
+        },
+        {
+          "name": "proofC",
+          "ty_idx": 2
+        }
+      ],
+      "return_ty_idx": 5
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.JettonWalletAlreadySet",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.JettonWalletNotSet",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotJettonMaster",
+      "err_code": 105
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientGas",
+      "err_code": 120
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.UnknownRoot",
+      "err_code": 121
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NullifierAlreadySpent",
+      "err_code": 122
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWithdrawProof",
+      "err_code": 124
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientReserve",
+      "err_code": 127
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientBalance",
+      "err_code": 128
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidRecipient",
+      "err_code": 130
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.StaleSparseSetRoot",
+      "err_code": 133
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSparseSetProof",
+      "err_code": 134
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WithdrawalCapacityReached",
+      "err_code": 135
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65534
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
