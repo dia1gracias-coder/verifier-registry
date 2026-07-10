@@ -1,0 +1,703 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "TonPool",
+  "author": "ZKResistor",
+  "version": "2.0.0",
+  "description": "ZK mixer pool for native TON. Proof binds recipient by construction; sender of withdraw tx receives RELAYER_REIMBURSEMENT.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TonPoolConfirmPoolDeployment"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TonDepositPayload"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TonPoolZkProof"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ZkProof"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "G1Point"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "G2Point"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TonPoolSparseSetUpdateProof"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SparseSetUpdateProof"
+    },
+    {
+      "kind": "uintN",
+      "n": 247
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TonWithdraw"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TonPoolStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TonPoolIdentity"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 29
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MerkleState"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 14
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SparseSetRoots"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 35,
+      "value_ty_idx": 14
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 33
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 31
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolDeployConfirmed"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TonDepositEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SparseSetEventUpdate"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 42
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TonWithdrawEvent"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "PoolDeployConfirmed",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 1179665153,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonMaster",
+          "ty_idx": 40
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SparseSetRoots",
+      "ty_idx": 33,
+      "fields": [
+        {
+          "name": "commitmentBucketCount",
+          "ty_idx": 34,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "nullifierBucketCount",
+          "ty_idx": 34,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "commitmentSeenRoots",
+          "ty_idx": 36
+        },
+        {
+          "name": "nullifierSpentRoots",
+          "ty_idx": 36
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SparseSetEventUpdate",
+      "ty_idx": 42,
+      "fields": [
+        {
+          "name": "bucketId",
+          "ty_idx": 35
+        },
+        {
+          "name": "newRoot",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MerkleState",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "nextIndex",
+          "ty_idx": 9
+        },
+        {
+          "name": "currentRoot",
+          "ty_idx": 14
+        },
+        {
+          "name": "rootHistory",
+          "ty_idx": 32,
+          "default_value": {
+            "kind": "shapedTuple",
+            "items": []
+          }
+        },
+        {
+          "name": "sparseSets",
+          "ty_idx": 37
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ZkProof",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "proofA",
+          "ty_idx": 19
+        },
+        {
+          "name": "proofB",
+          "ty_idx": 21
+        },
+        {
+          "name": "proofC",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "G1Point",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "raw",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "G2Point",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "raw",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SparseSetUpdateProof",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "expectedRoot",
+          "ty_idx": 14
+        },
+        {
+          "name": "siblingBitmap",
+          "ty_idx": 25
+        },
+        {
+          "name": "siblings",
+          "ty_idx": 3
+        }
+      ],
+      "description": "Canonical proof root. `siblings` is a packed chain ordered by increasing\ntree level; its exact shape is validated by `sparseSetApplyUpdate`."
+    },
+    {
+      "kind": "alias",
+      "name": "TonPoolZkProof",
+      "ty_idx": 15,
+      "target_ty_idx": 16
+    },
+    {
+      "kind": "alias",
+      "name": "TonPoolSparseSetUpdateProof",
+      "ty_idx": 23,
+      "target_ty_idx": 24,
+      "description": "Canonical proof root. `siblings` is a packed chain ordered by increasing\ntree level; its exact shape is validated by `sparseSetApplyUpdate`."
+    },
+    {
+      "kind": "struct",
+      "name": "TonPoolConfirmPoolDeployment",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1179665152,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TonPoolIdentity",
+      "ty_idx": 29,
+      "fields": [
+        {
+          "name": "factory",
+          "ty_idx": 7
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TonPoolStorage",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "identity",
+          "ty_idx": 30
+        },
+        {
+          "name": "relayerReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "pendingWithdrawTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "merkle",
+          "ty_idx": 38
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TonDepositPayload",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 3605025042,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "fromUser",
+          "ty_idx": 7
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 14
+        },
+        {
+          "name": "newRoot",
+          "ty_idx": 14
+        },
+        {
+          "name": "insertProof",
+          "ty_idx": 22
+        },
+        {
+          "name": "commitmentSetProof",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TonWithdraw",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 1265568593,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "root",
+          "ty_idx": 14
+        },
+        {
+          "name": "nullifierHash",
+          "ty_idx": 14
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "proof",
+          "ty_idx": 22
+        },
+        {
+          "name": "nullifierSetProof",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TonDepositEvent",
+      "ty_idx": 41,
+      "prefix": {
+        "prefix_num": 14585938,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "leafIndex",
+          "ty_idx": 9
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 14
+        },
+        {
+          "name": "newRoot",
+          "ty_idx": 14
+        },
+        {
+          "name": "fromUser",
+          "ty_idx": 7
+        },
+        {
+          "name": "sparseUpdate",
+          "ty_idx": 43
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TonWithdrawEvent",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 7437627,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "nullifierHash",
+          "ty_idx": 14
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "payout",
+          "ty_idx": 6
+        },
+        {
+          "name": "sparseUpdate",
+          "ty_idx": 43
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 28
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 27
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 39
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 41
+    },
+    {
+      "body_ty_idx": 44
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 82386,
+      "name": "factory",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 130873,
+      "name": "denomination",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 86586,
+      "name": "currentRoot",
+      "parameters": [],
+      "return_ty_idx": 14
+    },
+    {
+      "tvm_method_id": 70866,
+      "name": "nextIndex",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 86149,
+      "name": "sparseRoot",
+      "parameters": [
+        {
+          "name": "domain",
+          "ty_idx": 9
+        },
+        {
+          "name": "bucketId",
+          "ty_idx": 35
+        }
+      ],
+      "return_ty_idx": 14
+    },
+    {
+      "tvm_method_id": 93276,
+      "name": "rentRunway",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 114879,
+      "name": "relayerReserve",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 84123,
+      "name": "pendingWithdrawTon",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 113066,
+      "name": "withdrawalCount",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 86776,
+      "name": "treeDepth",
+      "parameters": [],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientGas",
+      "err_code": 120
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.UnknownRoot",
+      "err_code": 121
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NullifierAlreadySpent",
+      "err_code": 122
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWithdrawProof",
+      "err_code": 124
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientReserve",
+      "err_code": 127
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientBalance",
+      "err_code": 128
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidRecipient",
+      "err_code": 130
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.StaleSparseSetRoot",
+      "err_code": 133
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSparseSetProof",
+      "err_code": 134
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidDenomination",
+      "err_code": 202
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.FactoryInvariantViolation",
+      "err_code": 207
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65534
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
