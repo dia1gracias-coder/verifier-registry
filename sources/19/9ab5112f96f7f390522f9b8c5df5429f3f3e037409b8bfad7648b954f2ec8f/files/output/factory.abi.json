@@ -1,0 +1,525 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Factory",
+  "author": "ZKResistor",
+  "version": "2.0.0",
+  "description": "Unified factory: jetton pools (custom denoms) + TON pools (fixed whitelist)",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreatePool"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreateTonPool"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "FactoryPoolDeployConfirmed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolDeployConfirmed"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryCodes"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Registries"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 22,
+      "value_ty_idx": 7
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 22
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreateSenders"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 7
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 26
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryPoolCreatedEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmPoolDeployment"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "ConfirmPoolDeployment",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1179665152,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PoolDeployConfirmed",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1179665153,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonMaster",
+          "ty_idx": 16
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryCodes",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "poolCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "tonPoolCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Registries",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "poolRegistry",
+          "ty_idx": 23
+        },
+        {
+          "name": "poolAddressToKey",
+          "ty_idx": 24
+        },
+        {
+          "name": "tonPoolRegistry",
+          "ty_idx": 23
+        },
+        {
+          "name": "tonPoolAddressToKey",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CreateSenders",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "poolAddressToCreator",
+          "ty_idx": 27
+        },
+        {
+          "name": "tonPoolAddressToCreator",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryStorage",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "codes",
+          "ty_idx": 19
+        },
+        {
+          "name": "poolCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "tonPoolCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "inFlightCreates",
+          "ty_idx": 20
+        },
+        {
+          "name": "registries",
+          "ty_idx": 25
+        },
+        {
+          "name": "createSenders",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CreatePool",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 2696986816,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CreateTonPool",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 2696986818,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "FactoryPoolDeployConfirmed",
+      "ty_idx": 14,
+      "target_ty_idx": 15
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryPoolCreatedEvent",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 12632256,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "jettonMaster",
+          "ty_idx": 16
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        },
+        {
+          "name": "poolAddress",
+          "ty_idx": 7
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 17
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 30
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 29
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 116193,
+      "name": "poolCount",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 84542,
+      "name": "totalPoolCount",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 76291,
+      "name": "inFlightCreateCount",
+      "parameters": [],
+      "return_ty_idx": 20
+    },
+    {
+      "tvm_method_id": 113988,
+      "name": "maxFactoryPools",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 72583,
+      "name": "maxInFlightCreates",
+      "parameters": [],
+      "return_ty_idx": 20
+    },
+    {
+      "tvm_method_id": 73484,
+      "name": "pendingCreateSender",
+      "parameters": [
+        {
+          "name": "poolAddress",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 16
+    },
+    {
+      "tvm_method_id": 112866,
+      "name": "poolAddressFor",
+      "parameters": [
+        {
+          "name": "jettonMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ],
+      "return_ty_idx": 16
+    },
+    {
+      "tvm_method_id": 82477,
+      "name": "expectedPoolAddress",
+      "parameters": [
+        {
+          "name": "jettonMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 103128,
+      "name": "poolDeploymentPending",
+      "parameters": [
+        {
+          "name": "jettonMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 130054,
+      "name": "tonPoolCount",
+      "parameters": [],
+      "return_ty_idx": 9
+    },
+    {
+      "tvm_method_id": 117175,
+      "name": "tonPoolAddressFor",
+      "parameters": [
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ],
+      "return_ty_idx": 16
+    },
+    {
+      "tvm_method_id": 88385,
+      "name": "expectedTonPoolAddress",
+      "parameters": [
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 105805,
+      "name": "tonPoolDeploymentPending",
+      "parameters": [
+        {
+          "name": "denomination",
+          "ty_idx": 6
+        }
+      ],
+      "return_ty_idx": 5
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientBalance",
+      "err_code": 128
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PoolAlreadyExists",
+      "err_code": 200
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidDenomination",
+      "err_code": 202
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientCreatePoolFee",
+      "err_code": 203
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.FactoryCapacityReached",
+      "err_code": 204
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TooManyInFlightCreates",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidPoolConfirmation",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.FactoryInvariantViolation",
+      "err_code": 207
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
