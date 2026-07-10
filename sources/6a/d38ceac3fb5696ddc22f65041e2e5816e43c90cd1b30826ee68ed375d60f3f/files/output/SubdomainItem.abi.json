@@ -1,0 +1,540 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "SubdomainItem",
+  "author": "tolk-subdomains",
+  "version": "2.0.0",
+  "description": "Subdomain NFT item (TEP-62) holding its own DNS records.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferOwnership"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferOwnershipData"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TransferForwardPayload"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EditContent"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "DnsRecords"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 20,
+      "value_ty_idx": 3
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 19
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeDnsRecord"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GetStaticData"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ItemStorageInitialized"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ItemStorageNotInitialized"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OwnershipAssigned"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Excesses"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReportStaticData"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ItemNftDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DnsResolveResponse"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "TransferForwardPayload",
+      "ty_idx": 16,
+      "target_ty_idx": 17
+    },
+    {
+      "kind": "struct",
+      "name": "TransferOwnershipData",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "newOwnerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "responseDestination",
+          "ty_idx": 14
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 15
+        },
+        {
+          "name": "forwardAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferOwnership",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1607220500,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "transferData",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OwnershipAssigned",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 85167505,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "oldOwnerAddress",
+          "ty_idx": 14
+        },
+        {
+          "name": "payload",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Excesses",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GetStaticData",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 801842850,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReportStaticData",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 2339837749,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 20
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeDnsRecord",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1320284409,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "key",
+          "ty_idx": 20
+        },
+        {
+          "name": "value",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EditContent",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 436968785,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newContent",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "DnsRecords",
+      "ty_idx": 19,
+      "target_ty_idx": 21,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "struct",
+      "name": "DnsResolveResponse",
+      "ty_idx": 32,
+      "fields": [
+        {
+          "name": "resolvedPrefixLengthBits",
+          "ty_idx": 1
+        },
+        {
+          "name": "resolvedRecord",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ItemStorageNotInitialized",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "index",
+          "ty_idx": 20
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ItemStorageInitialized",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "index",
+          "ty_idx": 20
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "records",
+          "ty_idx": 22
+        },
+        {
+          "name": "label",
+          "ty_idx": 26
+        },
+        {
+          "name": "mintedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "lastTouch",
+          "ty_idx": 9
+        },
+        {
+          "name": "validUntil",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ItemNftDataReply",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "isInitialized",
+          "ty_idx": 5
+        },
+        {
+          "name": "index",
+          "ty_idx": 20
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 14
+        },
+        {
+          "name": "content",
+          "ty_idx": 15
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 25,
+    "storage_at_deployment_ty_idx": 27
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102351,
+      "name": "get_nft_data",
+      "parameters": [],
+      "return_ty_idx": 31
+    },
+    {
+      "tvm_method_id": 90228,
+      "name": "get_editor",
+      "parameters": [],
+      "return_ty_idx": 14
+    },
+    {
+      "tvm_method_id": 119378,
+      "name": "get_domain",
+      "parameters": [],
+      "return_ty_idx": 2
+    },
+    {
+      "tvm_method_id": 79694,
+      "name": "get_minted_at",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 85002,
+      "name": "get_last_touch",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 102302,
+      "name": "get_valid_until",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 123660,
+      "name": "dnsresolve",
+      "parameters": [
+        {
+          "name": "subdomain",
+          "ty_idx": 2
+        },
+        {
+          "name": "category",
+          "ty_idx": 20
+        }
+      ],
+      "return_ty_idx": 32
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_DNS_INVALID_SUBDOMAIN_BITS",
+      "err_code": 70
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_WRONG_WORKCHAIN",
+      "err_code": 211
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INDEX_MISMATCH",
+      "err_code": 220
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_OWNER",
+      "err_code": 401
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INSUFFICIENT_BALANCE",
+      "err_code": 402
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_FROM_COLLECTION",
+      "err_code": 404
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_CONTENT_TAG_INVALID",
+      "err_code": 412
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_UNKNOWN_OP",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
