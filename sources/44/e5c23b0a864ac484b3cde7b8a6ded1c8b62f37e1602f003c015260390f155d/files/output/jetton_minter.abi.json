@@ -1,0 +1,329 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "InternalTransferStep"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseWalletAddress"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 7
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 19
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StablecoinDataReply"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "JettonDataReply",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "totalSupply",
+          "ty_idx": 1
+        },
+        {
+          "name": "mintable",
+          "ty_idx": 5
+        },
+        {
+          "name": "adminAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "jettonContent",
+          "ty_idx": 3
+        },
+        {
+          "name": "jettonWalletCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StablecoinDataReply",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "usdtJettonMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "usdtJettonWallet",
+          "ty_idx": 13
+        },
+        {
+          "name": "usdtUnitsPerXtr",
+          "ty_idx": 1
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 15,
+      "target_ty_idx": 16
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 13
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 14
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "InternalTransferStep",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 395134233,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferInitiator",
+          "ty_idx": 13
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 13
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseWalletAddress",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 3513996288,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonWalletAddress",
+          "ty_idx": 13
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 20
+        }
+      ]
+    }
+  ],
+  "storage": {},
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 106029,
+      "name": "get_jetton_data",
+      "parameters": [],
+      "return_ty_idx": 21
+    },
+    {
+      "tvm_method_id": 103289,
+      "name": "get_wallet_address",
+      "parameters": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 126767,
+      "name": "get_stablecoin_data",
+      "parameters": [],
+      "return_ty_idx": 22
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERR_NOT_FROM_ADMIN",
+      "err_code": 73
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_UNAUTHORIZED_BURN",
+      "err_code": 74
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_NOT_ENOUGH_AMOUNT_TO_RESPOND",
+      "err_code": 75
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_NOT_FROM_USDT_WALLET",
+      "err_code": 76
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_USDT_WALLET_NOT_SET",
+      "err_code": 77
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_USDT_WALLET_ALREADY_SET",
+      "err_code": 78
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_BURN_PAYOUT_TOO_SMALL",
+      "err_code": 79
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_NOT_ENOUGH_TON",
+      "err_code": 709
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}

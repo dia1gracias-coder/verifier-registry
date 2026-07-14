@@ -1,0 +1,9 @@
+const MINIMAL_MESSAGE_VALUE_BOUND = ton("0.01")
+
+const MIN_TONS_FOR_STORAGE = ton("0.01")
+
+const JETTON_WALLET_GAS_CONSUMPTION = ton("0.015")
+
+const MINT_GAS_REQUIRED = ton("0.03")
+
+const BURN_PAYOUT_GAS_REQUIRED = ton("0.02")
