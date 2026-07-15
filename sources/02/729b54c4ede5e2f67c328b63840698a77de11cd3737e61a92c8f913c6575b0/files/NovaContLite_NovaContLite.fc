@@ -1,0 +1,1321 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; NovaContLite_NovaContLite.headers.fc
+;;
+;; Header files for NovaContLite
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_store_address_opt
+builder __tact_store_address_opt(builder b, slice address) inline;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_slice_neq
+int __tact_slice_neq(slice a, slice b) inline;
+
+;; __tact_dict_get_slice_int
+int __tact_dict_get_slice_int(cell d, int kl, slice k, int vl) inline;
+
+;; __tact_dict_set_slice_int
+(cell, ()) __tact_dict_set_slice_int(cell d, int kl, slice k, int v, int vl) inline;
+
+;; __tact_dict_get_slice_uint
+int __tact_dict_get_slice_uint(cell d, int kl, slice k, int vl) inline;
+
+;; __tact_dict_set_slice_uint
+(cell, ()) __tact_dict_set_slice_uint(cell d, int kl, slice k, int v, int vl) inline;
+
+;; __tact_dict_get_int_slice
+slice __tact_dict_get_int_slice(cell d, int kl, int k) inline;
+
+;; __tact_dict_set_int_slice
+(cell, ()) __tact_dict_set_int_slice(cell d, int kl, int k, slice v) inline;
+
+;; __tact_dict_get_int_cell
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline;
+
+;; __tact_dict_set_int_cell
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline;
+
+;; $DeployOk$_store
+builder $DeployOk$_store(builder build_0, (int) v) inline;
+
+;; $DeployOk$_store_cell
+cell $DeployOk$_store_cell((int) v, builder b) inline;
+
+;; $EscrowData$_store
+builder $EscrowData$_store(builder build_0, (slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice) v) inline_ref;
+
+;; $EscrowData$_store_cell
+cell $EscrowData$_store_cell((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice) v, builder b) inline;
+
+;; $EscrowData$_load
+(slice, ((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice))) $EscrowData$_load(slice sc_0) inline_ref;
+
+;; $EscrowData$_as_optional
+tuple $EscrowData$_as_optional((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice) v) inline;
+
+;; $EscrowData$_load_opt
+tuple $EscrowData$_load_opt(cell cl) inline;
+
+;; $EscrowCreated$_store
+builder $EscrowCreated$_store(builder build_0, (int, slice, slice, int, int, int) v) inline;
+
+;; $EscrowCreated$_store_cell
+cell $EscrowCreated$_store_cell((int, slice, slice, int, int, int) v, builder b) inline;
+
+;; $EscrowAccepted$_store
+builder $EscrowAccepted$_store(builder build_0, (int, int) v) inline;
+
+;; $EscrowAccepted$_store_cell
+cell $EscrowAccepted$_store_cell((int, int) v, builder b) inline;
+
+;; $WorkDelivered$_store
+builder $WorkDelivered$_store(builder build_0, (int, slice, int) v) inline;
+
+;; $WorkDelivered$_store_cell
+cell $WorkDelivered$_store_cell((int, slice, int) v, builder b) inline;
+
+;; $EscrowCompleted$_store
+builder $EscrowCompleted$_store(builder build_0, (int) v) inline;
+
+;; $EscrowCompleted$_store_cell
+cell $EscrowCompleted$_store_cell((int) v, builder b) inline;
+
+;; $EscrowCancelled$_store
+builder $EscrowCancelled$_store(builder build_0, (int, int, slice) v) inline;
+
+;; $EscrowCancelled$_store_cell
+cell $EscrowCancelled$_store_cell((int, int, slice) v, builder b) inline;
+
+;; $TimeoutClaimed$_store
+builder $TimeoutClaimed$_store(builder build_0, (int) v) inline;
+
+;; $TimeoutClaimed$_store_cell
+cell $TimeoutClaimed$_store_cell((int) v, builder b) inline;
+
+;; $DisputeRaised$_store
+builder $DisputeRaised$_store(builder build_0, (int, slice) v) inline;
+
+;; $DisputeRaised$_store_cell
+cell $DisputeRaised$_store_cell((int, slice) v, builder b) inline;
+
+;; $DisputeResolved$_store
+builder $DisputeResolved$_store(builder build_0, (int, int) v) inline;
+
+;; $DisputeResolved$_store_cell
+cell $DisputeResolved$_store_cell((int, int) v, builder b) inline;
+
+;; $NovaContLite$_store
+builder $NovaContLite$_store(builder build_0, (slice, cell, cell, int, int, cell, cell, int) v) inline;
+
+;; $NovaContLite$_load
+(slice, ((slice, cell, cell, int, int, cell, cell, int))) $NovaContLite$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $EscrowData$_not_null
+((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice)) $EscrowData$_not_null(tuple v) inline;
+
+;; $EscrowData$_to_tuple
+tuple $EscrowData$_to_tuple(((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice)) v) inline;
+
+;; $EscrowData$_to_opt_tuple
+tuple $EscrowData$_to_opt_tuple(tuple v) inline;
+
+;; $EscrowData$_to_opt_external
+tuple $EscrowData$_to_opt_external(tuple v) inline;
+
+;; $NovaContLite$init$_load
+(slice, ((slice))) $NovaContLite$init$_load(slice sc_0) inline;
+
+;; $NovaContLite$_contract_init
+(slice, cell, cell, int, int, cell, cell, int) $NovaContLite$_contract_init(slice $owner) impure inline;
+
+;; $NovaContLite$_contract_load
+(slice, cell, cell, int, int, cell, cell, int) $NovaContLite$_contract_load() impure inline;
+
+;; $NovaContLite$_contract_store
+() $NovaContLite$_contract_store((slice, cell, cell, int, int, cell, cell, int) v) impure inline;
+
+;; $global_emit
+() $global_emit(cell $body) impure inline;
+
+;; $SendParameters$_constructor_to_value_mode_body
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_body(slice $to, int $value, int $mode, cell $body) inline;
+
+;; $NovaContLite$_fun_distributeFunds
+((slice, cell, cell, int, int, cell, cell, int), ()) $NovaContLite$_fun_distributeFunds((slice, cell, cell, int, int, cell, cell, int) $self, int $escrowId, (slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice) $escrow, int $clientShareBps) impure inline_ref;
+
+;; $NovaContLite$_fun_requireEscrow
+((slice, cell, cell, int, int, cell, cell, int), (slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice)) $NovaContLite$_fun_requireEscrow((slice, cell, cell, int, int, cell, cell, int) $self, int $escrowId) impure inline_ref;
+
+;; $NovaContLite$_fun_getEscrow
+((slice, cell, cell, int, int, cell, cell, int), tuple) $NovaContLite$_fun_getEscrow((slice, cell, cell, int, int, cell, cell, int) $self, int $escrowId) impure inline_ref;
+
+;; $NovaContLite$_fun_getEscrowCount
+((slice, cell, cell, int, int, cell, cell, int), int) $NovaContLite$_fun_getEscrowCount((slice, cell, cell, int, int, cell, cell, int) $self) impure inline_ref;
+
+;; $NovaContLite$_fun_getOwner
+((slice, cell, cell, int, int, cell, cell, int), slice) $NovaContLite$_fun_getOwner((slice, cell, cell, int, int, cell, cell, int) $self) impure inline_ref;
+
+;; $NovaContLite$_fun_isAdmin
+((slice, cell, cell, int, int, cell, cell, int), int) $NovaContLite$_fun_isAdmin((slice, cell, cell, int, int, cell, cell, int) $self, slice $addr) impure inline_ref;
+
+;; $MessageParameters$_constructor_bounce_to_value_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline;
+
+;; $NovaContLite$_fun_reply
+((slice, cell, cell, int, int, cell, cell, int), ()) $NovaContLite$_fun_reply((slice, cell, cell, int, int, cell, cell, int) $self, cell $body) impure inline;
+
+;; $NovaContLite$_fun_notify
+((slice, cell, cell, int, int, cell, cell, int), ()) $NovaContLite$_fun_notify((slice, cell, cell, int, int, cell, cell, int) $self, cell $body) impure inline;
+
+;; $EscrowData$_constructor_client_provider_agreedTon_totalLocked_isExtraDeposit_description_evidenceUrl_state_acceptDeadline_deliveryDeadline_deliveryTime_acceptTime_createdAt_deliveryDuration_resolutionReason_disputeReason_resolvedClientShareBps_assignedSupport
+((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice)) $EscrowData$_constructor_client_provider_agreedTon_totalLocked_isExtraDeposit_description_evidenceUrl_state_acceptDeadline_deliveryDeadline_deliveryTime_acceptTime_createdAt_deliveryDuration_resolutionReason_disputeReason_resolvedClientShareBps_assignedSupport(slice $client, slice $provider, int $agreedTon, int $totalLocked, int $isExtraDeposit, slice $description, slice $evidenceUrl, int $state, int $acceptDeadline, int $deliveryDeadline, int $deliveryTime, int $acceptTime, int $createdAt, int $deliveryDuration, slice $resolutionReason, slice $disputeReason, int $resolvedClientShareBps, slice $assignedSupport) inline;
+
+;; $EscrowCreated$_constructor_escrowId_client_provider_agreedTon_totalLocked_isExtraDeposit
+((int, slice, slice, int, int, int)) $EscrowCreated$_constructor_escrowId_client_provider_agreedTon_totalLocked_isExtraDeposit(int $escrowId, slice $client, slice $provider, int $agreedTon, int $totalLocked, int $isExtraDeposit) inline;
+
+;; $EscrowAccepted$_constructor_escrowId_deliveryDeadline
+((int, int)) $EscrowAccepted$_constructor_escrowId_deliveryDeadline(int $escrowId, int $deliveryDeadline) inline;
+
+;; $EscrowCancelled$_constructor_escrowId_clientRefund_reason
+((int, int, slice)) $EscrowCancelled$_constructor_escrowId_clientRefund_reason(int $escrowId, int $clientRefund, slice $reason) inline;
+
+;; $WorkDelivered$_constructor_escrowId_evidenceUrl_deliveryTime
+((int, slice, int)) $WorkDelivered$_constructor_escrowId_evidenceUrl_deliveryTime(int $escrowId, slice $evidenceUrl, int $deliveryTime) inline;
+
+;; $EscrowCompleted$_constructor_escrowId
+((int)) $EscrowCompleted$_constructor_escrowId(int $escrowId) inline;
+
+;; $TimeoutClaimed$_constructor_escrowId
+((int)) $TimeoutClaimed$_constructor_escrowId(int $escrowId) inline;
+
+;; $DisputeRaised$_constructor_escrowId_raiser
+((int, slice)) $DisputeRaised$_constructor_escrowId_raiser(int $escrowId, slice $raiser) inline;
+
+;; $DisputeResolved$_constructor_escrowId_clientShareBps
+((int, int)) $DisputeResolved$_constructor_escrowId_clientShareBps(int $escrowId, int $clientShareBps) inline;
+
+;; $DeployOk$_constructor_queryId
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline;
+
+
+;; NovaContLite_NovaContLite.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(slice, slice) __tact_load_address_opt(slice cs) asm """
+
+            b{00} SDBEGINSQ
+            IF:<{
+              PUSHNULL
+            }>ELSE<{
+              LDMSGADDR
+              SWAP
+            }>
+
+""";
+
+builder __tact_store_addr_none(builder b) asm "b{00} STSLICECONST";
+
+builder __tact_store_address_opt(builder b, slice address) inline {
+    if (null?(address)) {
+        return __tact_store_addr_none(b);
+    } else {
+        return b.store_slice(address);
+    }
+}
+
+(cell, int) __tact_dict_delete(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTDEL
+""";
+
+(slice, int) __tact_dict_get(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTGET NULLSWAPIFNOT
+""";
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+int __tact_slice_neq(slice a, slice b) inline {
+    return (a.slice_hash() !=  b.slice_hash());
+}
+
+forall X0, X1, X2, X3 -> (X0, X1, X2, X3) __tact_tuple_destroy_4(tuple v) asm """
+    4 UNTUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14 -> tuple __tact_tuple_create_15((X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14) v) asm """
+    15 TUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14 -> (X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14) __tact_tuple_destroy_15(tuple v) asm """
+    15 UNTUPLE
+""";
+
+int __tact_dict_get_slice_int(cell d, int kl, slice k, int vl) inline {
+    var (r, ok) = __tact_dict_get(d, kl, k);
+    if (ok) {
+        return r~load_int(vl);
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_slice_int(cell d, int kl, slice k, int v, int vl) inline {
+    if (null?(v)) {
+        var (r, ok) = __tact_dict_delete(d, kl, k);
+        return (r, ());
+    } else {
+        return (dict_set_builder(d, kl, k, begin_cell().store_int(v, vl)), ());
+    }
+}
+
+int __tact_dict_get_slice_uint(cell d, int kl, slice k, int vl) inline {
+    var (r, ok) = __tact_dict_get(d, kl, k);
+    if (ok) {
+        return r~load_uint(vl);
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_slice_uint(cell d, int kl, slice k, int v, int vl) inline {
+    if (null?(v)) {
+        var (r, ok) = __tact_dict_delete(d, kl, k);
+        return (r, ());
+    } else {
+        return (dict_set_builder(d, kl, k, begin_cell().store_uint(v, vl)), ());
+    }
+}
+
+slice __tact_dict_get_int_slice(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_int_slice(cell d, int kl, int k, slice v) inline {
+    if (null?(v)) {
+        var (r, ok) = idict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (idict_set(d, kl, k, v), ());
+    }
+}
+
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get_ref?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline {
+    if (null?(v)) {
+        var (r, ok) = idict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (idict_set_ref(d, kl, k, v), ());
+    }
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_myBalance() impure asm """
+    BALANCE FIRST
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
+() $global_sendRawMessage(cell $msg, int $mode) impure asm """
+    SENDRAWMSG
+""";
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+builder $Builder$_fun_storeRef(cell $cell, builder $self) impure asm """
+    STREF
+""";
+
+() $global_emit(cell $body) impure inline {
+    cell $c = $Builder$_fun_endCell($Builder$_fun_storeRef($body, store_uint($global_beginCell(), 15211807202738752817960438464513, 104)));
+    $global_sendRawMessage($c, 0);
+}
+
+int $global_now() impure asm """
+    NOW
+""";
+
+((slice, cell, cell, int, int, cell, cell, int), ()) $NovaContLite$_fun_reply((slice, cell, cell, int, int, cell, cell, int) $self, cell $body) impure inline {
+    var (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)) = $self;
+    slice $to = __tact_context_get_sender();
+    int $bounce = true;
+    if (false) {
+        int $balance = $global_myBalance();
+        int $balanceBeforeMessage = ($balance - $Context$_get_value(__tact_context_get()));
+        if (($balanceBeforeMessage < 0)) {
+            $global_nativeReserve(0, 0);
+            $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 130, $body));
+            return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), ());
+        }
+    }
+    $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 66, $body));
+    return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), ());
+}
+
+((slice, cell, cell, int, int, cell, cell, int), ()) $NovaContLite$_fun_notify((slice, cell, cell, int, int, cell, cell, int) $self, cell $body) impure inline {
+    var (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)) = $self;
+    slice $to = __tact_context_get_sender();
+    int $bounce = false;
+    if (false) {
+        int $balance = $global_myBalance();
+        int $balanceBeforeMessage = ($balance - $Context$_get_value(__tact_context_get()));
+        if (($balanceBeforeMessage < 0)) {
+            $global_nativeReserve(0, 0);
+            $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 130, $body));
+            return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), ());
+        }
+    }
+    $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 66, $body));
+    return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), ());
+}
+
+;; NovaContLite_NovaContLite.constants.fc
+;; Cell h0w4mdTFHuuZyn10r4e9pLRiie8ytawXl1Df5UcAFDU=
+cell __gen_cell_cell_874c3899d4c51eeb99ca7d74af87bda4b46289ef32b5ac179750dfe547001435() asm """
+    B{b5ee9c7241010101001e000038000000004e6f7661436f6e743a2050726f76696465722073686172658db43416} B>boc PUSHREF
+""";
+
+;; Cell E3dpabXoa9WWF7gIMfSMFuBM2MoYedCnQjboukDnmHY=
+cell __gen_cell_cell_13776969b5e86bd59617b80831f48c16e04cd8ca1879d0a74236e8ba40e79876() asm """
+    B{b5ee9c7241010101001c000034000000004e6f7661436f6e743a20506c6174666f726d206665655160cdd1} B>boc PUSHREF
+""";
+
+;; Cell iOOk0jF9aj8A+db8ZdzlVLT8dykkFYNb4Q0Tdbf9+nI=
+cell __gen_cell_cell_88e3a4d2317d6a3f00f9d6fc65dce554b4fc77292415835be10d1375b7fdfa72() asm """
+    B{b5ee9c7241010101001d000036000000004e6f7661436f6e743a20436c69656e7420726566756e6458fbe555} B>boc PUSHREF
+""";
+
+;; String ""
+slice __gen_slice_string_96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7() asm """
+    B{b5ee9c724101010100020000004cacb9cd} B>boc <s PUSHSLICE
+""";
+
+;; Cell Pk0FFdBTY29wwM6kDsq6VS/cm0G2wlfK2oiInLlr9LI=
+cell __gen_cell_cell_3e4d0515d053636f70c0cea40ecaba552fdc9b41b6c257cada88889cb96bf4b2() asm """
+    B{b5ee9c7241010101001700002a000000004578636573732067617320726566756e64f05e650d} B>boc PUSHREF
+""";
+
+;; Cell wkSLngOLKuV1dELK1Rz+rT58IqHknd7kb6kZMH1n4m4=
+cell __gen_cell_cell_c2448b9e038b2ae5757442cad51cfead3e7c22a1e49ddee46fa919307d67e26e() asm """
+    B{b5ee9c72410101010032000060000000004e6f7661436f6e743a20457363726f772072656a65637465642e2046756c6c20726566756e642073656e742ee69d598d} B>boc PUSHREF
+""";
+
+;; String "Provider rejected"
+slice __gen_slice_string_20855179357678faafc6f93bca45635c5052553cfef889cc3f6023fc17b523a3() asm """
+    B{b5ee9c7241010101001300002250726f76696465722072656a6563746564ab2a4762} B>boc <s PUSHSLICE
+""";
+
+;; Cell 4aZZ8D5s7MhfI9yQ9BffPlZOX98GXkBeyjK1THQzq7I=
+cell __gen_cell_cell_e1a659f03e6cecc85f23dc90f417df3e564e5fdf065e405eca32b54c7433abb2() asm """
+    B{b5ee9c7241010101002e000058000000004e6f7661436f6e743a20457363726f772063616e63656c6c65642e2046756c6c20726566756e642e805c9c81} B>boc PUSHREF
+""";
+
+;; String "Cancelled before acceptance"
+slice __gen_slice_string_54e05b26506d07c91594f833f1a5bbdf71574e8fe573fbcf62578aabf107991f() asm """
+    B{b5ee9c7241010101001d00003643616e63656c6c6564206265666f726520616363657074616e6365019e7341} B>boc <s PUSHSLICE
+""";
+
+;; NovaContLite_NovaContLite.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_body(slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, null(), null(), $value, $to, true);
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: DeployOk
+;; Header: 0xaff90f57
+;; TLB: deploy_ok#aff90f57 queryId:uint64 = DeployOk
+;;
+
+builder $DeployOk$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 2952335191, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $DeployOk$_store_cell((int) v, builder b) inline {
+    return $DeployOk$_store(b, v).end_cell();
+}
+
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: EscrowData
+;; TLB: _ client:address provider:address agreedTon:coins totalLocked:coins isExtraDeposit:bool description:^string evidenceUrl:^string state:uint8 acceptDeadline:uint64 deliveryDeadline:uint64 deliveryTime:uint64 acceptTime:uint64 createdAt:uint64 deliveryDuration:uint64 resolutionReason:^string disputeReason:^string resolvedClientShareBps:uint16 assignedSupport:address = EscrowData
+;;
+
+builder $EscrowData$_store(builder build_0, (slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice) v) inline_ref {
+    var (v'client, v'provider, v'agreedTon, v'totalLocked, v'isExtraDeposit, v'description, v'evidenceUrl, v'state, v'acceptDeadline, v'deliveryDeadline, v'deliveryTime, v'acceptTime, v'createdAt, v'deliveryDuration, v'resolutionReason, v'disputeReason, v'resolvedClientShareBps, v'assignedSupport) = v;
+    build_0 = build_0.store_slice(v'client);
+    build_0 = build_0.store_slice(v'provider);
+    build_0 = build_0.store_varuint16(v'agreedTon);
+    build_0 = build_0.store_varuint16(v'totalLocked);
+    build_0 = build_0.store_int(v'isExtraDeposit, 1);
+    build_0 = build_0.store_builder_ref(begin_cell().store_slice(v'description));
+    build_0 = build_0.store_builder_ref(begin_cell().store_slice(v'evidenceUrl));
+    build_0 = build_0.store_uint(v'state, 8);
+    build_0 = build_0.store_uint(v'acceptDeadline, 64);
+    build_0 = build_0.store_uint(v'deliveryDeadline, 64);
+    build_0 = build_0.store_uint(v'deliveryTime, 64);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'acceptTime, 64);
+    build_1 = build_1.store_uint(v'createdAt, 64);
+    build_1 = build_1.store_uint(v'deliveryDuration, 64);
+    build_1 = build_1.store_builder_ref(begin_cell().store_slice(v'resolutionReason));
+    build_1 = build_1.store_builder_ref(begin_cell().store_slice(v'disputeReason));
+    build_1 = build_1.store_uint(v'resolvedClientShareBps, 16);
+    build_1 = __tact_store_address_opt(build_1, v'assignedSupport);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+cell $EscrowData$_store_cell((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice) v, builder b) inline {
+    return $EscrowData$_store(b, v).end_cell();
+}
+
+(slice, ((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice))) $EscrowData$_load(slice sc_0) inline_ref {
+    var v'client = sc_0~load_msg_addr();
+    var v'provider = sc_0~load_msg_addr();
+    var v'agreedTon = sc_0~load_varuint16();
+    var v'totalLocked = sc_0~load_varuint16();
+    var v'isExtraDeposit = sc_0~load_int(1);
+    var v'description = sc_0~load_ref().begin_parse();
+    var v'evidenceUrl = sc_0~load_ref().begin_parse();
+    var v'state = sc_0~load_uint(8);
+    var v'acceptDeadline = sc_0~load_uint(64);
+    var v'deliveryDeadline = sc_0~load_uint(64);
+    var v'deliveryTime = sc_0~load_uint(64);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'acceptTime = sc_1~load_uint(64);
+    var v'createdAt = sc_1~load_uint(64);
+    var v'deliveryDuration = sc_1~load_uint(64);
+    var v'resolutionReason = sc_1~load_ref().begin_parse();
+    var v'disputeReason = sc_1~load_ref().begin_parse();
+    var v'resolvedClientShareBps = sc_1~load_uint(16);
+    var v'assignedSupport = sc_1~__tact_load_address_opt();
+    return (sc_0, (v'client, v'provider, v'agreedTon, v'totalLocked, v'isExtraDeposit, v'description, v'evidenceUrl, v'state, v'acceptDeadline, v'deliveryDeadline, v'deliveryTime, v'acceptTime, v'createdAt, v'deliveryDuration, v'resolutionReason, v'disputeReason, v'resolvedClientShareBps, v'assignedSupport));
+}
+
+tuple $EscrowData$_as_optional((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice) v) inline {
+    var (v'client, v'provider, v'agreedTon, v'totalLocked, v'isExtraDeposit, v'description, v'evidenceUrl, v'state, v'acceptDeadline, v'deliveryDeadline, v'deliveryTime, v'acceptTime, v'createdAt, v'deliveryDuration, v'resolutionReason, v'disputeReason, v'resolvedClientShareBps, v'assignedSupport) = v;
+    return __tact_tuple_create_15(v'client, v'provider, v'agreedTon, v'totalLocked, v'isExtraDeposit, v'description, v'evidenceUrl, v'state, v'acceptDeadline, v'deliveryDeadline, v'deliveryTime, v'acceptTime, v'createdAt, v'deliveryDuration, [v'resolutionReason, v'disputeReason, v'resolvedClientShareBps, v'assignedSupport]);
+}
+
+tuple $EscrowData$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $EscrowData$_as_optional(sc~$EscrowData$_load());
+}
+
+((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice)) $EscrowData$_not_null(tuple v) inline {
+    var (slice vvv'client, slice vvv'provider, int vvv'agreedTon, int vvv'totalLocked, int vvv'isExtraDeposit, slice vvv'description, slice vvv'evidenceUrl, int vvv'state, int vvv'acceptDeadline, int vvv'deliveryDeadline, int vvv'deliveryTime, int vvv'acceptTime, int vvv'createdAt, int vvv'deliveryDuration, next) = __tact_tuple_destroy_15(v);
+    var (slice vvv'resolutionReason, slice vvv'disputeReason, int vvv'resolvedClientShareBps, slice vvv'assignedSupport) = __tact_tuple_destroy_4(next);
+    return (vvv'client, vvv'provider, vvv'agreedTon, vvv'totalLocked, vvv'isExtraDeposit, vvv'description, vvv'evidenceUrl, vvv'state, vvv'acceptDeadline, vvv'deliveryDeadline, vvv'deliveryTime, vvv'acceptTime, vvv'createdAt, vvv'deliveryDuration, vvv'resolutionReason, vvv'disputeReason, vvv'resolvedClientShareBps, vvv'assignedSupport);
+}
+
+tuple $EscrowData$_to_tuple(((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice)) v) inline {
+    var (v'client, v'provider, v'agreedTon, v'totalLocked, v'isExtraDeposit, v'description, v'evidenceUrl, v'state, v'acceptDeadline, v'deliveryDeadline, v'deliveryTime, v'acceptTime, v'createdAt, v'deliveryDuration, v'resolutionReason, v'disputeReason, v'resolvedClientShareBps, v'assignedSupport) = v;
+    return __tact_tuple_create_15(v'client, v'provider, v'agreedTon, v'totalLocked, v'isExtraDeposit, v'description, v'evidenceUrl, v'state, v'acceptDeadline, v'deliveryDeadline, v'deliveryTime, v'acceptTime, v'createdAt, v'deliveryDuration, [v'resolutionReason, v'disputeReason, v'resolvedClientShareBps, v'assignedSupport]);
+}
+
+tuple $EscrowData$_to_opt_tuple(tuple v) inline {
+    if (null?(v)) { return null(); } 
+    return $EscrowData$_to_tuple($EscrowData$_not_null(v)); 
+}
+
+tuple $EscrowData$_to_opt_external(tuple v) inline {
+    var loaded = $EscrowData$_to_opt_tuple(v);
+    if (null?(loaded)) {
+        return null();
+    } else {
+        return (loaded);
+    }
+}
+
+((slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice)) $EscrowData$_constructor_client_provider_agreedTon_totalLocked_isExtraDeposit_description_evidenceUrl_state_acceptDeadline_deliveryDeadline_deliveryTime_acceptTime_createdAt_deliveryDuration_resolutionReason_disputeReason_resolvedClientShareBps_assignedSupport(slice $client, slice $provider, int $agreedTon, int $totalLocked, int $isExtraDeposit, slice $description, slice $evidenceUrl, int $state, int $acceptDeadline, int $deliveryDeadline, int $deliveryTime, int $acceptTime, int $createdAt, int $deliveryDuration, slice $resolutionReason, slice $disputeReason, int $resolvedClientShareBps, slice $assignedSupport) inline {
+    return ($client, $provider, $agreedTon, $totalLocked, $isExtraDeposit, $description, $evidenceUrl, $state, $acceptDeadline, $deliveryDeadline, $deliveryTime, $acceptTime, $createdAt, $deliveryDuration, $resolutionReason, $disputeReason, $resolvedClientShareBps, $assignedSupport);
+}
+
+;;
+;; Type: EscrowCreated
+;; Header: 0x4db49d9c
+;; TLB: escrow_created#4db49d9c escrowId:uint64 client:address provider:address agreedTon:coins totalLocked:coins isExtraDeposit:bool = EscrowCreated
+;;
+
+builder $EscrowCreated$_store(builder build_0, (int, slice, slice, int, int, int) v) inline {
+    var (v'escrowId, v'client, v'provider, v'agreedTon, v'totalLocked, v'isExtraDeposit) = v;
+    build_0 = store_uint(build_0, 1303682460, 32);
+    build_0 = build_0.store_uint(v'escrowId, 64);
+    build_0 = build_0.store_slice(v'client);
+    build_0 = build_0.store_slice(v'provider);
+    build_0 = build_0.store_varuint16(v'agreedTon);
+    build_0 = build_0.store_varuint16(v'totalLocked);
+    build_0 = build_0.store_int(v'isExtraDeposit, 1);
+    return build_0;
+}
+
+cell $EscrowCreated$_store_cell((int, slice, slice, int, int, int) v, builder b) inline {
+    return $EscrowCreated$_store(b, v).end_cell();
+}
+
+((int, slice, slice, int, int, int)) $EscrowCreated$_constructor_escrowId_client_provider_agreedTon_totalLocked_isExtraDeposit(int $escrowId, slice $client, slice $provider, int $agreedTon, int $totalLocked, int $isExtraDeposit) inline {
+    return ($escrowId, $client, $provider, $agreedTon, $totalLocked, $isExtraDeposit);
+}
+
+;;
+;; Type: EscrowAccepted
+;; Header: 0xd12cae34
+;; TLB: escrow_accepted#d12cae34 escrowId:uint64 deliveryDeadline:uint64 = EscrowAccepted
+;;
+
+builder $EscrowAccepted$_store(builder build_0, (int, int) v) inline {
+    var (v'escrowId, v'deliveryDeadline) = v;
+    build_0 = store_uint(build_0, 3509366324, 32);
+    build_0 = build_0.store_uint(v'escrowId, 64);
+    build_0 = build_0.store_uint(v'deliveryDeadline, 64);
+    return build_0;
+}
+
+cell $EscrowAccepted$_store_cell((int, int) v, builder b) inline {
+    return $EscrowAccepted$_store(b, v).end_cell();
+}
+
+((int, int)) $EscrowAccepted$_constructor_escrowId_deliveryDeadline(int $escrowId, int $deliveryDeadline) inline {
+    return ($escrowId, $deliveryDeadline);
+}
+
+;;
+;; Type: WorkDelivered
+;; Header: 0x024246ed
+;; TLB: work_delivered#024246ed escrowId:uint64 evidenceUrl:^string deliveryTime:uint64 = WorkDelivered
+;;
+
+builder $WorkDelivered$_store(builder build_0, (int, slice, int) v) inline {
+    var (v'escrowId, v'evidenceUrl, v'deliveryTime) = v;
+    build_0 = store_uint(build_0, 37897965, 32);
+    build_0 = build_0.store_uint(v'escrowId, 64);
+    build_0 = build_0.store_builder_ref(begin_cell().store_slice(v'evidenceUrl));
+    build_0 = build_0.store_uint(v'deliveryTime, 64);
+    return build_0;
+}
+
+cell $WorkDelivered$_store_cell((int, slice, int) v, builder b) inline {
+    return $WorkDelivered$_store(b, v).end_cell();
+}
+
+((int, slice, int)) $WorkDelivered$_constructor_escrowId_evidenceUrl_deliveryTime(int $escrowId, slice $evidenceUrl, int $deliveryTime) inline {
+    return ($escrowId, $evidenceUrl, $deliveryTime);
+}
+
+;;
+;; Type: EscrowCompleted
+;; Header: 0xd5e03559
+;; TLB: escrow_completed#d5e03559 escrowId:uint64 = EscrowCompleted
+;;
+
+builder $EscrowCompleted$_store(builder build_0, (int) v) inline {
+    var (v'escrowId) = v;
+    build_0 = store_uint(build_0, 3588240729, 32);
+    build_0 = build_0.store_uint(v'escrowId, 64);
+    return build_0;
+}
+
+cell $EscrowCompleted$_store_cell((int) v, builder b) inline {
+    return $EscrowCompleted$_store(b, v).end_cell();
+}
+
+((int)) $EscrowCompleted$_constructor_escrowId(int $escrowId) inline {
+    return ($escrowId);
+}
+
+;;
+;; Type: EscrowCancelled
+;; Header: 0x702889f0
+;; TLB: escrow_cancelled#702889f0 escrowId:uint64 clientRefund:coins reason:^string = EscrowCancelled
+;;
+
+builder $EscrowCancelled$_store(builder build_0, (int, int, slice) v) inline {
+    var (v'escrowId, v'clientRefund, v'reason) = v;
+    build_0 = store_uint(build_0, 1881704944, 32);
+    build_0 = build_0.store_uint(v'escrowId, 64);
+    build_0 = build_0.store_varuint16(v'clientRefund);
+    build_0 = build_0.store_builder_ref(begin_cell().store_slice(v'reason));
+    return build_0;
+}
+
+cell $EscrowCancelled$_store_cell((int, int, slice) v, builder b) inline {
+    return $EscrowCancelled$_store(b, v).end_cell();
+}
+
+((int, int, slice)) $EscrowCancelled$_constructor_escrowId_clientRefund_reason(int $escrowId, int $clientRefund, slice $reason) inline {
+    return ($escrowId, $clientRefund, $reason);
+}
+
+;;
+;; Type: TimeoutClaimed
+;; Header: 0x48e61867
+;; TLB: timeout_claimed#48e61867 escrowId:uint64 = TimeoutClaimed
+;;
+
+builder $TimeoutClaimed$_store(builder build_0, (int) v) inline {
+    var (v'escrowId) = v;
+    build_0 = store_uint(build_0, 1223039079, 32);
+    build_0 = build_0.store_uint(v'escrowId, 64);
+    return build_0;
+}
+
+cell $TimeoutClaimed$_store_cell((int) v, builder b) inline {
+    return $TimeoutClaimed$_store(b, v).end_cell();
+}
+
+((int)) $TimeoutClaimed$_constructor_escrowId(int $escrowId) inline {
+    return ($escrowId);
+}
+
+;;
+;; Type: DisputeRaised
+;; Header: 0xa8dd4222
+;; TLB: dispute_raised#a8dd4222 escrowId:uint64 raiser:address = DisputeRaised
+;;
+
+builder $DisputeRaised$_store(builder build_0, (int, slice) v) inline {
+    var (v'escrowId, v'raiser) = v;
+    build_0 = store_uint(build_0, 2833072674, 32);
+    build_0 = build_0.store_uint(v'escrowId, 64);
+    build_0 = build_0.store_slice(v'raiser);
+    return build_0;
+}
+
+cell $DisputeRaised$_store_cell((int, slice) v, builder b) inline {
+    return $DisputeRaised$_store(b, v).end_cell();
+}
+
+((int, slice)) $DisputeRaised$_constructor_escrowId_raiser(int $escrowId, slice $raiser) inline {
+    return ($escrowId, $raiser);
+}
+
+;;
+;; Type: DisputeResolved
+;; Header: 0xa7e434b0
+;; TLB: dispute_resolved#a7e434b0 escrowId:uint64 clientShareBps:uint16 = DisputeResolved
+;;
+
+builder $DisputeResolved$_store(builder build_0, (int, int) v) inline {
+    var (v'escrowId, v'clientShareBps) = v;
+    build_0 = store_uint(build_0, 2816750768, 32);
+    build_0 = build_0.store_uint(v'escrowId, 64);
+    build_0 = build_0.store_uint(v'clientShareBps, 16);
+    return build_0;
+}
+
+cell $DisputeResolved$_store_cell((int, int) v, builder b) inline {
+    return $DisputeResolved$_store(b, v).end_cell();
+}
+
+((int, int)) $DisputeResolved$_constructor_escrowId_clientShareBps(int $escrowId, int $clientShareBps) inline {
+    return ($escrowId, $clientShareBps);
+}
+
+;;
+;; Type: NovaContLite
+;; TLB: _ owner:address admins:dict<address, bool> escrows:dict<int, ^EscrowData{client:address,provider:address,agreedTon:coins,totalLocked:coins,isExtraDeposit:bool,description:^string,evidenceUrl:^string,state:uint8,acceptDeadline:uint64,deliveryDeadline:uint64,deliveryTime:uint64,acceptTime:uint64,createdAt:uint64,deliveryDuration:uint64,resolutionReason:^string,disputeReason:^string,resolvedClientShareBps:uint16,assignedSupport:address}> escrowCount:uint64 supportCount:uint8 supports:dict<int, address> supportIndex:dict<address, uint8> nextSupportAssign:uint8 = NovaContLite
+;;
+
+builder $NovaContLite$_store(builder build_0, (slice, cell, cell, int, int, cell, cell, int) v) inline {
+    var (v'owner, v'admins, v'escrows, v'escrowCount, v'supportCount, v'supports, v'supportIndex, v'nextSupportAssign) = v;
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_dict(v'admins);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_dict(v'escrows);
+    build_1 = build_1.store_uint(v'escrowCount, 64);
+    build_1 = build_1.store_uint(v'supportCount, 8);
+    build_1 = build_1.store_dict(v'supports);
+    build_1 = build_1.store_dict(v'supportIndex);
+    build_1 = build_1.store_uint(v'nextSupportAssign, 8);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+(slice, ((slice, cell, cell, int, int, cell, cell, int))) $NovaContLite$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'admins = sc_0~load_dict();
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'escrows = sc_1~load_dict();
+    var v'escrowCount = sc_1~load_uint(64);
+    var v'supportCount = sc_1~load_uint(8);
+    var v'supports = sc_1~load_dict();
+    var v'supportIndex = sc_1~load_dict();
+    var v'nextSupportAssign = sc_1~load_uint(8);
+    return (sc_0, (v'owner, v'admins, v'escrows, v'escrowCount, v'supportCount, v'supports, v'supportIndex, v'nextSupportAssign));
+}
+
+(slice, ((slice))) $NovaContLite$init$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    return (sc_0, (v'owner));
+}
+
+(slice, cell, cell, int, int, cell, cell, int) $NovaContLite$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$NovaContLite$_load();
+    }
+    else {
+        (slice $owner) = $sc~$NovaContLite$init$_load();
+        $sc.end_parse();
+        return $NovaContLite$_contract_init($owner);
+    }
+}
+
+() $NovaContLite$_contract_store((slice, cell, cell, int, int, cell, cell, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $NovaContLite$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract NovaContLite functions
+;;
+
+(slice, cell, cell, int, int, cell, cell, int) $NovaContLite$_contract_init(slice $owner) impure inline {
+    var (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)) = (null(), null(), null(), null(), null(), null(), null(), null());
+    $self'owner = $owner;
+    $self'escrowCount = 0;
+    $self'admins~__tact_dict_set_slice_int(267, $owner, true, 1);
+    $self'supportCount = 0;
+    $self'nextSupportAssign = 0;
+    return ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign);
+}
+
+((slice, cell, cell, int, int, cell, cell, int), ()) $NovaContLite$_fun_distributeFunds((slice, cell, cell, int, int, cell, cell, int) $self, int $escrowId, (slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice) $escrow, int $clientShareBps) impure inline_ref {
+    var (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)) = $self;
+    var (($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport)) = $escrow;
+    int $providerShareBps = (10000 - $clientShareBps);
+    int $fee = (($escrow'agreedTon * 300) / 10000);
+    int $netAgreedTon = ($escrow'agreedTon - $fee);
+    int $providerNet = (($netAgreedTon * $providerShareBps) / 10000);
+    int $clientRefundFromAgreed = (($netAgreedTon * $clientShareBps) / 10000);
+    int $clientExtraRefund = ($escrow'totalLocked - $escrow'agreedTon);
+    int $clientRefund = ($clientRefundFromAgreed + $clientExtraRefund);
+    if (($providerNet > 50000000)) {
+        $global_send($SendParameters$_constructor_to_value_mode_body($escrow'provider, ($providerNet - 50000000), 16, __gen_cell_cell_874c3899d4c51eeb99ca7d74af87bda4b46289ef32b5ac179750dfe547001435()));
+    }
+    if (($fee > 0)) {
+        $global_send($SendParameters$_constructor_to_value_mode_body($self'owner, $fee, 16, __gen_cell_cell_13776969b5e86bd59617b80831f48c16e04cd8ca1879d0a74236e8ba40e79876()));
+    }
+    if (($clientRefund > 50000000)) {
+        $global_send($SendParameters$_constructor_to_value_mode_body($escrow'client, ($clientRefund - 50000000), 16, __gen_cell_cell_88e3a4d2317d6a3f00f9d6fc65dce554b4fc77292415835be10d1375b7fdfa72()));
+    }
+    return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), ());
+}
+
+((slice, cell, cell, int, int, cell, cell, int), (slice, slice, int, int, int, slice, slice, int, int, int, int, int, int, int, slice, slice, int, slice)) $NovaContLite$_fun_requireEscrow((slice, cell, cell, int, int, cell, cell, int) $self, int $escrowId) impure inline_ref {
+    var (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)) = $self;
+    tuple $escrow = $EscrowData$_load_opt(__tact_dict_get_int_cell($self'escrows, 257, $escrowId));
+    throw_unless(22704, (~ null?($escrow)));
+    var $fresh$ret_0 = $EscrowData$_not_null($escrow);
+    return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), $fresh$ret_0);
+}
+
+((slice, cell, cell, int, int, cell, cell, int), tuple) $NovaContLite$_fun_getEscrow((slice, cell, cell, int, int, cell, cell, int) $self, int $escrowId) impure inline_ref {
+    var (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)) = $self;
+    var $fresh$ret_1 = $EscrowData$_load_opt(__tact_dict_get_int_cell($self'escrows, 257, $escrowId));
+    return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), $fresh$ret_1);
+}
+
+((slice, cell, cell, int, int, cell, cell, int), int) $NovaContLite$_fun_getEscrowCount((slice, cell, cell, int, int, cell, cell, int) $self) impure inline_ref {
+    var (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)) = $self;
+    var $fresh$ret_2 = $self'escrowCount;
+    return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), $fresh$ret_2);
+}
+
+((slice, cell, cell, int, int, cell, cell, int), slice) $NovaContLite$_fun_getOwner((slice, cell, cell, int, int, cell, cell, int) $self) impure inline_ref {
+    var (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)) = $self;
+    var $fresh$ret_3 = $self'owner;
+    return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), $fresh$ret_3);
+}
+
+((slice, cell, cell, int, int, cell, cell, int), int) $NovaContLite$_fun_isAdmin((slice, cell, cell, int, int, cell, cell, int) $self, slice $addr) impure inline_ref {
+    var (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)) = $self;
+    int $a = __tact_dict_get_slice_int($self'admins, 267, $addr, 1);
+    if (null?($a)) {
+        var $fresh$ret_4 = false;
+        return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), $fresh$ret_4);
+    }
+    var $fresh$ret_5 = $a;
+    return (($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign), $fresh$ret_5);
+}
+
+;;
+;; Get methods of a Contract NovaContLite
+;;
+
+_ %getEscrow(int $escrowId) method_id(94824) {
+    int $escrowId = $escrowId;
+    var self = $NovaContLite$_contract_load();
+    var res = self~$NovaContLite$_fun_getEscrow($escrowId);
+    return $EscrowData$_to_opt_external(res);
+}
+
+_ %getEscrowCount() method_id(119388) {
+    var self = $NovaContLite$_contract_load();
+    var res = self~$NovaContLite$_fun_getEscrowCount();
+    return res;
+}
+
+_ %getOwner() method_id(102025) {
+    var self = $NovaContLite$_contract_load();
+    var res = self~$NovaContLite$_fun_getOwner();
+    return res;
+}
+
+_ %isAdmin(slice $addr) method_id(122448) {
+    slice $addr = $addr;
+    var self = $NovaContLite$_contract_load();
+    var res = self~$NovaContLite$_fun_isAdmin($addr);
+    return res;
+}
+
+;;
+;; Routing of a Contract NovaContLite
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign) = $NovaContLite$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    var op = in_msg~load_opcode_internal();
+    ;; Receive AddAdmin message
+    if (op == 3186566766) {
+        var $msg'admin = in_msg~load_msg_addr();
+        throw_unless(61796, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        $self'admins~__tact_dict_set_slice_int(267, $msg'admin, true, 1);
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive RemoveAdmin message
+    if (op == 3389799937) {
+        var $msg'admin = in_msg~load_msg_addr();
+        throw_unless(42432, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        $self'admins~__tact_dict_set_slice_int(267, $msg'admin, false, 1);
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive AddSupport message
+    if (op == 3534405676) {
+        var $msg'support = in_msg~load_msg_addr();
+        throw_unless(63270, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        throw_unless(28010, ($self'supportCount < 50));
+        int $idx = __tact_dict_get_slice_uint($self'supportIndex, 267, $msg'support, 8);
+        throw_unless(62807, null?($idx));
+        $self'supports~__tact_dict_set_int_slice(257, $self'supportCount, $msg'support);
+        $self'supportIndex~__tact_dict_set_slice_uint(267, $msg'support, $self'supportCount, 8);
+        $self'supportCount = ($self'supportCount + 1);
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive RemoveSupport message
+    if (op == 1573281303) {
+        var $msg'support = in_msg~load_msg_addr();
+        throw_unless(20408, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        int $idx = __tact_dict_get_slice_uint($self'supportIndex, 267, $msg'support, 8);
+        throw_unless(2129, (~ null?($idx)));
+        int $lastIdx = ($self'supportCount - 1);
+        slice $lastSupport = __tact_dict_get_int_slice($self'supports, 257, $lastIdx);
+        if (($idx != $lastIdx)) {
+            $self'supports~__tact_dict_set_int_slice(257, $idx, $lastSupport);
+            $self'supportIndex~__tact_dict_set_slice_uint(267, $lastSupport, $idx, 8);
+        }
+        $self'supports~__tact_dict_set_int_slice(257, $lastIdx, null());
+        $self'supportIndex~__tact_dict_set_slice_uint(267, $msg'support, null(), 8);
+        $self'supportCount = $lastIdx;
+        if (( (($self'supportCount > 0)) ? (($self'nextSupportAssign >= $self'supportCount)) : (false) )) {
+            $self'nextSupportAssign = 0;
+        } elseifnot ($self'supportCount) {
+            $self'nextSupportAssign = 0;
+        }
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive CreateEscrow message
+    if (op == 398910936) {
+        var $msg'provider = in_msg~load_msg_addr();
+        var $msg'description = in_msg~load_ref().begin_parse();
+        var $msg'acceptDays = in_msg~load_uint(16);
+        var $msg'acceptHours = in_msg~load_uint(16);
+        var $msg'deliveryDays = in_msg~load_uint(16);
+        var $msg'deliveryHours = in_msg~load_uint(16);
+        var ($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw) = __tact_context_get();
+        slice $sender = $ctx'sender;
+        int $attached = $ctx'value;
+        throw_unless(46620, ( ~ equal_slices_bits($msg'provider, $sender) ));
+        throw_unless(3825, ( (($msg'acceptDays > 0)) ? (true) : (($msg'acceptHours > 0)) ));
+        throw_unless(16687, ( (($msg'deliveryDays > 0)) ? (true) : (($msg'deliveryHours > 0)) ));
+        int $isExtra = ($attached < 10000000000);
+        int $agreedTon = ($isExtra ? (($attached * 4) / 5) : $attached);
+        throw_unless(47486, ($agreedTon > 0));
+        int $acceptDuration = (($msg'acceptDays * 86400) + ($msg'acceptHours * 3600));
+        int $deliveryDuration = (($msg'deliveryDays * 86400) + ($msg'deliveryHours * 3600));
+        var ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport) = $EscrowData$_constructor_client_provider_agreedTon_totalLocked_isExtraDeposit_description_evidenceUrl_state_acceptDeadline_deliveryDeadline_deliveryTime_acceptTime_createdAt_deliveryDuration_resolutionReason_disputeReason_resolvedClientShareBps_assignedSupport($sender, $msg'provider, $agreedTon, $attached, $isExtra, $msg'description, __gen_slice_string_96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7(), 0, ($global_now() + $acceptDuration), 0, 0, 0, $global_now(), $deliveryDuration, __gen_slice_string_96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7(), __gen_slice_string_96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7(), 0, null());
+        int $id = $self'escrowCount;
+        $self'escrows~__tact_dict_set_int_cell(257, $id, $EscrowData$_store_cell(($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), begin_cell()));
+        $self'escrowCount = ($self'escrowCount + 1);
+        $global_emit($EscrowCreated$_store_cell($EscrowCreated$_constructor_escrowId_client_provider_agreedTon_totalLocked_isExtraDeposit($id, $sender, $msg'provider, $agreedTon, $attached, $isExtra), begin_cell()));
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive AcceptEscrow message
+    if (op == 1803734382) {
+        var $msg'escrowId = in_msg~load_uint(64);
+        var ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport) = ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_requireEscrow($msg'escrowId);
+        slice $sender = __tact_context_get_sender();
+        throw_unless(40017, ( equal_slices_bits($sender, $escrow'provider) ));
+        throw_unless(15364, ($escrow'state == 0));
+        throw_unless(36568, ($global_now() <= $escrow'acceptDeadline));
+        $escrow'state = 1;
+        $escrow'acceptTime = $global_now();
+        $escrow'deliveryDeadline = ($global_now() + $escrow'deliveryDuration);
+        $self'escrows~__tact_dict_set_int_cell(257, $msg'escrowId, $EscrowData$_store_cell(($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), begin_cell()));
+        $global_emit($EscrowAccepted$_store_cell($EscrowAccepted$_constructor_escrowId_deliveryDeadline($msg'escrowId, $escrow'deliveryDeadline), begin_cell()));
+        ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_reply(__gen_cell_cell_3e4d0515d053636f70c0cea40ecaba552fdc9b41b6c257cada88889cb96bf4b2());
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive RejectEscrow message
+    if (op == 3255207197) {
+        var $msg'escrowId = in_msg~load_uint(64);
+        var ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport) = ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_requireEscrow($msg'escrowId);
+        slice $sender = __tact_context_get_sender();
+        throw_unless(19827, ( equal_slices_bits($sender, $escrow'provider) ));
+        throw_unless(15364, ($escrow'state == 0));
+        $escrow'state = 4;
+        $self'escrows~__tact_dict_set_int_cell(257, $msg'escrowId, $EscrowData$_store_cell(($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), begin_cell()));
+        $global_send($SendParameters$_constructor_to_value_mode_body($escrow'client, ($escrow'totalLocked - 50000000), 16, __gen_cell_cell_c2448b9e038b2ae5757442cad51cfead3e7c22a1e49ddee46fa919307d67e26e()));
+        $global_emit($EscrowCancelled$_store_cell($EscrowCancelled$_constructor_escrowId_clientRefund_reason($msg'escrowId, $escrow'totalLocked, __gen_slice_string_20855179357678faafc6f93bca45635c5052553cfef889cc3f6023fc17b523a3()), begin_cell()));
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive DeliverEscrow message
+    if (op == 3948456210) {
+        var $msg'escrowId = in_msg~load_uint(64);
+        var $msg'evidenceUrl = in_msg~load_ref().begin_parse();
+        var ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport) = ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_requireEscrow($msg'escrowId);
+        slice $sender = __tact_context_get_sender();
+        throw_unless(43073, ( equal_slices_bits($sender, $escrow'provider) ));
+        throw_unless(6587, ($escrow'state == 1));
+        throw_unless(42758, ($global_now() <= $escrow'deliveryDeadline));
+        throw_unless(6823, __tact_slice_neq($msg'evidenceUrl, __gen_slice_string_96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7()));
+        $escrow'state = 2;
+        $escrow'deliveryTime = $global_now();
+        $escrow'evidenceUrl = $msg'evidenceUrl;
+        $self'escrows~__tact_dict_set_int_cell(257, $msg'escrowId, $EscrowData$_store_cell(($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), begin_cell()));
+        $global_emit($WorkDelivered$_store_cell($WorkDelivered$_constructor_escrowId_evidenceUrl_deliveryTime($msg'escrowId, $msg'evidenceUrl, $global_now()), begin_cell()));
+        ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_reply(__gen_cell_cell_3e4d0515d053636f70c0cea40ecaba552fdc9b41b6c257cada88889cb96bf4b2());
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive ReleaseEscrow message
+    if (op == 1381817477) {
+        var $msg'escrowId = in_msg~load_uint(64);
+        var ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport) = ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_requireEscrow($msg'escrowId);
+        slice $sender = __tact_context_get_sender();
+        throw_unless(26598, ( equal_slices_bits($sender, $escrow'client) ));
+        throw_unless(29231, ($escrow'state == 2));
+        $escrow'state = 3;
+        $self'escrows~__tact_dict_set_int_cell(257, $msg'escrowId, $EscrowData$_store_cell(($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), begin_cell()));
+        ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_distributeFunds($msg'escrowId, ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), 0);
+        $global_emit($EscrowCompleted$_store_cell($EscrowCompleted$_constructor_escrowId($msg'escrowId), begin_cell()));
+        ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_reply(__gen_cell_cell_3e4d0515d053636f70c0cea40ecaba552fdc9b41b6c257cada88889cb96bf4b2());
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive CancelEscrow message
+    if (op == 1536996952) {
+        var $msg'escrowId = in_msg~load_uint(64);
+        var ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport) = ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_requireEscrow($msg'escrowId);
+        slice $sender = __tact_context_get_sender();
+        throw_unless(28875, ( equal_slices_bits($sender, $escrow'client) ));
+        throw_unless(6591, ( (($escrow'state == 0)) ? (true) : (($escrow'state == 1)) ));
+        int $wasNotYetAccepted = ( (($escrow'state == 0)) ? (true) : (($escrow'acceptTime == 0)) );
+        $escrow'state = 4;
+        $self'escrows~__tact_dict_set_int_cell(257, $msg'escrowId, $EscrowData$_store_cell(($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), begin_cell()));
+        if ($wasNotYetAccepted) {
+            $global_send($SendParameters$_constructor_to_value_mode_body($escrow'client, ($escrow'totalLocked - 50000000), 16, __gen_cell_cell_e1a659f03e6cecc85f23dc90f417df3e564e5fdf065e405eca32b54c7433abb2()));
+            $global_emit($EscrowCancelled$_store_cell($EscrowCancelled$_constructor_escrowId_clientRefund_reason($msg'escrowId, $escrow'totalLocked, __gen_slice_string_54e05b26506d07c91594f833f1a5bbdf71574e8fe573fbcf62578aabf107991f()), begin_cell()));
+        } else {
+            int $totalDuration = ($escrow'deliveryDeadline - $escrow'acceptTime);
+            int $elapsed = ($global_now() - $escrow'acceptTime);
+            if (($global_now() > $escrow'deliveryDeadline)) {
+                ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_distributeFunds($msg'escrowId, ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), 10000);
+            } elseif (($elapsed > ($totalDuration / 2))) {
+                ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_distributeFunds($msg'escrowId, ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), 5000);
+            } else {
+                ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_distributeFunds($msg'escrowId, ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), 10000);
+            }
+        }
+        ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_reply(__gen_cell_cell_3e4d0515d053636f70c0cea40ecaba552fdc9b41b6c257cada88889cb96bf4b2());
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive ClaimTimeout message
+    if (op == 2840878121) {
+        var $msg'escrowId = in_msg~load_uint(64);
+        var ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport) = ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_requireEscrow($msg'escrowId);
+        slice $sender = __tact_context_get_sender();
+        throw_unless(17027, ( equal_slices_bits($sender, $escrow'provider) ));
+        throw_unless(29231, ($escrow'state == 2));
+        throw_unless(36648, ($global_now() >= ($escrow'deliveryTime + 604800)));
+        $escrow'state = 3;
+        $self'escrows~__tact_dict_set_int_cell(257, $msg'escrowId, $EscrowData$_store_cell(($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), begin_cell()));
+        ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_distributeFunds($msg'escrowId, ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), 0);
+        $global_emit($TimeoutClaimed$_store_cell($TimeoutClaimed$_constructor_escrowId($msg'escrowId), begin_cell()));
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive RaiseDispute message
+    if (op == 1587697799) {
+        var $msg'escrowId = in_msg~load_uint(64);
+        var $msg'reason = in_msg~load_ref().begin_parse();
+        var ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport) = ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_requireEscrow($msg'escrowId);
+        slice $sender = __tact_context_get_sender();
+        throw_unless(63428, ( (( equal_slices_bits($sender, $escrow'client) )) ? (true) : (( equal_slices_bits($sender, $escrow'provider) )) ));
+        throw_unless(44275, ( (($escrow'state == 1)) ? (true) : (($escrow'state == 2)) ));
+        $escrow'state = 5;
+        $escrow'disputeReason = $msg'reason;
+        if (($self'supportCount > 0)) {
+            slice $assigned = __tact_dict_get_int_slice($self'supports, 257, $self'nextSupportAssign);
+            $escrow'assignedSupport = $assigned;
+            $self'nextSupportAssign = (($self'nextSupportAssign + 1) % $self'supportCount);
+        } else {
+            $escrow'assignedSupport = null();
+        }
+        $self'escrows~__tact_dict_set_int_cell(257, $msg'escrowId, $EscrowData$_store_cell(($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), begin_cell()));
+        $global_emit($DisputeRaised$_store_cell($DisputeRaised$_constructor_escrowId_raiser($msg'escrowId, $sender), begin_cell()));
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive ResolveDispute message
+    if (op == 4093421614) {
+        var $msg'escrowId = in_msg~load_uint(64);
+        var $msg'clientShareBps = in_msg~load_uint(16);
+        var $msg'reason = in_msg~load_ref().begin_parse();
+        var ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport) = ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_requireEscrow($msg'escrowId);
+        slice $sender = __tact_context_get_sender();
+        int $isAuthorized = ( (( equal_slices_bits($sender, $self'owner) )) ? (true) : (( ((~ null?($escrow'assignedSupport))) ? (( equal_slices_bits($sender, $escrow'assignedSupport) )) : (false) )) );
+        throw_unless(47340, $isAuthorized);
+        throw_unless(28434, ($escrow'state == 5));
+        throw_unless(35446, ( (($msg'clientShareBps >= 0)) ? (($msg'clientShareBps <= 10000)) : (false) ));
+        $escrow'state = 3;
+        $escrow'resolutionReason = $msg'reason;
+        $escrow'resolvedClientShareBps = $msg'clientShareBps;
+        $self'escrows~__tact_dict_set_int_cell(257, $msg'escrowId, $EscrowData$_store_cell(($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), begin_cell()));
+        ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_distributeFunds($msg'escrowId, ($escrow'client, $escrow'provider, $escrow'agreedTon, $escrow'totalLocked, $escrow'isExtraDeposit, $escrow'description, $escrow'evidenceUrl, $escrow'state, $escrow'acceptDeadline, $escrow'deliveryDeadline, $escrow'deliveryTime, $escrow'acceptTime, $escrow'createdAt, $escrow'deliveryDuration, $escrow'resolutionReason, $escrow'disputeReason, $escrow'resolvedClientShareBps, $escrow'assignedSupport), $msg'clientShareBps);
+        $global_emit($DisputeResolved$_store_cell($DisputeResolved$_constructor_escrowId_clientShareBps($msg'escrowId, $msg'clientShareBps), begin_cell()));
+        ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_reply(__gen_cell_cell_3e4d0515d053636f70c0cea40ecaba552fdc9b41b6c257cada88889cb96bf4b2());
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Receive Deploy message
+    if (op == 0x946a98b6) {
+        var $deploy'queryId = in_msg~load_uint(64);
+        ($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign)~$NovaContLite$_fun_notify($DeployOk$_store_cell($DeployOk$_constructor_queryId($deploy'queryId), begin_cell()));
+        $NovaContLite$_contract_store(($self'owner, $self'admins, $self'escrows, $self'escrowCount, $self'supportCount, $self'supports, $self'supportIndex, $self'nextSupportAssign));
+        return ();
+    }
+    
+    ;; Throw if not handled
+    throw(130);
+}
