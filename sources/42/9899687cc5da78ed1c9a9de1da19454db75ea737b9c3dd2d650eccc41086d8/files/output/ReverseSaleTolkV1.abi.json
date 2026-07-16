@@ -1,0 +1,557 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "ReverseSaleTolkV1",
+  "author": "Reverse NFT Marketplace",
+  "version": "1.0",
+  "description": "ReverseSale economic v2 implemented in Tolk 1.4.2",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Deploy"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelSale"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RescueHeldNft"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FillBuyOffer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BuyForReverseBuy"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimRejectedNft"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OwnershipAssigned"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReverseSaleStorage"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReverseSaleGasConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 22
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReverseSaleRuntime"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleRejectedItem"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 27
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReverseSaleStorageAtDeployment"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SaleState"
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        7,
+        25,
+        9
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 32
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "ReverseSaleStorageAtDeployment",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReverseSaleGasConfig",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "minContractReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "minDepositValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "minBuyValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "nftTransferValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "minRejectStorageValue",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleRejectedItem",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "prevOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "reasonCode",
+          "ty_idx": 25
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReverseSaleRuntime",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "status",
+          "ty_idx": 25
+        },
+        {
+          "name": "nftDeposited",
+          "ty_idx": 5
+        },
+        {
+          "name": "pendingMode",
+          "ty_idx": 25
+        },
+        {
+          "name": "pendingBuy",
+          "ty_idx": 26
+        },
+        {
+          "name": "pendingPayment",
+          "ty_idx": 6
+        },
+        {
+          "name": "pendingDealId",
+          "ty_idx": 11
+        },
+        {
+          "name": "rejectedItems",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReverseSaleStorage",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "seller",
+          "ty_idx": 7
+        },
+        {
+          "name": "nft",
+          "ty_idx": 7
+        },
+        {
+          "name": "price",
+          "ty_idx": 6
+        },
+        {
+          "name": "feeReceiver",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 21
+        },
+        {
+          "name": "gas",
+          "ty_idx": 23
+        },
+        {
+          "name": "runtime",
+          "ty_idx": 29
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SaleState",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "economicVersion",
+          "ty_idx": 21
+        },
+        {
+          "name": "status",
+          "ty_idx": 25
+        },
+        {
+          "name": "seller",
+          "ty_idx": 7
+        },
+        {
+          "name": "nft",
+          "ty_idx": 7
+        },
+        {
+          "name": "price",
+          "ty_idx": 6
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 21
+        },
+        {
+          "name": "feeReceiver",
+          "ty_idx": 7
+        },
+        {
+          "name": "nftDeposited",
+          "ty_idx": 5
+        },
+        {
+          "name": "pendingMode",
+          "ty_idx": 25
+        },
+        {
+          "name": "pendingUntil",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Deploy",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 2490013878,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CancelSale",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1381188430,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RescueHeldNft",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1381192270,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FillBuyOffer",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1381189186,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "buyContract",
+          "ty_idx": 7
+        },
+        {
+          "name": "settlementPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "acceptPayload",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BuyForReverseBuy",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1381188162,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "acceptPayload",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimRejectedNft",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1380078154,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "nft",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OwnershipAssigned",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 85167505,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "prevOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 19
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 20,
+    "storage_at_deployment_ty_idx": 30
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 3
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 86983,
+      "name": "get_sale_state",
+      "parameters": [],
+      "return_ty_idx": 31
+    },
+    {
+      "tvm_method_id": 105834,
+      "name": "get_rejected_item",
+      "parameters": [
+        {
+          "name": "nft",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 33
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_INCOMING_MESSAGE",
+      "err_code": 130
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_PRICE",
+      "err_code": 12537
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INSUFFICIENT_DEPLOY",
+      "err_code": 25034
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INSUFFICIENT_RETURN_VALUE",
+      "err_code": 39403
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_REJECTED",
+      "err_code": 41792
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_PREVIOUS_OWNER",
+      "err_code": 47652
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_FEE_TOO_HIGH",
+      "err_code": 52892
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_SELLER",
+      "err_code": 54672
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_CONFIG",
+      "err_code": 59253
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}
