@@ -1,0 +1,118 @@
+;; ============================================================
+;; bounce_target.fc
+;; 用途:研究 TON bounce 处理机制的目标合约
+;; 部署后,任何 bounceable 消息发到这里都会 bounce
+;; 
+;; 存储布局:
+;;   [owner_addr: slice] [reject_mode: uint8]
+;;
+;; reject_mode 语义:
+;;   0 = throw(0xFFFF)          常规异常,exit_code=0xFFFF
+;;   1 = throw(0x9999)          自定义 exit code(方便识别)
+;;   2 = throw_unless(0x8888, 0)  结构化拒绝
+;;   3 = 死循环消耗 gas         触发 out-of-gas
+;;   4 = 访问越界数据           触发 cell parsing 异常
+;; ============================================================
+
+#include "stdlib.fc";
+
+;; ---------- 存储读写 ----------
+
+(slice, int) load_state() inline {
+    slice ds = get_data().begin_parse();
+    slice owner = ds~load_msg_addr();
+    int mode = ds~load_uint(8);
+    return (owner, mode);
+}
+
+() save_state(slice owner, int mode) impure inline {
+    set_data(begin_cell()
+        .store_slice(owner)
+        .store_uint(mode, 8)
+        .end_cell());
+}
+
+;; ---------- 主入口 ----------
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; 1. 解析消息头
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    ;; 2. 处理 bounced 消息:不做任何事,静默忽略
+    ;;    (如果我们对 bounce 也 bounce,会形成无限循环,但 TON 协议阻止了)
+    if (flags & 1) {
+        return ();
+    }
+    
+    ;; 3. 提取 sender 地址(用于 owner 权限判断)
+    slice sender = cs~load_msg_addr();
+    
+    ;; 4. 加载状态
+    (slice owner, int reject_mode) = load_state();
+    
+    ;; 5. 检查是否是 owner 的管理消息
+    ;;    Owner 发来的消息如果带特殊 op_code,不 bounce,而是配置合约
+    if (equal_slices(sender, owner) & (slice_bits(in_msg_body) >= 32)) {
+        int op = in_msg_body~load_uint(32);
+        
+        if (op == 0x1) {
+            ;; op=1: 修改 reject_mode
+            int new_mode = in_msg_body~load_uint(8);
+            save_state(owner, new_mode);
+            return ();
+        }
+        
+        if (op == 0x2) {
+            ;; op=2: 提取合约里的 TON 到 owner
+            ;;       用于研究结束后回收 gas
+            int amount = in_msg_body~load_coins();
+            var msg = begin_cell()
+                .store_uint(0x18, 6)            ;; bounce=0, ihr_disabled=1
+                .store_slice(owner)
+                .store_coins(amount)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+            send_raw_message(msg.end_cell(), 1);  ;; mode=1: 单独付 fee
+            return ();
+        }
+    }
+    
+    ;; 6. 非 owner 或非管理消息 → 触发 bounce
+    if (reject_mode == 0) {
+        throw(0xFFFF);
+    }
+    if (reject_mode == 1) {
+        throw(0x9999);
+    }
+    if (reject_mode == 2) {
+        throw_unless(0x8888, 0);
+    }
+    if (reject_mode == 3) {
+        ;; 消耗 gas 直到 out-of-gas
+        int i = 0;
+        while (i < 999999999) {
+            i += 1;
+        }
+        ;; 不会到达这里
+    }
+    if (reject_mode == 4) {
+        ;; 尝试从空 slice 读取,触发 cell underflow
+        slice empty = begin_cell().end_cell().begin_parse();
+        int x = empty~load_uint(256);
+    }
+    
+    ;; 默认:普通 throw
+    throw(0xFFFF);
+}
+
+;; ---------- Getter(方便查询状态) ----------
+
+int get_reject_mode() method_id {
+    (_, int mode) = load_state();
+    return mode;
+}
+
+slice get_owner() method_id {
+    (slice owner, _) = load_state();
+    return owner;
+}
