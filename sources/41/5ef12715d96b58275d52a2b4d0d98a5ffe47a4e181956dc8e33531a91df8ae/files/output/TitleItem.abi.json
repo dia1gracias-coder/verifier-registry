@@ -1,0 +1,1471 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "TitleItem",
+  "author": "digital-nobility",
+  "version": "0.1.0",
+  "description": "TEP-85 soulbound title item: rank, patron chain, patents, merit",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Initialize"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DukeGrant"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PromoteVassal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrantPatent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PatentRejected"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CoSponsor"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CoSponsorGrant"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AcceptPatent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PatentApproved"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReclaimPatent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PatentReclaim"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PatentReturned"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RevokeVassal"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RevokeByPatron"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Repledge"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AcceptRepledge"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RepledgeApproved"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FinalizeRepledge"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RepledgeDone"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChainProve"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChainProveHop"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CacheOk"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProveOwnership"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestOwner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Revoke"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Destroy"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftTransfer"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ItemStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingPatent"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 43
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 44
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingRepledge"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 46
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 47
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MeritEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Excesses"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DukeRejected"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PatentFee"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RevocationEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RepledgeFee"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChainProof"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OwnershipProof"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OwnerInfo"
+    },
+    {
+      "kind": "addressAny"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        5,
+        57,
+        7,
+        59,
+        3
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "MeritEvent",
+      "ty_idx": 49,
+      "prefix": {
+        "prefix_num": 1145966081,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "actor",
+          "ty_idx": 7
+        },
+        {
+          "name": "kind",
+          "ty_idx": 13
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "ts",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ItemStorage",
+      "ty_idx": 42,
+      "fields": [
+        {
+          "name": "registry",
+          "ty_idx": 7
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "rank",
+          "ty_idx": 13
+        },
+        {
+          "name": "patron",
+          "ty_idx": 7
+        },
+        {
+          "name": "budget",
+          "ty_idx": 13
+        },
+        {
+          "name": "revokedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "merit",
+          "ty_idx": 6
+        },
+        {
+          "name": "chainValidUntil",
+          "ty_idx": 9
+        },
+        {
+          "name": "pendingPatent",
+          "ty_idx": 45
+        },
+        {
+          "name": "pendingRepledge",
+          "ty_idx": 48,
+          "default_value": {
+            "kind": "null"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingPatent",
+      "ty_idx": 43,
+      "fields": [
+        {
+          "name": "patronItem",
+          "ty_idx": 7
+        },
+        {
+          "name": "patronOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "targetRank",
+          "ty_idx": 13
+        },
+        {
+          "name": "coSponsored",
+          "ty_idx": 5
+        },
+        {
+          "name": "grantedAt",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingRepledge",
+      "ty_idx": 46,
+      "fields": [
+        {
+          "name": "newPatronOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "approved",
+          "ty_idx": 5
+        },
+        {
+          "name": "requestedAt",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Initialize",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1145963024,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "rank",
+          "ty_idx": 13
+        },
+        {
+          "name": "patron",
+          "ty_idx": 7
+        },
+        {
+          "name": "budget",
+          "ty_idx": 13
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "price",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DukeGrant",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1145963026,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "budget",
+          "ty_idx": 13
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "price",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DukeRejected",
+      "ty_idx": 51,
+      "prefix": {
+        "prefix_num": 1145963027,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RevokeVassal",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1145963056,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "vassal",
+          "ty_idx": 7
+        },
+        {
+          "name": "reason",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RevokeByPatron",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 1145963057,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "patronOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "reason",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Repledge",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 1145963059,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newPatron",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AcceptRepledge",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1145963061,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "vassal",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RepledgeApproved",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1145963062,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "patronOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "patronRank",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FinalizeRepledge",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1145963065,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RepledgeFee",
+      "ty_idx": 54,
+      "prefix": {
+        "prefix_num": 1145963063,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "rank",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RepledgeDone",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 1145963064,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "fee",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RevocationEvent",
+      "ty_idx": 53,
+      "prefix": {
+        "prefix_num": 1145966082,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "vassal",
+          "ty_idx": 7
+        },
+        {
+          "name": "patronItem",
+          "ty_idx": 7
+        },
+        {
+          "name": "ts",
+          "ty_idx": 9
+        },
+        {
+          "name": "reason",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PromoteVassal",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1145963040,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "candidate",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrantPatent",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1145963041,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "targetRank",
+          "ty_idx": 13
+        },
+        {
+          "name": "patronOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "grantedAt",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PatentRejected",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1145963042,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "candidateOwner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CoSponsor",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1145963043,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "candidate",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CoSponsorGrant",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1145963044,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "sponsorOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "sponsorRank",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AcceptPatent",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1145963045,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PatentFee",
+      "ty_idx": 52,
+      "prefix": {
+        "prefix_num": 1145963046,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "currentRank",
+          "ty_idx": 13
+        },
+        {
+          "name": "targetRank",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PatentApproved",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1145963047,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "targetRank",
+          "ty_idx": 13
+        },
+        {
+          "name": "newBudget",
+          "ty_idx": 13
+        },
+        {
+          "name": "fee",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReclaimPatent",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1145963048,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "candidate",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PatentReclaim",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1145963049,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "patronOwner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PatentReturned",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 1145963050,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "candidateOwner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChainProve",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 1145963072,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "dest",
+          "ty_idx": 7
+        },
+        {
+          "name": "payload",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChainProveHop",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 1145963073,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "dest",
+          "ty_idx": 7
+        },
+        {
+          "name": "initiatorOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "initiatorRank",
+          "ty_idx": 13
+        },
+        {
+          "name": "hopCount",
+          "ty_idx": 13
+        },
+        {
+          "name": "linkOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "payload",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChainProof",
+      "ty_idx": 55,
+      "prefix": {
+        "prefix_num": 1145963074,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "topOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "topRank",
+          "ty_idx": 13
+        },
+        {
+          "name": "initiatorOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "initiatorRank",
+          "ty_idx": 13
+        },
+        {
+          "name": "payload",
+          "ty_idx": 3
+        },
+        {
+          "name": "cached",
+          "ty_idx": 5
+        },
+        {
+          "name": "merit",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CacheOk",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 1145963075,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "topOwner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProveOwnership",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 81711432,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "dest",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 3
+        },
+        {
+          "name": "withContent",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OwnershipProof",
+      "ty_idx": 56,
+      "prefix": {
+        "prefix_num": 86296494,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemId",
+          "ty_idx": 57
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "data",
+          "ty_idx": 3
+        },
+        {
+          "name": "revokedAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "content",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestOwner",
+      "ty_idx": 37,
+      "prefix": {
+        "prefix_num": 3502489578,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "dest",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 3
+        },
+        {
+          "name": "withContent",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OwnerInfo",
+      "ty_idx": 58,
+      "prefix": {
+        "prefix_num": 232130531,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemId",
+          "ty_idx": 57
+        },
+        {
+          "name": "initiator",
+          "ty_idx": 7
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "data",
+          "ty_idx": 3
+        },
+        {
+          "name": "revokedAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "content",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Revoke",
+      "ty_idx": 38,
+      "prefix": {
+        "prefix_num": 1871312355,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Destroy",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 520377210,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Excesses",
+      "ty_idx": 50,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftTransfer",
+      "ty_idx": 40,
+      "prefix": {
+        "prefix_num": 1607220500,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "rest",
+          "ty_idx": 41
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 42
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 36
+    },
+    {
+      "body_ty_idx": 37
+    },
+    {
+      "body_ty_idx": 38
+    },
+    {
+      "body_ty_idx": 39
+    },
+    {
+      "body_ty_idx": 40
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 50
+    },
+    {
+      "body_ty_idx": 51
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 52
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 54
+    },
+    {
+      "body_ty_idx": 55
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 56
+    },
+    {
+      "body_ty_idx": 58
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 49
+    },
+    {
+      "body_ty_idx": 53
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 102351,
+      "name": "get_nft_data",
+      "parameters": [],
+      "return_ty_idx": 60
+    },
+    {
+      "tvm_method_id": 84760,
+      "name": "get_authority_address",
+      "parameters": [],
+      "return_ty_idx": 59
+    },
+    {
+      "tvm_method_id": 97667,
+      "name": "get_revoked_time",
+      "parameters": [],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.NotRegistry",
+      "err_code": 200
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.NotOwner",
+      "err_code": 201
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.Soulbound",
+      "err_code": 202
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.AlreadyRevoked",
+      "err_code": 203
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.Destroyed",
+      "err_code": 204
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.NotInitialized",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.NotTitleItem",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.CannotPromote",
+      "err_code": 207
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.NoPatent",
+      "err_code": 209
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.PatentExpired",
+      "err_code": 210
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.PatentNotExpired",
+      "err_code": 211
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.NeedsCoSponsor",
+      "err_code": 212
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.SponsorRankTooLow",
+      "err_code": 213
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.InsufficientValue",
+      "err_code": 214
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.NotPatron",
+      "err_code": 215
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.CannotRepledge",
+      "err_code": 216
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.NoRepledge",
+      "err_code": 217
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.RankTooLow",
+      "err_code": 218
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.NotApproved",
+      "err_code": 219
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.ChainTooDeep",
+      "err_code": 220
+    },
+    {
+      "kind": "enum_member",
+      "name": "ItemErr.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
