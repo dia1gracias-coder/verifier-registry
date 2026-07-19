@@ -1,0 +1,1659 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "SubdomainCollection",
+  "author": "tolk-subdomains",
+  "version": "4.0.0",
+  "description": "Per-domain DNS registry with claimable Linked ownership, access policy and immutable pricing.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RegisterSubdomain"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ItemReady"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReportStaticData"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetContent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionMeta"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PriceConfig"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 19
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetAccessMode"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetAllowlistEntry"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawFees"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProxyEditParentRecord"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FillUpParent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EnforceResolver"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetLabelReserved"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RescueNft"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GetRoyaltyParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmParentHandoff"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RetryParentReturn"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmMint"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionOrigin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryHandoffReceipt"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 39
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 40
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 38
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionNames"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": []
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 16,
+      "value_ty_idx": 44
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 43
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionPolicyState"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 44
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingMint"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 49
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 16,
+      "value_ty_idx": 50
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingParentReturn"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 52
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 53
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 47
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionSkeleton"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferOwnership"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferOwnershipData"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TransferForwardPayload"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeDnsRecord"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionReady"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ParentHandoffComplete"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SubdomainInit"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Excesses"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AdminAssigned"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReportRoyaltyParams"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GetStaticData"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionDataReply"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        1,
+        7
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MintQuoteReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ParentReturnReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DnsResolveResponse"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "TransferForwardPayload",
+      "ty_idx": 61,
+      "target_ty_idx": 13
+    },
+    {
+      "kind": "struct",
+      "name": "TransferOwnershipData",
+      "ty_idx": 58,
+      "fields": [
+        {
+          "name": "newOwnerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "responseDestination",
+          "ty_idx": 59
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 60
+        },
+        {
+          "name": "forwardAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 61
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferOwnership",
+      "ty_idx": 57,
+      "prefix": {
+        "prefix_num": 1607220500,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "transferData",
+          "ty_idx": 58
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Excesses",
+      "ty_idx": 66,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GetStaticData",
+      "ty_idx": 70,
+      "prefix": {
+        "prefix_num": 801842850,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReportStaticData",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 2339837749,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 16
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GetRoyaltyParams",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 1765620048,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReportRoyaltyParams",
+      "ty_idx": 68,
+      "prefix": {
+        "prefix_num": 2831876269,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "numerator",
+          "ty_idx": 69
+        },
+        {
+          "name": "denominator",
+          "ty_idx": 69
+        },
+        {
+          "name": "destination",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeDnsRecord",
+      "ty_idx": 62,
+      "prefix": {
+        "prefix_num": 1320284409,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "key",
+          "ty_idx": 16
+        },
+        {
+          "name": "value",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionReady",
+      "ty_idx": 63,
+      "prefix": {
+        "prefix_num": 1380210993,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "currentAdmin",
+          "ty_idx": 7
+        },
+        {
+          "name": "isLinked",
+          "ty_idx": 5
+        },
+        {
+          "name": "isNew",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ParentHandoffComplete",
+      "ty_idx": 64,
+      "prefix": {
+        "prefix_num": 1212436299,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "intendedAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfirmParentHandoff",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 1212436562,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "intendedAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SubdomainInit",
+      "ty_idx": 65,
+      "prefix": {
+        "prefix_num": 606644902,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "index",
+          "ty_idx": 16
+        },
+        {
+          "name": "minter",
+          "ty_idx": 7
+        },
+        {
+          "name": "label",
+          "ty_idx": 14
+        },
+        {
+          "name": "setWalletToMinter",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ItemReady",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1230128217,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "index",
+          "ty_idx": 16
+        },
+        {
+          "name": "minter",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RegisterSubdomain",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1227326361,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "label",
+          "ty_idx": 14
+        },
+        {
+          "name": "setWalletToMinter",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetContent",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 2036979278,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "meta",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawFees",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 508261685,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferAdmin",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 730527790,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AdminAssigned",
+      "ty_idx": 67,
+      "prefix": {
+        "prefix_num": 2671430556,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "prevAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProxyEditParentRecord",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 2545835094,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "key",
+          "ty_idx": 16
+        },
+        {
+          "name": "value",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FillUpParent",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1560206053,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EnforceResolver",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 3761412752,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetLabelReserved",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 3438243348,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "labelHash",
+          "ty_idx": 16
+        },
+        {
+          "name": "reserved",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RescueNft",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 546758054,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "nftAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "toAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetAccessMode",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 1094927187,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "accessMode",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetAllowlistEntry",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1095519319,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "wallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "allowed",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RetryParentReturn",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 1380995668,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfirmMint",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 1129138510,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "index",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PriceConfig",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "minChars",
+          "ty_idx": 21
+        },
+        {
+          "name": "p1",
+          "ty_idx": 6
+        },
+        {
+          "name": "p2",
+          "ty_idx": 6
+        },
+        {
+          "name": "p3",
+          "ty_idx": 6
+        },
+        {
+          "name": "p4",
+          "ty_idx": 6
+        },
+        {
+          "name": "p5",
+          "ty_idx": 6
+        },
+        {
+          "name": "p6",
+          "ty_idx": 6
+        },
+        {
+          "name": "p7",
+          "ty_idx": 6
+        },
+        {
+          "name": "p8",
+          "ty_idx": 6
+        },
+        {
+          "name": "p9",
+          "ty_idx": 6
+        },
+        {
+          "name": "p10",
+          "ty_idx": 6
+        },
+        {
+          "name": "pRest",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DnsResolveResponse",
+      "ty_idx": 75,
+      "fields": [
+        {
+          "name": "resolvedPrefixLengthBits",
+          "ty_idx": 1
+        },
+        {
+          "name": "resolvedRecord",
+          "ty_idx": 60
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionSkeleton",
+      "ty_idx": 56,
+      "fields": [
+        {
+          "name": "master",
+          "ty_idx": 7
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "isLinked",
+          "ty_idx": 5
+        },
+        {
+          "name": "linkedAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionMeta",
+      "ty_idx": 19,
+      "fields": [
+        {
+          "name": "priceConfig",
+          "ty_idx": 22
+        },
+        {
+          "name": "collectionContent",
+          "ty_idx": 3
+        },
+        {
+          "name": "itemContentBaseUri",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionOrigin",
+      "ty_idx": 38,
+      "fields": [
+        {
+          "name": "linkedAdmin",
+          "ty_idx": 7
+        },
+        {
+          "name": "isLinkedAtDeployment",
+          "ty_idx": 5
+        },
+        {
+          "name": "lastFactoryHandoff",
+          "ty_idx": 41
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryHandoffReceipt",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11
+        },
+        {
+          "name": "requestQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "intendedAdmin",
+          "ty_idx": 7
+        },
+        {
+          "name": "returnRequired",
+          "ty_idx": 5
+        },
+        {
+          "name": "returnInFlight",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": false
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingMint",
+      "ty_idx": 49,
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "minter",
+          "ty_idx": 7
+        },
+        {
+          "name": "price",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingParentReturn",
+      "ty_idx": 52,
+      "fields": [
+        {
+          "name": "returnQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "requestQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "inFlight",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": false
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionPolicyState",
+      "ty_idx": 47,
+      "fields": [
+        {
+          "name": "accessMode",
+          "ty_idx": 21
+        },
+        {
+          "name": "withdrawableRevenue",
+          "ty_idx": 6
+        },
+        {
+          "name": "allowlist",
+          "ty_idx": 48
+        },
+        {
+          "name": "pendingMints",
+          "ty_idx": 51
+        },
+        {
+          "name": "parentGeneration",
+          "ty_idx": 11
+        },
+        {
+          "name": "pendingParentReturn",
+          "ty_idx": 54
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionNames",
+      "ty_idx": 43,
+      "fields": [
+        {
+          "name": "reserved",
+          "ty_idx": 45
+        },
+        {
+          "name": "minted",
+          "ty_idx": 45
+        },
+        {
+          "name": "mintedCount",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionStorage",
+      "ty_idx": 37,
+      "fields": [
+        {
+          "name": "master",
+          "ty_idx": 7
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "origin",
+          "ty_idx": 42
+        },
+        {
+          "name": "isLinked",
+          "ty_idx": 5
+        },
+        {
+          "name": "lastParentFillUp",
+          "ty_idx": 9
+        },
+        {
+          "name": "meta",
+          "ty_idx": 23
+        },
+        {
+          "name": "names",
+          "ty_idx": 46
+        },
+        {
+          "name": "policy",
+          "ty_idx": 55
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionDataReply",
+      "ty_idx": 71,
+      "fields": [
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "content",
+          "ty_idx": 3
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 59
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MintQuoteReply",
+      "ty_idx": 73,
+      "fields": [
+        {
+          "name": "allowed",
+          "ty_idx": 5
+        },
+        {
+          "name": "effectivePrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "requiredValue",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ParentReturnReply",
+      "ty_idx": 74,
+      "fields": [
+        {
+          "name": "pending",
+          "ty_idx": 5
+        },
+        {
+          "name": "returnQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "requestQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 59
+        },
+        {
+          "name": "inFlight",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": false
+          }
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 37,
+    "storage_at_deployment_ty_idx": 56
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 36
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 3
+    },
+    {
+      "body_ty_idx": 57
+    },
+    {
+      "body_ty_idx": 62
+    },
+    {
+      "body_ty_idx": 63
+    },
+    {
+      "body_ty_idx": 64
+    },
+    {
+      "body_ty_idx": 65
+    },
+    {
+      "body_ty_idx": 66
+    },
+    {
+      "body_ty_idx": 67
+    },
+    {
+      "body_ty_idx": 68
+    },
+    {
+      "body_ty_idx": 70
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102491,
+      "name": "get_collection_data",
+      "parameters": [],
+      "return_ty_idx": 71
+    },
+    {
+      "tvm_method_id": 85719,
+      "name": "royalty_params",
+      "parameters": [],
+      "return_ty_idx": 72
+    },
+    {
+      "tvm_method_id": 92067,
+      "name": "get_nft_address_by_index",
+      "parameters": [
+        {
+          "name": "index",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 120741,
+      "name": "get_last_parent_fill_up",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 68099,
+      "name": "get_minted_count",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 105799,
+      "name": "get_is_mint_pending",
+      "parameters": [
+        {
+          "name": "index",
+          "ty_idx": 16
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 68445,
+      "name": "get_nft_content",
+      "parameters": [
+        {
+          "name": "_index",
+          "ty_idx": 1
+        },
+        {
+          "name": "individualContent",
+          "ty_idx": 3
+        }
+      ],
+      "return_ty_idx": 3
+    },
+    {
+      "tvm_method_id": 108963,
+      "name": "get_price",
+      "parameters": [
+        {
+          "name": "charCount",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 79234,
+      "name": "get_access_mode",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 121853,
+      "name": "get_withdrawable_revenue",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 78926,
+      "name": "get_is_allowlisted",
+      "parameters": [
+        {
+          "name": "wallet",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 130768,
+      "name": "get_mint_quote",
+      "parameters": [
+        {
+          "name": "wallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "charCount",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 73
+    },
+    {
+      "tvm_method_id": 97160,
+      "name": "get_parent_return",
+      "parameters": [],
+      "return_ty_idx": 74
+    },
+    {
+      "tvm_method_id": 113456,
+      "name": "get_min_chars",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 113142,
+      "name": "get_admin",
+      "parameters": [],
+      "return_ty_idx": 59
+    },
+    {
+      "tvm_method_id": 66233,
+      "name": "get_parent_domain",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 88174,
+      "name": "get_linked_admin",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 97097,
+      "name": "is_locked",
+      "parameters": [],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 120147,
+      "name": "get_is_linked",
+      "parameters": [],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 123660,
+      "name": "dnsresolve",
+      "parameters": [
+        {
+          "name": "subdomain",
+          "ty_idx": 2
+        },
+        {
+          "name": "_category",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 75
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_DNS_INVALID_SUBDOMAIN_BITS",
+      "err_code": 70
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_LABEL_TOO_SHORT",
+      "err_code": 200
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_LABEL_TOO_LONG",
+      "err_code": 201
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_LABEL_INVALID_CHARS",
+      "err_code": 202
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_LABEL_RESERVED",
+      "err_code": 203
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INSUFFICIENT_MINT_VALUE",
+      "err_code": 204
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_MINT_NOT_ALLOWED",
+      "err_code": 205
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_LABEL_TAKEN",
+      "err_code": 207
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_WRONG_WORKCHAIN",
+      "err_code": 211
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_RESCUE_PARENT_FORBIDDEN",
+      "err_code": 212
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NULL_OLD_OWNER",
+      "err_code": 213
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_LINKED_NO_CUSTODY",
+      "err_code": 214
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NO_PARENT_RETURN",
+      "err_code": 216
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_ACCESS_MODE",
+      "err_code": 217
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INDEX_MISMATCH",
+      "err_code": 220
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_MINT_NOT_PENDING",
+      "err_code": 221
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_LINKED_OWNER_PROOF_REQUIRED",
+      "err_code": 222
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_PARENT_TRANSFER_IN_FLIGHT",
+      "err_code": 223
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INSUFFICIENT_BALANCE",
+      "err_code": 402
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_ADMIN",
+      "err_code": 403
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_FROM_COLLECTION",
+      "err_code": 404
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_FROM_MASTER",
+      "err_code": 405
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_CANNOT_EDIT_RESOLVER",
+      "err_code": 406
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_UNKNOWN_OP",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
