@@ -1,0 +1,721 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "SubdomainFactory",
+  "author": "tolk-subdomains",
+  "version": "5.0.0",
+  "description": "Global factory for permanent Locked and self-custody Linked subdomain collections.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OwnershipAssigned"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TransferForwardPayload"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreateLinkedCollection"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionMeta"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PriceConfig"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionReady"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ParentHandoffComplete"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RetryCollectionDeployment"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryStorage"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingDeployment"
+    },
+    {
+      "kind": "uintN",
+      "n": 2
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 26,
+      "value_ty_idx": 29
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryPendingReturn"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 31
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 26,
+      "value_ty_idx": 32
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockCollection"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferOwnership"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferOwnershipData"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Excesses"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmParentHandoff"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "PendingDeployment",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "handoffValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "isLinked",
+          "ty_idx": 5
+        },
+        {
+          "name": "phase",
+          "ty_idx": 28
+        },
+        {
+          "name": "meta",
+          "ty_idx": 21
+        },
+        {
+          "name": "inFlight",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": false
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryPendingReturn",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "inFlight",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": false
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryStorage",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "pending",
+          "ty_idx": 30
+        },
+        {
+          "name": "rejectedReturns",
+          "ty_idx": 33,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "shapedTuple",
+              "items": []
+            },
+            "cast_to_ty_idx": 33
+          }
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "TransferForwardPayload",
+      "ty_idx": 14,
+      "target_ty_idx": 15
+    },
+    {
+      "kind": "struct",
+      "name": "TransferOwnershipData",
+      "ty_idx": 36,
+      "fields": [
+        {
+          "name": "newOwnerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "responseDestination",
+          "ty_idx": 13
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 37
+        },
+        {
+          "name": "forwardAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferOwnership",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 1607220500,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "transferData",
+          "ty_idx": 36
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OwnershipAssigned",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 85167505,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "oldOwnerAddress",
+          "ty_idx": 13
+        },
+        {
+          "name": "payload",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Excesses",
+      "ty_idx": 38,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockCollection",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 1812744983,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "isLinked",
+          "ty_idx": 5
+        },
+        {
+          "name": "meta",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionReady",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1380210993,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "currentAdmin",
+          "ty_idx": 7
+        },
+        {
+          "name": "isLinked",
+          "ty_idx": 5
+        },
+        {
+          "name": "isNew",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ParentHandoffComplete",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1212436299,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "intendedAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfirmParentHandoff",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 1212436562,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "deploymentId",
+          "ty_idx": 11
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "intendedAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RetryCollectionDeployment",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 1381257817,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CreateLinkedCollection",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1279872587,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "meta",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PriceConfig",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "minChars",
+          "ty_idx": 19
+        },
+        {
+          "name": "p1",
+          "ty_idx": 6
+        },
+        {
+          "name": "p2",
+          "ty_idx": 6
+        },
+        {
+          "name": "p3",
+          "ty_idx": 6
+        },
+        {
+          "name": "p4",
+          "ty_idx": 6
+        },
+        {
+          "name": "p5",
+          "ty_idx": 6
+        },
+        {
+          "name": "p6",
+          "ty_idx": 6
+        },
+        {
+          "name": "p7",
+          "ty_idx": 6
+        },
+        {
+          "name": "p8",
+          "ty_idx": 6
+        },
+        {
+          "name": "p9",
+          "ty_idx": 6
+        },
+        {
+          "name": "p10",
+          "ty_idx": 6
+        },
+        {
+          "name": "pRest",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionMeta",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "priceConfig",
+          "ty_idx": 20
+        },
+        {
+          "name": "autoRenewParent",
+          "ty_idx": 5
+        },
+        {
+          "name": "collectionContent",
+          "ty_idx": 3
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 25
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 38
+    },
+    {
+      "body_ty_idx": 39
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 96158,
+      "name": "get_collection_address",
+      "parameters": [
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 95932,
+      "name": "get_linked_collection_address",
+      "parameters": [
+        {
+          "name": "parentDomain",
+          "ty_idx": 7
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_METADATA_INVALID",
+      "err_code": 208
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_WRONG_WORKCHAIN",
+      "err_code": 211
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NULL_OLD_OWNER",
+      "err_code": 213
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_PARENT_TRANSFER_IN_FLIGHT",
+      "err_code": 223
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_METADATA_TOO_LARGE",
+      "err_code": 224
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INSUFFICIENT_BALANCE",
+      "err_code": 402
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_ADMIN",
+      "err_code": 403
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_FROM_COLLECTION",
+      "err_code": 404
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_UNKNOWN_OP",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
