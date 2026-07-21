@@ -1,0 +1,751 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "DuelEscrow",
+  "author": "LOOP",
+  "version": "1.0.0",
+  "description": "Native TON escrow with weighted two-party commit-reveal",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OpenOffer"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelOffer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MatchOffers"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Reveal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExpireOffer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExpireDuel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "OfferMap"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OfferData"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 25
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "DuelMap"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelData"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 29
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ActiveOfferMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 11
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "UsedOfferMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OfferRefund"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelPayout"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProtocolFee"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ContractConfigView"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "OpenOffer",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1280265985,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "chanceBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "totalPool",
+          "ty_idx": 6
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "counterOfferId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CancelOffer",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1280265986,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MatchOffers",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1280265987,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "firstOfferId",
+          "ty_idx": 11
+        },
+        {
+          "name": "secondOfferId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Reveal",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1280265988,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "secret",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExpireOffer",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1280265989,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExpireDuel",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1280265990,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetPaused",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1280265991,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DuelPayout",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 1280266001,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "reason",
+          "ty_idx": 24
+        }
+      ],
+      "description": "Attached to every terminal winner transfer so indexers can project the result."
+    },
+    {
+      "kind": "struct",
+      "name": "OfferRefund",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 1280266002,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "reason",
+          "ty_idx": 24
+        }
+      ],
+      "description": "Attached to unmatched or no-reveal refunds."
+    },
+    {
+      "kind": "struct",
+      "name": "ProtocolFee",
+      "ty_idx": 37,
+      "prefix": {
+        "prefix_num": 1280266003,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Attached to the protocol fee transfer."
+    },
+    {
+      "kind": "alias",
+      "name": "OfferMap",
+      "ty_idx": 22,
+      "target_ty_idx": 26
+    },
+    {
+      "kind": "alias",
+      "name": "DuelMap",
+      "ty_idx": 27,
+      "target_ty_idx": 30
+    },
+    {
+      "kind": "alias",
+      "name": "ActiveOfferMap",
+      "ty_idx": 31,
+      "target_ty_idx": 32
+    },
+    {
+      "kind": "alias",
+      "name": "UsedOfferMap",
+      "ty_idx": 33,
+      "target_ty_idx": 34
+    },
+    {
+      "kind": "struct",
+      "name": "OfferData",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "chanceBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "totalPool",
+          "ty_idx": 6
+        },
+        {
+          "name": "stake",
+          "ty_idx": 6
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "state",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DuelData",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "offerAId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerBId",
+          "ty_idx": 11
+        },
+        {
+          "name": "revealDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "secretA",
+          "ty_idx": 13
+        },
+        {
+          "name": "secretB",
+          "ty_idx": 13
+        },
+        {
+          "name": "revealedMask",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "locked",
+          "ty_idx": 6
+        },
+        {
+          "name": "offers",
+          "ty_idx": 22
+        },
+        {
+          "name": "duels",
+          "ty_idx": 27
+        },
+        {
+          "name": "activeOffers",
+          "ty_idx": 31
+        },
+        {
+          "name": "usedOfferIds",
+          "ty_idx": 33
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ContractConfigView",
+      "ty_idx": 38,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "locked",
+          "ty_idx": 6
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 21
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 36
+    },
+    {
+      "body_ty_idx": 37
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 94616,
+      "name": "contractConfig",
+      "parameters": [],
+      "return_ty_idx": 38
+    },
+    {
+      "tvm_method_id": 100877,
+      "name": "offerData",
+      "parameters": [
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 23
+    },
+    {
+      "tvm_method_id": 82385,
+      "name": "duelData",
+      "parameters": [
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 28
+    },
+    {
+      "tvm_method_id": 106493,
+      "name": "activeOffer",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 11
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotOwner",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.Paused",
+      "err_code": 101
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OfferAlreadyUsed",
+      "err_code": 102
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OwnerAlreadyActive",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OfferMissing",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OfferNotOpen",
+      "err_code": 105
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DuelMissing",
+      "err_code": 106
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidChance",
+      "err_code": 107
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidPool",
+      "err_code": 108
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidExpiry",
+      "err_code": 109
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 110
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.IncompatibleOffers",
+      "err_code": 111
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SameOwner",
+      "err_code": 112
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RevealClosed",
+      "err_code": 113
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongRevealer",
+      "err_code": 114
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadyRevealed",
+      "err_code": 115
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidCommitment",
+      "err_code": 116
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TooEarly",
+      "err_code": 117
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidFee",
+      "err_code": 118
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidOfferId",
+      "err_code": 119
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}

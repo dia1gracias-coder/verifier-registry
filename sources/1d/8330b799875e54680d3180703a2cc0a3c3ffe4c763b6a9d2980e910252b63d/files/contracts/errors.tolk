@@ -1,0 +1,23 @@
+enum Errors {
+    NotOwner = 100
+    Paused = 101
+    OfferAlreadyUsed = 102
+    OwnerAlreadyActive = 103
+    OfferMissing = 104
+    OfferNotOpen = 105
+    DuelMissing = 106
+    InvalidChance = 107
+    InvalidPool = 108
+    InvalidExpiry = 109
+    InsufficientValue = 110
+    IncompatibleOffers = 111
+    SameOwner = 112
+    RevealClosed = 113
+    WrongRevealer = 114
+    AlreadyRevealed = 115
+    InvalidCommitment = 116
+    TooEarly = 117
+    InvalidFee = 118
+    InvalidOfferId = 119
+    InvalidMessage = 0xFFFF
+}
