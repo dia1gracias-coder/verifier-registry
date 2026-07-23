@@ -1,0 +1,1120 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "ClaimableNftCollection",
+  "author": "Reza Apes",
+  "version": "1.0.0",
+  "description": "Signed entitlement NFT collection implementing TEP-62, TEP-64 and TEP-66",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimMint"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimVoucher"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimNonce"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestRoyaltyParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetMintPrice"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetTransferFrozen"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetTreasury"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetVoucherSigner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BeginOwnerTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AcceptOwnerTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelOwnerTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestTransferAuthorization"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimableCollectionStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionImmutableConfig"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 30
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionMutableConfig"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 33
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimIndexes"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 11
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 11
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FailedClaimRecord"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 39
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 36
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftItemInitAtDeployment"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ItemClaimContext"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 43
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingNftTransfer"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 45
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 46
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseRoyaltyParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoyaltyParams"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferAuthorization"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OffchainMetadataReply"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 54
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimConfigReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimLookupReply"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "NftItemInitAtDeployment",
+      "ty_idx": 42,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "individualContent",
+          "ty_idx": 31
+        },
+        {
+          "name": "claimContext",
+          "ty_idx": 44
+        },
+        {
+          "name": "nextTransferNonce",
+          "ty_idx": 11
+        },
+        {
+          "name": "pendingTransfer",
+          "ty_idx": 47
+        }
+      ],
+      "description": "Parameters sent by a collection to initialize a deterministic NFT item."
+    },
+    {
+      "kind": "struct",
+      "name": "ItemClaimContext",
+      "ty_idx": 43,
+      "fields": [
+        {
+          "name": "serial",
+          "ty_idx": 11
+        },
+        {
+          "name": "nonce",
+          "ty_idx": 14
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "recipientAddress",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Context returned intact in a rich bounce if item initialization fails."
+    },
+    {
+      "kind": "struct",
+      "name": "RequestRoyaltyParams",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1765620048,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseRoyaltyParams",
+      "ty_idx": 49,
+      "prefix": {
+        "prefix_num": 2831876269,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "royaltyParams",
+          "ty_idx": 50
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimVoucher",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1095779670,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "voucherDomain",
+          "ty_idx": 14
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "serial",
+          "ty_idx": 11
+        },
+        {
+          "name": "recipientAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "nonce",
+          "ty_idx": 16
+        }
+      ],
+      "description": "Domain-separated voucher signed by the backend Ed25519 key.\n\n`collectionAddress` and `voucherDomain` prevent a valid voucher from being\nreplayed on another collection or network deployment. Sign the raw 32-byte\nrepresentation hash of this cell; see the checked golden vector."
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimNonce",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 14
+        }
+      ],
+      "description": "A full-width nonce kept in a reference so ClaimVoucher stays within one cell.\n`value` is exactly 32 big-endian bytes on the wire."
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimMint",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1830713425,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "voucher",
+          "ty_idx": 17
+        },
+        {
+          "name": "signature",
+          "ty_idx": 18
+        }
+      ],
+      "description": "Claim an entitled Ape. The signature is Ed25519 over the raw 32-byte\nrepresentation hash of `voucher`; see `docs/ABI.md`."
+    },
+    {
+      "kind": "struct",
+      "name": "SetMintPrice",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1301098304,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "mintPrice",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetPaused",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1707140855,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetTransferFrozen",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1710418948,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "transferFrozen",
+          "ty_idx": 5
+        }
+      ],
+      "description": "Toggle collection-wide transfer policy without pausing minting. New\ncollections start frozen. While frozen, canonical NFT items are authorized\nto move only into the deterministic personal vault of their current owner."
+    },
+    {
+      "kind": "struct",
+      "name": "SetTreasury",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 564237988,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "treasuryAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetVoucherSigner",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 2137676869,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "signerPublicKey",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BeginOwnerTransfer",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 744840590,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "pendingOwnerAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AcceptOwnerTransfer",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 2045958316,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CancelOwnerTransfer",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 434085665,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 48,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestTransferAuthorization",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 1414676817,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "authorizationNonce",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "currentOwnerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "newOwnerAddress",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Canonical item -> collection transfer-policy request. The collection\nauthenticates the deterministic item address from `itemIndex` before it\nreplies. The monotonically increasing nonce binds the reply to one pending\ntransfer and prevents delayed/replayed approvals."
+    },
+    {
+      "kind": "struct",
+      "name": "TransferAuthorization",
+      "ty_idx": 52,
+      "prefix": {
+        "prefix_num": 1414676818,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "authorizationNonce",
+          "ty_idx": 11
+        },
+        {
+          "name": "allowed",
+          "ty_idx": 5
+        }
+      ],
+      "description": "Canonical collection -> item policy decision."
+    },
+    {
+      "kind": "struct",
+      "name": "RoyaltyParams",
+      "ty_idx": 50,
+      "fields": [
+        {
+          "name": "numerator",
+          "ty_idx": 51
+        },
+        {
+          "name": "denominator",
+          "ty_idx": 51
+        },
+        {
+          "name": "royaltyAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionImmutableConfig",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "maxSupply",
+          "ty_idx": 11
+        },
+        {
+          "name": "voucherDomain",
+          "ty_idx": 14
+        },
+        {
+          "name": "royaltyAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "collectionMetadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "commonContent",
+          "ty_idx": 31
+        },
+        {
+          "name": "nftItemCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "personalVaultCode",
+          "ty_idx": 3
+        }
+      ],
+      "description": "Values that are never modified after StateInit."
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionMutableConfig",
+      "ty_idx": 33,
+      "fields": [
+        {
+          "name": "mintPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "transferFrozen",
+          "ty_idx": 5
+        },
+        {
+          "name": "treasuryAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "voucherSignerPublicKey",
+          "ty_idx": 14
+        },
+        {
+          "name": "pendingOwnerAddress",
+          "ty_idx": 34
+        }
+      ],
+      "description": "Owner-controlled collection settings."
+    },
+    {
+      "kind": "struct",
+      "name": "FailedClaimRecord",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "nonce",
+          "ty_idx": 14
+        },
+        {
+          "name": "recipientAddress",
+          "ty_idx": 7
+        }
+      ],
+      "description": "A claim that reached asynchronous item deployment but bounced. Retaining the\noriginal index permits an exact retry without creating a marketplace index gap."
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimIndexes",
+      "ty_idx": 36,
+      "fields": [
+        {
+          "name": "claimedSerials",
+          "ty_idx": 37
+        },
+        {
+          "name": "usedNonces",
+          "ty_idx": 38
+        },
+        {
+          "name": "failedClaims",
+          "ty_idx": 40
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimableCollectionStorage",
+      "ty_idx": 29,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "immutableConfig",
+          "ty_idx": 32
+        },
+        {
+          "name": "mutableConfig",
+          "ty_idx": 35
+        },
+        {
+          "name": "claimIndexes",
+          "ty_idx": 41
+        }
+      ],
+      "description": "Root is intentionally four references or fewer."
+    },
+    {
+      "kind": "struct",
+      "name": "PendingNftTransfer",
+      "ty_idx": 45,
+      "fields": [
+        {
+          "name": "authorizationNonce",
+          "ty_idx": 11
+        },
+        {
+          "name": "originalOwnerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "transferBody",
+          "ty_idx": 3
+        }
+      ],
+      "description": "A standard TEP-62 transfer retained while the canonical collection makes\nthe current, collection-wide transfer-policy decision. The item accepts at\nmost one pending transfer and binds the reply to a monotonic nonce."
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionDataReply",
+      "ty_idx": 53,
+      "fields": [
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "collectionMetadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimConfigReply",
+      "ty_idx": 56,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "pendingOwnerAddress",
+          "ty_idx": 34
+        },
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "maxSupply",
+          "ty_idx": 11
+        },
+        {
+          "name": "mintPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "minimumMintPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "transferFrozen",
+          "ty_idx": 5
+        },
+        {
+          "name": "treasuryAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "voucherSignerPublicKey",
+          "ty_idx": 14
+        },
+        {
+          "name": "voucherDomain",
+          "ty_idx": 14
+        },
+        {
+          "name": "royaltyAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimLookupReply",
+      "ty_idx": 57,
+      "fields": [
+        {
+          "name": "claimed",
+          "ty_idx": 5
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OffchainMetadataReply",
+      "ty_idx": 54,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "string",
+          "ty_idx": 31
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 29
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 42
+    },
+    {
+      "body_ty_idx": 48
+    },
+    {
+      "body_ty_idx": 49
+    },
+    {
+      "body_ty_idx": 52
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102491,
+      "name": "get_collection_data",
+      "parameters": [],
+      "return_ty_idx": 53
+    },
+    {
+      "tvm_method_id": 92067,
+      "name": "get_nft_address_by_index",
+      "parameters": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 68445,
+      "name": "get_nft_content",
+      "parameters": [
+        {
+          "name": "_itemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "individualNftContent",
+          "ty_idx": 31
+        }
+      ],
+      "return_ty_idx": 55
+    },
+    {
+      "tvm_method_id": 85719,
+      "name": "royalty_params",
+      "parameters": [],
+      "return_ty_idx": 50
+    },
+    {
+      "tvm_method_id": 113817,
+      "name": "get_claim_config",
+      "parameters": [],
+      "return_ty_idx": 56
+    },
+    {
+      "tvm_method_id": 125755,
+      "name": "get_claimed_item_index",
+      "parameters": [
+        {
+          "name": "serial",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 57
+    },
+    {
+      "tvm_method_id": 99217,
+      "name": "is_nonce_used",
+      "parameters": [
+        {
+          "name": "nonce",
+          "ty_idx": 14
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 103527,
+      "name": "is_claim_retryable",
+      "parameters": [
+        {
+          "name": "serial",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 69961,
+      "name": "get_max_collection_supply",
+      "parameters": [],
+      "return_ty_idx": 11,
+      "description": "Compile-time on-chain ceiling used by deployment tooling and verification."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromOwner",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromPendingOwner",
+      "err_code": 403
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWorkchain",
+      "err_code": 406
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TooLittleValue",
+      "err_code": 709
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PriceBelowMinimum",
+      "err_code": 710
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.CollectionPaused",
+      "err_code": 711
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SupplyExhausted",
+      "err_code": 712
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongRecipient",
+      "err_code": 713
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongCollection",
+      "err_code": 714
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongVoucherDomain",
+      "err_code": 715
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.VoucherExpired",
+      "err_code": 716
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSignature",
+      "err_code": 717
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SerialAlreadyClaimed",
+      "err_code": 718
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NonceAlreadyUsed",
+      "err_code": 719
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSerial",
+      "err_code": 720
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PendingOwnerNotSet",
+      "err_code": 721
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SerialOutOfRange",
+      "err_code": 723
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.MaxSupplyOutOfRange",
+      "err_code": 724
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
