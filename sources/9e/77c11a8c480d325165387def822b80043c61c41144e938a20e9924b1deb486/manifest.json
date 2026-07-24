@@ -1,0 +1,5511 @@
+{
+  "code_hash": "9e77c11a8c480d325165387def822b80043c61c41144e938a20e9924b1deb486",
+  "source_bundle_hash": "86334fd4029fb203a48ccae075978178f8e8f5838d701831a0cd156812b19f93",
+  "verified_at": 1784898000,
+  "compiler": {
+    "language": "tolk",
+    "version": "1.4.1",
+    "entrypoint": "contracts/src/Poll.tolk",
+    "params": {
+      "compiler_version": "1.4.1"
+    }
+  },
+  "source_map": {
+    "code_boc64": "te6ccgECDQEAAbEAART/APSkE/S88sgLAQIBYgIDAfTQ+JGOLtMfMe1E0AHXLCNKa3t08r/XCwcB+kjTH9MfBJGlkwGlAeICyPpSyx/LH87J7VTgINcsI0pre3TjAtcsIKCwcQwxjiow7UTQ+kjWPzD4kiLHBfLgZyHI+lLOz4PJ7VTIz4UI+lJwzwtuyYBg+wDghA8BxwDy9AQCASAFBgHuMe1E0PpI0x/THyDXCgDy0GgE1wsHIJUgwAHDAJF/4vLgZCCSAaSTAqRZ4gPI+lISyx8Syx8SzsntVIj4KPiSAcj6UvpSz4HJggr68IDIz4mIAVMjyM+E0MzM+RbPC/8B+gKBAIzPC3ASzMzPkaU1vbrLB8lx+wAJAgEgBwgAG7yM52omh9JBjpj+uFj8AUG4XgiPgoyPpSEvpSz4HJAcjPhNDMzPkWyM+KAEDL/89QgJAgEgCwwBFP8A9KQT9LzyyAsKAHTT+JGRMOAg1ywjSmt7dDGOITDtRND6SPpI1woA+JIjxwXy4Gby0GUByPpS+lLPg8ntVOCEDwHHAPL0ABG0o72omh9JBhAAHbVZnaiaH0kGOmfmOuFAEA==",
+    "symbol_types_json": {
+      "alias_instantiations": [],
+      "declarations": [
+        {
+          "fields": [
+            {
+              "name": "skipBitsNValidation",
+              "ty_idx": 5
+            }
+          ],
+          "ident_loc": [
+            0,
+            433,
+            8,
+            433,
+            19
+          ],
+          "kind": "struct",
+          "name": "PackOptions",
+          "ty_idx": 20
+        },
+        {
+          "ident_loc": [
+            0,
+            1588,
+            6,
+            1588,
+            24
+          ],
+          "kind": "alias",
+          "name": "ExtraCurrenciesMap",
+          "target_ty_idx": 30,
+          "ty_idx": 28
+        },
+        {
+          "fields": [
+            {
+              "name": "code",
+              "ty_idx": 3
+            },
+            {
+              "name": "data",
+              "ty_idx": 3
+            }
+          ],
+          "ident_loc": [
+            0,
+            1592,
+            8,
+            1592,
+            21
+          ],
+          "kind": "struct",
+          "name": "ContractState",
+          "ty_idx": 21
+        },
+        {
+          "fields": [
+            {
+              "name": "fixedPrefixLength",
+              "ty_idx": 39
+            },
+            {
+              "name": "closeTo",
+              "ty_idx": 7
+            }
+          ],
+          "ident_loc": [
+            0,
+            1599,
+            8,
+            1599,
+            30
+          ],
+          "kind": "struct",
+          "name": "AddressShardingOptions",
+          "ty_idx": 38
+        },
+        {
+          "fields": [
+            {
+              "name": "workchain",
+              "ty_idx": 33
+            },
+            {
+              "name": "stateInit",
+              "ty_idx": 37
+            },
+            {
+              "name": "toShard",
+              "ty_idx": 40
+            }
+          ],
+          "ident_loc": [
+            0,
+            1621,
+            8,
+            1621,
+            25
+          ],
+          "kind": "struct",
+          "name": "AutoDeployAddress",
+          "ty_idx": 36
+        },
+        {
+          "encoded_as_ty_idx": 25,
+          "ident_loc": [
+            0,
+            1677,
+            6,
+            1677,
+            16
+          ],
+          "kind": "enum",
+          "members": [
+            {
+              "name": "NoBounce",
+              "value": "0"
+            },
+            {
+              "name": "Only256BitsOfBody",
+              "value": "1"
+            },
+            {
+              "name": "RichBounce",
+              "value": "2"
+            },
+            {
+              "name": "RichBounceOnlyRootCell",
+              "value": "3"
+            }
+          ],
+          "name": "BounceMode",
+          "ty_idx": 24
+        },
+        {
+          "ident_loc": [
+            0,
+            1687,
+            6,
+            1687,
+            19
+          ],
+          "kind": "alias",
+          "name": "OldBounceMode",
+          "target_ty_idx": 5,
+          "ty_idx": 26
+        },
+        {
+          "fields": [
+            {
+              "name": "bounce",
+              "ty_idx": 27
+            },
+            {
+              "name": "value",
+              "ty_idx": 32
+            },
+            {
+              "name": "dest",
+              "ty_idx": 41
+            },
+            {
+              "name": "body",
+              "ty_idx": 42
+            }
+          ],
+          "ident_loc": [
+            0,
+            1691,
+            8,
+            1691,
+            28
+          ],
+          "kind": "struct",
+          "name": "CreateMessageOptions",
+          "ty_idx": 43,
+          "type_params": [
+            "TBody"
+          ]
+        },
+        {
+          "fields": [
+            {
+              "name": "messageCell",
+              "ty_idx": 3
+            }
+          ],
+          "ident_loc": [
+            0,
+            1788,
+            8,
+            1788,
+            18
+          ],
+          "kind": "struct",
+          "name": "OutMessage",
+          "ty_idx": 22
+        },
+        {
+          "ident_loc": [
+            1,
+            4,
+            6,
+            4,
+            24
+          ],
+          "kind": "alias",
+          "name": "AllowedPollMessage",
+          "target_ty_idx": 16,
+          "ty_idx": 12
+        },
+        {
+          "fields": [
+            {
+              "name": "owner",
+              "ty_idx": 7
+            },
+            {
+              "name": "option0",
+              "ty_idx": 9
+            },
+            {
+              "name": "option1",
+              "ty_idx": 9
+            },
+            {
+              "name": "isClosed",
+              "ty_idx": 5
+            }
+          ],
+          "ident_loc": [
+            3,
+            11,
+            8,
+            11,
+            19
+          ],
+          "kind": "struct",
+          "name": "PollStorage",
+          "ty_idx": 17
+        },
+        {
+          "fields": [
+            {
+              "name": "poll",
+              "ty_idx": 7
+            },
+            {
+              "name": "voter",
+              "ty_idx": 7
+            },
+            {
+              "name": "hasVoted",
+              "ty_idx": 5
+            }
+          ],
+          "ident_loc": [
+            3,
+            27,
+            8,
+            27,
+            20
+          ],
+          "kind": "struct",
+          "name": "VoterStorage",
+          "ty_idx": 18
+        },
+        {
+          "fields": [
+            {
+              "name": "option",
+              "ty_idx": 14
+            }
+          ],
+          "ident_loc": [
+            3,
+            42,
+            21,
+            42,
+            25
+          ],
+          "kind": "struct",
+          "name": "Vote",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 1766682478
+          },
+          "ty_idx": 13
+        },
+        {
+          "fields": [],
+          "ident_loc": [
+            3,
+            46,
+            21,
+            46,
+            30
+          ],
+          "kind": "struct",
+          "name": "ClosePoll",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 336989729
+          },
+          "ty_idx": 15
+        }
+      ],
+      "files": [
+        {
+          "file_id": 0,
+          "file_name": "@stdlib/common.tolk",
+          "imports": [],
+          "size_chars": 75177
+        },
+        {
+          "file_id": 1,
+          "file_name": "contracts/src/Poll.tolk",
+          "imports": [
+            2,
+            3
+          ],
+          "size_chars": 3339
+        },
+        {
+          "file_id": 2,
+          "file_name": "gen/Voter.code.tolk",
+          "imports": [],
+          "size_chars": 649
+        },
+        {
+          "file_id": 3,
+          "file_name": "contracts/src/types.tolk",
+          "imports": [],
+          "size_chars": 829
+        }
+      ],
+      "functions": [
+        {
+          "end_loc": [
+            1,
+            66,
+            1,
+            66,
+            2
+          ],
+          "f_idx": 0,
+          "ident_loc": [
+            1,
+            11,
+            5,
+            11,
+            22
+          ],
+          "name": "onInternalMessage",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "in.body",
+              "ty_idx": 2
+            }
+          ],
+          "return_ty_idx": 0
+        },
+        {
+          "end_loc": [
+            1,
+            79,
+            1,
+            79,
+            2
+          ],
+          "f_idx": 1,
+          "ident_loc": [
+            1,
+            68,
+            5,
+            68,
+            21
+          ],
+          "name": "onBouncedMessage",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "in.body",
+              "ty_idx": 2
+            }
+          ],
+          "return_ty_idx": 0
+        },
+        {
+          "end_loc": [
+            3,
+            24,
+            1,
+            24,
+            2
+          ],
+          "f_idx": 2,
+          "ident_loc": [
+            3,
+            22,
+            17,
+            22,
+            21
+          ],
+          "name": "PollStorage.save",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 17
+            }
+          ],
+          "return_ty_idx": 0
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 3,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "VoterStorage.toCell",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 18
+            },
+            {
+              "name": "options",
+              "ty_idx": 20
+            }
+          ],
+          "return_ty_idx": 19
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 4,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "createMessage<Vote>",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "options",
+              "ty_idx": 23
+            }
+          ],
+          "return_ty_idx": 22
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 5,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "createMessage<void>",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "options",
+              "ty_idx": 44
+            }
+          ],
+          "return_ty_idx": 22
+        },
+        {
+          "end_loc": [
+            1,
+            84,
+            1,
+            84,
+            2
+          ],
+          "f_idx": 6,
+          "ident_loc": [
+            1,
+            81,
+            9,
+            81,
+            16
+          ],
+          "name": "results",
+          "num_params": 0,
+          "params": [],
+          "return_ty_idx": 45
+        },
+        {
+          "end_loc": [
+            1,
+            89,
+            1,
+            89,
+            2
+          ],
+          "f_idx": 7,
+          "ident_loc": [
+            1,
+            86,
+            9,
+            86,
+            14
+          ],
+          "name": "owner",
+          "num_params": 0,
+          "params": [],
+          "return_ty_idx": 7
+        },
+        {
+          "end_loc": [
+            1,
+            101,
+            1,
+            101,
+            2
+          ],
+          "f_idx": 8,
+          "ident_loc": [
+            1,
+            91,
+            9,
+            91,
+            25
+          ],
+          "name": "calcVoterAddress",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "voter",
+              "ty_idx": 7
+            }
+          ],
+          "return_ty_idx": 7
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 9,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "AutoDeployAddress.calculateAddress",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 36
+            }
+          ],
+          "return_ty_idx": 7
+        },
+        {
+          "end_loc": [
+            1,
+            106,
+            1,
+            106,
+            2
+          ],
+          "f_idx": 10,
+          "ident_loc": [
+            1,
+            103,
+            9,
+            103,
+            17
+          ],
+          "name": "isClosed",
+          "num_params": 0,
+          "params": [],
+          "return_ty_idx": 5
+        }
+      ],
+      "struct_instantiations": [
+        {
+          "monomorphic_fields_ty_idx": [
+            27,
+            32,
+            41,
+            13
+          ],
+          "struct_name": "CreateMessageOptions<Vote>",
+          "ty_idx": 23
+        },
+        {
+          "monomorphic_fields_ty_idx": [
+            27,
+            32,
+            41,
+            0
+          ],
+          "struct_name": "CreateMessageOptions<void>",
+          "ty_idx": 44
+        }
+      ],
+      "unique_types": [
+        {
+          "kind": "void"
+        },
+        {
+          "kind": "int"
+        },
+        {
+          "kind": "slice"
+        },
+        {
+          "kind": "cell"
+        },
+        {
+          "kind": "builder"
+        },
+        {
+          "kind": "bool"
+        },
+        {
+          "kind": "coins"
+        },
+        {
+          "kind": "address"
+        },
+        {
+          "kind": "intN",
+          "n": 32
+        },
+        {
+          "kind": "uintN",
+          "n": 32
+        },
+        {
+          "kind": "intN",
+          "n": 64
+        },
+        {
+          "kind": "uintN",
+          "n": 64
+        },
+        {
+          "alias_name": "AllowedPollMessage",
+          "kind": "AliasRef"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "Vote"
+        },
+        {
+          "kind": "uintN",
+          "n": 8
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "ClosePoll"
+        },
+        {
+          "kind": "union",
+          "stack_width": 2,
+          "variants": [
+            {
+              "prefix_len": 32,
+              "prefix_num": 1766682478,
+              "stack_type_id": 133,
+              "stack_width": 1,
+              "variant_ty_idx": 13
+            },
+            {
+              "prefix_len": 32,
+              "prefix_num": 336989729,
+              "stack_type_id": 134,
+              "stack_width": 0,
+              "variant_ty_idx": 15
+            }
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "PollStorage"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "VoterStorage"
+        },
+        {
+          "inner_ty_idx": 18,
+          "kind": "cellOf"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "PackOptions"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "ContractState"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "OutMessage"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "CreateMessageOptions",
+          "type_args_ty_idx": [
+            13
+          ]
+        },
+        {
+          "enum_name": "BounceMode",
+          "kind": "EnumRef"
+        },
+        {
+          "kind": "uintN",
+          "n": 2
+        },
+        {
+          "alias_name": "OldBounceMode",
+          "kind": "AliasRef"
+        },
+        {
+          "kind": "union",
+          "stack_width": 2,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 129,
+              "stack_width": 1,
+              "variant_ty_idx": 24
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 2,
+              "stack_width": 1,
+              "variant_ty_idx": 26
+            }
+          ]
+        },
+        {
+          "alias_name": "ExtraCurrenciesMap",
+          "kind": "AliasRef"
+        },
+        {
+          "kind": "varuintN",
+          "n": 32
+        },
+        {
+          "key_ty_idx": 8,
+          "kind": "mapKV",
+          "value_ty_idx": 29
+        },
+        {
+          "items_ty_idx": [
+            6,
+            28
+          ],
+          "kind": "tensor"
+        },
+        {
+          "kind": "union",
+          "stack_width": 3,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 17,
+              "stack_width": 1,
+              "variant_ty_idx": 6
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 135,
+              "stack_width": 2,
+              "variant_ty_idx": 31
+            }
+          ]
+        },
+        {
+          "kind": "intN",
+          "n": 8
+        },
+        {
+          "kind": "uintN",
+          "n": 256
+        },
+        {
+          "items_ty_idx": [
+            33,
+            34
+          ],
+          "kind": "tensor"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "AutoDeployAddress"
+        },
+        {
+          "kind": "union",
+          "stack_width": 3,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 130,
+              "stack_width": 2,
+              "variant_ty_idx": 21
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 3,
+              "stack_width": 1,
+              "variant_ty_idx": 3
+            }
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "AddressShardingOptions"
+        },
+        {
+          "kind": "uintN",
+          "n": 5
+        },
+        {
+          "inner_ty_idx": 38,
+          "kind": "nullable",
+          "stack_type_id": 132,
+          "stack_width": 3
+        },
+        {
+          "kind": "union",
+          "stack_width": 8,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 0,
+              "stack_type_id": 8,
+              "stack_width": 1,
+              "variant_ty_idx": 7
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 1,
+              "stack_type_id": 5,
+              "stack_width": 1,
+              "variant_ty_idx": 4
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 2,
+              "stack_type_id": 136,
+              "stack_width": 2,
+              "variant_ty_idx": 35
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 3,
+              "stack_type_id": 131,
+              "stack_width": 7,
+              "variant_ty_idx": 36
+            }
+          ]
+        },
+        {
+          "kind": "genericT",
+          "name_t": "TBody"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "CreateMessageOptions",
+          "type_args_ty_idx": [
+            42
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "CreateMessageOptions",
+          "type_args_ty_idx": [
+            0
+          ]
+        },
+        {
+          "items_ty_idx": [
+            9,
+            9
+          ],
+          "kind": "tensor"
+        }
+      ]
+    },
+    "debug_marks_json": [
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_import": [
+          0
+        ],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 0,
+        "range": [
+          1,
+          11,
+          5,
+          11,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 1,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 2,
+        "ty_idx": 2,
+        "var_name": "in.body"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 3,
+        "range": [
+          1,
+          11,
+          5,
+          11,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 4,
+        "stack": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 5,
+        "range": [
+          1,
+          11,
+          5,
+          11,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 6,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "onBouncedMessage",
+        "ir_import": [
+          0
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 7,
+        "range": [
+          1,
+          11,
+          5,
+          11,
+          22
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 8,
+        "ty_idx": 2,
+        "var_name": "in.body"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 9,
+        "range": [
+          1,
+          69,
+          20,
+          69,
+          37
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 10,
+        "range": [
+          1,
+          69,
+          20,
+          69,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 11,
+        "stack": [
+          3
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 12,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 13,
+        "stack": [
+          4
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 14,
+        "range": [
+          1,
+          70,
+          9,
+          70,
+          12
+        ]
+      },
+      {
+        "ir_lazy_slice": 4,
+        "ir_slots": [
+          8
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 15,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 16,
+        "range": [
+          1,
+          72,
+          19,
+          72,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 17,
+        "stack": [
+          4,
+          10
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 18,
+        "range": [
+          1,
+          72,
+          19,
+          72,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 19,
+        "stack": [
+          4,
+          9
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 20,
+        "range": [
+          1,
+          72,
+          9,
+          72,
+          16
+        ]
+      },
+      {
+        "ir_lazy_slice": 9,
+        "ir_slots": [
+          14,
+          15,
+          16,
+          17
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 21,
+        "ty_idx": 17,
+        "var_name": "storage"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 22,
+        "stack": [
+          9,
+          4
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 23,
+        "range": [
+          1,
+          73,
+          5,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 24,
+        "stack": [
+          9,
+          4,
+          18
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 25,
+        "range": [
+          1,
+          73,
+          5,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 26,
+        "stack": [
+          9,
+          4
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 27,
+        "range": [
+          1,
+          73,
+          5,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 28,
+        "stack": [
+          9,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 29,
+        "stack": [
+          9,
+          8
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 30,
+        "stack": [
+          8,
+          9
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 31,
+        "range": [
+          1,
+          73,
+          5,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 32,
+        "stack": [
+          8,
+          23,
+          9
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 33,
+        "range": [
+          1,
+          73,
+          5,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 34,
+        "stack": [
+          8,
+          23,
+          25,
+          9
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 35,
+        "stack": [
+          8,
+          23,
+          15,
+          9
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 36,
+        "range": [
+          1,
+          73,
+          5,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 37,
+        "stack": [
+          8,
+          23,
+          15,
+          27,
+          9
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 38,
+        "stack": [
+          8,
+          23,
+          15,
+          16,
+          9
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 39,
+        "stack": [
+          8,
+          23,
+          15,
+          16,
+          28
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 40,
+        "range": [
+          1,
+          73,
+          5,
+          73,
+          7
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 41,
+        "stack": [
+          28,
+          23,
+          15,
+          16,
+          8
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 42,
+        "range": [
+          1,
+          73,
+          5,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 43,
+        "stack": [
+          28,
+          23,
+          15,
+          16
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 44,
+        "range": [
+          1,
+          75,
+          12,
+          77,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 45,
+        "range": [
+          1,
+          76,
+          9,
+          76,
+          29
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 46,
+        "stack": [
+          28,
+          23,
+          15,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 47,
+        "range": [
+          1,
+          76,
+          9,
+          76,
+          24
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 48,
+        "stack": [
+          28,
+          23,
+          15,
+          16
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 49
+      },
+      {
+        "kind": "stack",
+        "mark_id": 50,
+        "stack": [
+          28,
+          23,
+          15,
+          16
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 51,
+        "range": [
+          1,
+          73,
+          26,
+          75,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 52,
+        "stack": [
+          28,
+          23,
+          16,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 53,
+        "range": [
+          1,
+          74,
+          9,
+          74,
+          29
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 54,
+        "stack": [
+          28,
+          23,
+          16,
+          32
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 55,
+        "range": [
+          1,
+          74,
+          9,
+          74,
+          24
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 56,
+        "stack": [
+          28,
+          23,
+          16,
+          15
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 57
+      },
+      {
+        "kind": "stack",
+        "mark_id": 58,
+        "stack": [
+          28,
+          23,
+          15,
+          16
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 59,
+        "stack": [
+          28,
+          23,
+          15,
+          16
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "PollStorage.save",
+        "ir_import": [
+          14,
+          15,
+          16,
+          17
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 60,
+        "range": [
+          1,
+          78,
+          13,
+          78,
+          17
+        ]
+      },
+      {
+        "ir_lazy_slice": 9,
+        "ir_slots": [
+          14,
+          15,
+          16,
+          17
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 61,
+        "ty_idx": 17,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 62,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 63,
+        "stack": [
+          28,
+          16,
+          15,
+          23,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 64,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 65,
+        "stack": [
+          28,
+          16,
+          15,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 66,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 67,
+        "stack": [
+          28,
+          16,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 68,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 69,
+        "stack": [
+          28,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 70,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 71,
+        "stack": [
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 72,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 73,
+        "stack": [
+          39
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 74,
+        "range": [
+          3,
+          23,
+          5,
+          23,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 75,
+        "stack": []
+      },
+      {
+        "f_idx": 2,
+        "f_name": "PollStorage.save",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 76,
+        "range": [
+          3,
+          24,
+          1,
+          24,
+          2
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "onBouncedMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 77,
+        "range": [
+          1,
+          79,
+          1,
+          79,
+          2
+        ]
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 78,
+        "range": [
+          1,
+          66,
+          1,
+          66,
+          2
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 79,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 80,
+        "stack": [
+          0,
+          40
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 81,
+        "range": [
+          1,
+          12,
+          9,
+          12,
+          12
+        ]
+      },
+      {
+        "ir_lazy_slice": 40,
+        "ir_slots": [
+          44,
+          45
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 82,
+        "ty_idx": 12,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 83,
+        "range": [
+          1,
+          14,
+          5,
+          65,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 84,
+        "stack": [
+          0,
+          40,
+          46
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 85,
+        "range": [
+          1,
+          14,
+          5,
+          65,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 86,
+        "stack": [
+          0,
+          40
+        ]
+      },
+      {
+        "ir_slots": [
+          44
+        ],
+        "kind": "smart_cast",
+        "mark_id": 87,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 88,
+        "range": [
+          1,
+          15,
+          17,
+          46,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 89,
+        "stack": [
+          40
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 90,
+        "range": [
+          1,
+          16,
+          27,
+          16,
+          50
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 91,
+        "stack": [
+          40,
+          50
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 92,
+        "range": [
+          1,
+          16,
+          27,
+          16,
+          50
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 93,
+        "stack": [
+          40,
+          49
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 94,
+        "range": [
+          1,
+          16,
+          17,
+          16,
+          24
+        ]
+      },
+      {
+        "ir_lazy_slice": 49,
+        "ir_slots": [
+          54,
+          55,
+          56,
+          57
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 95,
+        "ty_idx": 17,
+        "var_name": "storage"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 96,
+        "range": [
+          1,
+          17,
+          13,
+          17,
+          63
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 97,
+        "stack": [
+          40,
+          58,
+          49
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 98,
+        "range": [
+          1,
+          17,
+          13,
+          17,
+          63
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 99,
+        "stack": [
+          40,
+          58,
+          60,
+          49
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 100,
+        "stack": [
+          40,
+          58,
+          55,
+          49
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 101,
+        "range": [
+          1,
+          17,
+          13,
+          17,
+          63
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 102,
+        "stack": [
+          40,
+          58,
+          55,
+          62,
+          49
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 103,
+        "stack": [
+          40,
+          58,
+          55,
+          56,
+          49
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 104,
+        "stack": [
+          40,
+          58,
+          55,
+          56,
+          63,
+          49
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 105,
+        "range": [
+          1,
+          17,
+          13,
+          17,
+          63
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 106,
+        "stack": [
+          40,
+          58,
+          55,
+          56,
+          63,
+          65
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 107,
+        "stack": [
+          40,
+          58,
+          55,
+          56,
+          63,
+          57
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 108,
+        "range": [
+          1,
+          17,
+          13,
+          17,
+          63
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 109,
+        "stack": [
+          40,
+          58,
+          55,
+          56,
+          63
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 110,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          40
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 111,
+        "range": [
+          1,
+          18,
+          13,
+          18,
+          83
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 112,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          69
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 113,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44
+        ]
+      },
+      {
+        "ir_slots": [
+          44
+        ],
+        "kind": "smart_cast",
+        "mark_id": 114,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 115,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 116,
+        "range": [
+          1,
+          18,
+          21,
+          18,
+          55
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 117,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44
+        ]
+      },
+      {
+        "ir_slots": [
+          44
+        ],
+        "kind": "smart_cast",
+        "mark_id": 118,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 119,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 120,
+        "range": [
+          1,
+          18,
+          40,
+          18,
+          55
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 121,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44,
+          76
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 122,
+        "range": [
+          1,
+          18,
+          21,
+          18,
+          55
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 123,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44,
+          78
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 124,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44,
+          73
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 125,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 126,
+        "range": [
+          1,
+          18,
+          21,
+          18,
+          55
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 127,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44,
+          74
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 128,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44,
+          73
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 129,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44,
+          73
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 130,
+        "range": [
+          1,
+          18,
+          13,
+          18,
+          83
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 131,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 132,
+        "range": [
+          1,
+          21,
+          13,
+          21,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          44
+        ],
+        "kind": "smart_cast",
+        "mark_id": 133,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 134,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 135,
+        "range": [
+          1,
+          21,
+          13,
+          25,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 136,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 137,
+        "range": [
+          1,
+          23,
+          20,
+          25,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 138,
+        "stack": [
+          63,
+          58,
+          55,
+          44,
+          56
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 139,
+        "range": [
+          1,
+          24,
+          17,
+          24,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 140,
+        "stack": [
+          63,
+          58,
+          55,
+          44,
+          84
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 141,
+        "range": [
+          1,
+          24,
+          17,
+          24,
+          32
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 142,
+        "stack": [
+          63,
+          58,
+          55,
+          44,
+          56
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 143
+      },
+      {
+        "kind": "stack",
+        "mark_id": 144,
+        "stack": [
+          63,
+          58,
+          55,
+          56,
+          44
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 145,
+        "range": [
+          1,
+          21,
+          34,
+          23,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 146,
+        "stack": [
+          63,
+          58,
+          44,
+          56,
+          55
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 147,
+        "range": [
+          1,
+          22,
+          17,
+          22,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 148,
+        "stack": [
+          63,
+          58,
+          44,
+          56,
+          82
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 149,
+        "range": [
+          1,
+          22,
+          17,
+          22,
+          32
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 150,
+        "stack": [
+          63,
+          58,
+          44,
+          56,
+          55
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 151
+      },
+      {
+        "kind": "stack",
+        "mark_id": 152,
+        "stack": [
+          63,
+          58,
+          55,
+          44,
+          56
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 153,
+        "stack": [
+          63,
+          58,
+          55,
+          44,
+          56
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "PollStorage.save",
+        "ir_import": [
+          54,
+          55,
+          56,
+          57
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 154,
+        "range": [
+          1,
+          26,
+          21,
+          26,
+          25
+        ]
+      },
+      {
+        "ir_lazy_slice": 49,
+        "ir_slots": [
+          54,
+          55,
+          56,
+          57
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 155,
+        "ty_idx": 17,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 156,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 157,
+        "stack": [
+          63,
+          56,
+          55,
+          44,
+          58,
+          86
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 158,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 159,
+        "stack": [
+          63,
+          56,
+          55,
+          44,
+          86
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 160,
+        "stack": [
+          63,
+          56,
+          44,
+          55,
+          86
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 161,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 162,
+        "stack": [
+          63,
+          56,
+          44,
+          86
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 163,
+        "stack": [
+          63,
+          44,
+          56,
+          86
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 164,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 165,
+        "stack": [
+          63,
+          44,
+          86
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 166,
+        "stack": [
+          44,
+          63,
+          86
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 167,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 168,
+        "stack": [
+          44,
+          86
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 169,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 170,
+        "stack": [
+          44,
+          89
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 171,
+        "range": [
+          3,
+          23,
+          5,
+          23,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 172,
+        "stack": [
+          44
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "PollStorage.save",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 173,
+        "range": [
+          3,
+          24,
+          1,
+          24,
+          2
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 174,
+        "range": [
+          1,
+          32,
+          23,
+          32,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 175,
+        "stack": [
+          44,
+          90
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 176,
+        "range": [
+          1,
+          32,
+          17,
+          32,
+          42
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 177,
+        "range": [
+          1,
+          34,
+          27,
+          34,
+          48
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 178,
+        "stack": [
+          44,
+          90,
+          91
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 179,
+        "range": [
+          1,
+          34,
+          21,
+          34,
+          48
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 180,
+        "range": [
+          1,
+          35,
+          28,
+          35,
+          44
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 181,
+        "stack": [
+          44,
+          90,
+          91,
+          92
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 182,
+        "range": [
+          1,
+          35,
+          21,
+          35,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 183,
+        "range": [
+          1,
+          36,
+          21,
+          36,
+          36
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "VoterStorage.toCell",
+        "ir_import": [
+          91,
+          92,
+          94,
+          95
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 184,
+        "range": [
+          1,
+          33,
+          23,
+          37,
+          27
+        ]
+      },
+      {
+        "ir_slots": [
+          91,
+          92,
+          94
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 185,
+        "ty_idx": 18,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          95
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 186,
+        "ty_idx": 20,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 187,
+        "range": [
+          1,
+          33,
+          23,
+          37,
+          27
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 188,
+        "stack": [
+          44,
+          90,
+          92,
+          91,
+          96
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 189,
+        "range": [
+          1,
+          33,
+          23,
+          37,
+          27
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 190,
+        "stack": [
+          44,
+          90,
+          92,
+          96
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 191,
+        "range": [
+          1,
+          33,
+          23,
+          37,
+          27
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 192,
+        "stack": [
+          44,
+          90,
+          96
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 193,
+        "range": [
+          1,
+          33,
+          23,
+          37,
+          27
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 194,
+        "stack": [
+          44,
+          90,
+          96
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 195,
+        "range": [
+          1,
+          33,
+          23,
+          37,
+          27
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 196,
+        "stack": [
+          44,
+          90,
+          97
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "VoterStorage.toCell",
+        "ir_return": [
+          97
+        ],
+        "kind": "leave_fun",
+        "mark_id": 197,
+        "range": [
+          1,
+          33,
+          23,
+          37,
+          27
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 198,
+        "range": [
+          1,
+          33,
+          17,
+          37,
+          27
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 199,
+        "range": [
+          1,
+          31,
+          17,
+          31,
+          26
+        ]
+      },
+      {
+        "ir_slots": [
+          98,
+          99
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 200,
+        "ty_idx": 21,
+        "var_name": "voterInit"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 201,
+        "stack": [
+          44,
+          98,
+          99
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 202,
+        "range": [
+          1,
+          40,
+          17,
+          40,
+          53
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 203,
+        "range": [
+          1,
+          41,
+          24,
+          41,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 204,
+        "stack": [
+          44,
+          98,
+          99,
+          102
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 205,
+        "range": [
+          1,
+          41,
+          17,
+          41,
+          35
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 206,
+        "range": [
+          1,
+          42,
+          25,
+          42,
+          45
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 207,
+        "range": [
+          1,
+          42,
+          17,
+          42,
+          47
+        ]
+      },
+      {
+        "ir_slots": [
+          44
+        ],
+        "kind": "smart_cast",
+        "mark_id": 208,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 209,
+        "range": [
+          1,
+          43,
+          17,
+          43,
+          26
+        ]
+      },
+      {
+        "f_idx": 4,
+        "f_name": "createMessage<Vote>",
+        "ir_import": [
+          100,
+          101,
+          103,
+          102,
+          104,
+          105,
+          98,
+          99,
+          106,
+          107,
+          108,
+          109,
+          110,
+          44
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 210,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          100,
+          101,
+          103,
+          102,
+          104,
+          105,
+          98,
+          99,
+          106,
+          107,
+          108,
+          109,
+          110,
+          44
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 211,
+        "ty_idx": 23,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 212,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 213,
+        "stack": [
+          44,
+          98,
+          99,
+          102,
+          119
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 214,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 215,
+        "stack": [
+          44,
+          98,
+          99,
+          102,
+          119
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 216,
+        "stack": [
+          44,
+          98,
+          99,
+          102,
+          119,
+          99,
+          98
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 217,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 218,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 219,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 220,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 221,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 222,
+        "stack": [
+          44,
+          98,
+          99,
+          102,
+          119,
+          131
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 223,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 224,
+        "stack": [
+          44,
+          98,
+          99,
+          102,
+          119
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 225,
+        "stack": [
+          44,
+          98,
+          99,
+          119,
+          102
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 226,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 227,
+        "stack": [
+          44,
+          98,
+          99,
+          119
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 228,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 229,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 230,
+        "stack": [
+          44,
+          98,
+          99,
+          119
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 231,
+        "stack": [
+          44,
+          99,
+          98,
+          119
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 232,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 233,
+        "stack": [
+          44,
+          99,
+          119
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 234,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 235,
+        "stack": [
+          44,
+          119
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 236,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 237,
+        "stack": [
+          44,
+          119
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 238,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 239,
+        "stack": [
+          119
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 240,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 241,
+        "stack": [
+          177
+        ]
+      },
+      {
+        "f_idx": 4,
+        "f_name": "createMessage<Vote>",
+        "ir_return": [
+          177
+        ],
+        "kind": "leave_fun",
+        "mark_id": 242,
+        "range": [
+          1,
+          39,
+          26,
+          44,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 243,
+        "range": [
+          1,
+          39,
+          17,
+          39,
+          23
+        ]
+      },
+      {
+        "ir_slots": [
+          178
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 244,
+        "ty_idx": 22,
+        "var_name": "outMsg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 245,
+        "stack": [
+          178
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 246,
+        "range": [
+          1,
+          45,
+          25,
+          45,
+          54
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 247,
+        "stack": [
+          178,
+          179
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 248,
+        "range": [
+          1,
+          45,
+          20,
+          45,
+          24
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 249,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 250,
+        "range": [
+          1,
+          66,
+          1,
+          66,
+          2
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 251,
+        "stack": [
+          0,
+          40
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 252,
+        "range": [
+          1,
+          14,
+          5,
+          65,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 253,
+        "stack": [
+          0,
+          40,
+          46
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 254,
+        "stack": [
+          0,
+          46
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 255,
+        "range": [
+          1,
+          14,
+          5,
+          65,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 256,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "ir_slots": [],
+        "kind": "smart_cast",
+        "mark_id": 257,
+        "ty_idx": 15,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 258,
+        "range": [
+          1,
+          47,
+          22,
+          61,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 259,
+        "stack": []
+      },
+      {
+        "kind": "loc",
+        "mark_id": 260,
+        "range": [
+          1,
+          48,
+          27,
+          48,
+          50
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 261,
+        "stack": [
+          183
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 262,
+        "range": [
+          1,
+          48,
+          27,
+          48,
+          50
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 263,
+        "stack": [
+          182
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 264,
+        "range": [
+          1,
+          48,
+          17,
+          48,
+          24
+        ]
+      },
+      {
+        "ir_lazy_slice": 182,
+        "ir_slots": [
+          187,
+          188,
+          189,
+          190
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 265,
+        "ty_idx": 17,
+        "var_name": "storage"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 266,
+        "range": [
+          1,
+          49,
+          13,
+          49,
+          77
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 267,
+        "stack": [
+          191,
+          182
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 268,
+        "stack": [
+          187,
+          182
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 269,
+        "range": [
+          1,
+          49,
+          13,
+          49,
+          77
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 270,
+        "stack": [
+          187,
+          193,
+          182
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 271,
+        "stack": [
+          187,
+          193
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 272,
+        "range": [
+          1,
+          49,
+          21,
+          49,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 273,
+        "stack": [
+          187,
+          193,
+          197
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 274,
+        "stack": [
+          187,
+          193,
+          197,
+          187
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 275,
+        "range": [
+          1,
+          49,
+          21,
+          49,
+          54
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 276,
+        "stack": [
+          187,
+          193,
+          199
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 277,
+        "range": [
+          1,
+          49,
+          13,
+          49,
+          77
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 278,
+        "stack": [
+          187,
+          193
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 279,
+        "range": [
+          1,
+          50,
+          13,
+          50,
+          29
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "PollStorage.save",
+        "ir_import": [
+          187,
+          188,
+          189,
+          190
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 280,
+        "range": [
+          1,
+          51,
+          21,
+          51,
+          25
+        ]
+      },
+      {
+        "ir_lazy_slice": 182,
+        "ir_slots": [
+          187,
+          188,
+          189,
+          190
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 281,
+        "ty_idx": 17,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 282,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 283,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 284,
+        "stack": [
+          187,
+          193,
+          187,
+          202
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 285,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 286,
+        "stack": [
+          187,
+          193,
+          202
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 287,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 288,
+        "stack": [
+          187,
+          202
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 289,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 290,
+        "stack": [
+          187,
+          202
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 291,
+        "range": [
+          3,
+          23,
+          22,
+          23,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 292,
+        "stack": [
+          187,
+          203
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 293,
+        "range": [
+          3,
+          23,
+          5,
+          23,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 294,
+        "stack": [
+          187
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "PollStorage.save",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 295,
+        "range": [
+          3,
+          24,
+          1,
+          24,
+          2
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 296,
+        "range": [
+          1,
+          54,
+          17,
+          54,
+          30
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 297,
+        "range": [
+          1,
+          55,
+          17,
+          55,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 298,
+        "range": [
+          1,
+          56,
+          17,
+          56,
+          36
+        ]
+      },
+      {
+        "f_idx": 5,
+        "f_name": "createMessage<void>",
+        "ir_import": [
+          204,
+          205,
+          207,
+          206,
+          208,
+          209,
+          210,
+          211,
+          212,
+          213,
+          214,
+          187,
+          215
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 299,
+        "range": [
+          1,
+          53,
+          29,
+          57,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          204,
+          205,
+          207,
+          206,
+          208,
+          209,
+          210,
+          211,
+          212,
+          213,
+          214,
+          187,
+          215
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 300,
+        "ty_idx": 44,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 301,
+        "range": [
+          1,
+          53,
+          29,
+          57,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 302,
+        "stack": [
+          187,
+          224
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 303,
+        "range": [
+          1,
+          53,
+          29,
+          57,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 304,
+        "stack": [
+          187,
+          224
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 305,
+        "range": [
+          1,
+          53,
+          29,
+          57,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 306,
+        "stack": [
+          224
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 307,
+        "range": [
+          1,
+          53,
+          29,
+          57,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 308,
+        "range": [
+          1,
+          53,
+          29,
+          57,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 309,
+        "stack": [
+          224
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 310,
+        "range": [
+          1,
+          53,
+          29,
+          57,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 311,
+        "stack": [
+          279
+        ]
+      },
+      {
+        "f_idx": 5,
+        "f_name": "createMessage<void>",
+        "ir_return": [
+          279
+        ],
+        "kind": "leave_fun",
+        "mark_id": 312,
+        "range": [
+          1,
+          53,
+          29,
+          57,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 313,
+        "range": [
+          1,
+          53,
+          17,
+          53,
+          26
+        ]
+      },
+      {
+        "ir_slots": [
+          280
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 314,
+        "ty_idx": 22,
+        "var_name": "returnMsg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 315,
+        "stack": [
+          280
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 316,
+        "range": [
+          1,
+          60,
+          28,
+          60,
+          91
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 317,
+        "stack": [
+          280,
+          283
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 318,
+        "range": [
+          1,
+          60,
+          23,
+          60,
+          27
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 319,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 320,
+        "range": [
+          1,
+          66,
+          1,
+          66,
+          2
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 321,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 322,
+        "range": [
+          1,
+          63,
+          46,
+          63,
+          67
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 323,
+        "stack": [
+          0,
+          284
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 324,
+        "stack": [
+          284,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 325,
+        "range": [
+          1,
+          63,
+          29,
+          63,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 326,
+        "stack": [
+          284,
+          285
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 327,
+        "range": [
+          1,
+          63,
+          13,
+          63,
+          67
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 328,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 329,
+        "range": [
+          1,
+          66,
+          1,
+          66,
+          2
+        ]
+      },
+      {
+        "f_idx": 6,
+        "f_name": "results",
+        "ir_import": [],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 330,
+        "range": [
+          1,
+          81,
+          9,
+          81,
+          16
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 331,
+        "stack": []
+      },
+      {
+        "kind": "loc",
+        "mark_id": 332,
+        "range": [
+          1,
+          82,
+          19,
+          82,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 333,
+        "stack": [
+          1
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 334,
+        "range": [
+          1,
+          82,
+          19,
+          82,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 335,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 336,
+        "range": [
+          1,
+          82,
+          9,
+          82,
+          16
+        ]
+      },
+      {
+        "ir_lazy_slice": 0,
+        "ir_slots": [
+          5,
+          6,
+          7,
+          8
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 337,
+        "ty_idx": 17,
+        "var_name": "storage"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 338,
+        "range": [
+          1,
+          83,
+          5,
+          83,
+          46
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 339,
+        "stack": [
+          9,
+          0
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 340,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 341,
+        "range": [
+          1,
+          83,
+          5,
+          83,
+          46
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 342,
+        "stack": [
+          11,
+          0
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 343,
+        "stack": [
+          6,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 344,
+        "range": [
+          1,
+          83,
+          5,
+          83,
+          46
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 345,
+        "stack": [
+          6,
+          13
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 346,
+        "stack": [
+          6,
+          7
+        ]
+      },
+      {
+        "f_idx": 6,
+        "f_name": "results",
+        "ir_return": [
+          6,
+          7
+        ],
+        "kind": "leave_fun",
+        "mark_id": 347,
+        "range": [
+          1,
+          83,
+          5,
+          83,
+          46
+        ]
+      },
+      {
+        "f_idx": 7,
+        "f_name": "owner",
+        "ir_import": [],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 348,
+        "range": [
+          1,
+          86,
+          9,
+          86,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 349,
+        "stack": []
+      },
+      {
+        "kind": "loc",
+        "mark_id": 350,
+        "range": [
+          1,
+          87,
+          19,
+          87,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 351,
+        "stack": [
+          1
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 352,
+        "range": [
+          1,
+          87,
+          19,
+          87,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 353,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 354,
+        "range": [
+          1,
+          87,
+          9,
+          87,
+          16
+        ]
+      },
+      {
+        "ir_lazy_slice": 0,
+        "ir_slots": [
+          5,
+          6,
+          7,
+          8
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 355,
+        "ty_idx": 17,
+        "var_name": "storage"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 356,
+        "range": [
+          1,
+          88,
+          5,
+          88,
+          25
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 357,
+        "stack": [
+          9,
+          0
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 358,
+        "stack": [
+          9
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 359,
+        "stack": [
+          5
+        ]
+      },
+      {
+        "f_idx": 7,
+        "f_name": "owner",
+        "ir_return": [
+          5
+        ],
+        "kind": "leave_fun",
+        "mark_id": 360,
+        "range": [
+          1,
+          88,
+          5,
+          88,
+          25
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "calcVoterAddress",
+        "ir_import": [
+          0
+        ],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 361,
+        "range": [
+          1,
+          91,
+          9,
+          91,
+          25
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 362,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 363,
+        "ty_idx": 7,
+        "var_name": "voter"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 364,
+        "range": [
+          1,
+          93,
+          15,
+          93,
+          34
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 365,
+        "stack": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 366,
+        "range": [
+          1,
+          93,
+          9,
+          93,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 367,
+        "range": [
+          1,
+          95,
+          19,
+          95,
+          40
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 368,
+        "stack": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 369,
+        "range": [
+          1,
+          95,
+          13,
+          95,
+          40
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 370,
+        "range": [
+          1,
+          96,
+          13,
+          96,
+          18
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 371,
+        "range": [
+          1,
+          97,
+          13,
+          97,
+          28
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "VoterStorage.toCell",
+        "ir_import": [
+          2,
+          0,
+          3,
+          4
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 372,
+        "range": [
+          1,
+          94,
+          15,
+          98,
+          19
+        ]
+      },
+      {
+        "ir_slots": [
+          2,
+          0,
+          3
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 373,
+        "ty_idx": 18,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          4
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 374,
+        "ty_idx": 20,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 375,
+        "range": [
+          1,
+          94,
+          15,
+          98,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 376,
+        "stack": [
+          0,
+          1,
+          2,
+          5
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 377,
+        "range": [
+          1,
+          94,
+          15,
+          98,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 378,
+        "stack": [
+          0,
+          1,
+          5
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 379,
+        "stack": [
+          1,
+          0,
+          5
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 380,
+        "range": [
+          1,
+          94,
+          15,
+          98,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 381,
+        "stack": [
+          1,
+          5
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 382,
+        "range": [
+          1,
+          94,
+          15,
+          98,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 383,
+        "stack": [
+          1,
+          5
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 384,
+        "range": [
+          1,
+          94,
+          15,
+          98,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 385,
+        "stack": [
+          1,
+          6
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "VoterStorage.toCell",
+        "ir_return": [
+          6
+        ],
+        "kind": "leave_fun",
+        "mark_id": 386,
+        "range": [
+          1,
+          94,
+          15,
+          98,
+          19
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 387,
+        "range": [
+          1,
+          94,
+          9,
+          98,
+          19
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 388,
+        "range": [
+          1,
+          92,
+          9,
+          92,
+          13
+        ]
+      },
+      {
+        "ir_slots": [
+          7,
+          8
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 389,
+        "ty_idx": 21,
+        "var_name": "init"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 390,
+        "stack": [
+          7,
+          8
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 391,
+        "range": [
+          1,
+          100,
+          32,
+          100,
+          47
+        ]
+      },
+      {
+        "f_idx": 9,
+        "f_name": "AutoDeployAddress.calculateAddress",
+        "ir_import": [
+          9,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 392,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "ir_slots": [
+          9,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 393,
+        "ty_idx": 36,
+        "var_name": "self"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 394,
+        "stack": [
+          8,
+          7
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 395,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 396,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 397,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 398,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 399,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 400,
+        "stack": [
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 401,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 402,
+        "stack": [
+          15,
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 403,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 404,
+        "stack": [
+          15,
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 405,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 406,
+        "stack": [
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 407,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 408,
+        "stack": [
+          14
+        ]
+      },
+      {
+        "f_idx": 9,
+        "f_name": "AutoDeployAddress.calculateAddress",
+        "ir_return": [
+          14
+        ],
+        "kind": "leave_fun",
+        "mark_id": 409,
+        "range": [
+          1,
+          100,
+          12,
+          100,
+          68
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "calcVoterAddress",
+        "ir_return": [
+          14
+        ],
+        "kind": "leave_fun",
+        "mark_id": 410,
+        "range": [
+          1,
+          100,
+          5,
+          100,
+          68
+        ]
+      },
+      {
+        "f_idx": 10,
+        "f_name": "isClosed",
+        "ir_import": [],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 411,
+        "range": [
+          1,
+          103,
+          9,
+          103,
+          17
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 412,
+        "stack": []
+      },
+      {
+        "kind": "loc",
+        "mark_id": 413,
+        "range": [
+          1,
+          104,
+          19,
+          104,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 414,
+        "stack": [
+          1
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 415,
+        "range": [
+          1,
+          104,
+          19,
+          104,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 416,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 417,
+        "range": [
+          1,
+          104,
+          9,
+          104,
+          16
+        ]
+      },
+      {
+        "ir_lazy_slice": 0,
+        "ir_slots": [
+          5,
+          6,
+          7,
+          8
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 418,
+        "ty_idx": 17,
+        "var_name": "storage"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 419,
+        "range": [
+          1,
+          105,
+          5,
+          105,
+          28
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 420,
+        "stack": [
+          9,
+          0
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 421,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 422,
+        "range": [
+          1,
+          105,
+          5,
+          105,
+          28
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 423,
+        "range": [
+          1,
+          105,
+          5,
+          105,
+          28
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 424,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 425,
+        "range": [
+          1,
+          105,
+          5,
+          105,
+          28
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 426,
+        "stack": [
+          12
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 427,
+        "stack": [
+          8
+        ]
+      },
+      {
+        "f_idx": 10,
+        "f_name": "isClosed",
+        "ir_return": [
+          8
+        ],
+        "kind": "leave_fun",
+        "mark_id": 428,
+        "range": [
+          1,
+          105,
+          5,
+          105,
+          28
+        ]
+      }
+    ],
+    "debug_marks_base64": "te6ccgICArYAAQAAErYAAAIBIAABAAICASAAIQAiAgEgAAMABAIBIAAFAAYCAVgADwAQAgFqAAcACAIBSAD8AP0BQb6/PIjeVgwPjRkPse64OLjjmOE5y1FgAA9CyLfo3jL9HgAJAUG+vlxlL4XpfJsLXD83jnL5RmmEGckqNiDdbHUJE5NjVrYADAIDzEAACgALAgH2AQECPwEB3gJDAgPLwAANAA4CASAAYgBjAgFIAKIAowIBIAARABICASAAFgAXAUG+4tFcZI/tsYzh5+DDePTYLoYyhvC5wRSrzZRJQ0VWKk8AEwFBvutr9xEOjqlf3bywSVwEZL6vlkquHmBzf8iVVBrzE+HfAUQCA8zAABQAFQIBIAEJAQoCAWIBNwE4AUG+607hEcbdTzRMl0S4io2BifU+6pgKWq0VZMrwFeymw98AGAFBvv5bjuH70HKmEmhMzHsQGnTqgA09V+h68X+I8nd6WNozApQCCZkAAAFAABkAGgIBIAAbABwBAdoCkwIBIAAdAB4CASAAHwAgAgEgAjsCPAIBIAJMAk0CASACZAJlAgEgAnkCegFDv7QGMeDr9WbyA70zgrCnv2uFJpqVlg36f3ZjLCyt+8sn4AAjAgEgACYAJwIJnAAAAJgAJAAlAgEgAQcALQEB3AKlAgEgACgAKQICdgAqACsCAVgALgAvAUK/AWdF+zNcqEdMt9fwXB5/rn8O1G6VaRemWJz7UqXOVeEAUAFBvn2H6oYL/lnttJN8S8FQfd0OaAjTkjBEZ8UrPNIM9JgsAFcBQb53RYpk96QbUBxtIyXQEpKC/aOu/BVE9cj+N7veQ0FcnAAsAgmdAAAAjAEHAC0CASACmgKaAUG+m0EAdrNdGO6MoUzM2Wg9mUFO62tAcbSlvbQDkWuC0x4AMAFBvrnq/pCeMzqFzeQdXtfIjfJulBrST11/L0E5UahKtDHGADUCCZwAAAA4ADEAMgIBIABaADMCAUgCmgA0AgEgAQgCmgEBSAKlAgiYAAABADYANwIBbgA4ADkCAWIAPwBAAgFYADoAOwIBIAA8AD0CASABAQKZAgEgAj8BCAIBIAKhAqECASAAfAA+AgEgAIMCUAIBIABFAEYCASAAQQBCAgEgAEMAigIBSAEvAEQCASACXwJoAQFIAYICASAARwBIAgEgAEoASwIBIABJArECASACsQKxAgEgAlECtAIBIAKxAEwCASABZgBPAgEgAE0ATQEBIABOAASoaAIBIAJbAmACCZoAAAFgAFEAUgIB7gKZAFwCAUgAUwBUAgEgAFUAVgEB3AKsAgEgAQ8CowIBIAEWAkoCCZsAAAFQAFgAWQIBWABaAFsCASAAXQBeAgFYApsCmwIBIABcAQ8CASACmwKdAgEgAF8AYAIBSABhAWUCASACowEWAgEgAkoBXwIBIAKrAlECASAAZABlAgHyAHMAdAIBIABmAGcCAUgAbABtAgEgAGgAaQIBIABqAGsCASAAeAB5AgEgAH8AgAIBIACIAIkCASAAkACRAgEgAJcAmAIBSABuAG8CASAAcABwAgFIAckByQIBIABxAHEBASAAcgAEqaABAfQBzQIBIAB1Ad8CASABzAB2AQEgAHcABKogAgEgAHoAewIBIAB8AH0CASACmQKZAgEgApoCRgIBIAJGAH4CASABFwEXAgEgAqoBGAIBIACBAIICASAAhQCGAgEgAIMAhAIBIAFgAWUCASABGAKyAgEgArIBYQIBIAFnAR8CASAAhwJpAgEgAW8BbwIBIACKAIsCASAAjQCOAgEgASUCdAIBIACMAS8CASACdwGBAgEgAX8AjwIBIAEyAn4CASACfwE0AgEgAJIAkwIBIACUAJUCASACfgGDAgEgAYQBiAIBIAGIAoQCASACiwCWAgEgAZICkAIBIACZAJoCASAAnQCeAgEgAo0AmwIBIAE/AJwCASACkQGfAgEgAUIBogIBIACfAKACASAAoQGqAgEgAaIBqwIBIAGrAa0CASABrQGtAgEgAKQApQIBYgCqAKsCASAApgCnAgEgAKgAqQIBIAC2ALcCASAAyADJAgEgANgA2QIBIADnAOgCASAArACtAgHUALQAtAIBIACuAK8CASAAsgCzAgEgAjcAsAIBIACwAhEBASAAsQAEq5ACASACFQIVAgEgAhYCFgEBIAC1AASryAIBIAC4ALkCASAAvwDAAgEgAeAAugIBIAC7ALwCASAB4wHnAgEgAecAvQIBIAC9AMMBASAAvgAEqlACASAAwQDCAgEgAe0AxQIBIADDAMMCASAAwwHwAQEgAMQABKpYAgEgAMYAzgEBIADHAASqeAIBIADKAMsCASAA0wDUAgEgAMwAzQIBIADSANUCASAAzgHzAgEgANAA0AEBIADPAASqgAEBIADRAASqmAIBIAH8AfwCASAA1QDWAgEgANcCAQIBIAH9Af0CASAB/QICAgEgAgMCAwIBIADaANsCASAA4QDiAgEgANwA3QIBIADgAOMCASAA3gDeAgEgAh8CHwEBIADfAASq6AIBIAIhAiECASAA4wDjAgEgAOMA5AIBIAIlAiUCASAA5QDlAQEgAOYABKsYAgEgAOkA6gIBIADzAPQCASAA6wDsAgEgAO8A8AIBIADtAO0CASACKQIpAQEgAO4ABKswAgEgAi8A8QIBIADxAPgBASAA8gAEq2ACASAA9QD1AgEgAPYA9wIBIAD4APgCASAA+AD6AgEgAPoCNwEBIAD5AASraAEBIAD7AASreAFBvu1aqORyi/FMAtFtsnwPX0s6S8bVt6ADHqQHibp9IdufAP4BQb7eeWiT/4z0XqPqYrxGeYJNKLs1X1Vfgu+QLMnh3hGvZwEEAgmcAAAAeAD/AQACAVgBAQI/AgEgAQIBAwEBWAKcAgEgAkABFgEB1AKpAgmbAAAAMAEFAQYCAVgClwEHAgHOAkICQgIBIAKZAQgCASACQgJCAgEgAQsBDAIBIAEQARECASABSQENAgEgARIBEwIBIAEOAqECASACmQEPAgEgAp0CpAIBIAEiASMCASABKgErAgEgARQBFQIBIAEaARsCASABFgKmAgEgAkoBFwIBIAKkAqgCASABGAEYAQEgARkABKg4AgEgAlMBHAIBIAJeAR8CASABHQEdAQEgAR4ABKiAAgEgASABIAEBIAEhAASooAIBIAJmASQCASABJgEnAgEgAXMBJQIBIAF1AXUCASABKAEpAgEgAnQBLgIBIAF1AnUCASACdQJ3AgEgASwBLQIBIAEwATECASABLgEvAgEgAn0BMgIBIAF5AXkCASABgQGBAgEgATIBMwIBIAGDATYCASABNAE0AgEgAoEChQEBIAE1AASpAAIBIAGFAYoCASABOQE6AgEgATwBPQIBIAE7AowCASACjQGZAgEgAYoCjgIBIAE+AT8CASABQAFBAgEgAZsBnwIBIAGfAUICASABQgFCAQFIAUMBASABQwAEqXACA8xAAUUBRgIBWAFHAUgCASABTwFQAgFYAUkBSgIBIAFNAU4CAfQCmwKbAgEgAUsBTAIBIAI/AkACASACQQJGAgEgAVsBXAIBIAFoAWkCASABUQFSAgEgAVcBWAIBIAFTAVQCASABVQFWAgEgAXsBfAIBIAGMAY0CASABpQGmAgEgAcMBxAIBIAFZAVoCASACCAIJAgEgAdwB3QIBIAHpAeoCASABXQFeAgEgAWMBZAIBIAJHAqcCASABXwFgAgEgAqsCqwIBIAFhAWEBASABYgAEqFACASABZQJTAgEgAWYBZwIBIAJRAlECASACVAJaAgEgAlsCWwIBIAFqAWsCASABcQFyAgEgAl8BbAIBIAFtAW4CASACYgJqAgEgAmoBbwIBIAFvAmwBASABcAAEqLgCASABcwF0AgEgAXcBeAIBIAJsAXUCASABdQJ3AQEgAXYABKjQAgEgAncBeQIBIAF5AYEBASABegAEqOgCASABfQF+AgEgAYcCiQIBIAF/AYACASABgwGEAgEgAYECfwIBIAJ/AoUBASABggAEqPACASAChQKFAgEgAYUBhQEBIAGGAASpGAIBIAGIAYkCASABigGKAgEgAocChwEBIAGLAASpIAIBIAGOAY8CASABlwGYAgEgAZABkQIBIAGUAZQCASABkgGSAgEgApACkAEBIAGTAASpOAIBIAGVAZUBASABlgAEqUgCASABmQGaAgEgAZ0BngIBIAKRAZsCASABmwGbAQEgAZwABKlYAgEgAZ8BoQIBIAGhAaIBASABoAAEqWABASABowEBIAGkAASpaAAEqXgCASABpwGoAgEgAbcBuAIBIAGpAaoCASABrwGwAgEgAasBqwIBIAGtAbEBASABrAAEqYABASABrgAEqZACASABsQGyAgEgAbUBtQEBIAGzAQEgAbQABKmYAASpqAEBIAG2AASpsAIBIAG5AboCASABvwHAAgEgAbsBuwIBIAG9Ab0BASABvAAEqbgBASABvgAEqcACASABwQHBAgEgAcEByQEBIAHCAASp0AIBIAHFAcYCASABzgHPAgEgAccByAIBIAHLAdACASAByQHJAgEgAcwBzAEBIAHKAASp2AIBIAHMAdIBASABzQAEqegCASAB0AHRAgEgAdYB1wIBIAHSAdICASAB0gHTAQEgAdQBASAB1QAEqfgABKoAAgEgAdgB2AIBIAHaAdoBASAB2QAEqggBASAB2wAEqhgCASAB3gHlAgEgAeUB6wIBIAHfAeACASAB4QHhAgEgAeMB4wEBIAHiAASqKAEBIAHkAASqOAIBIAHmAeYCASAB5wHnAQEgAegABKpAAgEgAesB7AIBIAH2AfcCASAB7QHtAgEgAe4B7wIBIAHwAfACASAB8AHyAgEgAfIB8wEBIAHxAASqaAEBIAH0AQEgAfUABKpwAASqkAIBIAH4AfkCASACAAIBAgEgAfoB+gIBIAH8Af0BASAB+wAEqqABASAB/gEBIAH/AASqqAAEqsACASACAgIDAgEgAgYCBgEBIAIEAQEgAgUABKrIAASq0AEBIAIHAASq4AIBIAIZAhoCASACCgILAgEgAgwCDQIBSAITAhQCASACDgIPAgEgAg8CEAIBIAI4AhECASACEQIRAgEgAhECFQEBIAISAASroAIBIAIVAhYBAUgCGAEBIAIXAQEgAhgABKuoAASruAIBIAIbAhwCASACKwIsAgEgAh0CHgIBIAIjAiQCASACHwIhAgEgAiECJQEBIAIgAASq+AEBIAIiAASrAAIBIAIlAiYCASACKQIvAQEgAicBASACKAAEqxAABKsoAQEgAioABKtAAgEgAi0CLgIBIAIzAjQCASACLwIxAgEgAjECNQEBIAIwAASrSAEBIAIyAASrUAIBIAI1AjcCASACNwI4AQEgAjYABKtYAQEgAjkBASACOgAEq4gABKuYAgEgAj0CPgIBIAJEAkUCASACmQI/AgEgAkACQQIBIAKbAkICASACQgKkAgEgAqQCSAEBIAJDAASoCAIBIAJGAkcCASACSgJLAgEgAkgCSAIBIAJIAqoBASACSQAEqCACASACqgKqAgEgAqsCsgIBIAJOAk8CASACVgJXAgEgAlACsQIBIAJTAlgCASACsgJRAQEgAlIABKhYAgEgAlQCVAEBIAJVAASocAIBIAJYAlkCASACXgJfAgEgAloCWgIBIAJaAlsBASACXAEBIAJdAASoiAAEqJACASACYAJgAgEgAmICYgEBIAJhAASomAEBIAJjAASoqAIBIAJmAmcCASACcQJyAgEgAmgCaQIBIAJuAnMCASACagJqAgEgAmwCbAEBIAJrAASosAEBIAJtAASowAIBIAJvAm8BASACcAAEqMgCASACcwJzAgEgAnMCdAIBIAJ1AnUCASACdwJ3AQEgAnYABKjYAQEgAngABKjgAgEgAnsCfAIBIAKJAooCASACfQJ+AgEgAoMChAIBIAJ/An8CASACgQKBAQEgAoAABKj4AQEgAoIABKkIAgEgAoUChwIBIAKHAo4BASAChgAEqRABASACiAAEqSgCASACiwKLAgEgAowCjQIBIAKOAo4CASACjgKQAgEgApACkQEBIAKPAASpMAEBIAKSAQEgApMABKlAAASpUAIJmgAAAaAClQKWAgFuApcCmAIBSAKfAqABAfQCnAIBIAKZApoCASACmwKbAgEgAp0CnQEBIAKcAAHVAQEgAp4ABKgQAgEgAqECogIBIAKuAq8CASACowKjAgEgAqYCpwIBIAKkAqQBASACpQAEqBgCASACqAKqAgEgAqoCqwEBIAKpAASoKAEBIAKsAQEgAq0ABKgwAASoQAIBIAKwArEBAdQCtQIBIAKyArICASACtAK0AQEgArMABKhIAQEgArUABKhg"
+  },
+  "files": [
+    {
+      "path": "contracts/src/Poll.tolk",
+      "content_hash": "c3b44b43f83584a0e45f05ffcb4c9c22b0e489a06e28ed2fee16f834bf8b8210"
+    },
+    {
+      "path": "contracts/src/types.tolk",
+      "content_hash": "40cfb7c5e4552d958472ef32c4173578fcdbab0611a046fb79fc0244500a66e0"
+    },
+    {
+      "path": "gen/Voter.code.tolk",
+      "content_hash": "2b604bbac50084f9b20e4d7f093475da5ce28f983308a2e4406d51129093d279"
+    },
+    {
+      "path": "output/Poll.abi.json",
+      "content_hash": "b86d9de5a992179bc66afb2627a7f4565dbeb74455208f83fd75ed4e425964f6"
+    }
+  ]
+}
