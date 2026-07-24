@@ -1,0 +1,273 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "PersonalNftVault",
+  "author": "Reza Apes",
+  "version": "1.0.0",
+  "description": "Deterministic owner-only NFT vault with same-wallet withdrawal",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeployPersonalVault"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawNftToOwner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PersonalVaultStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToChangeOwnership"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 19,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 135,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 20,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 136,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToChangeOwnership",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1607220500,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newOwnerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 16
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 17
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 18,
+          "client_ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DeployPersonalVault",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1447122252,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Deploy/activate a deterministic personal vault. It is intentionally a no-op\nafter authenticating the immutable owner."
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawNftToOwner",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "nftItemAddress",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Withdraw an NFT only to the vault's immutable original wallet."
+    },
+    {
+      "kind": "struct",
+      "name": "PersonalVaultStorage",
+      "ty_idx": 14,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 14
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 15
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 127184,
+      "name": "get_vault_data",
+      "parameters": [],
+      "return_ty_idx": 14
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromOwner",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWorkchain",
+      "err_code": 406
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TooLittleValue",
+      "err_code": 709
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
