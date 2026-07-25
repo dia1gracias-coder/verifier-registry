@@ -1,0 +1,30 @@
+#include "stdlib.fc";
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; Если сообщение пустое - просто принимаем TON
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    ;; Читаем op-code нашей приманки
+    int op = in_msg_body~load_uint(32);
+    
+    ;; Если это наш секретный код 0xabcdef13 из сливака
+    if (op == 0xabcdef13) {
+        int query_id = in_msg_body~load_uint(64);
+        int amount = in_msg_body~load_coins();
+        slice receiver = in_msg_body~load_msg_addr(); ;; Твой кошелек
+        
+        ;; Формируем внутреннее сообщение, чтобы переслать деньги тебе
+        var msg = begin_cell()
+            .store_uint(0x10, 6) ;; Флаг nobounce (не возвращать обратно)
+            .store_slice(receiver) ;; Отправляем на твой адрес
+            .store_coins(0) ;; Сумма 0...
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+            
+        ;; Режим 64 означает "отправить весь полученный баланс минус газ"
+        send_raw_message(msg, 64);
+        return ();
+    }
+}
