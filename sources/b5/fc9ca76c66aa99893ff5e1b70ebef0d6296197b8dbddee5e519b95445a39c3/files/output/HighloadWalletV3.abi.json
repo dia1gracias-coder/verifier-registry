@@ -1,0 +1,238 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "HighloadWalletV3",
+  "author": "The Tolk Team",
+  "version": "1.0.0",
+  "description": "Highload Wallet V3. Batch transaction wallet for high-volume operations",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "InternalTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "HighloadWalletStorage"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "QueryBitmapMap"
+    },
+    {
+      "kind": "uintN",
+      "n": 13
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Bitmap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 16,
+      "value_ty_idx": 17
+    },
+    {
+      "kind": "uintN",
+      "n": 22
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "Bitmap",
+      "ty_idx": 17,
+      "target_ty_idx": 3
+    },
+    {
+      "kind": "alias",
+      "name": "QueryBitmapMap",
+      "ty_idx": 15,
+      "target_ty_idx": 18
+    },
+    {
+      "kind": "struct",
+      "name": "InternalTransfer",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 2923619748,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "actions",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "HighloadWalletStorage",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "publicKey",
+          "ty_idx": 14
+        },
+        {
+          "name": "subwalletId",
+          "ty_idx": 9
+        },
+        {
+          "name": "oldQueries",
+          "ty_idx": 15
+        },
+        {
+          "name": "queries",
+          "ty_idx": 15
+        },
+        {
+          "name": "lastCleanTime",
+          "ty_idx": 11
+        },
+        {
+          "name": "timeout",
+          "ty_idx": 19
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 13
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "incoming_external": [
+    {
+      "body_ty_idx": 2
+    }
+  ],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 78748,
+      "name": "get_public_key",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 81467,
+      "name": "get_subwallet_id",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 80822,
+      "name": "get_last_clean_time",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 105070,
+      "name": "get_timeout",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 117746,
+      "name": "processed?",
+      "parameters": [
+        {
+          "name": "queryId",
+          "ty_idx": 1
+        },
+        {
+          "name": "needClean",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 5
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_SIGNATURE",
+      "err_code": 33
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_SUBWALLET_ID",
+      "err_code": 34
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_CREATED_AT",
+      "err_code": 35
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_ALREADY_EXECUTED",
+      "err_code": 36
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_MESSAGE_TO_SEND",
+      "err_code": 37
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_TIMEOUT",
+      "err_code": 38
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}
