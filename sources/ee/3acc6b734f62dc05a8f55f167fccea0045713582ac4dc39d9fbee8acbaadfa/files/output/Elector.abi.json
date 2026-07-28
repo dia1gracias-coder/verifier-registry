@@ -1,0 +1,1224 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Elector",
+  "author": "The Tolk Team",
+  "version": "1.0.0",
+  "description": "TON Elector contract. Manages validator elections and stakes",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SimpleTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NewStakeMessage"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RecoverStakeRequest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UpgradeCode"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfigConfirmed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfigConfirmedAlt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NewComplaint"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Complaint"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SignedVoteForComplaint"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VoteForComplaint"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FallbackMessage"
+    },
+    {
+      "kind": "uintN",
+      "n": 31
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Elections"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MemberParams"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 32
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 31
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 34
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "CreditsMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 6
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PastElection"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "FrozenDict"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ValidatorInRound"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 40
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Complaints"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ComplaintStatus"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 27,
+      "value_ty_idx": 9
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 43
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 38
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnMsg"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VSetWithOpcode"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VSet"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "AnyValidatorDescr"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ValidatorDescr"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ValidatorDescrWithAdnlAddr"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 52,
+          "prefix_num": 358873114506,
+          "prefix_len": 40,
+          "stack_type_id": 129,
+          "stack_width": 2
+        },
+        {
+          "variant_ty_idx": 53,
+          "prefix_num": 496312067978,
+          "prefix_len": 40,
+          "stack_type_id": 130,
+          "stack_width": 3
+        }
+      ],
+      "stack_width": 4
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 27,
+      "value_ty_idx": 51
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 50
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayStake"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 1
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 58
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ParticipantExtEntry"
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 60
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        1,
+        6,
+        6,
+        61,
+        5,
+        5
+      ]
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 1
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PastElectionFullEntry"
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ComplaintFullInfo"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ComplaintUnpacked"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 66,
+      "stack_type_id": 136,
+      "stack_width": 12
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ComplaintListEntry"
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 69
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "SimpleTransfer",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "NewStakeMessage",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1316189259,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "validatorPubkey",
+          "ty_idx": 14
+        },
+        {
+          "name": "stakeAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "maxFactor",
+          "ty_idx": 9
+        },
+        {
+          "name": "adnlAddr",
+          "ty_idx": 14
+        },
+        {
+          "name": "signature",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RecoverStakeRequest",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1197831204,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayStake",
+      "ty_idx": 57,
+      "prefix": {
+        "prefix_num": 4184830756,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UpgradeCode",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1313042276,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "remaining",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfigConfirmed",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 4000730955,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfigConfirmedAlt",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 4000730991,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NewComplaint",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1382499184,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "electionId",
+          "ty_idx": 9
+        },
+        {
+          "name": "rawComplaint",
+          "ty_idx": 19,
+          "client_ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SignedVoteForComplaint",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1450460016,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "signature",
+          "ty_idx": 15
+        },
+        {
+          "name": "vote",
+          "ty_idx": 19,
+          "client_ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "VoteForComplaint",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "signTag",
+          "ty_idx": 9
+        },
+        {
+          "name": "idx",
+          "ty_idx": 27
+        },
+        {
+          "name": "electId",
+          "ty_idx": 9
+        },
+        {
+          "name": "chash",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FallbackMessage",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "opcodeBits",
+          "ty_idx": 29
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ParticipantExtEntry",
+      "ty_idx": 60,
+      "fields": [
+        {
+          "name": "pubkey",
+          "ty_idx": 14
+        },
+        {
+          "name": "data",
+          "ty_idx": 58
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PastElectionFullEntry",
+      "ty_idx": 64,
+      "fields": [
+        {
+          "name": "id",
+          "ty_idx": 9
+        },
+        {
+          "name": "unfreezeAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "stakeHeld",
+          "ty_idx": 9
+        },
+        {
+          "name": "vsetHash",
+          "ty_idx": 14
+        },
+        {
+          "name": "frozenDict",
+          "ty_idx": 39
+        },
+        {
+          "name": "totalStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "bonuses",
+          "ty_idx": 6
+        },
+        {
+          "name": "complaints",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ComplaintUnpacked",
+      "ty_idx": 67,
+      "fields": [
+        {
+          "name": "validatorPubkey",
+          "ty_idx": 14
+        },
+        {
+          "name": "description",
+          "ty_idx": 3
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "severity",
+          "ty_idx": 24
+        },
+        {
+          "name": "rewardAddr",
+          "ty_idx": 14
+        },
+        {
+          "name": "paid",
+          "ty_idx": 6
+        },
+        {
+          "name": "suggestedFine",
+          "ty_idx": 6
+        },
+        {
+          "name": "suggestedFinePart",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ComplaintFullInfo",
+      "ty_idx": 66,
+      "fields": [
+        {
+          "name": "complaint",
+          "ty_idx": 67
+        },
+        {
+          "name": "voters",
+          "ty_idx": 63
+        },
+        {
+          "name": "vsetId",
+          "ty_idx": 14
+        },
+        {
+          "name": "weightRemaining",
+          "ty_idx": 10
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ComplaintListEntry",
+      "ty_idx": 69,
+      "fields": [
+        {
+          "name": "id",
+          "ty_idx": 14
+        },
+        {
+          "name": "info",
+          "ty_idx": 66
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "CreditsMap",
+      "ty_idx": 36,
+      "target_ty_idx": 37
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "currectElections",
+          "ty_idx": 35
+        },
+        {
+          "name": "credits",
+          "ty_idx": 36
+        },
+        {
+          "name": "pastElections",
+          "ty_idx": 47
+        },
+        {
+          "name": "grams",
+          "ty_idx": 6
+        },
+        {
+          "name": "activeId",
+          "ty_idx": 9
+        },
+        {
+          "name": "activeHash",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MemberParams",
+      "ty_idx": 32,
+      "fields": [
+        {
+          "name": "msgValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "timestamp",
+          "ty_idx": 9
+        },
+        {
+          "name": "maxFactor",
+          "ty_idx": 9
+        },
+        {
+          "name": "srcAddr",
+          "ty_idx": 14
+        },
+        {
+          "name": "adnlAddr",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Elections",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "electionsAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "electionsCloseAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "minStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "members",
+          "ty_idx": 33
+        },
+        {
+          "name": "isFailed",
+          "ty_idx": 5
+        },
+        {
+          "name": "isFinished",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ValidatorInRound",
+      "ty_idx": 40,
+      "fields": [
+        {
+          "name": "addr",
+          "ty_idx": 14
+        },
+        {
+          "name": "weight",
+          "ty_idx": 11
+        },
+        {
+          "name": "stake",
+          "ty_idx": 6
+        },
+        {
+          "name": "isBanned",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "FrozenDict",
+      "ty_idx": 39,
+      "target_ty_idx": 41
+    },
+    {
+      "kind": "alias",
+      "name": "Complaints",
+      "ty_idx": 42,
+      "target_ty_idx": 46
+    },
+    {
+      "kind": "struct",
+      "name": "PastElection",
+      "ty_idx": 38,
+      "fields": [
+        {
+          "name": "unfreezeAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "stakeHeld",
+          "ty_idx": 9
+        },
+        {
+          "name": "vsetHash",
+          "ty_idx": 14
+        },
+        {
+          "name": "frozenDict",
+          "ty_idx": 39
+        },
+        {
+          "name": "totalStake",
+          "ty_idx": 6
+        },
+        {
+          "name": "bonuses",
+          "ty_idx": 6
+        },
+        {
+          "name": "complaints",
+          "ty_idx": 42
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ComplaintStatus",
+      "ty_idx": 43,
+      "prefix": {
+        "prefix_num": 45,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "complaint",
+          "ty_idx": 44
+        },
+        {
+          "name": "voters",
+          "ty_idx": 45
+        },
+        {
+          "name": "vsetId",
+          "ty_idx": 14
+        },
+        {
+          "name": "weightRemaining",
+          "ty_idx": 10
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Complaint",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 188,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "validatorPubkey",
+          "ty_idx": 14
+        },
+        {
+          "name": "description",
+          "ty_idx": 3
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "severity",
+          "ty_idx": 24
+        },
+        {
+          "name": "rewardAddr",
+          "ty_idx": 14
+        },
+        {
+          "name": "paid",
+          "ty_idx": 6
+        },
+        {
+          "name": "suggestedFine",
+          "ty_idx": 6
+        },
+        {
+          "name": "suggestedFinePart",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "VSet",
+      "ty_idx": 50,
+      "prefix": {
+        "prefix_num": 18,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "utimeSince",
+          "ty_idx": 9
+        },
+        {
+          "name": "utimeUntil",
+          "ty_idx": 9
+        },
+        {
+          "name": "_total",
+          "ty_idx": 27
+        },
+        {
+          "name": "_main",
+          "ty_idx": 27
+        },
+        {
+          "name": "totalWeight",
+          "ty_idx": 11
+        },
+        {
+          "name": "dict",
+          "ty_idx": 55
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ValidatorDescr",
+      "ty_idx": 52,
+      "prefix": {
+        "prefix_num": 358873114506,
+        "prefix_len": 40
+      },
+      "fields": [
+        {
+          "name": "validatorPubkey",
+          "ty_idx": 14
+        },
+        {
+          "name": "validatorWeight",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ValidatorDescrWithAdnlAddr",
+      "ty_idx": 53,
+      "prefix": {
+        "prefix_num": 496312067978,
+        "prefix_len": 40
+      },
+      "fields": [
+        {
+          "name": "validatorPubkey",
+          "ty_idx": 14
+        },
+        {
+          "name": "validatorWeight",
+          "ty_idx": 11
+        },
+        {
+          "name": "adnlAddr",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "AnyValidatorDescr",
+      "ty_idx": 51,
+      "target_ty_idx": 54
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnMsg",
+      "ty_idx": 48,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 9
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "reason",
+          "ty_idx": 9
+        }
+      ],
+      "custom_pack_unpack": {
+        "pack_to_builder": true
+      }
+    },
+    {
+      "kind": "struct",
+      "name": "VSetWithOpcode",
+      "ty_idx": 49,
+      "prefix": {
+        "prefix_num": 1314280276,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "vset",
+          "ty_idx": 56
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 30
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 28
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 48
+    },
+    {
+      "body_ty_idx": 49
+    },
+    {
+      "body_ty_idx": 57
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 87852,
+      "name": "participates_in",
+      "parameters": [
+        {
+          "name": "validatorPubkey",
+          "ty_idx": 14
+        }
+      ],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 123541,
+      "name": "participant_list",
+      "parameters": [],
+      "return_ty_idx": 59
+    },
+    {
+      "tvm_method_id": 86698,
+      "name": "participant_list_extended",
+      "parameters": [],
+      "return_ty_idx": 62
+    },
+    {
+      "tvm_method_id": 130944,
+      "name": "compute_returned_stake",
+      "parameters": [
+        {
+          "name": "walletAddr",
+          "ty_idx": 14
+        }
+      ],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 104565,
+      "name": "past_election_ids",
+      "parameters": [],
+      "return_ty_idx": 63
+    },
+    {
+      "tvm_method_id": 81558,
+      "name": "past_elections",
+      "parameters": [],
+      "return_ty_idx": 65
+    },
+    {
+      "tvm_method_id": 74376,
+      "name": "past_elections_list",
+      "parameters": [],
+      "return_ty_idx": 59
+    },
+    {
+      "tvm_method_id": 86500,
+      "name": "get_past_complaints",
+      "parameters": [
+        {
+          "name": "electionId",
+          "ty_idx": 9
+        }
+      ],
+      "return_ty_idx": 42
+    },
+    {
+      "tvm_method_id": 77853,
+      "name": "show_complaint",
+      "parameters": [
+        {
+          "name": "electionId",
+          "ty_idx": 9
+        },
+        {
+          "name": "chash",
+          "ty_idx": 14
+        }
+      ],
+      "return_ty_idx": 68
+    },
+    {
+      "tvm_method_id": 70210,
+      "name": "list_complaints",
+      "parameters": [
+        {
+          "name": "electionId",
+          "ty_idx": 9
+        }
+      ],
+      "return_ty_idx": 70
+    },
+    {
+      "tvm_method_id": 97951,
+      "name": "complaint_storage_price",
+      "parameters": [
+        {
+          "name": "bits",
+          "ty_idx": 1
+        },
+        {
+          "name": "refs",
+          "ty_idx": 1
+        },
+        {
+          "name": "expireIn",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "plain_int",
+      "err_code": 0
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 34
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 37
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 44
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 49
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 57
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 59
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 61
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}
