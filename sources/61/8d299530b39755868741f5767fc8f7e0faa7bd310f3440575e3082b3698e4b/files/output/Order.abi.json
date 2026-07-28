@@ -1,0 +1,507 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Order",
+  "author": "The Tolk Team",
+  "version": "2.1",
+  "description": "Multisig V2 Order. Collects approvals and executes actions",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "InitOrderRequest"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "DirectIndexedAddressMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 7
+    },
+    {
+      "kind": "uintN",
+      "n": 48
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "DirectOrderActionsMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "SignerIndexOnInit"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ApproveRequest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TextComment"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderStorageInitialized"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderStorageRemaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderStorageHeader"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecuteOrderRequest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ApproveRejected"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ApproveAccepted"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderDataReply"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 1
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 5
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "dict"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "dict",
+      "ty_idx": 34,
+      "target_ty_idx": 35,
+      "description": "Think of it as \"a map with unknown keys and unknown values\".\nPrefer using `map<K, V>`, not `dict`."
+    },
+    {
+      "kind": "struct",
+      "name": "TextComment",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "comment",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "DirectIndexedAddressMap",
+      "ty_idx": 14,
+      "target_ty_idx": 15,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "DirectOrderActionsMap",
+      "ty_idx": 17,
+      "target_ty_idx": 18,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "SignerIndexOnInit",
+      "ty_idx": 19,
+      "target_ty_idx": 20
+    },
+    {
+      "kind": "struct",
+      "name": "ExecuteOrderRequest",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 1963556701,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "orderSeqno",
+          "ty_idx": 25
+        },
+        {
+          "name": "expirationDate",
+          "ty_idx": 16
+        },
+        {
+          "name": "approvalsNum",
+          "ty_idx": 13
+        },
+        {
+          "name": "signersHash",
+          "ty_idx": 25
+        },
+        {
+          "name": "order",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "InitOrderRequest",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 2624846754,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "threshold",
+          "ty_idx": 13
+        },
+        {
+          "name": "signers",
+          "ty_idx": 14
+        },
+        {
+          "name": "expirationDate",
+          "ty_idx": 16
+        },
+        {
+          "name": "order",
+          "ty_idx": 17
+        },
+        {
+          "name": "signerIndexOnInit",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ApproveRequest",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 2808226575,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "signerIndex",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ApproveAccepted",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 2187369462,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ApproveRejected",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 2947491902,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "exitCode",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderStorageInitialized",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "multisigAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "orderSeqno",
+          "ty_idx": 25
+        },
+        {
+          "name": "remaining",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderStorageRemaining",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "threshold",
+          "ty_idx": 13
+        },
+        {
+          "name": "sentForExecution",
+          "ty_idx": 5
+        },
+        {
+          "name": "signers",
+          "ty_idx": 14
+        },
+        {
+          "name": "approvalsMask",
+          "ty_idx": 25
+        },
+        {
+          "name": "approvalsNum",
+          "ty_idx": 13
+        },
+        {
+          "name": "expirationDate",
+          "ty_idx": 16
+        },
+        {
+          "name": "order",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderDataReply",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "multisigAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "orderSeqno",
+          "ty_idx": 1
+        },
+        {
+          "name": "threshold",
+          "ty_idx": 32
+        },
+        {
+          "name": "sentForExecution",
+          "ty_idx": 33
+        },
+        {
+          "name": "signers",
+          "ty_idx": 34
+        },
+        {
+          "name": "approvalsMask",
+          "ty_idx": 32
+        },
+        {
+          "name": "approvalsNum",
+          "ty_idx": 32
+        },
+        {
+          "name": "expirationDate",
+          "ty_idx": 32
+        },
+        {
+          "name": "order",
+          "ty_idx": 34
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderStorageHeader",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "multisigAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "orderSeqno",
+          "ty_idx": 25
+        },
+        {
+          "name": "remaining",
+          "ty_idx": 23
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 24,
+    "storage_at_deployment_ty_idx": 27
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 123832,
+      "name": "get_order_data",
+      "parameters": [],
+      "return_ty_idx": 31
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_UNAUTHORIZED_INIT",
+      "err_code": 104
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_ALREADY_INITED",
+      "err_code": 105
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_UNAUTHORIZED_SIGN",
+      "err_code": 106
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_ALREADY_APPROVED",
+      "err_code": 107
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_EXPIRED",
+      "err_code": 111
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_UNKNOWN_OP",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}
