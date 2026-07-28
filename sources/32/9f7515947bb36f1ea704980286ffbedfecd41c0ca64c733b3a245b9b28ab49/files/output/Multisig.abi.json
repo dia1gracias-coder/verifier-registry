@@ -1,0 +1,478 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Multisig",
+  "author": "The Tolk Team",
+  "version": "2.1",
+  "description": "Multisig V2.1. Multi-signature wallet with order-based approval",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NewOrderRequest"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "uintN",
+      "n": 48
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "DirectOrderActionsMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecuteOrderRequest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExecuteInternalRequest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TextComment"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MultisigStorage"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "DirectIndexedAddressMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 7
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "IndexedAddressMap"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "InitOrderRequest"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "SignerIndexOnInit"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 14
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MultisigDataReply"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "dict"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "dict",
+      "ty_idx": 30,
+      "target_ty_idx": 31,
+      "description": "Think of it as \"a map with unknown keys and unknown values\".\nPrefer using `map<K, V>`, not `dict`."
+    },
+    {
+      "kind": "struct",
+      "name": "TextComment",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "comment",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "IndexedAddressMap",
+      "ty_idx": 25,
+      "target_ty_idx": 24
+    },
+    {
+      "kind": "alias",
+      "name": "DirectIndexedAddressMap",
+      "ty_idx": 23,
+      "target_ty_idx": 24,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "DirectOrderActionsMap",
+      "ty_idx": 16,
+      "target_ty_idx": 17,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "SignerIndexOnInit",
+      "ty_idx": 27,
+      "target_ty_idx": 28
+    },
+    {
+      "kind": "struct",
+      "name": "NewOrderRequest",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 4145565967,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "orderSeqno",
+          "ty_idx": 13
+        },
+        {
+          "name": "isAutoApprove",
+          "ty_idx": 5
+        },
+        {
+          "name": "index",
+          "ty_idx": 14
+        },
+        {
+          "name": "expirationDate",
+          "ty_idx": 15
+        },
+        {
+          "name": "order",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExecuteOrderRequest",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1963556701,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "orderSeqno",
+          "ty_idx": 13
+        },
+        {
+          "name": "expirationDate",
+          "ty_idx": 15
+        },
+        {
+          "name": "approvalsNum",
+          "ty_idx": 14
+        },
+        {
+          "name": "signersHash",
+          "ty_idx": 13
+        },
+        {
+          "name": "order",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExecuteInternalRequest",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 2737592767,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "order",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "InitOrderRequest",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 2624846754,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "threshold",
+          "ty_idx": 14
+        },
+        {
+          "name": "signers",
+          "ty_idx": 23
+        },
+        {
+          "name": "expirationDate",
+          "ty_idx": 15
+        },
+        {
+          "name": "order",
+          "ty_idx": 16
+        },
+        {
+          "name": "signerIndexOnInit",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MultisigStorage",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "nextOrderSeqno",
+          "ty_idx": 13
+        },
+        {
+          "name": "threshold",
+          "ty_idx": 14
+        },
+        {
+          "name": "signers",
+          "ty_idx": 23
+        },
+        {
+          "name": "signersNum",
+          "ty_idx": 14
+        },
+        {
+          "name": "proposers",
+          "ty_idx": 25
+        },
+        {
+          "name": "allowArbitraryOrderSeqno",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MultisigDataReply",
+      "ty_idx": 29,
+      "fields": [
+        {
+          "name": "nextOrderSeqno",
+          "ty_idx": 1
+        },
+        {
+          "name": "threshold",
+          "ty_idx": 1
+        },
+        {
+          "name": "signers",
+          "ty_idx": 30
+        },
+        {
+          "name": "proposers",
+          "ty_idx": 30
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 22
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 26
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 107307,
+      "name": "get_multisig_data",
+      "parameters": [],
+      "return_ty_idx": 29
+    },
+    {
+      "tvm_method_id": 93855,
+      "name": "get_order_estimate",
+      "parameters": [
+        {
+          "name": "order",
+          "ty_idx": 3
+        },
+        {
+          "name": "expirationDate",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 111399,
+      "name": "get_order_address",
+      "parameters": [
+        {
+          "name": "orderSeqno",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 7
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_NOT_ENOUGH_TON",
+      "err_code": 100
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_UNAUTHORIZED_EXECUTE",
+      "err_code": 101
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_SIGNERS_OUTDATED",
+      "err_code": 102
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_DICTIONARY_SEQUENCE",
+      "err_code": 103
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INCONSISTENT_DATA",
+      "err_code": 108
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_THRESHOLD",
+      "err_code": 109
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_SIGNERS",
+      "err_code": 110
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_EXPIRED",
+      "err_code": 111
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_UNAUTHORIZED_NEW_ORDER",
+      "err_code": 1007
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_NEW_ORDER",
+      "err_code": 1008
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}
