@@ -1,0 +1,476 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Config",
+  "author": "The Tolk Team",
+  "version": "1.0.0",
+  "description": "TON Config contract. Manages network configuration parameters",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetNextValidatorSetRequest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetCustomParamRequest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NewVotingProposalRequest"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfigProposal"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VoteForProposalRequest"
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ConfigDict"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 8,
+      "value_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "VoteDict"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 17,
+      "value_ty_idx": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AnswerBody"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ElectorCodeChangeAction"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "tuple"
+    },
+    {
+      "kind": "unknown"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 31
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 30
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 30
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "tuple",
+      "ty_idx": 30,
+      "target_ty_idx": 32,
+      "description": "`tuple` represents a TVM tuple. Essentially, it's \"an array of unknown elements\".\nReading an individual element results in `unknown`, cast it to perform some actions:\n```\n// wrong:\nvar elem = someTuple.get(0);    // unknown\nreturn elem + 123;              // error, can not apply `+`\n\n// correct:\nvar elem = someTuple.get(0) as int;\nreturn elem + 123;\n```"
+    },
+    {
+      "kind": "struct",
+      "name": "ConfigProposal",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 243,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "paramId",
+          "ty_idx": 8
+        },
+        {
+          "name": "paramValue",
+          "ty_idx": 16
+        },
+        {
+          "name": "ifHashEqual",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetNextValidatorSetRequest",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1314280276,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "vset",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetCustomParamRequest",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1849906028,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paramId",
+          "ty_idx": 8
+        },
+        {
+          "name": "receiverAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "value",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NewVotingProposalRequest",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1851150418,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "expireAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "critical",
+          "ty_idx": 5
+        },
+        {
+          "name": "proposal",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "VoteForProposalRequest",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1450144869,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "signature",
+          "ty_idx": 21
+        },
+        {
+          "name": "signedVoteBody",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ElectorCodeChangeAction",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1313042276,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "payload",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AnswerBody",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "ansTag",
+          "ty_idx": 9
+        },
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "ConfigDict",
+      "ty_idx": 24,
+      "target_ty_idx": 25,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "VoteDict",
+      "ty_idx": 26,
+      "target_ty_idx": 27
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 24
+        },
+        {
+          "name": "storedSeqno",
+          "ty_idx": 9
+        },
+        {
+          "name": "publicKey",
+          "ty_idx": 17
+        },
+        {
+          "name": "voteDict",
+          "ty_idx": 26
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 23
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 20
+    }
+  ],
+  "incoming_external": [
+    {
+      "body_ty_idx": 2
+    }
+  ],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 85143,
+      "name": "seqno",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 94347,
+      "name": "get_proposal",
+      "parameters": [
+        {
+          "name": "proposalHash",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 33
+    },
+    {
+      "tvm_method_id": 107394,
+      "name": "list_proposals",
+      "parameters": [],
+      "return_ty_idx": 34
+    },
+    {
+      "tvm_method_id": 75077,
+      "name": "proposal_storage_price",
+      "parameters": [
+        {
+          "name": "critical",
+          "ty_idx": 1
+        },
+        {
+          "name": "seconds",
+          "ty_idx": 1
+        },
+        {
+          "name": "bits",
+          "ty_idx": 1
+        },
+        {
+          "name": "refs",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "plain_int",
+      "err_code": 0
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_VALIDATOR_SET",
+      "err_code": 9
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_BAD_SEQNO",
+      "err_code": 33
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_SIGNATURE",
+      "err_code": 34
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_VALID_UNTIL_EXPIRED",
+      "err_code": 35
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_MESSAGE",
+      "err_code": 37
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_EXTERNAL_BODY_TOO_DEEP",
+      "err_code": 39
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_WRONG_CURRENT_VSET",
+      "err_code": 40
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_WRONG_VALIDATOR_DESCRIPTION",
+      "err_code": 41
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_PROPOSAL_STATUS",
+      "err_code": 44
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}
