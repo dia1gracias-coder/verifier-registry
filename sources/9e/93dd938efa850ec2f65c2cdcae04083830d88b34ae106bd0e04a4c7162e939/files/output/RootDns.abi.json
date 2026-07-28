@@ -1,0 +1,132 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "RootDns",
+  "author": "The Tolk Team",
+  "version": "1.0.0",
+  "description": "Root DNS resolver. Entry point for TON DNS resolution",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RootDnsStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DnsResolveResponse"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "RootDnsStorage",
+      "ty_idx": 12,
+      "fields": [
+        {
+          "name": "tonAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "tMeAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "tonWwwAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DnsResolveResponse",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "resolvedPrefixLengthBits",
+          "ty_idx": 1
+        },
+        {
+          "name": "resolvedRecord",
+          "ty_idx": 14
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 12
+  },
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 123660,
+      "name": "dnsresolve",
+      "parameters": [
+        {
+          "name": "subdomain",
+          "ty_idx": 2
+        },
+        {
+          "name": "_category",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 13
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_DNS_INVALID_SUBDOMAIN_BITS",
+      "err_code": 70
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}

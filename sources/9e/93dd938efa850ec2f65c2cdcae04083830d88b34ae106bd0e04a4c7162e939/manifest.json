@@ -1,0 +1,3785 @@
+{
+  "code_hash": "9e93dd938efa850ec2f65c2cdcae04083830d88b34ae106bd0e04a4c7162e939",
+  "source_bundle_hash": "1f3543ea8ae643081c736d98a78afd95eec05b68d0200ef54e511ab89aff4b98",
+  "verified_at": 1785243600,
+  "compiler": {
+    "language": "tolk",
+    "version": "1.4.2",
+    "entrypoint": "dns/contracts/RootDns.tolk",
+    "params": {
+      "compiler_version": "1.4.2"
+    }
+  },
+  "source_map": {
+    "code_boc64": "te6ccgECBgEAAQoAART/APSkE/S88sgLAQIBYgIDAAzQMPiR8kAC+6HGGdtF2/ZgQa6TUnAF5aCMQa4UDkGAAEWukgUi4SpDgBGGAcUovgbw28BBKgWmDmIFvdqJoRZuje3RkZ2fCAUWbu7u8Z4tnwgFnqAD9JH0kfSQYEuEfxxATa46fqAJjgscKLZmYvDhxglMcZGfFdScJfSlk7ZjwGUkYGXFEwQFAAZ0b24AzsjOz4QCz1Akwh+OHiXXHR/HBY4UMTMxeHDjBKYYyM+K6k4S+lLJ2zHgMJFb4osm1ljIzs+EAosXSM8Wz4QCz1ADwieOHAPXHSdYxwWOEXhw4wSmIMjPiupOEvpSydsx4FuSXwTicG0=",
+    "symbol_types_json": {
+      "alias_instantiations": [],
+      "declarations": [
+        {
+          "fields": [
+            {
+              "name": "tonAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "tMeAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "tonWwwAddress",
+              "ty_idx": 7
+            }
+          ],
+          "ident_loc": [
+            4,
+            38,
+            8,
+            38,
+            22
+          ],
+          "kind": "struct",
+          "name": "RootDnsStorage",
+          "ty_idx": 12
+        },
+        {
+          "fields": [
+            {
+              "name": "resolvedPrefixLengthBits",
+              "ty_idx": 1
+            },
+            {
+              "name": "resolvedRecord",
+              "ty_idx": 14
+            }
+          ],
+          "ident_loc": [
+            4,
+            44,
+            8,
+            44,
+            26
+          ],
+          "kind": "struct",
+          "name": "DnsResolveResponse",
+          "ty_idx": 13
+        }
+      ],
+      "files": [
+        {
+          "file_id": 0,
+          "file_name": "@stdlib/common.tolk",
+          "imports": [],
+          "size_chars": 75314
+        },
+        {
+          "file_id": 1,
+          "file_name": "dns/contracts/RootDns.tolk",
+          "imports": [
+            2,
+            3,
+            4
+          ],
+          "size_chars": 3033
+        },
+        {
+          "file_id": 2,
+          "file_name": "dns/contracts/dns-utils.tolk",
+          "imports": [
+            3
+          ],
+          "size_chars": 4661
+        },
+        {
+          "file_id": 3,
+          "file_name": "dns/contracts/errors.tolk",
+          "imports": [],
+          "size_chars": 878
+        },
+        {
+          "file_id": 4,
+          "file_name": "dns/contracts/storage.tolk",
+          "imports": [
+            2,
+            3
+          ],
+          "size_chars": 3070
+        }
+      ],
+      "functions": [
+        {
+          "end_loc": [
+            1,
+            18,
+            1,
+            18,
+            2
+          ],
+          "f_idx": 0,
+          "ident_loc": [
+            1,
+            16,
+            5,
+            16,
+            22
+          ],
+          "name": "onInternalMessage",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "in.body",
+              "ty_idx": 2
+            }
+          ],
+          "return_ty_idx": 0
+        },
+        {
+          "end_loc": [
+            1,
+            90,
+            1,
+            90,
+            2
+          ],
+          "f_idx": 1,
+          "ident_loc": [
+            1,
+            20,
+            9,
+            20,
+            19
+          ],
+          "name": "dnsresolve",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "subdomain",
+              "ty_idx": 2
+            },
+            {
+              "name": "_category",
+              "ty_idx": 1
+            }
+          ],
+          "return_ty_idx": 13
+        },
+        {
+          "end_loc": [
+            1,
+            14,
+            1,
+            14,
+            2
+          ],
+          "f_idx": 2,
+          "ident_loc": [
+            1,
+            12,
+            5,
+            12,
+            28
+          ],
+          "name": "getPrefixLengthByDomain",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "domainLength",
+              "ty_idx": 1
+            },
+            {
+              "name": "startsWithZeroByte",
+              "ty_idx": 5
+            }
+          ],
+          "return_ty_idx": 1
+        },
+        {
+          "end_loc": [
+            2,
+            27,
+            1,
+            27,
+            2
+          ],
+          "f_idx": 3,
+          "ident_loc": [
+            2,
+            25,
+            13,
+            25,
+            27
+          ],
+          "name": "address.toNextResolver",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 7
+            }
+          ],
+          "return_ty_idx": 3
+        }
+      ],
+      "struct_instantiations": [],
+      "unique_types": [
+        {
+          "kind": "void"
+        },
+        {
+          "kind": "int"
+        },
+        {
+          "kind": "slice"
+        },
+        {
+          "kind": "cell"
+        },
+        {
+          "kind": "builder"
+        },
+        {
+          "kind": "bool"
+        },
+        {
+          "kind": "coins"
+        },
+        {
+          "kind": "address"
+        },
+        {
+          "kind": "intN",
+          "n": 32
+        },
+        {
+          "kind": "uintN",
+          "n": 32
+        },
+        {
+          "kind": "intN",
+          "n": 64
+        },
+        {
+          "kind": "uintN",
+          "n": 64
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "RootDnsStorage"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "DnsResolveResponse"
+        },
+        {
+          "inner_ty_idx": 3,
+          "kind": "nullable"
+        }
+      ]
+    },
+    "debug_marks_json": [
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_import": [
+          0
+        ],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 0,
+        "range": [
+          1,
+          16,
+          5,
+          16,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 1,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 2,
+        "ty_idx": 2,
+        "var_name": "in.body"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 3,
+        "stack": []
+      },
+      {
+        "kind": "loc",
+        "mark_id": 4,
+        "range": [
+          1,
+          16,
+          5,
+          16,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 5,
+        "stack": [
+          1
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 6,
+        "range": [
+          1,
+          16,
+          5,
+          16,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 7,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 8,
+        "range": [
+          1,
+          18,
+          1,
+          18,
+          2
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "dnsresolve",
+        "ir_import": [
+          0,
+          1
+        ],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 9,
+        "range": [
+          1,
+          20,
+          9,
+          20,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 10,
+        "stack": [
+          0,
+          1
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 11,
+        "ty_idx": 2,
+        "var_name": "subdomain"
+      },
+      {
+        "ir_slots": [
+          1
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 12,
+        "ty_idx": 1,
+        "var_name": "_category"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 13,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 14,
+        "stack": [
+          0,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 15,
+        "range": [
+          1,
+          21,
+          23,
+          21,
+          41
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 16,
+        "stack": [
+          0,
+          3
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 17,
+        "range": [
+          1,
+          21,
+          13,
+          21,
+          55
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 18,
+        "stack": [
+          0,
+          5
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 19,
+        "range": [
+          1,
+          21,
+          5,
+          21,
+          100
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 20,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 21,
+        "stack": [
+          0,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 22,
+        "range": [
+          1,
+          23,
+          40,
+          23,
+          50
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 23,
+        "stack": [
+          0,
+          9
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 24,
+        "stack": [
+          0,
+          9,
+          9
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 25,
+        "range": [
+          1,
+          23,
+          30,
+          23,
+          66
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 26,
+        "stack": [
+          0,
+          9,
+          11
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 27,
+        "range": [
+          1,
+          23,
+          9,
+          23,
+          27
+        ]
+      },
+      {
+        "ir_slots": [
+          12
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 28,
+        "ty_idx": 5,
+        "var_name": "startsWithZeroByte"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 29,
+        "stack": [
+          0,
+          9,
+          12
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 30,
+        "stack": [
+          0,
+          9,
+          12,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 31,
+        "range": [
+          1,
+          24,
+          43,
+          24,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 32,
+        "stack": [
+          0,
+          9,
+          12,
+          13
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 33,
+        "range": [
+          1,
+          24,
+          9,
+          24,
+          30
+        ]
+      },
+      {
+        "ir_slots": [
+          14
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 34,
+        "ty_idx": 1,
+        "var_name": "subdomainLengthInBits"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 35,
+        "stack": [
+          0,
+          9,
+          12,
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 36,
+        "range": [
+          1,
+          27,
+          5,
+          27,
+          7
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 37,
+        "stack": [
+          0,
+          14,
+          12,
+          9
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 38,
+        "range": [
+          1,
+          27,
+          9,
+          27,
+          65
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 39,
+        "stack": [
+          0,
+          14,
+          12
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 40,
+        "range": [
+          1,
+          27,
+          9,
+          27,
+          65
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 41,
+        "stack": [
+          0,
+          14,
+          12,
+          20
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 42,
+        "stack": [
+          0,
+          14,
+          12,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 43,
+        "stack": [
+          0,
+          14,
+          12
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 44,
+        "stack": [
+          0,
+          14,
+          12,
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 45,
+        "range": [
+          1,
+          27,
+          31,
+          27,
+          65
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 46,
+        "stack": [
+          0,
+          14,
+          12,
+          17
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 47,
+        "range": [
+          1,
+          27,
+          9,
+          27,
+          65
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 48,
+        "stack": [
+          0,
+          14,
+          12,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 49,
+        "stack": [
+          0,
+          14,
+          12,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 50,
+        "stack": [
+          0,
+          14,
+          12,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 51,
+        "range": [
+          1,
+          27,
+          5,
+          29,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 52,
+        "stack": [
+          0,
+          14,
+          12
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 53,
+        "range": [
+          1,
+          27,
+          67,
+          29,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 54,
+        "stack": []
+      },
+      {
+        "kind": "loc",
+        "mark_id": 55,
+        "range": [
+          1,
+          28,
+          44,
+          28,
+          53
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 56,
+        "stack": [
+          21
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 57,
+        "range": [
+          1,
+          28,
+          18,
+          28,
+          53
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 58,
+        "range": [
+          1,
+          28,
+          71,
+          28,
+          75
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 59,
+        "stack": [
+          21,
+          22
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 60,
+        "range": [
+          1,
+          28,
+          55,
+          28,
+          75
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "dnsresolve",
+        "ir_return": [
+          21,
+          22
+        ],
+        "kind": "leave_fun",
+        "mark_id": 61,
+        "range": [
+          1,
+          28,
+          9,
+          28,
+          77
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 62,
+        "stack": [
+          0,
+          14,
+          12
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 63,
+        "range": [
+          1,
+          31,
+          5,
+          31,
+          7
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 64,
+        "stack": [
+          0,
+          14,
+          12,
+          12
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 65,
+        "range": [
+          1,
+          31,
+          5,
+          33,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 66,
+        "stack": [
+          0,
+          14,
+          12
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 67,
+        "range": [
+          1,
+          31,
+          29,
+          33,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 68,
+        "stack": [
+          12,
+          14,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 69,
+        "range": [
+          1,
+          32,
+          19,
+          32,
+          27
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 70,
+        "range": [
+          1,
+          32,
+          19,
+          32,
+          27
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 71,
+        "stack": [
+          12,
+          14,
+          24
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 72,
+        "stack": [
+          12,
+          14,
+          0
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 73
+      },
+      {
+        "kind": "stack",
+        "mark_id": 74,
+        "stack": [
+          0,
+          14,
+          12
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 75,
+        "stack": [
+          0,
+          14,
+          12
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 76,
+        "range": [
+          1,
+          35,
+          23,
+          35,
+          71
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 77,
+        "stack": [
+          0,
+          14,
+          12,
+          26
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 78,
+        "range": [
+          1,
+          35,
+          23,
+          35,
+          71
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 79,
+        "stack": [
+          0,
+          14,
+          12,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 80,
+        "range": [
+          1,
+          35,
+          9,
+          35,
+          20
+        ]
+      },
+      {
+        "ir_lazy_slice": 25,
+        "ir_slots": [
+          30,
+          31,
+          32
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 81,
+        "ty_idx": 12,
+        "var_name": "rootStorage"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 82,
+        "range": [
+          1,
+          38,
+          21,
+          38,
+          41
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 83,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          33
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 84,
+        "range": [
+          1,
+          37,
+          24,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 85,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          33,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 86,
+        "range": [
+          1,
+          38,
+          10,
+          38,
+          20
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 87,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 88,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 89,
+        "range": [
+          1,
+          39,
+          10,
+          39,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 90,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          38
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 91,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 92,
+        "range": [
+          1,
+          40,
+          21,
+          40,
+          41
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 93,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          34,
+          39
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 94,
+        "range": [
+          1,
+          40,
+          10,
+          40,
+          20
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 95,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          40
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 96,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 97,
+        "range": [
+          1,
+          41,
+          10,
+          41,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 98,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          43
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 99,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 100,
+        "range": [
+          1,
+          42,
+          10,
+          42,
+          17
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 101,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 102,
+        "range": [
+          1,
+          37,
+          9,
+          37,
+          21
+        ]
+      },
+      {
+        "ir_slots": [
+          45
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 103,
+        "ty_idx": 2,
+        "var_name": "tonWwwDomain"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 104,
+        "stack": [
+          0,
+          14,
+          12,
+          25,
+          45
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 105,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 106,
+        "range": [
+          1,
+          44,
+          5,
+          54,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 107,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          46,
+          25
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 108,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 109,
+        "range": [
+          1,
+          44,
+          5,
+          54,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 110,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          47,
+          25
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 111,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 112,
+        "range": [
+          1,
+          44,
+          5,
+          54,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 113,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          48,
+          25
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 114,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          48
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 115,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          32
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 116,
+        "range": [
+          1,
+          44,
+          5,
+          44,
+          7
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 117,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          32,
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 118,
+        "range": [
+          1,
+          44,
+          9,
+          44,
+          65
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 119,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          32,
+          52
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 120,
+        "range": [
+          1,
+          44,
+          5,
+          54,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 121,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          32
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 122,
+        "range": [
+          1,
+          44,
+          67,
+          54,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 123,
+        "range": [
+          1,
+          45,
+          9,
+          45,
+          11
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 124,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          32,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 125,
+        "range": [
+          1,
+          45,
+          23,
+          45,
+          34
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 126,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          32,
+          56
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 127,
+        "stack": [
+          0,
+          14,
+          12,
+          32,
+          30,
+          31,
+          56,
+          45
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 128,
+        "range": [
+          1,
+          45,
+          68,
+          45,
+          77
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 129,
+        "stack": [
+          0,
+          14,
+          12,
+          32,
+          30,
+          31,
+          57
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 130,
+        "range": [
+          1,
+          45,
+          9,
+          53,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 131,
+        "stack": [
+          0,
+          14,
+          12,
+          32,
+          30,
+          31
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 132,
+        "range": [
+          1,
+          45,
+          93,
+          53,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 133,
+        "stack": [
+          0,
+          14,
+          12,
+          32
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "getPrefixLengthByDomain",
+        "ir_import": [
+          58,
+          12
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 134,
+        "range": [
+          1,
+          47,
+          43,
+          50,
+          18
+        ]
+      },
+      {
+        "ir_slots": [
+          58
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 135,
+        "ty_idx": 1,
+        "var_name": "domainLength"
+      },
+      {
+        "ir_slots": [
+          12
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 136,
+        "ty_idx": 5,
+        "var_name": "startsWithZeroByte"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 137,
+        "range": [
+          1,
+          13,
+          67,
+          13,
+          76
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 138,
+        "range": [
+          1,
+          13,
+          79,
+          13,
+          80
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 139,
+        "stack": [
+          32,
+          12,
+          65,
+          66
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 140,
+        "range": [
+          1,
+          13,
+          45,
+          13,
+          81
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 141,
+        "stack": [
+          32,
+          64
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 142,
+        "range": [
+          1,
+          13,
+          12,
+          13,
+          81
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 143,
+        "stack": [
+          32,
+          67
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 144,
+        "stack": [
+          32,
+          59
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "getPrefixLengthByDomain",
+        "ir_return": [
+          59
+        ],
+        "kind": "leave_fun",
+        "mark_id": 145,
+        "range": [
+          1,
+          13,
+          5,
+          13,
+          81
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 146,
+        "range": [
+          1,
+          47,
+          17,
+          50,
+          18
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "address.toNextResolver",
+        "ir_import": [
+          32
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 147,
+        "range": [
+          1,
+          51,
+          59,
+          51,
+          73
+        ]
+      },
+      {
+        "ir_slots": [
+          32
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 148,
+        "ty_idx": 7,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 149,
+        "range": [
+          2,
+          26,
+          12,
+          26,
+          23
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 150,
+        "stack": [
+          32,
+          59,
+          70
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 151,
+        "range": [
+          2,
+          26,
+          24,
+          26,
+          33
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 152,
+        "stack": [
+          32,
+          59,
+          72
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 153,
+        "stack": [
+          32,
+          59,
+          70
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 154,
+        "stack": [
+          59,
+          32,
+          70
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 155,
+        "range": [
+          2,
+          26,
+          64,
+          26,
+          76
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 156,
+        "stack": [
+          59,
+          73
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 157,
+        "stack": [
+          59,
+          70
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 158,
+        "range": [
+          2,
+          26,
+          83,
+          26,
+          90
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 159,
+        "stack": [
+          59,
+          74
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 160,
+        "stack": [
+          59,
+          68
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "address.toNextResolver",
+        "ir_return": [
+          68
+        ],
+        "kind": "leave_fun",
+        "mark_id": 161,
+        "range": [
+          2,
+          26,
+          5,
+          26,
+          92
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 162,
+        "range": [
+          1,
+          51,
+          17,
+          51,
+          75
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 163,
+        "range": [
+          1,
+          46,
+          13,
+          52,
+          14
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "dnsresolve",
+        "ir_return": [
+          59,
+          68
+        ],
+        "kind": "leave_fun",
+        "mark_id": 164,
+        "range": [
+          1,
+          46,
+          13,
+          52,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 165,
+        "stack": [
+          0,
+          14,
+          12,
+          32,
+          30,
+          31
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 166
+      },
+      {
+        "kind": "stack",
+        "mark_id": 167,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 168,
+        "stack": [
+          0,
+          14,
+          12,
+          45,
+          30,
+          31,
+          32
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 169,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 170,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 171,
+        "range": [
+          1,
+          56,
+          44,
+          56,
+          64
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 172,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          75
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 173,
+        "range": [
+          1,
+          56,
+          21,
+          56,
+          32
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 174,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          75,
+          76
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 175,
+        "range": [
+          1,
+          56,
+          33,
+          56,
+          43
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 176,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          77
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 177,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          76
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 178,
+        "range": [
+          1,
+          56,
+          66,
+          56,
+          75
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 179,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          80
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 180,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          76
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 181,
+        "range": [
+          1,
+          56,
+          90,
+          56,
+          97
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 182,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          81
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 183,
+        "range": [
+          1,
+          56,
+          9,
+          56,
+          18
+        ]
+      },
+      {
+        "ir_slots": [
+          82
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 184,
+        "ty_idx": 2,
+        "var_name": "tonDomain"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 185,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          82
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 186,
+        "range": [
+          1,
+          58,
+          5,
+          58,
+          7
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 187,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          82,
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 188,
+        "range": [
+          1,
+          58,
+          9,
+          58,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 189,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          82,
+          86
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 190,
+        "range": [
+          1,
+          58,
+          5,
+          68,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 191,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          82
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 192,
+        "range": [
+          1,
+          58,
+          63,
+          68,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 193,
+        "range": [
+          1,
+          59,
+          9,
+          59,
+          11
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 194,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          82,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 195,
+        "range": [
+          1,
+          59,
+          23,
+          59,
+          34
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 196,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          82,
+          90
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 197,
+        "range": [
+          1,
+          59,
+          64,
+          59,
+          73
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 198,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          91
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 199,
+        "range": [
+          1,
+          59,
+          9,
+          67,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 200,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 201,
+        "range": [
+          1,
+          59,
+          86,
+          67,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 202,
+        "stack": [
+          0,
+          14,
+          12,
+          30
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "getPrefixLengthByDomain",
+        "ir_import": [
+          92,
+          12
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 203,
+        "range": [
+          1,
+          61,
+          43,
+          64,
+          18
+        ]
+      },
+      {
+        "ir_slots": [
+          92
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 204,
+        "ty_idx": 1,
+        "var_name": "domainLength"
+      },
+      {
+        "ir_slots": [
+          12
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 205,
+        "ty_idx": 5,
+        "var_name": "startsWithZeroByte"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 206,
+        "range": [
+          1,
+          13,
+          67,
+          13,
+          76
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 207,
+        "range": [
+          1,
+          13,
+          79,
+          13,
+          80
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 208,
+        "stack": [
+          30,
+          12,
+          99,
+          100
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 209,
+        "range": [
+          1,
+          13,
+          45,
+          13,
+          81
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 210,
+        "stack": [
+          30,
+          98
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 211,
+        "range": [
+          1,
+          13,
+          12,
+          13,
+          81
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 212,
+        "stack": [
+          30,
+          101
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 213,
+        "stack": [
+          30,
+          93
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "getPrefixLengthByDomain",
+        "ir_return": [
+          93
+        ],
+        "kind": "leave_fun",
+        "mark_id": 214,
+        "range": [
+          1,
+          13,
+          5,
+          13,
+          81
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 215,
+        "range": [
+          1,
+          61,
+          17,
+          64,
+          18
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "address.toNextResolver",
+        "ir_import": [
+          30
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 216,
+        "range": [
+          1,
+          65,
+          56,
+          65,
+          70
+        ]
+      },
+      {
+        "ir_slots": [
+          30
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 217,
+        "ty_idx": 7,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 218,
+        "range": [
+          2,
+          26,
+          12,
+          26,
+          23
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 219,
+        "stack": [
+          30,
+          93,
+          104
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 220,
+        "range": [
+          2,
+          26,
+          24,
+          26,
+          33
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 221,
+        "stack": [
+          30,
+          93,
+          106
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 222,
+        "stack": [
+          30,
+          93,
+          104
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 223,
+        "stack": [
+          93,
+          30,
+          104
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 224,
+        "range": [
+          2,
+          26,
+          64,
+          26,
+          76
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 225,
+        "stack": [
+          93,
+          107
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 226,
+        "stack": [
+          93,
+          104
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 227,
+        "range": [
+          2,
+          26,
+          83,
+          26,
+          90
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 228,
+        "stack": [
+          93,
+          108
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 229,
+        "stack": [
+          93,
+          102
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "address.toNextResolver",
+        "ir_return": [
+          102
+        ],
+        "kind": "leave_fun",
+        "mark_id": 230,
+        "range": [
+          2,
+          26,
+          5,
+          26,
+          92
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 231,
+        "range": [
+          1,
+          65,
+          17,
+          65,
+          72
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 232,
+        "range": [
+          1,
+          60,
+          13,
+          66,
+          14
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "dnsresolve",
+        "ir_return": [
+          93,
+          102
+        ],
+        "kind": "leave_fun",
+        "mark_id": 233,
+        "range": [
+          1,
+          60,
+          13,
+          66,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 234,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 235
+      },
+      {
+        "kind": "stack",
+        "mark_id": 236,
+        "stack": [
+          0,
+          14,
+          12,
+          31
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 237,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          30,
+          82
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 238,
+        "stack": [
+          0,
+          14,
+          12,
+          31
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 239,
+        "stack": [
+          0,
+          14,
+          12,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 240,
+        "range": [
+          1,
+          71,
+          21,
+          71,
+          40
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 241,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          109
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 242,
+        "range": [
+          1,
+          70,
+          21,
+          70,
+          32
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 243,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          109,
+          110
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 244,
+        "range": [
+          1,
+          71,
+          10,
+          71,
+          20
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 245,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          111
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 246,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          110
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 247,
+        "range": [
+          1,
+          72,
+          10,
+          72,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 248,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          114
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 249,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          110
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 250,
+        "range": [
+          1,
+          73,
+          21,
+          73,
+          39
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 251,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          110,
+          115
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 252,
+        "range": [
+          1,
+          73,
+          10,
+          73,
+          20
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 253,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          116
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 254,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          110
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 255,
+        "range": [
+          1,
+          74,
+          10,
+          74,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 256,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          119
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 257,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          110
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 258,
+        "range": [
+          1,
+          75,
+          10,
+          75,
+          17
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 259,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          120
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 260,
+        "range": [
+          1,
+          70,
+          9,
+          70,
+          18
+        ]
+      },
+      {
+        "ir_slots": [
+          121
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 261,
+        "ty_idx": 2,
+        "var_name": "tMeDomain"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 262,
+        "stack": [
+          0,
+          14,
+          12,
+          31,
+          121
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 263,
+        "range": [
+          1,
+          77,
+          5,
+          77,
+          7
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 264,
+        "stack": [
+          0,
+          121,
+          12,
+          31,
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 265,
+        "range": [
+          1,
+          77,
+          9,
+          77,
+          66
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 266,
+        "stack": [
+          0,
+          121,
+          12,
+          31,
+          125
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 267,
+        "range": [
+          1,
+          77,
+          5,
+          87,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 268,
+        "stack": [
+          0,
+          121,
+          12,
+          31
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 269,
+        "range": [
+          1,
+          77,
+          68,
+          87,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 270,
+        "range": [
+          1,
+          78,
+          9,
+          78,
+          11
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 271,
+        "stack": [
+          31,
+          121,
+          12,
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 272,
+        "range": [
+          1,
+          78,
+          23,
+          78,
+          34
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 273,
+        "stack": [
+          31,
+          121,
+          12,
+          129
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 274,
+        "stack": [
+          31,
+          12,
+          129,
+          121
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 275,
+        "range": [
+          1,
+          78,
+          69,
+          78,
+          78
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 276,
+        "stack": [
+          31,
+          12,
+          130
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 277,
+        "range": [
+          1,
+          78,
+          9,
+          86,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 278,
+        "stack": [
+          31,
+          12
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 279,
+        "range": [
+          1,
+          78,
+          91,
+          86,
+          10
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "getPrefixLengthByDomain",
+        "ir_import": [
+          131,
+          12
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 280,
+        "range": [
+          1,
+          80,
+          43,
+          83,
+          18
+        ]
+      },
+      {
+        "ir_slots": [
+          131
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 281,
+        "ty_idx": 1,
+        "var_name": "domainLength"
+      },
+      {
+        "ir_slots": [
+          12
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 282,
+        "ty_idx": 5,
+        "var_name": "startsWithZeroByte"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 283,
+        "range": [
+          1,
+          13,
+          67,
+          13,
+          76
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 284,
+        "stack": [
+          31,
+          12,
+          138
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 285,
+        "range": [
+          1,
+          13,
+          79,
+          13,
+          80
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 286,
+        "stack": [
+          31,
+          12,
+          138,
+          139
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 287,
+        "range": [
+          1,
+          13,
+          45,
+          13,
+          81
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 288,
+        "stack": [
+          31,
+          137
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 289,
+        "range": [
+          1,
+          13,
+          12,
+          13,
+          81
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 290,
+        "stack": [
+          31,
+          140
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 291,
+        "stack": [
+          31,
+          132
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "getPrefixLengthByDomain",
+        "ir_return": [
+          132
+        ],
+        "kind": "leave_fun",
+        "mark_id": 292,
+        "range": [
+          1,
+          13,
+          5,
+          13,
+          81
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 293,
+        "range": [
+          1,
+          80,
+          17,
+          83,
+          18
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "address.toNextResolver",
+        "ir_import": [
+          31
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 294,
+        "range": [
+          1,
+          84,
+          56,
+          84,
+          70
+        ]
+      },
+      {
+        "ir_slots": [
+          31
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 295,
+        "ty_idx": 7,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 296,
+        "range": [
+          2,
+          26,
+          12,
+          26,
+          23
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 297,
+        "stack": [
+          31,
+          132,
+          143
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 298,
+        "range": [
+          2,
+          26,
+          24,
+          26,
+          33
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 299,
+        "stack": [
+          31,
+          132,
+          145
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 300,
+        "stack": [
+          31,
+          132,
+          143
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 301,
+        "stack": [
+          132,
+          31,
+          143
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 302,
+        "range": [
+          2,
+          26,
+          64,
+          26,
+          76
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 303,
+        "stack": [
+          132,
+          146
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 304,
+        "stack": [
+          132,
+          143
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 305,
+        "range": [
+          2,
+          26,
+          83,
+          26,
+          90
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 306,
+        "stack": [
+          132,
+          147
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 307,
+        "stack": [
+          132,
+          141
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "address.toNextResolver",
+        "ir_return": [
+          141
+        ],
+        "kind": "leave_fun",
+        "mark_id": 308,
+        "range": [
+          2,
+          26,
+          5,
+          26,
+          92
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 309,
+        "range": [
+          1,
+          84,
+          17,
+          84,
+          72
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 310,
+        "range": [
+          1,
+          79,
+          13,
+          85,
+          14
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "dnsresolve",
+        "ir_return": [
+          132,
+          141
+        ],
+        "kind": "leave_fun",
+        "mark_id": 311,
+        "range": [
+          1,
+          79,
+          13,
+          85,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 312,
+        "stack": [
+          31,
+          12
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 313
+      },
+      {
+        "kind": "stack",
+        "mark_id": 314,
+        "stack": []
+      },
+      {
+        "kind": "stack",
+        "mark_id": 315,
+        "stack": [
+          0,
+          121,
+          12,
+          31
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 316,
+        "stack": []
+      },
+      {
+        "kind": "stack",
+        "mark_id": 317,
+        "stack": []
+      },
+      {
+        "kind": "loc",
+        "mark_id": 318,
+        "range": [
+          1,
+          89,
+          40,
+          89,
+          41
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 319,
+        "stack": [
+          148
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 320,
+        "range": [
+          1,
+          89,
+          14,
+          89,
+          41
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 321,
+        "range": [
+          1,
+          89,
+          59,
+          89,
+          63
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 322,
+        "stack": [
+          148,
+          149
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 323,
+        "range": [
+          1,
+          89,
+          43,
+          89,
+          63
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "dnsresolve",
+        "ir_return": [
+          148,
+          149
+        ],
+        "kind": "leave_fun",
+        "mark_id": 324,
+        "range": [
+          1,
+          89,
+          5,
+          89,
+          65
+        ]
+      }
+    ],
+    "debug_marks_base64": "te6ccgICAsoAAQAAE3gAAAIBIAABAAICASAAAwAEAgEgAAUABgIBIAAHAAgCASAB3AHdAgEgAiICIwIBIAKuAq8CA35CAAkACgIBSAARABIBQb2baIgajkEONMB8WqIzV89MLPMc4bSeA6Oxwa3PSNt64AAqAUG9how/QwuxxQw5keD2GCBihbt7RHYkBy4s9/s52ksKOmAACwIDzkAADAANAgEgAA4ADwEB3AJ5AgEgArwCMwIBIAJnABACASACxgJ4AgFIAEoASwFBvsOKCHDlab+OqroyXYuXDo8iOzzRXb8f26lO6e2WWX7zABMCA8xAABQAFQIBIAAWABcCAUgAJgAnAgEgABgAGQIBIAAgACECASAAGgAbAgEgAB4AHwIBWAAcAB0CASAA6wDsAgEgArYCnAIBIAIaAp0CASAA9wD4AgEgAQQBBQIBIAAiACMCASAAJAAlAgEgASABIQIBIAE+AT8CASABWAFZAgEgAXABcQIBIAAoACkCAUgBwQHCAgEgAY4BjwIBIAGrAawCA8xAACsALAIB8gAtAC4CAUgAMAAxAgEgArYCvAIBIAKLAC8CASACyAKiAgEgADIAMwIBYgA0ADUCASAAOwA8AgEgAEQARQIBIAA2ADYCASAANwA4AgEgAhECEQIBIACFAQICASABAgA5AQEgADoABKkAAgEgAD0APgIBIABBAEICASAAPwBwAgEgAEACUgIBIAKiAfoCASACggKoAgEgAlICgQIBIAKTAEMCASAClQDzAgEgAEYARwIBIABIAEkCASAA8gDyAgEgAPIAegIBIAJDAgkCASACSQEAAUG+ULKv9chJWs5JqH4oJn/U5ZRbkBmaeu9yHN8bmJoTHzwATAFBvkQiDZUahPUjvycxsg5NC4vzfpVue+BtRfNX6dkln1gcAFACCZsAAAAwAE0ATgIBWAKzAE8CAc4CeAJ4AgEgAosCxAIDy8AAUQBSAgFYAFMAVAIBSABbAFwCAVgAZwBoAgEgAFUAVgIBIABXAFgCASAAWQBaAgEgAHIAcwIBIAB8AH0CASAAhgCHAgEgAJIAkwIBIABdAF4CAc4AYwBkAgEgAF8AYAIBIABhAGICASAApAClAgEgALsAvAIBIADIAMkCASAA1wDYAgEgAGUAZgEB1AGqAgEgAOkA6QIBIAGpAakCAe4CjAKMAgEgAGkAagIBIABrAnQCASAAbQBuAgEgAr0AbAIBIALAAngCASACdwBvAgEgAHAAcQIBIAKkAfoCASAB+gKCAgEgAoICqgIBIAB0AHUCASAAeAB5AgEgAHYCUgIBIAB3Am0CASACqgKqAgEgAlkCWQIBIAB6AlwCASACQgB7AgEgAm8CbwIBIAJeAkUCASAAfgB/AgEgAIAAgQIBIAIJAkkCASACEAIQAgEgAhAAggIBIACDAIQCASACEgCFAgEgAIUBDAIBIAEMARABASACFAIBIACIAIkCASAAiwCMAgEgAIoBDwIBIAEWARYCASABEAESAgEgAI0BJAIBIACOAI8CASABGAEeAgEgASgBLAIBIACQAS4BASAAkQAEqWACASAAlACVAgEgAJoAmwIBIACWAJcCASABOQFCAgEgAS4AmAIBIACYATwBASAAmQAEqYgCASAAnACdAgEgAKAAoQIBIACeAJ4CASAAngFKAQEgAJ8ABKmwAgEgAUoAogIBIACiAKIBASAAowAEqdgCASAApgCnAgEgAK8AsAIBIACoAKkCASAArACsAgEgAKoAqgIBIACqAK0BASAAqwAEqfACASAArQCtAQEgAK4ABKoAAgEgALEAsgIBIAC3ALgCASAAswCzAgEgALUAtQEBIAC0AASqCAEBIAC2AASqGAIBIAC5ALkCASAAuQDAAQEgALoABKooAgEgAL0BZQIBIADCAMMCASAAvgC/AgEgAMABaAIBIAFqAWoBASAAwQAEqjACASABbQFtAgEgAMQAxQIBIADGAMYCASABdwF3AQEgAMcABKp4AgEgAMoAywIBIADOAM8CASAAzADNAgEgAM0AzQIBIAF+AX4CASABhAGEAgEgANAA0QIBIADUAYkCASABhADSAgEgANIA1QEBIADTAASqqAIBIADVAYwBASAA1gAEqsgCASAA2QDaAgEgAOIA4wIBIADbANwCASAA3ADdAgEgAZQBlAIBIADeAN4CASAA3gDfAQEgAOABASAA4QAEqugABKr4AgEgAOQA5QIBIAGgAOgCASABmQGZAgEgAZoA5gEBIADnAASrEAIBIAGnAOkBASAA6gAEqzACASAA7QDuAgEgAPAA8QIBIAH4AjsCASACgQDvAgEgApQCbgIBIADyAPUCASAA9QD2AgEgAPMA8wEBIAD0AASomAIBIAJdAl0CASACAgICAgEgAPkA+gIBIAD9AP4CASACQwJDAgEgAPsA/AIBIAJFAgoCASACCgJGAgEgAP8BAAIBIAIQAQECASACRgJLAgEgAksCEQIBIAECAQIBASABAwAEqPgCASABBgEHAgEgARQBFQIBIAEIAQkCASABDgEPAgEgAQoBCgIBIAEMAQwBASABCwAEqQgBASABDQAEqRACASABEAEQAgEgARIBEgEBIAERAASpGAEBIAETAASpKAIBIAEWARcCASABGgEbAgEgARgBGAIBIAEYARwBASABGQAEqTACASABHAEcAgEgAR4BHgEBIAEdAASpOAEBIAEfAASpQAIBIAEiASMCASABMAExAgEgASQBJQIBIAEqASsCASABJgEmAgEgASgBKAEBIAEnAASpSAEBIAEpAASpUAIBIAEsASwCASABLgE0AQEgAS0ABKlYAQEgAS8ABKloAgEgATIBMwIBIAE4ATkCASABNAE0AgEgATYBOgEBIAE1AASpcAEBIAE3AASpeAIBIAE6ATwCASABPAFEAQEgATsABKmAAQEgAT0ABKmQAgEgAUABQQIBIAFMAU0CASABQgFDAgEgAUYBRwIBIAFEAUQCASABRAFIAQEgAUUABKmYAgEgAUgBSgIBIAFKAVABASABSQAEqcABASABSwAEqcgCASABTgFPAgEgAVIBUwIBIAFQAVACASABVAFUAQEgAVEABKnQAgEgAVQBVgIBIAFWAV4BASABVQAEqegBASABVwAEqhACASABWgFbAgEgAWQBZQIBIAFcAV0CASABYAFhAgEgAV4BXgIBIAFiAWIBASABXwAEqiACASABYgFoAgEgAWgBaAEBIAFjAASqOAIBIAFmAWcCASABbAFtAgEgAWgBagIBIAFqAW4BASABaQAEqkgBASABawAEqlACASABbgFuAgEgAXYBdgEBIAFvAASqYAIBIAFyAXMCASABgAGBAgEgAXQBdQIBIAF6AXsCASABdgF3AgEgAXwBfAEBIAF4AQEgAXkABKpwAASqgAIBIAF8AX4CASABfgGEAQEgAX0ABKqIAQEgAX8ABKqQAgEgAYIBgwIBIAGIAYkCASABhAGGAgEgAYYBhgEBIAGFAASqoAEBIAGHAASqsAIBIAGKAYoCASABjAGUAQEgAYsABKq4AQEgAY0ABKrQAgEgAZABkQIBIAGdAZ4CASABkgGTAgEgAZgBnwIBIAGUAZYCASABlgGZAQEgAZUABKrgAQEgAZcABKrwAgEgAZkBmgEBIAGbAQEgAZwABKsAAASrCAIBIAGfAaACASABpQGmAgEgAaEBoQIBIAGjAacBASABogAEqxgBASABpAAEqyACASABpwGpAgEgAakBsQEBIAGoAASrKAEBIAGqAASrOAIBIAGtAa4CASABtQG2AgEgAa8BrwIBIAGvAbACASABsQGxAgEgAbMBswEBIAGyAASrSAEBIAG0AASrUAIBIAG3AbgCASABvQG+AgEgAbkBuQIBIAG7AbsBASABugAEq3ABASABvAAEq3gCASABvwG/AgEgAb8BxgEBIAHAAASriAIBIAHDAcQCASAB0AHRAgEgAcUBxQIBIAHIAckCASABxgHGAQEgAccABKuQAgEgAcoBzAIBIAHMAc0BASABywAEq6ABASABzgEBIAHPAASrqAAEq7ACASAB0gHTAgFIAdoB2gIBIAHUAdUCASAB2AHYAQEgAdYBASAB1wAEq7gABKvIAQEgAdkABKvQAQEgAdsABKvYAgFIAd4B3wIBIAHoAekBQb7Fe8jKJtwnEya/gjtsPaZxyeCju5YoRP64aCrv3CyXJwHgAUG+xKTRj50tvqEQC3CyTTRNK5m2TbeuR/I7Ykl+TgGowo8B4QIJnwAAAKkCvgLAAgmZAAAAwAHiAeMBAfoCvwIBIAHkAeUCASAB5gHnAgFIAgQCBQIBIAHzAfQCASAB/AH9AUK/ETvUlBlK9+mhE4+E6YcHralJojlUDMI+aU1nHxtvbdsB6gFCvyZqsQhHPLbj35fx1kqW6/GPL8lK+6+OxUhBqLo4P4GnAe0CCZwAAAAoAesB7AEB/AK/AgFIAjMCtwIJmgAAAKAB7gHvAgEgAfAB8QIBYgJrAfICASACFQIWAgEgAh0CHgEB1AJxAgEgAfUCmgIBIAH2AfcCASACvAKLAgEgAfgB+QIBIAI7AqYCASAB+gH6AgEgAn4CqAEBIAH7AASoQAIBIAJQAf4CASACIAH/AgEgAmwCbAIBIAIAAgECASACbgICAgEgAgICXgEBIAIDAASosAIBIAIGAgcCASACDQIOAgEgAggCCQIBIAIMAgwCASACXgIKAgEgAgoCCgEBIAILAASoyAIBIAJGAkYCASACDwIQAQHUAhQCASACRgIRAgEgAhICEgEBIAJNAQEgAhMABKjoAASo8AIBIAKzAhcCASACGAIZAgEgAjMCxAIBIALEAhoCASACGwIcAgEgAsgCeAIBIAJ4AqQCASACpAJ+AgEgAnUCHwIBIAKPAiACASACfAI6AgEgAmwCIQIBIAKVAm4CAVgCJAIlAUO/Zft0+kJ2CCbnVhc9GM9QRfvtNtRkaxGleJnYA75dKeHAAoQBQb7lmfzfciC/ll7b2/fOeaAfVsMRHDX6/wNPQeAcSJZ3XwImAgFYAikCKgIJmgAAASACJwIoAgEgAjECMgIBIAI8Aj0BQb5euaeEA2wQKV6MmM66JzJxCBZB7LMVDYIoYbCWEmVK3AIrAUG+WO2ZJUtjfF1A30a7hA7ECKeUB7yPlyTJhonGLsi2BRwCYQIJnAAAAEgCLAItAgEgAi4CLwIBSAKcAjACAVgCvgK+AgEgAosCxQEBSAJ5AgFuArwCMwIBIAI0AjUCASACvgKMAgEgAjYCNwIBIAJ1AjkCASACOAJ2AgEgAncCfAIBIAKMAsgCASACOgI7AgEgAoICggIBIAKoAqgCASACTgJPAgEgAj4CPwIBIAJAAkECAUgCSQJKAgEgAkICQwIBIAJDAkQCASACXgJeAgEgAkUCRQIBIAJFAkYBASACRwEBIAJIAASowAAEqNACASACSwJLAQFIAk0BASACTAAEqNgABKjgAgEgAlACUQIBIAJVAlYCASACUgKSAgEgApICkgIBIAJTAlMBASACVAAEqGgCASACVwJYAgEgAlsCXAIBIAKUAlkCASACWQJvAQEgAloABKiAAgEgAm8CXQIBIAJdAl4BASACXwEBIAJgAASoqAAEqLgCCZoAAADgAmICYwIBIAJkAmUCAUgCaAJpAgFYAmYCwgIBIAJyAnMCASACvAJnAgEgAowCxgIBIAJqAmsCAdQCbgJvAgEgApMCbAIBIAJtAm0CASAClQKVAgEgAm4CbgEBIAJwAQEgAnEABKiQAASooAIBIAJ0AnUCASACegJ7AgEgAnYCdwIBIAJ8AnwCASACeAJ4AgEgAqQCpAEBIAJ5AASoKAIBIAJ8An0CASACgAKBAgEgAn4CfgIBIAJ+AoIBASACfwAEqEgCASACggKrAgEgAqsClAEBIAKDAASoUAIJmgAAASAChQKGAgFYAocCiAIBIAKNAo4CAfQCvgK+AgEgAokCigIBIAK8ArwCASACiwK9AgEgAowCjAEBIAK4AgEgApgCmQIBSAKPApACASACkQKSAgEgApICkwIBIAKrAqsCASAClAKUAgEgApQClQEBIAKWAQEgApcABKh4AASoiAIBIAKaApsCASACngKfAgEgApwCnQIBIAKdAp0CASACyALIAgEgAqICogIBIAKgAqECASACpgKnAgEgAqICpAIBIAKkAqgBASACowAEqDABASACpQAEqDgCASACqAKqAgEgAqoCqwEBIAKpAASoWAEBIAKsAQEgAq0ABKhgAASocAIDeiACsAKxAUO/TH7Qwe+lCsFqJgx4wllnW9cj82miXzPUzFjslQ18MI/AArkBQb4gjYGU3VSYoNYheBC/7A2W1bxjNsHShAdPqVRQGWD6OAKyAUG+DtgsJpMQUenAzkejhbDdZyLIK1xzpwNNU//moXrDI3gCtQIJnQAAATwCswK0AQH0Ar8BAdQCwQIJngAAAO4CtgK3AQFYAr8BAUgCuAAEqAgCCZwAAAA4AroCuwIBWAK8Ar0CASACwgLDAgEgAr4CvgIBIALAAsABASACvwAB1QEBIALBAASoEAIBIALEAsUCAUgCyALIAgEgAsYCxgIBIALGAsgBASACxwAEqBgBASACyQAEqCA="
+  },
+  "files": [
+    {
+      "path": "dns/contracts/RootDns.tolk",
+      "content_hash": "772a370e959fcc3db802d335d2644d5290fe3e1195f7ab3bbd4941efcbeccf6c"
+    },
+    {
+      "path": "dns/contracts/dns-utils.tolk",
+      "content_hash": "a2aa55671d1b7ba40bd80b5607ae5350cd7dccab01357dcf6cd734a65aec89ae"
+    },
+    {
+      "path": "dns/contracts/errors.tolk",
+      "content_hash": "2136c31db0c05ec43933e3a5c9cade638f8d8b5a5cc515b980f2518b5a2a18af"
+    },
+    {
+      "path": "dns/contracts/storage.tolk",
+      "content_hash": "b13a29611ebad0c1076d031df1c82ef7159ad935a85d95e2602093a13fab6065"
+    },
+    {
+      "path": "output/RootDns.abi.json",
+      "content_hash": "62829ebd26a8ce960ba054755a6f73a7ffa5ea4720ea030de2334a80ab0b4ff7"
+    }
+  ]
+}
