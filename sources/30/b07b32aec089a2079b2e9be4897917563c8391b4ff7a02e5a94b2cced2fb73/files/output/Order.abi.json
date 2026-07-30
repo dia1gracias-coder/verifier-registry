@@ -1,0 +1,478 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Order",
+  "author": "SwiftDelivery",
+  "version": "1.20.0",
+  "description": "A single delivery order with escrow",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AcceptOrder"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConfirmWithCode"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelOrder"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimExpired"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CourierRelease"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderStorage"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "OrderStatus"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderExtra"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 22
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderAccepted"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderCompleted"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderExpired"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderCancelled"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OrderReopened"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "enum",
+      "name": "OrderStatus",
+      "ty_idx": 20,
+      "encoded_as_ty_idx": 21,
+      "members": [
+        {
+          "name": "Open",
+          "value": "0"
+        },
+        {
+          "name": "Accepted",
+          "value": "1"
+        },
+        {
+          "name": "Completed",
+          "value": "2"
+        },
+        {
+          "name": "Cancelled",
+          "value": "3"
+        },
+        {
+          "name": "Expired",
+          "value": "4"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderExtra",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "senderContact",
+          "ty_idx": 3
+        },
+        {
+          "name": "courierContact",
+          "ty_idx": 3
+        },
+        {
+          "name": "secretHash",
+          "ty_idx": 14
+        },
+        {
+          "name": "referral",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderStorage",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "sender",
+          "ty_idx": 7
+        },
+        {
+          "name": "courier",
+          "ty_idx": 19
+        },
+        {
+          "name": "description",
+          "ty_idx": 3
+        },
+        {
+          "name": "area",
+          "ty_idx": 3
+        },
+        {
+          "name": "origin",
+          "ty_idx": 3
+        },
+        {
+          "name": "reward",
+          "ty_idx": 6
+        },
+        {
+          "name": "status",
+          "ty_idx": 20
+        },
+        {
+          "name": "nonce",
+          "ty_idx": 11
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "acceptedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "extra",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AcceptOrder",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 2685009921,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "courierContact",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConfirmWithCode",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 2685009922,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "secret",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CancelOrder",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 2685009923,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimExpired",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 2685009924,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "CourierRelease",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 2685009925,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "OrderAccepted",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 2685010177,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "courier",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderCompleted",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 2685010178,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "courier",
+          "ty_idx": 7
+        },
+        {
+          "name": "reward",
+          "ty_idx": 6
+        },
+        {
+          "name": "referralPayout",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderCancelled",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 2685010179,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "reward",
+          "ty_idx": 6
+        },
+        {
+          "name": "referralPayout",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderExpired",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 2685010180,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "courier",
+          "ty_idx": 7
+        },
+        {
+          "name": "reward",
+          "ty_idx": 6
+        },
+        {
+          "name": "referralPayout",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OrderReopened",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 2685010181,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "courier",
+          "ty_idx": 7
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 18
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 120887,
+      "name": "orderData",
+      "parameters": [],
+      "return_ty_idx": 18
+    },
+    {
+      "tvm_method_id": 101642,
+      "name": "status",
+      "parameters": [],
+      "return_ty_idx": 20
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "OrderErrors.WrongStatus",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "OrderErrors.NotSender",
+      "err_code": 101
+    },
+    {
+      "kind": "enum_member",
+      "name": "OrderErrors.NotCourier",
+      "err_code": 102
+    },
+    {
+      "kind": "enum_member",
+      "name": "OrderErrors.FeeTooLow",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "OrderErrors.NotExpired",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "OrderErrors.DeadlinePassed",
+      "err_code": 105
+    },
+    {
+      "kind": "enum_member",
+      "name": "OrderErrors.BadCode",
+      "err_code": 108
+    },
+    {
+      "kind": "enum_member",
+      "name": "OrderErrors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
