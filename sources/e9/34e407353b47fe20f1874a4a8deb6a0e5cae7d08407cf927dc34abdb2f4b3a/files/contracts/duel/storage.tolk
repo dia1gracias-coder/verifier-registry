@@ -1,0 +1,105 @@
+import "errors"
+
+const OFFER_OPEN = 1
+const OFFER_MATCHED = 2
+
+const REVEALED_A = 1
+const REVEALED_B = 2
+
+type OfferMap = map<uint64, Cell<OfferData>>
+
+type DuelMap = map<uint64, Cell<DuelData>>
+
+type ActiveOfferMap = map<address, uint64>
+
+type UsedOfferMap = map<uint64, bool>
+
+struct DirectOfferData {
+    inviteId: uint256
+    opponent: address?
+}
+
+struct OfferData {
+    owner: address
+    commitment: uint256
+    chanceBps: uint16
+    totalPool: coins
+    stake: coins
+    expiresAt: uint32
+    state: uint8
+    feeExempt: bool
+    direct: Cell<DirectOfferData>
+}
+
+struct DuelData {
+    offerAId: uint64
+    offerBId: uint64
+    boostDeadline: uint32
+    hardDeadline: uint32
+    revealDeadline: uint32
+    boostRevision: uint16
+    secretA: uint256
+    secretB: uint256
+    revealedMask: uint8
+}
+
+struct Storage {
+    owner: address
+    treasury: address
+    feeBps: uint16
+    networkId: int32
+    inviteSignerPublicKey: uint256
+    paused: bool
+    locked: coins
+    offers: OfferMap
+    duels: DuelMap
+    activeOffers: ActiveOfferMap
+    usedOfferIds: UsedOfferMap
+}
+
+struct ContractConfigView {
+    owner: address
+    treasury: address
+    feeBps: uint16
+    networkId: int32
+    inviteSignerPublicKey: uint256
+    contractAddress: address
+    paused: bool
+    locked: coins
+    holderFeeSupported: bool
+}
+
+struct DuelAdminStateView {
+    owner: address
+    treasury: address
+    feeBps: uint16
+    paused: bool
+    locked: coins
+}
+
+struct DuelBoostView {
+    stakeA: coins
+    stakeB: coins
+    chanceABps: uint16
+    chanceBBps: uint16
+    boostDeadline: uint32
+    hardDeadline: uint32
+    revealDeadline: uint32
+    boostRevision: uint16
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+fun Storage.loadOffer(self, offerId: uint64): OfferData {
+    return self.offers.mustGet(offerId, Errors.OfferMissing).load();
+}
+
+fun Storage.loadDuel(self, duelId: uint64): DuelData {
+    return self.duels.mustGet(duelId, Errors.DuelMissing).load();
+}

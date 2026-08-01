@@ -1,0 +1,1366 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "DuelEscrow",
+  "author": "LOOP",
+  "version": "1.5.0",
+  "description": "Address-bound TON escrow with a guaranteed boost response window, commit-reveal and holder fee permits",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OpenOffer"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "HolderFeePermit"
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelOffer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MatchOffers"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Reveal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExpireOffer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExpireDuel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OpenDirectOffer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AcceptDirectOffer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DirectAcceptance"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelFundReserve"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelWithdrawSurplus"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelSetFee"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelSetTreasury"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelSetOwner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BoostDuel"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "OfferMap"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OfferData"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DirectOfferData"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 39
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 37
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 42
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "DuelMap"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelData"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 45
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 46
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ActiveOfferMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 11
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "UsedOfferMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OfferRefund"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelPayout"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProtocolFee"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelAdminWithdrawal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ContractConfigView"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelBoostView"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DuelAdminStateView"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "HolderFeePermit",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "validUntil",
+          "ty_idx": 9
+        },
+        {
+          "name": "signature",
+          "ty_idx": 16
+        }
+      ],
+      "description": "Backend Ed25519 proof that the offer owner holds PLUSH BRICK. The permit is\ndomain-separated and bound to the network, contract, offer id, owner wallet\nand expiry, so it cannot be replayed for another player or deployment. A\nvalid permit marks the offer fee-exempt: if it wins, no protocol fee is\nwithheld from the payout."
+    },
+    {
+      "kind": "struct",
+      "name": "OpenOffer",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1280265985,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "chanceBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "totalPool",
+          "ty_idx": 6
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "counterOfferId",
+          "ty_idx": 11
+        },
+        {
+          "name": "holder",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CancelOffer",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1280265986,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MatchOffers",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1280265987,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "firstOfferId",
+          "ty_idx": 11
+        },
+        {
+          "name": "secondOfferId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Reveal",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1280265988,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "secret",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExpireOffer",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1280265989,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ExpireDuel",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1280265990,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetPaused",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 1280265991,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OpenDirectOffer",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1280265992,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "chanceBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "totalPool",
+          "ty_idx": 6
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "inviteId",
+          "ty_idx": 13
+        },
+        {
+          "name": "holder",
+          "ty_idx": 18
+        }
+      ],
+      "description": "Opens a Telegram direct invite. `inviteId` is public and only identifies\nthe invite; acceptance still requires a backend Ed25519 permit bound to the\naccepting wallet address."
+    },
+    {
+      "kind": "struct",
+      "name": "DirectAcceptance",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "counterOfferId",
+          "ty_idx": 11
+        },
+        {
+          "name": "validUntil",
+          "ty_idx": 9
+        },
+        {
+          "name": "signature",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AcceptDirectOffer",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1280265993,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "chanceBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "totalPool",
+          "ty_idx": 6
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "acceptance",
+          "ty_idx": 28
+        },
+        {
+          "name": "holder",
+          "ty_idx": 18
+        }
+      ],
+      "description": "Atomically opens the invited wallet's complementary offer, verifies its\naddress-bound permit and matches the pair."
+    },
+    {
+      "kind": "struct",
+      "name": "DuelFundReserve",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1280265994,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DuelWithdrawSurplus",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1280265995,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DuelSetFee",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1280265996,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DuelSetTreasury",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 1280265997,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DuelSetOwner",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 1280265998,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BoostDuel",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 1280265999,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "expectedRevision",
+          "ty_idx": 14
+        },
+        {
+          "name": "minChanceBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "validUntil",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Adds a verified amount to one side of a matched duel while its boost window is open.\n`expectedRevision` and `minChanceBps` protect wallet transactions from stale ordering."
+    },
+    {
+      "kind": "struct",
+      "name": "DuelPayout",
+      "ty_idx": 53,
+      "prefix": {
+        "prefix_num": 1280266001,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "reason",
+          "ty_idx": 38
+        }
+      ],
+      "description": "Attached to every terminal winner transfer so indexers can project the result."
+    },
+    {
+      "kind": "struct",
+      "name": "OfferRefund",
+      "ty_idx": 52,
+      "prefix": {
+        "prefix_num": 1280266002,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        },
+        {
+          "name": "reason",
+          "ty_idx": 38
+        }
+      ],
+      "description": "Attached to unmatched or no-reveal refunds."
+    },
+    {
+      "kind": "struct",
+      "name": "ProtocolFee",
+      "ty_idx": 54,
+      "prefix": {
+        "prefix_num": 1280266003,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Attached to the protocol fee transfer."
+    },
+    {
+      "kind": "struct",
+      "name": "DuelAdminWithdrawal",
+      "ty_idx": 55,
+      "prefix": {
+        "prefix_num": 1280266004,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "OfferMap",
+      "ty_idx": 36,
+      "target_ty_idx": 43
+    },
+    {
+      "kind": "alias",
+      "name": "DuelMap",
+      "ty_idx": 44,
+      "target_ty_idx": 47
+    },
+    {
+      "kind": "alias",
+      "name": "ActiveOfferMap",
+      "ty_idx": 48,
+      "target_ty_idx": 49
+    },
+    {
+      "kind": "alias",
+      "name": "UsedOfferMap",
+      "ty_idx": 50,
+      "target_ty_idx": 51
+    },
+    {
+      "kind": "struct",
+      "name": "DirectOfferData",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "inviteId",
+          "ty_idx": 13
+        },
+        {
+          "name": "opponent",
+          "ty_idx": 40
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OfferData",
+      "ty_idx": 37,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "commitment",
+          "ty_idx": 13
+        },
+        {
+          "name": "chanceBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "totalPool",
+          "ty_idx": 6
+        },
+        {
+          "name": "stake",
+          "ty_idx": 6
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "state",
+          "ty_idx": 38
+        },
+        {
+          "name": "feeExempt",
+          "ty_idx": 5
+        },
+        {
+          "name": "direct",
+          "ty_idx": 41
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DuelData",
+      "ty_idx": 45,
+      "fields": [
+        {
+          "name": "offerAId",
+          "ty_idx": 11
+        },
+        {
+          "name": "offerBId",
+          "ty_idx": 11
+        },
+        {
+          "name": "boostDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "hardDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "revealDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "boostRevision",
+          "ty_idx": 14
+        },
+        {
+          "name": "secretA",
+          "ty_idx": 13
+        },
+        {
+          "name": "secretB",
+          "ty_idx": 13
+        },
+        {
+          "name": "revealedMask",
+          "ty_idx": 38
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 35,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "networkId",
+          "ty_idx": 8
+        },
+        {
+          "name": "inviteSignerPublicKey",
+          "ty_idx": 13
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "locked",
+          "ty_idx": 6
+        },
+        {
+          "name": "offers",
+          "ty_idx": 36
+        },
+        {
+          "name": "duels",
+          "ty_idx": 44
+        },
+        {
+          "name": "activeOffers",
+          "ty_idx": 48
+        },
+        {
+          "name": "usedOfferIds",
+          "ty_idx": 50
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ContractConfigView",
+      "ty_idx": 56,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "networkId",
+          "ty_idx": 8
+        },
+        {
+          "name": "inviteSignerPublicKey",
+          "ty_idx": 13
+        },
+        {
+          "name": "contractAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "locked",
+          "ty_idx": 6
+        },
+        {
+          "name": "holderFeeSupported",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DuelAdminStateView",
+      "ty_idx": 58,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "locked",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DuelBoostView",
+      "ty_idx": 57,
+      "fields": [
+        {
+          "name": "stakeA",
+          "ty_idx": 6
+        },
+        {
+          "name": "stakeB",
+          "ty_idx": 6
+        },
+        {
+          "name": "chanceABps",
+          "ty_idx": 14
+        },
+        {
+          "name": "chanceBBps",
+          "ty_idx": 14
+        },
+        {
+          "name": "boostDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "hardDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "revealDeadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "boostRevision",
+          "ty_idx": 14
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 35
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 34
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 52
+    },
+    {
+      "body_ty_idx": 53
+    },
+    {
+      "body_ty_idx": 54
+    },
+    {
+      "body_ty_idx": 55
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 94616,
+      "name": "contractConfig",
+      "parameters": [],
+      "return_ty_idx": 56
+    },
+    {
+      "tvm_method_id": 100877,
+      "name": "offerData",
+      "parameters": [
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 37
+    },
+    {
+      "tvm_method_id": 82385,
+      "name": "duelData",
+      "parameters": [
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 45
+    },
+    {
+      "tvm_method_id": 92203,
+      "name": "duelBoostData",
+      "parameters": [
+        {
+          "name": "duelId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 57
+    },
+    {
+      "tvm_method_id": 103758,
+      "name": "directOfferData",
+      "parameters": [
+        {
+          "name": "offerId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 39
+    },
+    {
+      "tvm_method_id": 106493,
+      "name": "activeOffer",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 11
+    },
+    {
+      "tvm_method_id": 129928,
+      "name": "adminState",
+      "parameters": [],
+      "return_ty_idx": 58
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotOwner",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.Paused",
+      "err_code": 101
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OfferAlreadyUsed",
+      "err_code": 102
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OwnerAlreadyActive",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OfferMissing",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OfferNotOpen",
+      "err_code": 105
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DuelMissing",
+      "err_code": 106
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidChance",
+      "err_code": 107
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidPool",
+      "err_code": 108
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidExpiry",
+      "err_code": 109
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 110
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.IncompatibleOffers",
+      "err_code": 111
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SameOwner",
+      "err_code": 112
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RevealClosed",
+      "err_code": 113
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongRevealer",
+      "err_code": 114
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadyRevealed",
+      "err_code": 115
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidCommitment",
+      "err_code": 116
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TooEarly",
+      "err_code": 117
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidFee",
+      "err_code": 118
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidOfferId",
+      "err_code": 119
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DirectInviteRequired",
+      "err_code": 120
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidDirectPermit",
+      "err_code": 121
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DirectPermitExpired",
+      "err_code": 122
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidAdminAmount",
+      "err_code": 123
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientSurplus",
+      "err_code": 124
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.MustBePaused",
+      "err_code": 125
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidTreasury",
+      "err_code": 126
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidOwner",
+      "err_code": 127
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ActiveValueLocked",
+      "err_code": 129
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BoostClosed",
+      "err_code": 130
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidBoost",
+      "err_code": 131
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.StaleBoost",
+      "err_code": 132
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RevealNotOpen",
+      "err_code": 133
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidHolderPermit",
+      "err_code": 134
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.HolderPermitExpired",
+      "err_code": 135
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
