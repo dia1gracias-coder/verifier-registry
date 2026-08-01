@@ -1,0 +1,763 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "BankQueue",
+  "author": "LOOP",
+  "version": "1.4.0",
+  "description": "FIFO payout cycle for LOOP BANK with maturity-based principal limits and pruned settled positions",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreatePosition"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetBankPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankFundReserve"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankWithdrawSurplus"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankSetFee"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankSetTreasury"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankSetOwner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankStorage"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "PositionMap"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankPositionData"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 22
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 24
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "QueueMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 11
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ActivePositionMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 11
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "UsedPositionMap"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankPayout"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankProtocolFee"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankAdminWithdrawal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankContractConfigView"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankQueueView"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BankAdminStateView"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "CreatePosition",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1279413761,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "positionId",
+          "ty_idx": 11
+        },
+        {
+          "name": "principal",
+          "ty_idx": 6
+        },
+        {
+          "name": "multiplierBps",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetBankPaused",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1279413762,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankFundReserve",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1279413763,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankWithdrawSurplus",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1279413764,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankSetFee",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1279413765,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankSetTreasury",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1279413766,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankSetOwner",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1279413767,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankPayout",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 1279413777,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "positionId",
+          "ty_idx": 11
+        },
+        {
+          "name": "principal",
+          "ty_idx": 6
+        },
+        {
+          "name": "targetPayout",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankProtocolFee",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 1279413778,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "positionId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankAdminWithdrawal",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 1279413779,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "PositionMap",
+      "ty_idx": 21,
+      "target_ty_idx": 25
+    },
+    {
+      "kind": "alias",
+      "name": "QueueMap",
+      "ty_idx": 26,
+      "target_ty_idx": 27
+    },
+    {
+      "kind": "alias",
+      "name": "ActivePositionMap",
+      "ty_idx": 28,
+      "target_ty_idx": 29
+    },
+    {
+      "kind": "alias",
+      "name": "UsedPositionMap",
+      "ty_idx": 30,
+      "target_ty_idx": 31
+    },
+    {
+      "kind": "struct",
+      "name": "BankPositionData",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "principal",
+          "ty_idx": 6
+        },
+        {
+          "name": "multiplierBps",
+          "ty_idx": 13
+        },
+        {
+          "name": "targetPayout",
+          "ty_idx": 6
+        },
+        {
+          "name": "fundedAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "queueIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "completedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "status",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankStorage",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 13
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "headQueueIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "nextQueueIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "completedPositions",
+          "ty_idx": 11,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "lockedFunding",
+          "ty_idx": 6
+        },
+        {
+          "name": "positions",
+          "ty_idx": 21
+        },
+        {
+          "name": "queue",
+          "ty_idx": 26
+        },
+        {
+          "name": "activePositions",
+          "ty_idx": 28
+        },
+        {
+          "name": "usedPositionIds",
+          "ty_idx": 30
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankContractConfigView",
+      "ty_idx": 35,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 13
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "headQueueIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "nextQueueIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "completedPositions",
+          "ty_idx": 11
+        },
+        {
+          "name": "principalLimit",
+          "ty_idx": 6
+        },
+        {
+          "name": "lockedFunding",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankQueueView",
+      "ty_idx": 36,
+      "fields": [
+        {
+          "name": "headQueueIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "nextQueueIndex",
+          "ty_idx": 11
+        },
+        {
+          "name": "openPositions",
+          "ty_idx": 11
+        },
+        {
+          "name": "completedPositions",
+          "ty_idx": 11
+        },
+        {
+          "name": "principalLimit",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BankAdminStateView",
+      "ty_idx": 37,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "treasury",
+          "ty_idx": 7
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 13
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "completedPositions",
+          "ty_idx": 11
+        },
+        {
+          "name": "principalLimit",
+          "ty_idx": 6
+        },
+        {
+          "name": "lockedFunding",
+          "ty_idx": 6
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 20
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 34
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 94616,
+      "name": "contractConfig",
+      "parameters": [],
+      "return_ty_idx": 35
+    },
+    {
+      "tvm_method_id": 130765,
+      "name": "queueData",
+      "parameters": [],
+      "return_ty_idx": 36
+    },
+    {
+      "tvm_method_id": 93807,
+      "name": "positionData",
+      "parameters": [
+        {
+          "name": "positionId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 22
+    },
+    {
+      "tvm_method_id": 104606,
+      "name": "activePosition",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 11
+    },
+    {
+      "tvm_method_id": 129928,
+      "name": "adminState",
+      "parameters": [],
+      "return_ty_idx": 37
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.NotOwner",
+      "err_code": 200
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.Paused",
+      "err_code": 201
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.PositionAlreadyUsed",
+      "err_code": 202
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.OwnerAlreadyActive",
+      "err_code": 203
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.PositionMissing",
+      "err_code": 204
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.InvalidPrincipal",
+      "err_code": 205
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.InvalidMultiplier",
+      "err_code": 206
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.InvalidFee",
+      "err_code": 207
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.InsufficientValue",
+      "err_code": 208
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.AllocationLimit",
+      "err_code": 209
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.InvalidAdminAmount",
+      "err_code": 210
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.InsufficientSurplus",
+      "err_code": 211
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.MustBePaused",
+      "err_code": 212
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.InvalidTreasury",
+      "err_code": 213
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.InvalidOwner",
+      "err_code": 214
+    },
+    {
+      "kind": "enum_member",
+      "name": "BankErrors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0"
+}
