@@ -1,0 +1,829 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "PayoutDistributor",
+  "version": "1.0.0",
+  "description": "Push-only jetton payout with per-payout and rolling daily caps",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BatchPayout"
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayoutNode"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetJettonWallet"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetSigner"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetRouting"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGuardian"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetCaps"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetGasParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferOwner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawJettons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawTon"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUp"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonNotify"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonExcesses"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AdminKeys"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 34
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Routing"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 36
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Limits"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "AdminKeys",
+      "ty_idx": 34,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "guardian",
+          "ty_idx": 7
+        },
+        {
+          "name": "signerKey",
+          "ty_idx": 20
+        }
+      ],
+      "description": "owner is the cold multisig; guardian is an online key that may pause but\nnever unpause and never move funds."
+    },
+    {
+      "kind": "struct",
+      "name": "Routing",
+      "ty_idx": 36,
+      "fields": [
+        {
+          "name": "gasWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "excessTo",
+          "ty_idx": 7
+        },
+        {
+          "name": "jettonWallet",
+          "ty_idx": 37
+        }
+      ],
+      "description": "gasWallet is the only sender allowed to submit a batch. excessTo receives\nTEP-74 excesses — pointing it at the gas wallet returns leftover TON to the\naccount that paid it and keeps N receipts off the fund-holding contract."
+    },
+    {
+      "kind": "struct",
+      "name": "Limits",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "maxBatch",
+          "ty_idx": 14
+        },
+        {
+          "name": "tonPerPayout",
+          "ty_idx": 6
+        },
+        {
+          "name": "batchOverhead",
+          "ty_idx": 6
+        },
+        {
+          "name": "maxPerPayout",
+          "ty_idx": 6
+        },
+        {
+          "name": "dailyCap",
+          "ty_idx": 6
+        },
+        {
+          "name": "daySpent",
+          "ty_idx": 6
+        },
+        {
+          "name": "windowStartedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "lastBatchId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "maxBatch / tonPerPayout / batchOverhead are settable because the real numbers\ncan only come from measuring gas on a live network.\n\nThe daily cap is a tumbling 24h window, not a true sliding one: a sliding\nwindow needs a ring buffer of timestamps and its cost grows per batch. The\ntradeoff is that up to 2x dailyCap can leave across a window boundary."
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 33,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 35
+        },
+        {
+          "name": "routing",
+          "ty_idx": 38
+        },
+        {
+          "name": "limits",
+          "ty_idx": 39
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayoutNode",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "payoutId",
+          "ty_idx": 11
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "next",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BatchPayout",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 790233344,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "signature",
+          "ty_idx": 13
+        },
+        {
+          "name": "batchId",
+          "ty_idx": 11
+        },
+        {
+          "name": "validUntil",
+          "ty_idx": 9
+        },
+        {
+          "name": "count",
+          "ty_idx": 14
+        },
+        {
+          "name": "totalAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "payouts",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetJettonWallet",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 790233089,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetSigner",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 790233090,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "signerKey",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetRouting",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 790233091,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "gasWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "excessTo",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetGuardian",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 790233092,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "guardian",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetCaps",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 790233093,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "maxPerPayout",
+          "ty_idx": 6
+        },
+        {
+          "name": "dailyCap",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetGasParams",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 790233094,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "tonPerPayout",
+          "ty_idx": 6
+        },
+        {
+          "name": "batchOverhead",
+          "ty_idx": 6
+        },
+        {
+          "name": "maxBatch",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetPaused",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 790233095,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferOwner",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 790233096,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newOwner",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawJettons",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 790233097,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawTon",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 790233098,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUp",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 790233099,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransfer",
+      "ty_idx": 40,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "destination",
+          "ty_idx": 7
+        },
+        {
+          "name": "responseDestination",
+          "ty_idx": 7
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 41
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 31
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonNotify",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "sender",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 31
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonExcesses",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 33
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 32
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 40
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 128352,
+      "name": "adminKeys",
+      "parameters": [],
+      "return_ty_idx": 34
+    },
+    {
+      "tvm_method_id": 129362,
+      "name": "routing",
+      "parameters": [],
+      "return_ty_idx": 36
+    },
+    {
+      "tvm_method_id": 68252,
+      "name": "limits",
+      "parameters": [],
+      "return_ty_idx": 39
+    },
+    {
+      "tvm_method_id": 66178,
+      "name": "dailyRemaining",
+      "parameters": [],
+      "return_ty_idx": 6,
+      "description": "How much may still leave in the current window, accounting for a window that\nhas already expired but not yet been reset by a batch."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotOwner",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotGuardian",
+      "err_code": 101
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotGasWallet",
+      "err_code": 102
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.Paused",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NoJettonWallet",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BadSignature",
+      "err_code": 105
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.StaleBatchId",
+      "err_code": 106
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.Expired",
+      "err_code": 107
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BatchTooLarge",
+      "err_code": 108
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.EmptyBatch",
+      "err_code": 109
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientGas",
+      "err_code": 110
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PayoutTooLarge",
+      "err_code": 111
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ZeroAmount",
+      "err_code": 112
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BadWorkchain",
+      "err_code": 113
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.CountMismatch",
+      "err_code": 114
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TotalMismatch",
+      "err_code": 115
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DailyCap",
+      "err_code": 116
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientTon",
+      "err_code": 117
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
