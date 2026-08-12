@@ -1,0 +1,612 @@
+builder int_to_string(int value) inline {
+    builder result = begin_cell();
+    tuple digits = null();
+
+    do {
+        int digit = value~divmod(10);
+        digits = cons(digit + 48, digits);
+    } until (value == 0);
+
+    do {
+        int digit = digits~list_next();
+        result~store_uint(digit, 8);
+    } until (null?(digits));
+
+    return result;
+}
+
+
+cell gen_bonus_payload(
+    cell structure_name,            ;; 40 symbols maximum
+    cell bonus_title,               ;; 20 symbols maximum
+    cell recipient_profile_login,           ;; 20 symbols maximum
+    cell reason_profile_login,      ;; 20 symbols maximum
+    int reason_place_number         ;; 10 symbols maximum
+) inline {
+   
+    {-
+        default:
+        <structure_name>: <bonus_title> → <recipient_profile_login>
+        (from <reason_profile_login> #<reason_place_number>)
+
+        reason_profile_login is null:
+        <structure_name>: <bonus_title> → <recipient_profile_login>
+        (from System #<reason_place_number>)
+
+        recipient_profile_login is null:
+        <structure_name>: <bonus_title> →
+        (from <reason_profile_login> #<reason_place_number>)
+    -}
+
+    builder payload = begin_cell()
+        .store_slice(structure_name.begin_parse())
+        .store_slice(": ")
+        .store_slice(bonus_title.begin_parse())
+        .store_slice(" →");
+
+    ifnot (null?(recipient_profile_login)) {
+        payload = payload
+            .store_slice(" ")
+            .store_slice(recipient_profile_login.begin_parse());
+    }
+
+    payload = payload.store_slice(" (from ");
+
+    if (null?(reason_profile_login)) {
+        payload = payload.store_slice("System");
+    } else {
+        payload = payload.store_slice(reason_profile_login.begin_parse());
+    }
+
+    payload = payload
+        .store_slice(" #")
+        .store_builder(int_to_string(reason_place_number))
+        .store_slice(")");
+
+    return payload.end_cell();
+}
+
+
+() send_jetton_transfer_msg(int query_id, int jetton_amount, slice destination_addr, slice response_destination_addr, 
+    int forward_ton_amount, cell forward_payload, slice sender_jetton_wallet, int attached_ton_amount, int send_mode) impure inline {
+
+    {-
+        transfer#0f8a7ea5
+            query_id:uint64
+            amount:Coins
+            destination:MsgAddress
+            response_destination:MsgAddress
+            custom_payload:(Maybe ^Cell)
+            forward_ton_amount:Coins
+            forward_payload:(Either Cell ^Cell)
+            = JettonMsg;
+    -}
+
+    cell body = begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(query_id, 64)
+        .store_coins(jetton_amount)
+        .store_slice(destination_addr)
+        .store_slice(response_destination_addr)
+        .store_maybe_ref(null())                    ;; custom payload (Maybe ^Cell)
+        .store_coins(forward_ton_amount)
+        .store_maybe_ref(forward_payload)           ;; right branch of (Either Cell ^Cell)
+        .end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)                        ;; bounceable
+        .store_slice(sender_jetton_wallet)
+        .store_coins(attached_ton_amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)     ;; default msg flags                   
+        .store_maybe_ref(body)                      ;; body:(Either X ^X)
+        .end_cell();
+
+    send_raw_message(msg, send_mode);
+}
+
+
+() send_jetton_bonus(
+    int query_id,
+    cell structure_name,
+    cell bonus_title,
+
+    cell recipient_profile_login,
+    slice recipient_addr,
+
+    cell reason_profile_login,
+    int reason_place_number,
+
+    int jetton_amount,
+    int forward_ton_amount,
+    slice sender_jetton_wallet,
+    slice response_destination_addr,
+    slice prefix
+) impure inline {
+
+    cell payload = gen_bonus_payload(
+        structure_name,
+        bonus_title, 
+        recipient_profile_login,
+        reason_profile_login,
+        reason_place_number);
+
+    cell body = begin_cell()
+        .store_uint(0, 32)                       ;; zero opcode → simple text message
+        .store_slice(prefix)                      ;; configured label or tag
+        .store_ref(payload)                         ;; actual text content (snake cell)
+        .end_cell();
+
+    send_jetton_transfer_msg(
+        query_id,
+        jetton_amount,
+        recipient_addr,
+        response_destination_addr,
+        forward_ton_amount,
+        body,               ;; forward_payload
+        sender_jetton_wallet,
+        50000000,           ;; amount 0.05 TON
+        1 + 16              ;; send_mode 
+    );
+}
+
+
+int send_ton_bonus_to_wallet(
+    cell structure_name,
+    cell bonus_title,
+
+    cell recipient_profile_login,
+    slice recipient_owner_addr,
+
+    cell reason_profile_login,
+    int reason_place_number,
+
+    int amount,
+    slice prefix
+) impure inline {
+    
+    cell payload = gen_bonus_payload(
+        structure_name,
+        bonus_title, 
+        recipient_profile_login,
+        reason_profile_login,
+        reason_place_number);
+    
+    cell body = begin_cell()
+        .store_uint(0, 32)                       ;; zero opcode → simple text message
+        .store_slice(prefix)                      ;; configured label or tag
+        .store_ref(payload)                       ;; actual text content (snake cell)
+        .end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x10, 6)                     ;; internal message (nobounce)
+        .store_slice(recipient_owner_addr)                   ;; destination address
+        .store_coins(amount)                     ;; amount in nanotons
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)  ;; default message headers
+        .store_uint(1, 1)                        ;; store body as a ref
+        .store_ref(body)
+        .end_cell();
+
+    send_raw_message(msg, 1 + 16); 
+    ;; The internal message is non-bounceable.
+    ;; Mode 16 handles an action-phase send failure.
+
+    return (amount);
+}
+
+
+int pay_bonus(
+    int query_id,
+
+    cell structure_name,
+    cell bonus_title,
+
+    cell recipient_profile_login,
+    slice recipient_profile_addr,       ;; retained as the royalty identity
+    slice recipient_owner_addr,
+
+    cell reason_profile_login,
+    int reason_place_number,
+
+    int amount,
+    slice sender_jetton_wallet,
+    slice response_destination_addr,
+
+    cell royalties,
+    slice prefix
+) impure inline {
+    (_, int recipient_profile_hash) = parse_std_addr(recipient_profile_addr);
+    (slice royalty_config, int royalty_config_found?) =
+        royalties.udict_get?(256, recipient_profile_hash);
+
+    (int royalty_numerator, int royalty_denominator, slice royalty_recipient_addr) =
+        (0, 0, address_none());
+    if (royalty_config_found?) {
+        (royalty_numerator, royalty_denominator, royalty_recipient_addr) =
+            parse__royalty_config(royalty_config);
+    }
+
+    int payee_amount = amount;
+    int royalty_amount = 0;
+
+    if ((~ is_address_none(royalty_recipient_addr)) & (royalty_numerator > 0) & (royalty_denominator > 0)) 
+    {
+        royalty_amount = muldiv(payee_amount, royalty_numerator, royalty_denominator);
+        if (royalty_amount > payee_amount)
+        {
+            royalty_amount = payee_amount;
+        }
+
+        payee_amount -= royalty_amount;
+    }
+
+    if (is_address_none(sender_jetton_wallet)) {
+        if (payee_amount > 0) {
+            send_ton_bonus_to_wallet(
+                structure_name,
+                bonus_title,
+
+                recipient_profile_login,
+                recipient_owner_addr,
+
+                reason_profile_login,
+                reason_place_number,
+
+                payee_amount,
+                prefix
+            );
+        }
+
+        if (royalty_amount > 0) {
+            send_ton_bonus_to_wallet(
+                structure_name,
+                bonus_title,
+
+                null(),                  ;; royalty recipient is not a profile
+                royalty_recipient_addr,
+
+                reason_profile_login,
+                reason_place_number,
+
+                royalty_amount,
+                prefix
+            );
+        }
+
+        return (amount);
+    }
+
+    if (payee_amount > 0) {
+        send_jetton_bonus(
+            query_id,
+            structure_name,
+            bonus_title,
+
+            recipient_profile_login,
+            recipient_owner_addr,       ;; recipient_addr
+
+            reason_profile_login,
+            reason_place_number,
+
+            payee_amount,               ;; jetton_amount
+            1,                          ;; forward_ton_amount
+
+            sender_jetton_wallet,
+            response_destination_addr,
+            prefix
+        );
+    }
+
+    if (royalty_amount > 0) {
+        send_jetton_bonus(
+            query_id,
+            structure_name,
+            bonus_title,
+
+            null(),                     ;; royalty recipient is not a profile
+            royalty_recipient_addr,     ;; recipient_addr
+
+            reason_profile_login,
+            reason_place_number,
+
+            royalty_amount,             ;; jetton_amount
+            1,                          ;; forward_ton_amount
+
+            sender_jetton_wallet,
+            response_destination_addr,
+            prefix
+        );
+    }
+
+    return (0);                          ;; Jetton payments do not reduce TON principal
+}
+
+
+
+(cell, (int, int)) process_rewards(
+    ;; Processing state
+    cell queue,
+    int seq_no,
+
+    ;; Rewards
+    slice reward_set,
+
+    ;; SourcePlace
+    int source_struct,
+    slice source_profile_addr,
+    int source_place_number,
+    cell source_profile_login,
+
+    ;; Execution context
+    int query_id,
+    slice processor_addr,
+
+    ;; Display metadata
+    cell structure_name,
+    slice prefix
+) impure inline
+{
+   int total_paid_ton = 0;
+   
+    ;; RewardSet constructor:
+    ;; 0 = empty
+    ;; 1 = cons
+
+    while (reward_set~load_uint(1)) 
+    {
+        ;; Parse Reward from `rewards` here.
+        ;; Your Reward.tlb currently uses 32-bit constructor tags.
+        int reward_tag = reward_set~load_uint(32);
+
+        ;; process reward according to reward_tag
+        if (reward_tag == 0x210bbdce)      ;; commands
+        { 
+            {-
+                commands#210bbdce
+                    from_level: uint16
+                    to_level: uint16
+                    count: uint8
+                    struct: uint8 
+                    cmd: SystemCommand
+                    payload: (Maybe ^Cell)
+                = Reward;
+            -}
+
+            int from_level = reward_set~load_uint(16);
+            int to_level = reward_set~load_uint(16);
+            int count = reward_set~load_uint(8);
+            int command_struct = reward_set~load_uint(8);
+            int cmd = reward_set~load_uint(32);
+            cell payload = reward_set~load_maybe_ref();
+
+            int level = from_level;
+            while (level <= to_level) 
+            {  
+                repeat (count)
+                {
+                    (seq_no) = queue~add__system_command__task(
+                        command_struct,                
+                        cmd, 
+                        source_struct,          
+                        source_profile_addr,    
+                        source_place_number,    
+                        level,                  
+                        query_id,         
+                        payload,
+                        seq_no);
+                }
+            
+                level += 1;
+            }
+        }
+
+        elseif (reward_tag == 0xc4a6ef3e)  ;; bonus 
+        {
+            {-
+                bonus#c4a6ef3e
+                    from_level: uint16
+                    to_level: uint16
+                    type: BonusType
+                    amount: Coins
+                    sender_jetton_wallet: MsgAddress
+                    title: ^Cell
+                    payload: (Maybe ^Cell)
+                = Reward;
+            -}
+
+            int from_level = reward_set~load_uint(16);
+            int to_level = reward_set~load_uint(16);
+            int bonus_type = reward_set~load_uint(32);
+            int amount = reward_set~load_coins();
+            slice sender_jetton_wallet = reward_set~load_msg_addr();
+            cell bonus_title = reward_set~load_ref();
+            cell payload = reward_set~load_maybe_ref(); 
+
+            int level = from_level;
+            while (level <= to_level) 
+            {  
+                (seq_no) = queue~add__bonus_query__task(
+                    bonus_type, 
+                    source_struct,
+                    source_profile_addr, 
+                    source_place_number, 
+                    level, 
+                    amount, 
+                    sender_jetton_wallet, 
+                    bonus_title,                    
+                    query_id, 
+                    payload, 
+                    seq_no);
+                
+                level += 1;
+            }
+
+
+        }
+
+        elseif (reward_tag == 0xfb0f2b7c)  ;; command_or_bonus 
+        {
+            {-
+                command_or_bonus#fb0f2b7c
+                    from_level: uint16
+                    to_level: uint16
+                    command_struct: uint8
+                    command_cmd: SystemCommand
+                    bonus_type: BonusType
+                    bonus_amount: Coins
+                    bonus_sender_jetton_wallet: MsgAddress
+                    bonus_title: ^Cell
+                    payload: (Maybe ^Cell)
+                = Reward;
+            -}
+
+            int from_level = reward_set~load_uint(16);
+            int to_level = reward_set~load_uint(16);
+            int command_struct = reward_set~load_uint(8);
+            int command_cmd = reward_set~load_uint(32);
+
+            int bonus_type = reward_set~load_uint(32);
+            int bonus_amount = reward_set~load_coins();
+            slice bonus_sender_jetton_wallet = reward_set~load_msg_addr();
+            cell bonus_title = reward_set~load_ref();
+            cell payload = reward_set~load_maybe_ref(); 
+
+            int level = from_level;
+            while (level <= to_level) 
+            {  
+                (seq_no) = queue~add__system_command__and__bonus_query__task(
+                    command_struct,             
+                    command_cmd,                
+                    source_struct,
+                    source_profile_addr, 
+                    source_place_number, 
+                    level, 
+                    bonus_type, 
+                    bonus_amount,                   
+                    bonus_sender_jetton_wallet,     
+                    bonus_title,                     
+                    query_id, 
+                    payload, 
+                    seq_no);
+                
+                level += 1;
+            }
+        }
+
+        elseif (reward_tag == 0x33a40e44)  ;; profile_payment 
+        {
+            {-
+                profile_payment#33a40e44
+                    type: BonusType
+                    profile_addr: MsgAddress
+                    amount: Coins
+                    sender_jetton_wallet: MsgAddress
+                    title: ^Cell
+                    payload: (Maybe ^Cell)
+                = Reward;
+            -}
+
+            int bonus_type = reward_set~load_uint(32);
+            slice recipient_profile_addr = reward_set~load_msg_addr();
+            int amount = reward_set~load_coins();
+            slice sender_jetton_wallet = reward_set~load_msg_addr();
+            cell bonus_title = reward_set~load_ref();
+            cell payload = reward_set~load_maybe_ref(); 
+            
+            (seq_no) = queue~add__profile_info_query__task(
+                source_struct, 
+                bonus_type, 
+                source_place_number, 
+                source_profile_login, 
+                recipient_profile_addr,
+                amount, 
+                sender_jetton_wallet, 
+                bonus_title,                     
+                query_id, 
+                payload, 
+                seq_no);
+        }
+
+        elseif (reward_tag == 0x67d146f6)  ;; direct_payment
+        {
+            {-
+                direct_payment#67d146f6
+                    recipient: MsgAddress
+                    amount: Coins
+                    sender_jetton_wallet: MsgAddress
+                    forward_ton_amount: Coins
+                    title: ^Cell
+                = Reward;
+            -}
+
+            slice recipient_addr = reward_set~load_msg_addr(); 
+            int amount = reward_set~load_coins();
+            slice sender_jetton_wallet = reward_set~load_msg_addr();
+            int forward_ton_amount = reward_set~load_coins();
+            cell bonus_title = reward_set~load_ref();
+
+            if (is_address_none(sender_jetton_wallet))     ;; transfer TON 
+            {
+                total_paid_ton += send_ton_bonus_to_wallet(
+                    structure_name,
+                    bonus_title,
+
+                    null(),                 ;; recipient_profile_login
+                    recipient_addr,         ;; recipient_owner_addr
+                   
+                    source_profile_login,   ;; reason_profile_login
+                    source_place_number,    ;; reason_place_number
+
+                    amount,
+                    prefix
+                );
+            }
+            else 
+            {
+                send_jetton_bonus(
+                    query_id, 
+                    structure_name, 
+                    bonus_title, 
+
+                    null(),                     ;; recipient_profile_login
+                    recipient_addr,              
+
+                    source_profile_login,       ;; reason_profile_login
+                    source_place_number,        ;; reason_place_number
+
+                    amount,                     ;; jetton_amount 
+                    forward_ton_amount,
+                    sender_jetton_wallet,
+                    processor_addr,             ;; response_destination_addr
+                    prefix
+                );
+            }
+        }
+
+        else 
+        {
+            throw(err::wrong_op);
+        }
+
+        ;; Either RewardSet ^RewardSet:
+        ;; 0 = next RewardSet inline
+        ;; 1 = next RewardSet in a reference
+        int next_in_ref = reward_set~load_uint(1);
+
+        if (next_in_ref) 
+        {
+            cell next_cell = reward_set~load_ref();
+
+            ;; Referenced continuation should be the last item
+            ;; in the current cell.
+            
+            reward_set.end_parse();
+
+            reward_set = next_cell.begin_parse();
+        }
+    }
+
+    ;; Validate that nothing follows the empty constructor.
+    reward_set.end_parse();
+
+    return (queue, (seq_no, total_paid_ton));
+}

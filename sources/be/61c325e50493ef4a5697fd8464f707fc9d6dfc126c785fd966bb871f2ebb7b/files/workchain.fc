@@ -1,0 +1,10 @@
+const WORKCHAIN = BASECHAIN;
+
+int is_valid_workchain(slice addr) inline {
+    (int wc, _) = parse_std_addr(addr);
+    return wc == WORKCHAIN;
+}
+
+() check_workchain(slice addr) impure inline {
+    throw_unless(err::wrong_workchain, is_valid_workchain(addr));
+}

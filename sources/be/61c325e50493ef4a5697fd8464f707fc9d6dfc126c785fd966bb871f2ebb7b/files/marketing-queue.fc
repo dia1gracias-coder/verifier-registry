@@ -1,0 +1,244 @@
+builder store__relative_place_ref(
+    builder b,
+    int source_struct,
+    slice source_profile_addr,
+    int source_place_number,
+    int level
+) inline {
+    return b
+        .store_uint(source_struct, 8)
+        .store_slice(source_profile_addr)
+        .store_uint(source_place_number, 32)
+        .store_uint(level, 16);
+}
+
+
+(cell, int) add__task(
+    cell queue,
+    int query_id,
+    cell command,
+    cell query,
+    cell payload,
+    int seq_no
+) inline {
+    builder task = begin_cell()
+        .store_uint(query_id, 64)
+        .store_maybe_ref(command)
+        .store_maybe_ref(query)
+        .store_maybe_ref(payload);
+
+    seq_no += 1;
+
+    int added = queue~udict_add_builder?(32, seq_no, task);
+    throw_unless(err::bad_request, added);
+
+    return (queue, seq_no);
+}
+
+
+(cell, int) add__user_command__task(
+    cell queue,
+    int struct,
+    int cmd,
+    slice profile_addr,
+    slice source_addr,
+    int amount,
+    slice sender_jetton_wallet,
+    int query_id,
+    cell payload,
+    int seq_no
+) inline {
+    cell command = begin_cell()
+        .store_uint(0x48b18cdf, 32)
+        .store_uint(struct, 8)
+        .store_uint(cmd, 32)
+        .store_slice(profile_addr)
+        .store_slice(source_addr)
+        .store_coins(amount)
+        .store_slice(sender_jetton_wallet)
+        .end_cell();
+
+    return add__task(
+        queue,
+        query_id,
+        command,
+        null(),
+        payload,
+        seq_no
+    );
+}
+
+
+(cell, int) add__system_command__task(
+    cell queue,
+    int command_struct,
+    int cmd,
+    int source_struct,
+    slice source_profile_addr,
+    int source_place_number,
+    int level,
+    int query_id,
+    cell payload,
+    int seq_no
+) inline {
+    builder command = begin_cell()
+        .store_uint(0x5bfcb9f2, 32)
+        .store_uint(command_struct, 8)
+        .store_uint(cmd, 32);
+
+    command = store__relative_place_ref(
+        command,
+        source_struct,
+        source_profile_addr,
+        source_place_number,
+        level
+    );
+
+    return add__task(
+        queue,
+        query_id,
+        command.end_cell(),
+        null(),
+        payload,
+        seq_no
+    );
+}
+
+
+(cell, int) add__bonus_query__task(
+    cell queue,
+    int bonus_type,
+    int source_struct,
+    slice source_profile_addr,
+    int source_place_number,
+    int level,
+    int amount,
+    slice sender_jetton_wallet,
+    cell bonus_title,
+    int query_id,
+    cell payload,
+    int seq_no
+) inline {
+    builder query = begin_cell()
+        .store_uint(0x24a2cffa, 32)
+        .store_uint(bonus_type, 32);
+
+    query = store__relative_place_ref(
+        query,
+        source_struct,
+        source_profile_addr,
+        source_place_number,
+        level
+    );
+
+    query = query
+        .store_coins(amount)
+        .store_slice(sender_jetton_wallet)
+        .store_ref(bonus_title);
+
+    return add__task(
+        queue,
+        query_id,
+        null(),
+        query.end_cell(),
+        payload,
+        seq_no
+    );
+}
+
+
+(cell, int) add__system_command__and__bonus_query__task(
+    cell queue,
+    int command_struct,
+    int cmd,
+    int source_struct,
+    slice source_profile_addr,
+    int source_place_number,
+    int level,
+    int bonus_type,
+    int amount,
+    slice sender_jetton_wallet,
+    cell bonus_title,
+    int query_id,
+    cell payload,
+    int seq_no
+) inline {
+    builder command = begin_cell()
+        .store_uint(0x5bfcb9f2, 32)
+        .store_uint(command_struct, 8)
+        .store_uint(cmd, 32);
+
+    command = store__relative_place_ref(
+        command,
+        source_struct,
+        source_profile_addr,
+        source_place_number,
+        level
+    );
+
+    builder query = begin_cell()
+        .store_uint(0x24a2cffa, 32)
+        .store_uint(bonus_type, 32);
+
+    query = store__relative_place_ref(
+        query,
+        source_struct,
+        source_profile_addr,
+        source_place_number,
+        level
+    );
+
+    query = query
+        .store_coins(amount)
+        .store_slice(sender_jetton_wallet)
+        .store_ref(bonus_title);
+
+    return add__task(
+        queue,
+        query_id,
+        command.end_cell(),
+        query.end_cell(),
+        payload,
+        seq_no
+    );
+}
+
+
+(cell, int) add__profile_info_query__task(
+    cell queue,
+    int struct,
+    int bonus_type,
+    int source_place_number,
+    cell source_profile_login,
+    slice recipient_profile_addr,
+    int amount,
+    slice sender_jetton_wallet,
+    cell bonus_title,
+    int query_id,
+    cell payload,
+    int seq_no
+) inline {
+    cell query = begin_cell()
+        .store_uint(0xf1e4dc7b, 32)
+        .store_uint(struct, 8)
+        .store_uint(bonus_type, 32)
+
+        ;; reason: PlaceInfo
+        .store_uint(source_place_number, 32)
+        .store_maybe_ref(source_profile_login)
+
+        .store_slice(recipient_profile_addr)
+        .store_coins(amount)
+        .store_slice(sender_jetton_wallet)
+        .store_ref(bonus_title)
+        .end_cell();
+
+    return add__task(
+        queue,
+        query_id,
+        null(),
+        query,
+        payload,
+        seq_no
+    );
+}

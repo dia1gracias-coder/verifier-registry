@@ -1,0 +1,265 @@
+(int, cell, cell, cell) parse__marketing_task(slice s) inline {
+     {-
+        default#_
+            query_id: uint64
+            command: (Maybe ^MarketingTaskCommand)
+            query: (Maybe ^MarketingTaskQuery)
+            payload: (Maybe ^Cell) 
+        = MarketingTask;
+    -}
+
+    int query_id = s~load_uint(64);
+    cell command = s~load_maybe_ref();
+    cell query = s~load_maybe_ref();
+    cell payload = s~load_maybe_ref();
+
+    s.end_parse();
+
+    return (query_id, command, query, payload);
+}
+
+
+(cell, cell, cell, cell) parse__structure_config(slice s) inline {
+    {-
+        default#_ 
+            commands: (HashmapE 32 CommandConfig) 
+            rewards: (HashmapE 32 RewardConfig) 
+            royalties: (HashmapE 256 RoyaltyConfig)
+            name: ^Cell
+        = StructureConfig;
+    -}
+
+    return (
+        s~load_dict(),        ;; commands
+        s~load_dict(),        ;; rewards
+        s~load_dict(),        ;; royalties
+        s~load_ref()          ;; name
+    );
+}
+
+
+cell parse__reward_config(slice s) inline {
+     {-
+        default#_
+            sets: (HashmapE 8 RewardSet)
+        = RewardConfig;
+    -}
+
+    return s~load_dict();
+}
+
+
+(int, slice, int) parse__command_config(slice s) inline {
+     {-
+        default#_
+            price: Coins
+            sender_jetton_wallet: MsgAddress
+            gram_fee: Coins
+        = CommandConfig;
+    -}
+
+    return (
+        s~load_coins(),       ;; price
+        s~load_msg_addr(),    ;; sender_jetton_wallet
+        s~load_coins()        ;; gram_fee
+    );
+}
+
+
+(int, int, slice) parse__royalty_config(slice s) inline {
+    {-
+        default#_ 
+            numerator: uint16 
+            denominator: uint16 
+            recipient: MsgAddress
+        = RoyaltyConfig;
+    -}
+
+    return (
+        s~load_uint(16),       ;; numerator
+        s~load_uint(16),       ;; denominator
+        s~load_msg_addr()      ;; recipient
+    );
+}
+
+
+(int, int, int, slice, int, int, int, slice, cell) try_parse__bonus_query(cell query) inline {
+    {-
+        bonus_query#24a2cffa
+            type: BonusType
+            relative: RelativePlaceRef
+            amount: Coins
+            sender_jetton_wallet: MsgAddress
+            bonus_title: ^Cell
+        = MarketingTaskQuery;
+
+        default#_
+            source: PlaceRef
+            level: uint16
+        = RelativePlaceRef;
+
+        default#_
+            struct: uint8
+            profile_addr: MsgAddress
+            place_number: #
+        = PlaceRef;
+    -} 
+    
+    slice s = query.begin_parse();
+
+    int tag = s~load_uint(32);
+
+    if (tag != 0x24a2cffa) {
+        return (
+            0,
+            0,          ;; bonus_type
+            0,          ;; source_struct
+            null(),     ;; source_profile_addr
+            0,          ;; source_place_number
+            0,          ;; level
+            0,          ;; amount
+            null(),     ;; sender_jetton_wallet
+            null()      ;; bonus_title
+        );
+    }
+
+    int bonus_type = s~load_uint(32);
+
+    ;; relative.source: PlaceRef
+    int source_struct = s~load_uint(8);
+    slice source_profile_addr = s~load_msg_addr();
+    int source_place_number = s~load_uint(32);
+
+    ;; relative.level
+    int level = s~load_uint(16);
+
+    int amount = s~load_coins();
+    slice sender_jetton_wallet = s~load_msg_addr();
+    cell bonus_title = s~load_ref();
+
+    s.end_parse();
+
+    return (
+        -1,
+        bonus_type,
+        source_struct,
+        source_profile_addr,
+        source_place_number,
+        level,
+        amount,
+        sender_jetton_wallet,
+        bonus_title
+    );
+}
+
+
+(int, int, int, int, cell, slice, int, slice, cell) try_parse__profile_info_query(cell query) inline {
+    {-
+        profile_info_query#f1e4dc7b
+            struct: uint8
+            type: BonusType
+            reason: PlaceInfo
+            recipient_profile_addr: MsgAddress
+            amount: Coins
+            sender_jetton_wallet: MsgAddress
+            bonus_title: ^Cell
+        = MarketingTaskQuery;
+
+        default#_
+            place_number: #
+            profile_login: (Maybe ^Cell)
+        = PlaceInfo;
+    -} 
+
+    slice s = query.begin_parse();
+
+    int tag = s~load_uint(32);
+
+    if (tag != 0xf1e4dc7b) {
+        return (
+            0,
+            0,          ;; struct
+            0,          ;; bonus_type
+            0,          ;; reason_place_number
+            null(),     ;; reason_profile_login
+            null(),     ;; recipient_profile_addr
+            0,          ;; amount
+            null(),     ;; sender_jetton_wallet
+            null()      ;; bonus_title
+        );
+    }
+
+    int struct = s~load_uint(8);
+    int bonus_type = s~load_uint(32);
+
+    ;; reason: PlaceInfo
+    int reason_place_number = s~load_uint(32);
+    cell reason_profile_login = s~load_maybe_ref();
+
+    slice recipient_profile_addr = s~load_msg_addr();
+    int amount = s~load_coins();
+    slice sender_jetton_wallet = s~load_msg_addr();
+    cell bonus_title = s~load_ref();
+
+    s.end_parse();
+
+    return (
+        -1,
+        struct,
+        bonus_type,
+        reason_place_number,
+        reason_profile_login,
+        recipient_profile_addr,
+        amount,
+        sender_jetton_wallet,
+        bonus_title
+    );
+}
+
+(int, int, int, slice, slice, int, slice) try_parse__user_command(cell command) inline {
+    {-
+        user_command#48b18cdf
+            struct: uint8
+            cmd: UserCommand
+            profile_addr: MsgAddress
+            source_addr: MsgAddress
+            amount: Coins
+            sender_jetton_wallet: MsgAddress
+        = MarketingTaskCommand;
+    -}
+
+    slice s = command.begin_parse();
+
+    int tag = s~load_uint(32);
+
+    if (tag != 0x48b18cdf) {
+        return (
+            0,
+            0,
+            0,
+            null(),
+            null(),
+            0,
+            null()
+        );
+    }
+
+    int struct = s~load_uint(8);
+    int cmd = s~load_uint(32);
+    slice profile_addr = s~load_msg_addr();
+    slice source_addr = s~load_msg_addr();
+    int amount = s~load_coins();
+    slice sender_jetton_wallet = s~load_msg_addr();
+
+    s.end_parse();
+
+    return (
+        -1,
+        struct,
+        cmd,
+        profile_addr,
+        source_addr,
+        amount,
+        sender_jetton_wallet
+    );
+}

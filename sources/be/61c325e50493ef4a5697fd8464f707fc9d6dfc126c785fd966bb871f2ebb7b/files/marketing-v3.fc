@@ -1,0 +1,1025 @@
+#include "imports/stdlib.fc";
+#include "op-codes.fc";
+#include "workchain.fc";
+#include "utils.fc";
+#include "marketing-parsers.fc";
+#include "marketing-queue.fc";
+#include "marketing-rewards.fc";
+
+const MIN_TONS_FOR_STORAGE =  100000000; ;; 0.1 TON
+
+
+(slice, int, int, cell, int, int, int, slice, cell, cell, slice) load_data() inline {
+    {- 
+        default#_
+            admin: MsgAddress
+            index: uint32
+            series: Series
+            metadata_uri: ^Cell
+            max_tasks: uint16
+            queue_size: uint16
+            seq_no: uint32
+            processor: MsgAddress
+            queue: (HashmapE 32 MarketingTask)
+            structures: (HashmapE 8 StructureConfig) 
+            prefix: Cell
+        = MarketingStorage;
+    -}
+
+    slice ds = get_data().begin_parse();
+
+    slice admin_addr = ds~load_msg_addr();
+    int index = ds~load_uint(32);
+    int series = ds~load_uint(32);
+    cell metadata_uri = ds~load_ref();
+    int max_tasks = ds~load_uint(16);
+    int queue_size = ds~load_uint(16);
+    int seq_no = ds~load_uint(32);
+    slice processor_addr = ds~load_msg_addr();
+    cell queue = ds~load_dict();
+    cell structures = ds~load_dict();
+    slice prefix = ds;
+
+    return (
+        admin_addr,
+        index,
+        series,
+        metadata_uri,
+        max_tasks,
+        queue_size,
+        seq_no,
+        processor_addr,
+        queue,
+        structures,
+        prefix
+    );
+}
+
+
+() store_data(slice admin_addr, int index, int series, cell metadata_uri,
+    int max_tasks, int queue_size, int seq_no, slice processor_addr,
+    cell queue, cell structures, slice prefix) impure inline {
+        set_data(begin_cell()
+            .store_slice(admin_addr)
+            .store_uint(index, 32)
+            .store_uint(series, 32)
+            .store_ref(metadata_uri)
+            .store_uint(max_tasks, 16)
+            .store_uint(queue_size, 16)
+            .store_uint(seq_no, 32)
+            .store_slice(processor_addr)
+            .store_dict(queue)
+            .store_dict(structures)
+            .store_slice(prefix)
+            .end_cell()
+        );
+}
+
+
+() refund_jetton(
+    int query_id,
+    slice receiver_addr,
+    int jetton_amount,
+    int send_mode,
+    int attached_ton_amount,
+    slice sender_jetton_wallet,
+    slice response_destination_addr,
+    cell comment,
+    slice prefix
+) impure inline {
+   
+    cell forward_payload = begin_cell()
+        .store_uint(0, 32)                  ;; text comment
+        .store_slice(prefix)
+        .store_ref(comment)
+        .end_cell();
+
+    send_jetton_transfer_msg(
+        query_id,
+        jetton_amount,
+        receiver_addr,
+        response_destination_addr,
+        1,                                  ;; forward_ton_amount
+        forward_payload,
+        sender_jetton_wallet,
+        attached_ton_amount,
+        send_mode
+    );
+}
+
+
+() refund_ton_to_wallet(
+    slice receiver_addr,
+    int amount,
+    int send_mode,
+    cell comment,
+    slice prefix
+) impure inline {
+
+    cell body = begin_cell()
+        .store_uint(0, 32)
+        .store_slice(prefix)
+        .store_ref(comment)
+        .end_cell();
+
+    cell msg = begin_cell()
+        .store_uint(0x18, 6)                ;; bounceable
+        .store_slice(receiver_addr)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+        .store_uint(1, 1)                   ;; body stored as reference
+        .store_ref(body)
+        .end_cell();
+
+    send_raw_message(msg, send_mode);
+}
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_msg_flags();
+    if (flags & 1) {  ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_addr = cs~load_msg_addr();
+
+    (slice admin_addr, int index, int series, cell metadata_uri,
+        int max_tasks, int queue_size, int seq_no, slice processor_addr,
+        cell queue, cell structures, slice prefix) = load_data();
+
+    (int op, int query_id) = in_msg_body~load_op_and_query_id();
+
+    if (op == op::exec) 
+    {   
+         {- 
+            exec#748e0264
+                query_id: uint64
+                struct: uint8
+                profile_addr: MsgAddress
+                cmd: UserCommand
+                payload: (Maybe ^Cell)
+            = MarketingInternalMsg;
+        -}
+
+        ;; check current queue size
+        throw_unless(err::forbidden, queue_size < max_tasks);
+
+        ;; extract msg args
+        int struct = in_msg_body~load_uint(8);
+        slice profile_addr = in_msg_body~load_msg_addr();
+        check_workchain(profile_addr);
+        int cmd = in_msg_body~load_uint(32);
+        cell payload = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        ;; get structure config
+        (slice struct_config, int struct_config_found?) = structures.udict_get?(8, struct);
+        throw_unless(err::bad_request, struct_config_found?);
+
+        ;; parse structure config
+        (cell commands, _, _, _) = parse__structure_config(struct_config);
+        
+        ;; get command config
+        (slice cmd_config, int cmd_config_found?) = commands.udict_get?(32, cmd);
+        throw_unless(err::bad_request, cmd_config_found?);
+
+        ;; parse command config
+        (int price, slice sender_jetton_wallet, int gram_fee) = parse__command_config(cmd_config);
+
+        ;; in case Jetton command, stop executing
+        throw_unless(err::forbidden,  is_address_none(sender_jetton_wallet));
+       
+        ;; check amount
+        throw_if(err::insufficient_funds, msg_value < price + gram_fee);
+
+        ;; update state
+        int amount = msg_value - gram_fee;
+        
+        int new_seq_no = queue~add__user_command__task(
+            struct,
+            cmd,
+            profile_addr,
+            sender_addr,            ;; source_addr
+            amount,
+            sender_jetton_wallet,
+            query_id,
+            payload,
+            seq_no
+        ) ;
+
+        store_data(
+            admin_addr,
+            index,
+            series,
+            metadata_uri,
+            max_tasks,
+            queue_size + 1,
+            new_seq_no,
+            processor_addr,
+            queue,
+            structures,
+            prefix
+        );
+
+        ;; Reserve the contract balance and command amount,
+        ;; then forward the remaining TON (gram fee) to the processor.   
+        int balance_before_msg = my_balance - msg_value + my_storage_due();
+        int expected_balance = balance_before_msg + amount;
+        int reserved_amount = max(MIN_TONS_FOR_STORAGE, expected_balance); 
+        raw_reserve(reserved_amount, 2); ;; up to the amount
+
+        send_msg(
+            processor_addr,
+            0,
+            op::marketing_excesses,
+            query_id,
+            null(),         ;; payload
+            FALSE,          ;; non-bounceable (processor may be an uninit wallet)
+            128 + 2);       ;; full available balance, ignore errors
+
+        return();
+    }
+
+    if (op == op::transfer_notification) 
+    {
+        {- 
+            transfer_notification#7362d09c
+                query_id: uint64
+                amount: Coins
+                sender: MsgAddress
+                forward_payload: (Either Cell ^Cell) 
+        -}
+
+        int jetton_amount = in_msg_body~load_coins();
+        slice sender_owner_addr = in_msg_body~load_msg_addr();
+
+        int fp_in_ref? = in_msg_body~load_bool();
+        
+        slice fp_slice = in_msg_body;
+        if (fp_in_ref?) 
+        {
+            cell fp_cell = in_msg_body~load_ref();
+            in_msg_body.end_parse();
+
+            fp_slice = fp_cell.begin_parse();
+        } 
+
+        if (fp_slice.slice_bits() < 32) ;; empty forward payload
+        {
+            return ();
+        }
+        
+        int fp_op = fp_slice~load_uint(32);
+        if (fp_op == op::exec)      ;; process only exec forward payload
+        {
+            ;; extract msg args
+            int fp_query_id = fp_slice~load_uint(64);
+          
+            int struct = fp_slice~load_uint(8);
+            slice profile_addr = fp_slice~load_msg_addr();
+            int cmd = fp_slice~load_uint(32);
+            cell payload = fp_slice~load_maybe_ref();
+            fp_slice.end_parse();
+
+            ;; get structure config
+            (slice struct_config, int struct_config_found?) = structures.udict_get?(8, struct);
+            ifnot (struct_config_found?)
+            {
+                return ();
+            }
+
+            (cell commands, _, _, _) = parse__structure_config(struct_config);
+        
+            ;; get command config
+            (slice cmd_config, int cmd_config_found?) = commands.udict_get?(32, cmd);
+            ifnot (cmd_config_found?)
+            {
+                return ();
+            }
+
+            ;; parse command config
+            (int price, slice sender_jetton_wallet, int gram_fee) = parse__command_config(cmd_config);
+
+
+            if (is_address_none(sender_jetton_wallet)) ;; just accept
+            {
+                return ();
+            }
+
+            ;; Accept notifications only from the configured
+            ;; Jetton wallet belonging to this marketing contract.
+            ifnot (equal_slices_bits(sender_addr, sender_jetton_wallet)) 
+            {
+                return ();
+            }
+
+
+            if (queue_size >= max_tasks)
+            {
+                cell comment = begin_cell()
+                    .store_slice("queue is full")
+                    .end_cell();
+
+                refund_jetton(
+                    fp_query_id,
+                    sender_owner_addr,          ;; receiver_addr
+                    jetton_amount,
+                    64 + 2,                     ;; send_mode
+                    0,                          ;; attached_ton_amount
+                    sender_jetton_wallet,
+                    sender_owner_addr,          ;; response_destination_addr,
+                    comment,
+                    prefix
+                );
+                
+                return ();
+            }
+
+            ifnot (is_valid_workchain(profile_addr))
+            {
+                cell comment = begin_cell()
+                    .store_slice("invalid workchain")
+                    .end_cell();
+
+                refund_jetton(
+                    fp_query_id,
+                    sender_owner_addr,                  ;; receiver_addr
+                    jetton_amount,
+                    64 + 2,                             ;; send_mode
+                    0,                                  ;; attached_ton_amount
+                    sender_jetton_wallet,
+                    sender_owner_addr,                  ;; response_destination_addr,
+                    comment,
+                    prefix
+                );
+
+                return ();
+            } 
+
+
+            ;; check amount
+            if (jetton_amount < price)
+            {
+                cell comment = begin_cell()
+                    .store_slice("insufficient funds")
+                    .end_cell();
+
+                refund_jetton(
+                    fp_query_id,
+                    sender_owner_addr,                  ;; receiver_addr
+                    jetton_amount,
+                    64 + 2,                             ;; send_mode
+                    0,                                  ;; attached_ton_amount
+                    sender_jetton_wallet,
+                    sender_owner_addr,                  ;; response_destination_addr,
+                    comment,
+                    prefix
+                );
+                
+                return ();
+            }
+
+            
+            if (msg_value < gram_fee)
+            {
+                cell comment = begin_cell()
+                    .store_slice("insufficient fee")
+                    .end_cell();
+
+                refund_jetton(
+                    fp_query_id,
+                    sender_owner_addr,              ;; receiver_addr
+                    jetton_amount,
+                    64 + 2,                         ;; send_mode
+                    0,                              ;; attached_ton_amount
+                    sender_jetton_wallet,
+                    sender_owner_addr,              ;; response_destination_addr,
+                    comment,
+                    prefix
+                );
+                
+                return ();
+            }
+        
+            ;; update state
+
+            int new_seq_no = queue~add__user_command__task(
+                struct,
+                cmd,
+                profile_addr,
+                sender_owner_addr,      ;; source_addr
+                jetton_amount,          ;; amount
+                sender_jetton_wallet,
+                fp_query_id,
+                payload,
+                seq_no
+            ) ;
+
+            store_data(
+                admin_addr,
+                index,
+                series,
+                metadata_uri,
+                max_tasks,
+                queue_size + 1,
+                new_seq_no,
+                processor_addr,
+                queue,
+                structures,
+                prefix
+            );
+
+            ;; Preserve the previous contract balance,
+            ;; then forward the remaining incoming TON to the processor.
+            int balance_before_msg = my_balance - msg_value + my_storage_due();
+            int expected_balance = balance_before_msg;
+            int reserved_amount = max(MIN_TONS_FOR_STORAGE, expected_balance); 
+            raw_reserve(reserved_amount, 2); ;; up to the amount
+
+            send_msg(
+                processor_addr,
+                0,
+                op::marketing_excesses,
+                fp_query_id,
+                null(),         ;; payload
+                FALSE,          ;; non-bounceable (processor may be an uninit wallet)
+                128 + 2);       ;; full available balance, ignore errors
+        }
+
+        return ();
+    }
+
+    if (op == op::command_response) 
+    {   
+        {-
+            command_response#c328f3f3
+                query_id: uint64
+                task_key: #  
+                code: #
+                source: SourcePlace
+            = MarketingInternalMsg;
+
+            default#_
+                place: PlaceRef
+                profile_login: (Maybe ^Cell)
+            = SourcePlace;
+
+            default#_
+                struct: uint8
+                profile_addr: MsgAddress
+                place_number: #
+            = PlaceRef;
+        -}
+
+        throw_unless(err::unauthorized, equal_slices_bits(sender_addr, processor_addr));
+
+        ;; parse the msg
+        int task_key = in_msg_body~load_uint(32);
+        int code = in_msg_body~load_uint(32);
+        int source_struct = in_msg_body~load_uint(8);
+        slice source_profile_addr = in_msg_body~load_msg_addr();
+        int source_place_number = in_msg_body~load_uint(32);
+        cell source_profile_login = in_msg_body~load_maybe_ref();
+        in_msg_body.end_parse();
+
+        throw_unless(err::bad_request, task_key > 0);
+        throw_if(err::not_found, task_key > seq_no);
+        throw_if(err::not_found, queue.dict_empty?());
+
+        (slice task, int task_found?) = queue~udict_delete_get?(32, task_key);
+        throw_unless(err::not_found, task_found?);
+
+        (int task_query_id, cell task_command, _, _) = parse__marketing_task(task);
+        throw_if(err::forbidden, null?(task_command));
+
+        ;; parse the command
+        slice tcs = task_command.begin_parse();
+        int command_tag = tcs~load_uint(32); 
+        int task_struct = tcs~load_uint(8);
+        int cmd = tcs~load_uint(32);
+
+        ;; source must be from the same struct
+        throw_unless(err::not_found, source_struct == task_struct);
+        
+        ;; get structure config
+        (slice struct_config, int struct_config_found?) = structures.udict_get?(8, source_struct);
+        throw_unless(err::bad_request, struct_config_found?);
+
+        ;; parse structure config
+        (_, cell rewards, _, cell structure_name) = parse__structure_config(struct_config);
+
+        ;; get reward config
+        (slice reward_config, int reward_config_found?) = rewards.udict_get?(32, cmd);
+        throw_unless(err::bad_request, reward_config_found?);
+
+        ;; parse reward config
+        cell sets = parse__reward_config(reward_config);
+
+        ;; get reward set
+        (slice reward_set, int reward_set_found?) = sets.udict_get?(8, code);
+        ifnot (reward_set_found?)
+        {
+            (reward_set, reward_set_found?) = sets.udict_get?(8, 0);    ;; looking for the default one
+        }
+
+        int total_paid_ton = 0;
+        int new_seq_no = seq_no;
+
+        ;; only if rewards are set
+        if (reward_set_found?) 
+        {
+            (new_seq_no, total_paid_ton) = queue~process_rewards(
+                seq_no,
+                reward_set,
+
+                source_struct,
+                source_profile_addr,
+                source_place_number,
+                source_profile_login,
+
+                task_query_id,
+                processor_addr,
+                structure_name,
+                prefix
+            );
+        }
+
+        int created_tasks = new_seq_no - seq_no;
+
+        store_data(
+            admin_addr,
+            index,
+            series,
+            metadata_uri,
+            max_tasks,
+            queue_size - 1 + created_tasks,
+            new_seq_no,
+            processor_addr,
+            queue,
+            structures,
+            prefix
+        );
+
+        ;; Preserve the previous balance minus TON rewards paid,
+        ;; then forward the remaining incoming TON to the processor.
+        int balance_before_msg = my_balance - msg_value + my_storage_due();
+        int expected_balance = balance_before_msg - total_paid_ton;
+        int reserved_amount = max(MIN_TONS_FOR_STORAGE, expected_balance); 
+        raw_reserve(reserved_amount, 2); ;; up to the amount
+
+        send_msg(
+            processor_addr,
+            0,
+            op::marketing_excesses,
+            query_id,
+            null(),         ;; payload
+            FALSE,          ;; non-bounceable (processor may be an uninit wallet)
+            128 + 2);       ;; full available balance, ignore errors
+
+        return ();
+    }
+
+    if (op == op::bonus_query_response)
+    {
+        {-
+            bonus_query_response#96e7f3f6
+                query_id: uint64
+                task_key: #  
+                reason: PlaceInfo
+                recipient: ProfileData
+            = MarketingInternalMsg;
+
+            default#_
+                place_number: #
+                profile_login: (Maybe ^Cell)
+            = PlaceInfo;
+
+            default#_
+                profile_addr: MsgAddress
+                profile_login: ^Cell
+                owner_addr: MsgAddress
+            = ProfileData;
+        -}
+
+        throw_unless(err::unauthorized, equal_slices_bits(sender_addr, processor_addr));
+
+        int task_key = in_msg_body~load_uint(32);
+
+        int reason_place_number = in_msg_body~load_uint(32);
+        cell reason_profile_login = in_msg_body~load_maybe_ref();
+
+        slice recipient_profile_addr = in_msg_body~load_msg_addr();
+        cell recipient_profile_login = in_msg_body~load_ref();
+        slice recipient_owner_addr = in_msg_body~load_msg_addr();
+
+        in_msg_body.end_parse();
+
+        throw_unless(err::bad_request, task_key > 0);
+        
+        throw_if(err::not_found, task_key > seq_no);
+        throw_if(err::not_found, queue.dict_empty?());
+
+        (slice task, int task_found?) = queue~udict_delete_get?(32, task_key);
+        throw_unless(err::not_found, task_found?);
+
+        (int task_query_id, _, cell query, _) = parse__marketing_task(task);
+        throw_if(err::forbidden, null?(query));
+
+        ;; parse the query 
+        (
+            int success?,
+            _,
+            int source_struct,
+            _,
+            _,
+            _,
+            int amount,
+            slice sender_jetton_wallet,
+            cell bonus_title
+        ) = try_parse__bonus_query(query);
+        throw_unless(err::forbidden, success?);
+
+        ;; get structure config
+        (slice struct_config, int struct_config_found?) = structures.udict_get?(8, source_struct);
+        throw_unless(err::bad_request, struct_config_found?);
+
+        ;; parse structure config
+        (_, _, cell royalties, cell structure_name) = parse__structure_config(struct_config);
+
+        ;; pay
+        int total_paid_ton = 0;
+        total_paid_ton += pay_bonus(
+            task_query_id,
+
+            structure_name,
+            bonus_title,
+
+            recipient_profile_login,
+            recipient_profile_addr,
+            recipient_owner_addr,
+
+            reason_profile_login,
+            reason_place_number,
+
+            amount,
+            sender_jetton_wallet,
+            processor_addr,             ;; response_destination_addr
+
+            royalties,
+            prefix
+        );
+
+        ;; update state
+        store_data(
+            admin_addr,
+            index,
+            series,
+            metadata_uri,
+            max_tasks,
+            queue_size - 1,
+            seq_no,
+            processor_addr,
+            queue,
+            structures,
+            prefix
+        );
+
+        ;; reserve and send excesses to the processor        
+        int balance_before_msg = my_balance - msg_value + my_storage_due();
+        int expected_balance = balance_before_msg - total_paid_ton;
+        int reserved_amount = max(MIN_TONS_FOR_STORAGE, expected_balance); 
+        raw_reserve(reserved_amount, 2);    ;; up to the amount
+
+        send_msg(
+            processor_addr,
+            0,
+            op::marketing_excesses,
+            query_id,
+            null(),         ;; payload
+            FALSE,          ;; non-bounceable (processor may be an uninit wallet)
+            128 + 2);       ;; full available balance, ignore errors
+
+        return ();
+    }
+
+    if (op == op::profile_info_query_response)
+    {
+        {-
+            profile_info_query_response#6d7fa64d
+                query_id: uint64
+                task_key: #  
+                profile: ProfileInfo
+            = MarketingInternalMsg;
+
+            default#_
+                profile_login: ^Cell
+                owner_addr: MsgAddress
+            = ProfileInfo;
+        -}
+
+        throw_unless(err::unauthorized, equal_slices_bits(sender_addr, processor_addr));
+
+        int task_key = in_msg_body~load_uint(32);
+        cell recipient_profile_login = in_msg_body~load_ref();
+        slice recipient_owner_addr = in_msg_body~load_msg_addr();
+        in_msg_body.end_parse();
+
+        throw_unless(err::bad_request, task_key > 0);
+        throw_if(err::not_found, task_key > seq_no);
+        throw_if(err::not_found, queue.dict_empty?());
+
+        (slice task, int task_found?) = queue~udict_delete_get?(32, task_key);
+        throw_unless(err::not_found, task_found?);
+
+        (int task_query_id, _, cell query, _) = parse__marketing_task(task);
+        throw_if(err::forbidden, null?(query));
+
+        ;; parse the query
+        (
+            int success?, 
+            int struct,
+            _,
+            int reason_place_number,
+            cell reason_profile_login,
+            slice recipient_profile_addr,
+            int amount,
+            slice sender_jetton_wallet,
+            cell bonus_title
+        ) = try_parse__profile_info_query(query);
+        throw_unless(err::forbidden, success?);
+
+        ;; get structure config
+        (slice struct_config, int struct_config_found?) = structures.udict_get?(8, struct);
+        throw_unless(err::bad_request, struct_config_found?);
+
+        ;; parse structure config
+        (_, _, cell royalties, cell structure_name) = parse__structure_config(struct_config);
+
+        ;; pay
+        int total_paid_ton = 0;
+        total_paid_ton += pay_bonus(
+            task_query_id,
+
+            structure_name,
+            bonus_title,
+
+            recipient_profile_login,
+            recipient_profile_addr,
+            recipient_owner_addr,
+
+            reason_profile_login,
+            reason_place_number,
+
+            amount,
+            sender_jetton_wallet,
+            processor_addr,             ;; response_destination_addr
+
+            royalties,
+            prefix
+        );
+
+        ;; update state
+        store_data(
+            admin_addr,
+            index,
+            series,
+            metadata_uri,
+            max_tasks,
+            queue_size - 1,
+            seq_no,
+            processor_addr,
+            queue,
+            structures,
+            prefix
+        );
+
+        ;; reserve and send excesses to the processor        
+        int balance_before_msg = my_balance - msg_value + my_storage_due();
+        int expected_balance = balance_before_msg - total_paid_ton;
+        int reserved_amount = max(MIN_TONS_FOR_STORAGE, expected_balance); 
+        raw_reserve(reserved_amount, 2);    ;; up to the amount
+
+        send_msg(
+            processor_addr,
+            0,
+            op::marketing_excesses,
+            query_id,
+            null(),         ;; payload
+            FALSE,          ;; non-bounceable (processor may be an uninit wallet)
+            128 + 2);       ;; full available balance, ignore errors
+
+        return ();
+    }
+
+    if (op == op::cancel_task)
+    {
+        {-
+            cancel_task#87d5330c
+                query_id: uint64 
+                task_key: uint32 
+                comment: ^Cell
+            = MarketingInternalMsg;
+        -}
+
+        throw_unless(err::unauthorized, equal_slices_bits(sender_addr, processor_addr));
+
+        int task_key = in_msg_body~load_uint(32);
+        cell comment = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        throw_unless(err::bad_request, task_key > 0);
+        throw_if(err::not_found, task_key > seq_no);
+        throw_if(err::not_found, queue.dict_empty?());
+        
+        (slice task, int found?) = queue~udict_delete_get?(32, task_key);
+        throw_unless(err::not_found, found?);
+
+        {-
+            default#_
+                query_id: uint64
+                command: (Maybe ^MarketingTaskCommand)
+                query: (Maybe ^MarketingTaskQuery)
+                payload: (Maybe ^Cell) 
+            = MarketingTask;
+        -}
+
+        (int task_query_id, cell task_command, _, _) = parse__marketing_task(task);
+
+        ;; can cancel only commands
+        throw_if(err::forbidden, null?(task_command));
+
+        (
+            int success?,
+            _,
+            _,
+            _,
+            slice source_addr,
+            int amount,
+            slice sender_jetton_wallet
+        ) = try_parse__user_command(task_command);
+
+        ;; can cancel only user commands
+        throw_unless(err::forbidden, success?);
+
+        int total_paid_ton = 0;
+
+        ;; refund only amount. Gram_fee is not refundable
+        if (amount > 0)
+        {
+            ;; Refunds are bounceable. If a refund bounces, the task remains
+            ;; deleted and the administrator resends the message via op::proxy.
+            
+            if (is_address_none(sender_jetton_wallet))
+            {
+                refund_ton_to_wallet(
+                    source_addr,        ;; receiver_addr
+                    amount,
+                    1 + 16,             ;; pay fees separately; don't ignore errors
+                    comment,
+                    prefix
+                ); 
+                    
+                total_paid_ton += amount;
+            }            
+            else
+            {
+               
+                refund_jetton(
+                    task_query_id,
+                    source_addr,            ;; receiver_addr
+                    amount,                 ;; jetton_amount
+                    1 + 16,                 ;; pay fees separately; don't ignore errors
+                    50000000,               ;; 0.05 TON attached_ton_amount
+                    sender_jetton_wallet,
+                    processor_addr,         ;; response_destination_addr
+                    comment,
+                    prefix
+                );
+            }
+        }      
+
+        ;; update state
+        store_data(
+            admin_addr,
+            index,
+            series,
+            metadata_uri,
+            max_tasks,
+            queue_size - 1,
+            seq_no,
+            processor_addr,
+            queue,
+            structures,
+            prefix
+        );
+
+        ;; Preserve the previous balance minus the refunded TON amount,
+        ;; then forward the remaining incoming TON to the processor.
+        int balance_before_msg = my_balance - msg_value + my_storage_due();
+        int expected_balance = balance_before_msg - total_paid_ton;
+        int reserved_amount = max(MIN_TONS_FOR_STORAGE, expected_balance); 
+        raw_reserve(reserved_amount, 2); ;; up to the amount
+
+        send_msg(
+            processor_addr,
+            0,
+            op::marketing_excesses,
+            query_id,
+            null(),         ;; payload
+            FALSE,          ;; non-bounceable (processor may be an uninit wallet)
+            128 + 2);       ;; full available balance, ignore errors   
+
+        return ();
+    }
+
+    if (op == op::proxy) 
+    { 
+        {-
+            proxy#a11cdbe3
+                query_id: uint64 
+                mode: uint8 
+                msg: ^Cell 
+            = MarketingInternalMsg;
+        -}
+
+        throw_unless(err::unauthorized, equal_slices_bits(sender_addr, admin_addr));
+
+        int mode = in_msg_body~load_uint(8);
+        cell msg = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        ;; reject if +32 flag is set
+        throw_if(err::bad_request, mode & 32);
+
+        raw_reserve(MIN_TONS_FOR_STORAGE, 2);
+        send_raw_message(msg, mode); 
+        
+        return ();
+    }
+   
+    if (op == op::upgrade) 
+    {
+        {-
+            upgrade#53c57870
+                query_id: uint64 
+                code: ^Cell 
+                data: ^Cell 
+            = MarketingInternalMsg;
+        -}
+
+        throw_unless(err::unauthorized, equal_slices_bits(sender_addr, admin_addr));
+
+        cell new_code = in_msg_body~load_ref();
+        cell new_data = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+    
+        set_code(new_code);
+        set_data(new_data);
+        
+        return();
+    }
+    
+    throw(err::wrong_op);
+}
+
+
+
+{- 
+    Get methods
+-}
+(int, slice, int, int, cell) get_basic_data() method_id {
+    (slice admin_addr, int index, int series, cell metadata_uri,
+        _, _, _, _, _, _, _) = load_data();
+    return (-1, admin_addr, index, series, metadata_uri);
+}
+
+
+(slice, int, int, cell, int, int, int, slice, cell, cell, slice)
+get_marketing_data() method_id {
+    return load_data();
+}
+
+
+(int, slice, int) get_first_task() method_id {
+    (_, _, _, _, _, _, _, _, cell queue, _, _) = load_data();
+
+    (int task_key, slice task, int found) =
+        queue.udict_get_min?(32);
+
+    return (task_key, task, found);
+}
+
+
+(int, int, int) get_version() method_id {
+
+    int major = 3;
+    int minor = 0;
+    int patch = 0;
+
+    return (major, minor, patch);
+}

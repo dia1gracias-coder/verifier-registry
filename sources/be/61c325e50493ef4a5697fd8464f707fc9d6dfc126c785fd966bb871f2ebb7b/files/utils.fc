@@ -1,0 +1,51 @@
+cell build_state_init(cell init_code, cell init_data) inline {
+    return begin_cell()
+        .store_uint(0, 1)          ;; split_depth: (Maybe (## 5))
+        .store_uint(0, 1)          ;; special: (Maybe TickTock)
+        .store_maybe_ref(init_code)
+        .store_maybe_ref(init_data)
+        .store_uint(0, 1)          ;; library: (HashmapE 256 SimpleLib)
+        .end_cell();
+}
+
+
+slice calc_address(cell state_init) inline {
+    return begin_cell()
+        .store_uint(4, 3)                  ;; addr_std$10, no anycast
+        .store_int(BASECHAIN, 8)           ;; workchain_id:int8
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}
+
+
+() send_msg(
+    slice to_address,
+    int amount,
+    int op,
+    int query_id,
+    builder payload,
+    int bounceable,
+    int send_mode
+) impure inline {
+    builder msg = begin_cell();
+
+    if (bounceable) {
+        msg = msg.store_uint(0x18, 6);
+    } else {
+        msg = msg.store_uint(0x10, 6);
+    }
+
+    msg = msg
+        .store_slice(to_address)
+        .store_coins(amount)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op, 32)
+        .store_uint(query_id, 64);
+
+    ifnot (builder_null?(payload)) {
+        msg = msg.store_builder(payload);
+    }
+
+    send_raw_message(msg.end_cell(), send_mode);
+}
