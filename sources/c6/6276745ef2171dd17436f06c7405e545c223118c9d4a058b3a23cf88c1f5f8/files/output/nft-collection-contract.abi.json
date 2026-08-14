@@ -1,0 +1,1164 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "NftCollection",
+  "author": "Hoppr",
+  "version": "1.0.0",
+  "description": "Hoppr Genesis fixed-supply signed-quote NFT collection",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MintWithQuote"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "HopprQuote"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "HopprQuoteTail"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "HopprQuoteCrypto"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PauseMinting"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UnpauseMinting"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RotateSigner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RevealMetadata"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FreezeMetadata"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PremintGiveaways"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PremintTreasury"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetMerkleRoot"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimWhitelist"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftCollectionStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 35
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionContent"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 37
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RevealState"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 39
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionAssets"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionMaps"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 17,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 42
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WhitelistState"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 46
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 41
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftItemInitAtDeployment"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        3,
+        7
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OffchainMetadataReply"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 51
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        17,
+        1,
+        8
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        17,
+        1,
+        1,
+        5
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        5,
+        17,
+        5,
+        5,
+        27
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        1,
+        6,
+        6,
+        6,
+        6,
+        5
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "CollectionContent",
+      "ty_idx": 37,
+      "fields": [
+        {
+          "name": "collectionMetadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "commonContent",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RevealState",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "delayedRevealEnabled",
+          "ty_idx": 5
+        },
+        {
+          "name": "metadataCommitment",
+          "ty_idx": 17
+        },
+        {
+          "name": "metadataRevealed",
+          "ty_idx": 5
+        },
+        {
+          "name": "metadataFrozen",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionConfig",
+      "ty_idx": 35,
+      "fields": [
+        {
+          "name": "immutableTreasuryAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "networkId",
+          "ty_idx": 8
+        },
+        {
+          "name": "maximumSupply",
+          "ty_idx": 9
+        },
+        {
+          "name": "giveawaySupply",
+          "ty_idx": 14
+        },
+        {
+          "name": "treasuryNftSupply",
+          "ty_idx": 14
+        },
+        {
+          "name": "whitelistMaxClaims",
+          "ty_idx": 14
+        },
+        {
+          "name": "itemDeploymentValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "collectionExecutionReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "outboundMessageReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "minimumStorageReserve",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionMaps",
+      "ty_idx": 42,
+      "fields": [
+        {
+          "name": "usedQuoteHashes",
+          "ty_idx": 43
+        },
+        {
+          "name": "mintedSerialGuards",
+          "ty_idx": 44
+        },
+        {
+          "name": "whitelistClaimedWallets",
+          "ty_idx": 43
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WhitelistState",
+      "ty_idx": 46,
+      "fields": [
+        {
+          "name": "merkleRoot",
+          "ty_idx": 17
+        },
+        {
+          "name": "claimsUsed",
+          "ty_idx": 14
+        },
+        {
+          "name": "locked",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionAssets",
+      "ty_idx": 41,
+      "fields": [
+        {
+          "name": "nftItemCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "maps",
+          "ty_idx": 45
+        },
+        {
+          "name": "whitelist",
+          "ty_idx": 47
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftCollectionStorage",
+      "ty_idx": 34,
+      "fields": [
+        {
+          "name": "adminAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "quotePublicKey",
+          "ty_idx": 17
+        },
+        {
+          "name": "signerEpoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 9
+        },
+        {
+          "name": "mintedCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "giveawayPremintedCount",
+          "ty_idx": 14
+        },
+        {
+          "name": "treasuryPremintedCount",
+          "ty_idx": 14
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "config",
+          "ty_idx": 36
+        },
+        {
+          "name": "content",
+          "ty_idx": 38
+        },
+        {
+          "name": "reveal",
+          "ty_idx": 40
+        },
+        {
+          "name": "assets",
+          "ty_idx": 48
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftItemInitAtDeployment",
+      "ty_idx": 49,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "content",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MintWithQuote",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1213157457,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "quote",
+          "ty_idx": 21
+        },
+        {
+          "name": "signature",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PauseMinting",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1213157377,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UnpauseMinting",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 1213157378,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RotateSigner",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1213157379,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newPublicKey",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RevealMetadata",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1213157380,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "finalBaseUri",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FreezeMetadata",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 1213157381,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PremintGiveaways",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1213157382,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "quantity",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferAdmin",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1213157383,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newAdminAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PremintTreasury",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1213157384,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "quantity",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetMerkleRoot",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 1213157385,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newRoot",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimWhitelist",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 1213157386,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "snapshotBalance",
+          "ty_idx": 17
+        },
+        {
+          "name": "proof",
+          "ty_idx": 3
+        }
+      ],
+      "description": "`proof` is a forward snake. Every cell stores one 256-bit sibling hash and\noptionally references the next proof cell. Pair hashes are sorted."
+    },
+    {
+      "kind": "struct",
+      "name": "OffchainMetadataReply",
+      "ty_idx": 51,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "string",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "HopprQuote",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "version",
+          "ty_idx": 14
+        },
+        {
+          "name": "networkId",
+          "ty_idx": 8
+        },
+        {
+          "name": "mintContractAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "buyerWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "quantity",
+          "ty_idx": 14
+        },
+        {
+          "name": "firstSerial",
+          "ty_idx": 9
+        },
+        {
+          "name": "lastSerial",
+          "ty_idx": 9
+        },
+        {
+          "name": "tail",
+          "ty_idx": 20
+        }
+      ],
+      "description": "Canonical quote payload. The signature is intentionally outside this cell.\nAutomatic Tolk serialization is the normative encoding and is mirrored by QuoteCodec.ts."
+    },
+    {
+      "kind": "struct",
+      "name": "HopprQuoteTail",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "usdTotalNanoDollars",
+          "ty_idx": 11
+        },
+        {
+          "name": "paymentAssetKind",
+          "ty_idx": 16
+        },
+        {
+          "name": "paymentAssetId",
+          "ty_idx": 17
+        },
+        {
+          "name": "paymentAmountBaseUnits",
+          "ty_idx": 6
+        },
+        {
+          "name": "validFrom",
+          "ty_idx": 9
+        },
+        {
+          "name": "validUntil",
+          "ty_idx": 9
+        },
+        {
+          "name": "crypto",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "HopprQuoteCrypto",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "nonce",
+          "ty_idx": 17
+        },
+        {
+          "name": "signerEpoch",
+          "ty_idx": 9
+        },
+        {
+          "name": "metadataAssignmentCommitment",
+          "ty_idx": 17
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 34
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 49
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102491,
+      "name": "get_collection_data",
+      "parameters": [],
+      "return_ty_idx": 50
+    },
+    {
+      "tvm_method_id": 92067,
+      "name": "get_nft_address_by_index",
+      "parameters": [
+        {
+          "name": "index",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 68445,
+      "name": "get_nft_content",
+      "parameters": [
+        {
+          "name": "_index",
+          "ty_idx": 1
+        },
+        {
+          "name": "individualContent",
+          "ty_idx": 3
+        }
+      ],
+      "return_ty_idx": 52
+    },
+    {
+      "tvm_method_id": 86787,
+      "name": "get_treasury_address",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 94255,
+      "name": "get_admin_address",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 100410,
+      "name": "get_quote_config",
+      "parameters": [],
+      "return_ty_idx": 53
+    },
+    {
+      "tvm_method_id": 103484,
+      "name": "is_quote_used",
+      "parameters": [
+        {
+          "name": "quoteHash",
+          "ty_idx": 17
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 68099,
+      "name": "get_minted_count",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 80111,
+      "name": "get_giveaway_preminted_count",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 65967,
+      "name": "get_giveaway_supply",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 103643,
+      "name": "get_treasury_preminted_count",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 115614,
+      "name": "get_treasury_nft_supply",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 130121,
+      "name": "get_reserved_allocation_state",
+      "parameters": [],
+      "return_ty_idx": 54
+    },
+    {
+      "tvm_method_id": 73030,
+      "name": "get_whitelist_config",
+      "parameters": [],
+      "return_ty_idx": 55
+    },
+    {
+      "tvm_method_id": 93419,
+      "name": "get_whitelist_claimed",
+      "parameters": [
+        {
+          "name": "wallet",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 79765,
+      "name": "get_reveal_status",
+      "parameters": [],
+      "return_ty_idx": 56
+    },
+    {
+      "tvm_method_id": 69498,
+      "name": "get_mint_config",
+      "parameters": [],
+      "return_ty_idx": 57
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.NotAdmin",
+      "err_code": 1001
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.MintPaused",
+      "err_code": 1002
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.UnsupportedQuoteVersion",
+      "err_code": 1003
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.WrongNetwork",
+      "err_code": 1004
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.WrongCollection",
+      "err_code": 1005
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.WrongBuyer",
+      "err_code": 1006
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.WrongSignerEpoch",
+      "err_code": 1007
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.WrongPaymentAsset",
+      "err_code": 1008
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.QuoteNotYetValid",
+      "err_code": 1009
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.QuoteExpired",
+      "err_code": 1010
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.QuoteLifetimeInvalid",
+      "err_code": 1011
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.QuantityZero",
+      "err_code": 1012
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.BatchLimitExceeded",
+      "err_code": 1013
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.InvalidSerialRange",
+      "err_code": 1014
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.SupplyExceeded",
+      "err_code": 1016
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.SerialAlreadyMinted",
+      "err_code": 1017
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.QuoteAlreadyUsed",
+      "err_code": 1018
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.Underpayment",
+      "err_code": 1019
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.InvalidSignature",
+      "err_code": 1020
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.InvalidPublicKey",
+      "err_code": 1021
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.RevealDisabled",
+      "err_code": 1022
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.MetadataFrozen",
+      "err_code": 1023
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.InvalidReveal",
+      "err_code": 1024
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.AlreadyRevealed",
+      "err_code": 1025
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.Overpayment",
+      "err_code": 1026
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.GiveawayPremintAlreadyCompleted",
+      "err_code": 1027
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.InvalidAdminAddress",
+      "err_code": 1028
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.GiveawayPremintIncomplete",
+      "err_code": 1029
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.TreasuryPremintAlreadyCompleted",
+      "err_code": 1030
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.TreasuryPremintIncomplete",
+      "err_code": 1031
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.WhitelistRootUnset",
+      "err_code": 1032
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.WhitelistRootLocked",
+      "err_code": 1033
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.WhitelistAlreadyClaimed",
+      "err_code": 1034
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.WhitelistAllocationExhausted",
+      "err_code": 1035
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.InvalidMerkleProof",
+      "err_code": 1036
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.MerkleProofTooDeep",
+      "err_code": 1037
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.PublicAllocationExceeded",
+      "err_code": 1038
+    },
+    {
+      "kind": "enum_member",
+      "name": "HopprErrors.InvalidMessage",
+      "err_code": 1099
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
