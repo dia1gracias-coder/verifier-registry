@@ -1,0 +1,280 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "ValidatorRegistry",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ValidatorInfo"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Entry"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Collator"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ShardSet"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 14
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 2613519016,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "registry",
+          "ty_idx": 22
+        },
+        {
+          "name": "lastCleanupKeyBlockSeqno",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ValidatorInfo",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1467379436,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "allowUpdateAt",
+          "ty_idx": 9,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "entry",
+          "ty_idx": 21,
+          "default_value": {
+            "kind": "null"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Entry",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 3940594292,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "collators",
+          "ty_idx": 19
+        },
+        {
+          "name": "monitoringShards",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Collator",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 271991956,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "monitoringShards",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ShardSet",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "n",
+          "ty_idx": 18
+        },
+        {
+          "name": "mask",
+          "ty_idx": 1
+        }
+      ],
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 12
+  },
+  "incoming_messages": [],
+  "incoming_external": [
+    {
+      "body_ty_idx": 2
+    }
+  ],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERR_INVALID_OP",
+      "err_code": 900
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_TOO_MANY_COLLATORS",
+      "err_code": 901
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_TOO_EARLY_CLEANUP",
+      "err_code": 902
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_WRONG_KEY_BLOCK_SEQNO",
+      "err_code": 903
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_WRONG_VAL_SET_IDX",
+      "err_code": 904
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_TOO_BIG_VALID_UNTIL",
+      "err_code": 905
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_MESSAGE_EXPIRED",
+      "err_code": 906
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_VALIDATOR_NOT_FOUND",
+      "err_code": 907
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_TOO_EARLY_REQUEST",
+      "err_code": 908
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_WRONG_SIGNATURE",
+      "err_code": 909
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_RANGE_ERROR",
+      "err_code": 910
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_NO_CONFIG",
+      "err_code": 911
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_BAD_NEW_CODE_HASH",
+      "err_code": 912
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_NEW_CODE_ALREADY_INSTALLED",
+      "err_code": 913
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}
