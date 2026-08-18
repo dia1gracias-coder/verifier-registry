@@ -1,0 +1,8066 @@
+{
+  "code_hash": "9134b6a78d07cc8b301cd69bb1deba3b08197e750967893eb369a2c6637439f8",
+  "source_bundle_hash": "a6bc22faf845d9df8fbef1979351b2757a035c5d12871c39030d4d5f6438d41d",
+  "verified_at": 1787043600,
+  "compiler": {
+    "language": "tolk",
+    "version": "1.4.1",
+    "entrypoint": "contracts/src/nft-item-contract.tolk",
+    "params": {
+      "compiler_version": "1.4.1"
+    }
+  },
+  "source_map": {
+    "code_boc64": "te6ccgECBwEAAW4AART/APSkE/S88sgLAQIBYgIDAeLQ+JGRMODtRNDTH/pIIMcAjhww+JIhxwXy59EC+kjU0QLIyx8T+lIS+lLMye1U4PpI10wk1ywi/mHopOMCbCHXLCF+WTUUjiEzAtcLP/iSyM+FCPpSghCLdxc1zwuOyz/L//pSyYBA+wDgXwPHAPLkSwQANaEfn9qJoaY/9JBBjgEqYOCy2tvB9JGumP6qYQL6NfiSIscF8ufSBNM/+kj6UPQB+gAj+kQw8tfVINdLIfLn1CLXCwCfAcABlMABwwCSMHDi8ufUkVvi+JNw+Dr4J28Qggr68IChI5RTMaCh3iRukTGYJPpEMPLX1aLiIML/8ufTJAnIyx8Y+lIY+lIYzMntVCaUNjAzMOMNIm4FBgBOyM+QFE42RiPPCz8U+lIVzsnIz4UIFfpSUAX6AnHPC2oTzMlx+wASAD6SXwOOGcjPhQgT+lJY+gKCENUydtvPC4rLP8lx+wDi",
+    "symbol_types_json": {
+      "alias_instantiations": [],
+      "declarations": [
+        {
+          "fields": [
+            {
+              "name": "skipBitsNValidation",
+              "ty_idx": 5
+            }
+          ],
+          "ident_loc": [
+            0,
+            433,
+            8,
+            433,
+            19
+          ],
+          "kind": "struct",
+          "name": "PackOptions",
+          "ty_idx": 30
+        },
+        {
+          "fields": [
+            {
+              "name": "assertEndAfterReading",
+              "ty_idx": 5
+            },
+            {
+              "name": "throwIfOpcodeDoesNotMatch",
+              "ty_idx": 1
+            }
+          ],
+          "ident_loc": [
+            0,
+            445,
+            8,
+            445,
+            21
+          ],
+          "kind": "struct",
+          "name": "UnpackOptions",
+          "ty_idx": 27
+        },
+        {
+          "ident_loc": [
+            0,
+            1588,
+            6,
+            1588,
+            24
+          ],
+          "kind": "alias",
+          "name": "ExtraCurrenciesMap",
+          "target_ty_idx": 40,
+          "ty_idx": 38
+        },
+        {
+          "fields": [
+            {
+              "name": "code",
+              "ty_idx": 3
+            },
+            {
+              "name": "data",
+              "ty_idx": 3
+            }
+          ],
+          "ident_loc": [
+            0,
+            1592,
+            8,
+            1592,
+            21
+          ],
+          "kind": "struct",
+          "name": "ContractState",
+          "ty_idx": 47
+        },
+        {
+          "fields": [
+            {
+              "name": "fixedPrefixLength",
+              "ty_idx": 50
+            },
+            {
+              "name": "closeTo",
+              "ty_idx": 7
+            }
+          ],
+          "ident_loc": [
+            0,
+            1599,
+            8,
+            1599,
+            30
+          ],
+          "kind": "struct",
+          "name": "AddressShardingOptions",
+          "ty_idx": 49
+        },
+        {
+          "fields": [
+            {
+              "name": "workchain",
+              "ty_idx": 43
+            },
+            {
+              "name": "stateInit",
+              "ty_idx": 48
+            },
+            {
+              "name": "toShard",
+              "ty_idx": 51
+            }
+          ],
+          "ident_loc": [
+            0,
+            1621,
+            8,
+            1621,
+            25
+          ],
+          "kind": "struct",
+          "name": "AutoDeployAddress",
+          "ty_idx": 46
+        },
+        {
+          "encoded_as_ty_idx": 35,
+          "ident_loc": [
+            0,
+            1677,
+            6,
+            1677,
+            16
+          ],
+          "kind": "enum",
+          "members": [
+            {
+              "name": "NoBounce",
+              "value": "0"
+            },
+            {
+              "name": "Only256BitsOfBody",
+              "value": "1"
+            },
+            {
+              "name": "RichBounce",
+              "value": "2"
+            },
+            {
+              "name": "RichBounceOnlyRootCell",
+              "value": "3"
+            }
+          ],
+          "name": "BounceMode",
+          "ty_idx": 34
+        },
+        {
+          "ident_loc": [
+            0,
+            1687,
+            6,
+            1687,
+            19
+          ],
+          "kind": "alias",
+          "name": "OldBounceMode",
+          "target_ty_idx": 5,
+          "ty_idx": 36
+        },
+        {
+          "fields": [
+            {
+              "name": "bounce",
+              "ty_idx": 37
+            },
+            {
+              "name": "value",
+              "ty_idx": 42
+            },
+            {
+              "name": "dest",
+              "ty_idx": 52
+            },
+            {
+              "name": "body",
+              "ty_idx": 53
+            }
+          ],
+          "ident_loc": [
+            0,
+            1691,
+            8,
+            1691,
+            28
+          ],
+          "kind": "struct",
+          "name": "CreateMessageOptions",
+          "ty_idx": 54,
+          "type_params": [
+            "TBody"
+          ]
+        },
+        {
+          "fields": [
+            {
+              "name": "forceInline",
+              "ty_idx": 59
+            }
+          ],
+          "ident_loc": [
+            0,
+            1782,
+            8,
+            1782,
+            23
+          ],
+          "kind": "struct",
+          "name": "UnsafeBodyNoRef",
+          "ty_idx": 60,
+          "type_params": [
+            "T"
+          ]
+        },
+        {
+          "fields": [
+            {
+              "name": "messageCell",
+              "ty_idx": 3
+            }
+          ],
+          "ident_loc": [
+            0,
+            1788,
+            8,
+            1788,
+            18
+          ],
+          "kind": "struct",
+          "name": "OutMessage",
+          "ty_idx": 31
+        },
+        {
+          "ident_loc": [
+            1,
+            16,
+            6,
+            16,
+            29
+          ],
+          "kind": "alias",
+          "name": "AllowedMessageToNftItem",
+          "target_ty_idx": 22,
+          "ty_idx": 12
+        },
+        {
+          "fields": [
+            {
+              "name": "itemIndex",
+              "ty_idx": 9
+            },
+            {
+              "name": "collectionAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "ownerAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "content",
+              "ty_idx": 24
+            }
+          ],
+          "ident_loc": [
+            3,
+            1,
+            8,
+            1,
+            22
+          ],
+          "kind": "struct",
+          "name": "NftItemStorage",
+          "ty_idx": 23
+        },
+        {
+          "fields": [
+            {
+              "name": "itemIndex",
+              "ty_idx": 9
+            },
+            {
+              "name": "collectionAddress",
+              "ty_idx": 7
+            }
+          ],
+          "ident_loc": [
+            3,
+            8,
+            8,
+            8,
+            36
+          ],
+          "kind": "struct",
+          "name": "NftItemStorageNotInitialized",
+          "ty_idx": 25
+        },
+        {
+          "fields": [
+            {
+              "name": "itemIndex",
+              "ty_idx": 9
+            },
+            {
+              "name": "collectionAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "rest",
+              "ty_idx": 16
+            }
+          ],
+          "ident_loc": [
+            3,
+            13,
+            8,
+            13,
+            28
+          ],
+          "kind": "struct",
+          "name": "NftItemStorageLoader",
+          "ty_idx": 26
+        },
+        {
+          "fields": [
+            {
+              "name": "ownerAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "content",
+              "ty_idx": 24
+            }
+          ],
+          "ident_loc": [
+            4,
+            3,
+            8,
+            3,
+            31
+          ],
+          "kind": "struct",
+          "name": "NftItemInitAtDeployment",
+          "ty_idx": 28
+        },
+        {
+          "fields": [
+            {
+              "name": "queryId",
+              "ty_idx": 11
+            }
+          ],
+          "ident_loc": [
+            4,
+            64,
+            21,
+            64,
+            38
+          ],
+          "kind": "struct",
+          "name": "RequestStaticData",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 801842850
+          },
+          "ty_idx": 21
+        },
+        {
+          "fields": [
+            {
+              "name": "queryId",
+              "ty_idx": 11
+            },
+            {
+              "name": "itemIndex",
+              "ty_idx": 44
+            },
+            {
+              "name": "collectionAddress",
+              "ty_idx": 7
+            }
+          ],
+          "ident_loc": [
+            4,
+            68,
+            21,
+            68,
+            39
+          ],
+          "kind": "struct",
+          "name": "ResponseStaticData",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 2339837749
+          },
+          "ty_idx": 57
+        },
+        {
+          "fields": [
+            {
+              "name": "value",
+              "ty_idx": 16
+            }
+          ],
+          "ident_loc": [
+            4,
+            74,
+            14,
+            74,
+            27
+          ],
+          "kind": "struct",
+          "name": "PayloadInline",
+          "prefix": {
+            "prefix_len": 1,
+            "prefix_num": 0
+          },
+          "ty_idx": 17
+        },
+        {
+          "fields": [
+            {
+              "name": "value",
+              "ty_idx": 19
+            }
+          ],
+          "ident_loc": [
+            4,
+            78,
+            14,
+            78,
+            26
+          ],
+          "kind": "struct",
+          "name": "PayloadInRef",
+          "prefix": {
+            "prefix_len": 1,
+            "prefix_num": 1
+          },
+          "ty_idx": 18
+        },
+        {
+          "fields": [
+            {
+              "name": "queryId",
+              "ty_idx": 11
+            },
+            {
+              "name": "oldOwnerAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "payload",
+              "ty_idx": 16
+            }
+          ],
+          "ident_loc": [
+            4,
+            82,
+            21,
+            82,
+            44
+          ],
+          "kind": "struct",
+          "name": "NotificationForNewOwner",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 85167505
+          },
+          "ty_idx": 32
+        },
+        {
+          "fields": [
+            {
+              "name": "queryId",
+              "ty_idx": 11
+            }
+          ],
+          "ident_loc": [
+            4,
+            89,
+            21,
+            89,
+            39
+          ],
+          "kind": "struct",
+          "name": "ReturnExcessesBack",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 3576854235
+          },
+          "ty_idx": 55
+        },
+        {
+          "fields": [
+            {
+              "name": "queryId",
+              "ty_idx": 11
+            },
+            {
+              "name": "newOwnerAddress",
+              "ty_idx": 7
+            },
+            {
+              "name": "sendExcessesTo",
+              "ty_idx": 14
+            },
+            {
+              "name": "customPayload",
+              "ty_idx": 15
+            },
+            {
+              "name": "forwardTonAmount",
+              "ty_idx": 6
+            },
+            {
+              "name": "forwardPayload",
+              "ty_idx": 16
+            }
+          ],
+          "ident_loc": [
+            4,
+            93,
+            21,
+            93,
+            41
+          ],
+          "kind": "struct",
+          "name": "AskToChangeOwnership",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 1607220500
+          },
+          "ty_idx": 13
+        }
+      ],
+      "files": [
+        {
+          "file_id": 0,
+          "file_name": "@stdlib/common.tolk",
+          "imports": [],
+          "size_chars": 75177
+        },
+        {
+          "file_id": 1,
+          "file_name": "contracts/src/nft-item-contract.tolk",
+          "imports": [
+            2,
+            3,
+            4
+          ],
+          "size_chars": 4635
+        },
+        {
+          "file_id": 2,
+          "file_name": "contracts/src/errors.tolk",
+          "imports": [],
+          "size_chars": 1313
+        },
+        {
+          "file_id": 3,
+          "file_name": "contracts/src/item-storage.tolk",
+          "imports": [],
+          "size_chars": 887
+        },
+        {
+          "file_id": 4,
+          "file_name": "contracts/src/messages.tolk",
+          "imports": [
+            5
+          ],
+          "size_chars": 2075
+        },
+        {
+          "file_id": 5,
+          "file_name": "contracts/src/quote-types.tolk",
+          "imports": [],
+          "size_chars": 735
+        }
+      ],
+      "functions": [
+        {
+          "end_loc": [
+            1,
+            108,
+            1,
+            108,
+            2
+          ],
+          "f_idx": 0,
+          "ident_loc": [
+            1,
+            18,
+            5,
+            18,
+            22
+          ],
+          "name": "onInternalMessage",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "in.body",
+              "ty_idx": 2
+            }
+          ],
+          "return_ty_idx": 0
+        },
+        {
+          "end_loc": [
+            1,
+            110,
+            46,
+            110,
+            47
+          ],
+          "f_idx": 1,
+          "ident_loc": [
+            1,
+            110,
+            5,
+            110,
+            21
+          ],
+          "name": "onBouncedMessage",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "in.body",
+              "ty_idx": 2
+            }
+          ],
+          "return_ty_idx": 0
+        },
+        {
+          "end_loc": [
+            3,
+            21,
+            1,
+            21,
+            2
+          ],
+          "f_idx": 2,
+          "ident_loc": [
+            3,
+            19,
+            20,
+            19,
+            32
+          ],
+          "name": "NftItemStorage.startLoading",
+          "num_params": 0,
+          "params": [],
+          "return_ty_idx": 26
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 3,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "NftItemStorageLoader.fromCell",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "packedCell",
+              "ty_idx": 3
+            },
+            {
+              "name": "options",
+              "ty_idx": 27
+            }
+          ],
+          "return_ty_idx": 26
+        },
+        {
+          "end_loc": [
+            3,
+            25,
+            1,
+            25,
+            2
+          ],
+          "f_idx": 4,
+          "ident_loc": [
+            3,
+            23,
+            26,
+            23,
+            42
+          ],
+          "name": "NftItemStorageLoader.isNotInitialized",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 26
+            }
+          ],
+          "return_ty_idx": 5
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 5,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "NftItemInitAtDeployment.fromSlice",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "rawSlice",
+              "ty_idx": 2
+            },
+            {
+              "name": "options",
+              "ty_idx": 27
+            }
+          ],
+          "return_ty_idx": 28
+        },
+        {
+          "end_loc": [
+            3,
+            38,
+            1,
+            38,
+            2
+          ],
+          "f_idx": 6,
+          "ident_loc": [
+            3,
+            36,
+            20,
+            36,
+            24
+          ],
+          "name": "NftItemStorage.save",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 23
+            }
+          ],
+          "return_ty_idx": 0
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 7,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "NftItemStorage.toCell",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 23
+            },
+            {
+              "name": "options",
+              "ty_idx": 30
+            }
+          ],
+          "return_ty_idx": 29
+        },
+        {
+          "end_loc": [
+            3,
+            34,
+            1,
+            34,
+            2
+          ],
+          "f_idx": 8,
+          "ident_loc": [
+            3,
+            27,
+            26,
+            27,
+            36
+          ],
+          "name": "NftItemStorageLoader.endLoading",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 26
+            }
+          ],
+          "return_ty_idx": 23
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 9,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "slice.loadAny<address>",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 2
+            },
+            {
+              "name": "options",
+              "ty_idx": 27
+            }
+          ],
+          "return_ty_idx": 7
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 10,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "slice.loadAny<string>",
+          "num_params": 2,
+          "params": [
+            {
+              "name": "self",
+              "ty_idx": 2
+            },
+            {
+              "name": "options",
+              "ty_idx": 27
+            }
+          ],
+          "return_ty_idx": 24
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 11,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "createMessage<NotificationForNewOwner>",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "options",
+              "ty_idx": 33
+            }
+          ],
+          "return_ty_idx": 31
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 12,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "createMessage<ReturnExcessesBack>",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "options",
+              "ty_idx": 56
+            }
+          ],
+          "return_ty_idx": 31
+        },
+        {
+          "end_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "f_idx": 13,
+          "ident_loc": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "name": "createMessage<UnsafeBodyNoRef<ResponseStaticData>>",
+          "num_params": 1,
+          "params": [
+            {
+              "name": "options",
+              "ty_idx": 61
+            }
+          ],
+          "return_ty_idx": 31
+        },
+        {
+          "end_loc": [
+            1,
+            125,
+            1,
+            125,
+            2
+          ],
+          "f_idx": 14,
+          "ident_loc": [
+            1,
+            112,
+            9,
+            112,
+            21
+          ],
+          "name": "get_nft_data",
+          "num_params": 0,
+          "params": [],
+          "return_ty_idx": 62
+        }
+      ],
+      "struct_instantiations": [
+        {
+          "monomorphic_fields_ty_idx": [
+            37,
+            42,
+            52,
+            32
+          ],
+          "struct_name": "CreateMessageOptions<NotificationForNewOwner>",
+          "ty_idx": 33
+        },
+        {
+          "monomorphic_fields_ty_idx": [
+            37,
+            42,
+            52,
+            55
+          ],
+          "struct_name": "CreateMessageOptions<ReturnExcessesBack>",
+          "ty_idx": 56
+        },
+        {
+          "monomorphic_fields_ty_idx": [
+            57
+          ],
+          "struct_name": "UnsafeBodyNoRef<ResponseStaticData>",
+          "ty_idx": 58
+        },
+        {
+          "monomorphic_fields_ty_idx": [
+            37,
+            42,
+            52,
+            58
+          ],
+          "struct_name": "CreateMessageOptions<UnsafeBodyNoRef<ResponseStaticData>>",
+          "ty_idx": 61
+        }
+      ],
+      "unique_types": [
+        {
+          "kind": "void"
+        },
+        {
+          "kind": "int"
+        },
+        {
+          "kind": "slice"
+        },
+        {
+          "kind": "cell"
+        },
+        {
+          "kind": "builder"
+        },
+        {
+          "kind": "bool"
+        },
+        {
+          "kind": "coins"
+        },
+        {
+          "kind": "address"
+        },
+        {
+          "kind": "intN",
+          "n": 32
+        },
+        {
+          "kind": "uintN",
+          "n": 32
+        },
+        {
+          "kind": "intN",
+          "n": 64
+        },
+        {
+          "kind": "uintN",
+          "n": 64
+        },
+        {
+          "alias_name": "AllowedMessageToNftItem",
+          "kind": "AliasRef"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "AskToChangeOwnership"
+        },
+        {
+          "kind": "addressOpt"
+        },
+        {
+          "inner_ty_idx": 3,
+          "kind": "nullable"
+        },
+        {
+          "kind": "remaining"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "PayloadInline"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "PayloadInRef"
+        },
+        {
+          "inner_ty_idx": 16,
+          "kind": "cellOf"
+        },
+        {
+          "kind": "union",
+          "stack_width": 2,
+          "variants": [
+            {
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 133,
+              "stack_width": 1,
+              "variant_ty_idx": 17
+            },
+            {
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 134,
+              "stack_width": 1,
+              "variant_ty_idx": 18
+            }
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "RequestStaticData"
+        },
+        {
+          "kind": "union",
+          "stack_width": 7,
+          "variants": [
+            {
+              "prefix_len": 32,
+              "prefix_num": 1607220500,
+              "stack_type_id": 135,
+              "stack_width": 6,
+              "variant_ty_idx": 13
+            },
+            {
+              "prefix_len": 32,
+              "prefix_num": 801842850,
+              "stack_type_id": 136,
+              "stack_width": 1,
+              "variant_ty_idx": 21
+            }
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NftItemStorage"
+        },
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NftItemStorageNotInitialized"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NftItemStorageLoader"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "UnpackOptions"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NftItemInitAtDeployment"
+        },
+        {
+          "inner_ty_idx": 23,
+          "kind": "cellOf"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "PackOptions"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "OutMessage"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "NotificationForNewOwner"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "CreateMessageOptions",
+          "type_args_ty_idx": [
+            32
+          ]
+        },
+        {
+          "enum_name": "BounceMode",
+          "kind": "EnumRef"
+        },
+        {
+          "kind": "uintN",
+          "n": 2
+        },
+        {
+          "alias_name": "OldBounceMode",
+          "kind": "AliasRef"
+        },
+        {
+          "kind": "union",
+          "stack_width": 2,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 129,
+              "stack_width": 1,
+              "variant_ty_idx": 34
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 2,
+              "stack_width": 1,
+              "variant_ty_idx": 36
+            }
+          ]
+        },
+        {
+          "alias_name": "ExtraCurrenciesMap",
+          "kind": "AliasRef"
+        },
+        {
+          "kind": "varuintN",
+          "n": 32
+        },
+        {
+          "key_ty_idx": 8,
+          "kind": "mapKV",
+          "value_ty_idx": 39
+        },
+        {
+          "items_ty_idx": [
+            6,
+            38
+          ],
+          "kind": "tensor"
+        },
+        {
+          "kind": "union",
+          "stack_width": 3,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 17,
+              "stack_width": 1,
+              "variant_ty_idx": 6
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 137,
+              "stack_width": 2,
+              "variant_ty_idx": 41
+            }
+          ]
+        },
+        {
+          "kind": "intN",
+          "n": 8
+        },
+        {
+          "kind": "uintN",
+          "n": 256
+        },
+        {
+          "items_ty_idx": [
+            43,
+            44
+          ],
+          "kind": "tensor"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "AutoDeployAddress"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "ContractState"
+        },
+        {
+          "kind": "union",
+          "stack_width": 3,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 0,
+              "stack_type_id": 131,
+              "stack_width": 2,
+              "variant_ty_idx": 47
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 1,
+              "prefix_num": 1,
+              "stack_type_id": 3,
+              "stack_width": 1,
+              "variant_ty_idx": 3
+            }
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "AddressShardingOptions"
+        },
+        {
+          "kind": "uintN",
+          "n": 5
+        },
+        {
+          "inner_ty_idx": 49,
+          "kind": "nullable",
+          "stack_type_id": 132,
+          "stack_width": 3
+        },
+        {
+          "kind": "union",
+          "stack_width": 8,
+          "variants": [
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 0,
+              "stack_type_id": 8,
+              "stack_width": 1,
+              "variant_ty_idx": 7
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 1,
+              "stack_type_id": 5,
+              "stack_width": 1,
+              "variant_ty_idx": 4
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 2,
+              "stack_type_id": 138,
+              "stack_width": 2,
+              "variant_ty_idx": 45
+            },
+            {
+              "is_prefix_implicit": true,
+              "prefix_len": 2,
+              "prefix_num": 3,
+              "stack_type_id": 130,
+              "stack_width": 7,
+              "variant_ty_idx": 46
+            }
+          ]
+        },
+        {
+          "kind": "genericT",
+          "name_t": "TBody"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "CreateMessageOptions",
+          "type_args_ty_idx": [
+            53
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "ReturnExcessesBack"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "CreateMessageOptions",
+          "type_args_ty_idx": [
+            55
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "ResponseStaticData"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "UnsafeBodyNoRef",
+          "type_args_ty_idx": [
+            57
+          ]
+        },
+        {
+          "kind": "genericT",
+          "name_t": "T"
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "UnsafeBodyNoRef",
+          "type_args_ty_idx": [
+            59
+          ]
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "CreateMessageOptions",
+          "type_args_ty_idx": [
+            58
+          ]
+        },
+        {
+          "items_ty_idx": [
+            5,
+            1,
+            7,
+            14,
+            15
+          ],
+          "kind": "tensor"
+        }
+      ]
+    },
+    "debug_marks_json": [
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_import": [
+          0
+        ],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 0,
+        "range": [
+          1,
+          18,
+          5,
+          18,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 1,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 2,
+        "ty_idx": 2,
+        "var_name": "in.body"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 3,
+        "range": [
+          1,
+          18,
+          5,
+          18,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 4,
+        "stack": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 5,
+        "range": [
+          1,
+          18,
+          5,
+          18,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 6,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "f_idx": 1,
+        "f_name": "onBouncedMessage",
+        "ir_import": [
+          0
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 7,
+        "range": [
+          1,
+          18,
+          5,
+          18,
+          22
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 8,
+        "ty_idx": 2,
+        "var_name": "in.body"
+      },
+      {
+        "f_idx": 1,
+        "f_name": "onBouncedMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 9,
+        "range": [
+          1,
+          110,
+          46,
+          110,
+          47
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 10,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 11,
+        "range": [
+          1,
+          108,
+          1,
+          108,
+          2
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 12,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "NftItemStorage.startLoading",
+        "ir_import": [],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 13,
+        "range": [
+          1,
+          19,
+          19,
+          19,
+          48
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 14,
+        "range": [
+          3,
+          20,
+          42,
+          20,
+          60
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 15,
+        "stack": [
+          0,
+          6
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "NftItemStorageLoader.fromCell",
+        "ir_import": [
+          6,
+          7,
+          8
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 16,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "ir_slots": [
+          6
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 17,
+        "ty_idx": 3,
+        "var_name": "packedCell"
+      },
+      {
+        "ir_slots": [
+          7,
+          8
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 18,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 19,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 20,
+        "stack": [
+          0,
+          9
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 21,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 22,
+        "stack": [
+          0,
+          11,
+          9
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 23,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 24,
+        "stack": [
+          0,
+          11,
+          12,
+          9
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 25,
+        "stack": [
+          0,
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 26,
+        "stack": [
+          0,
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "NftItemStorageLoader.fromCell",
+        "ir_return": [
+          11,
+          12,
+          13
+        ],
+        "kind": "leave_fun",
+        "mark_id": 27,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 28,
+        "stack": [
+          0,
+          3,
+          4,
+          5
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "NftItemStorage.startLoading",
+        "ir_return": [
+          3,
+          4,
+          5
+        ],
+        "kind": "leave_fun",
+        "mark_id": 29,
+        "range": [
+          3,
+          20,
+          5,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 30,
+        "range": [
+          1,
+          19,
+          9,
+          19,
+          16
+        ]
+      },
+      {
+        "ir_slots": [
+          14,
+          15,
+          16
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 31,
+        "ty_idx": 26,
+        "var_name": "loading"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 32,
+        "stack": [
+          0,
+          14,
+          15,
+          16
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 33,
+        "range": [
+          1,
+          20,
+          5,
+          20,
+          7
+        ]
+      },
+      {
+        "f_idx": 4,
+        "f_name": "NftItemStorageLoader.isNotInitialized",
+        "ir_import": [
+          14,
+          15,
+          16
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 34,
+        "range": [
+          1,
+          20,
+          17,
+          20,
+          33
+        ]
+      },
+      {
+        "ir_slots": [
+          14,
+          15,
+          16
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 35,
+        "ty_idx": 26,
+        "var_name": "self"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 36,
+        "stack": [
+          0,
+          14,
+          15,
+          16,
+          16
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 37,
+        "range": [
+          3,
+          24,
+          22,
+          24,
+          29
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 38,
+        "stack": [
+          0,
+          14,
+          15,
+          16,
+          18
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 39,
+        "stack": [
+          0,
+          14,
+          15,
+          16,
+          17
+        ]
+      },
+      {
+        "f_idx": 4,
+        "f_name": "NftItemStorageLoader.isNotInitialized",
+        "ir_return": [
+          17
+        ],
+        "kind": "leave_fun",
+        "mark_id": 40,
+        "range": [
+          3,
+          24,
+          5,
+          24,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 41,
+        "range": [
+          1,
+          20,
+          5,
+          32,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 42,
+        "stack": [
+          0,
+          14,
+          15,
+          16
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 43,
+        "range": [
+          1,
+          20,
+          37,
+          32,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 44,
+        "stack": [
+          0,
+          14,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 45,
+        "range": [
+          1,
+          22,
+          13,
+          22,
+          29
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 46,
+        "stack": [
+          0,
+          14,
+          15,
+          20
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 47,
+        "stack": [
+          0,
+          14,
+          15,
+          20,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 48,
+        "range": [
+          1,
+          22,
+          13,
+          22,
+          58
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 49,
+        "stack": [
+          0,
+          14,
+          15,
+          22
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 50,
+        "range": [
+          1,
+          21,
+          9,
+          23,
+          50
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 51,
+        "stack": [
+          0,
+          14,
+          15
+        ]
+      },
+      {
+        "f_idx": 5,
+        "f_name": "NftItemInitAtDeployment.fromSlice",
+        "ir_import": [
+          0,
+          23,
+          24
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 52,
+        "range": [
+          1,
+          24,
+          20,
+          24,
+          62
+        ]
+      },
+      {
+        "ir_slots": [
+          0
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 53,
+        "ty_idx": 2,
+        "var_name": "rawSlice"
+      },
+      {
+        "ir_slots": [
+          23,
+          24
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 54,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 55,
+        "stack": [
+          25,
+          14,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 56,
+        "stack": [
+          15,
+          14,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 57,
+        "range": [
+          1,
+          24,
+          20,
+          24,
+          62
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 58,
+        "stack": [
+          15,
+          14,
+          26,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 59,
+        "range": [
+          1,
+          24,
+          20,
+          24,
+          62
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 60,
+        "stack": [
+          15,
+          14,
+          26,
+          27,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 61,
+        "range": [
+          1,
+          24,
+          20,
+          24,
+          62
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 62,
+        "stack": [
+          15,
+          14,
+          26,
+          27
+        ]
+      },
+      {
+        "f_idx": 5,
+        "f_name": "NftItemInitAtDeployment.fromSlice",
+        "ir_return": [
+          26,
+          27
+        ],
+        "kind": "leave_fun",
+        "mark_id": 63,
+        "range": [
+          1,
+          24,
+          20,
+          24,
+          62
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 64,
+        "range": [
+          1,
+          24,
+          13,
+          24,
+          17
+        ]
+      },
+      {
+        "ir_slots": [
+          28,
+          29
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 65,
+        "ty_idx": 28,
+        "var_name": "init"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 66,
+        "stack": [
+          15,
+          14,
+          28,
+          29
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 67,
+        "range": [
+          1,
+          26,
+          13,
+          26,
+          41
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 68,
+        "range": [
+          1,
+          27,
+          13,
+          27,
+          57
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 69,
+        "range": [
+          1,
+          28,
+          13,
+          28,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 70,
+        "range": [
+          1,
+          29,
+          13,
+          29,
+          34
+        ]
+      },
+      {
+        "f_idx": 6,
+        "f_name": "NftItemStorage.save",
+        "ir_import": [
+          14,
+          15,
+          28,
+          29
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 71,
+        "range": [
+          1,
+          30,
+          11,
+          30,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          14,
+          15,
+          28,
+          29
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 72,
+        "ty_idx": 23,
+        "var_name": "self"
+      },
+      {
+        "f_idx": 7,
+        "f_name": "NftItemStorage.toCell",
+        "ir_import": [
+          14,
+          15,
+          28,
+          29,
+          30
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 73,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "ir_slots": [
+          14,
+          15,
+          28,
+          29
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 74,
+        "ty_idx": 23,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          30
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 75,
+        "ty_idx": 30,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 76,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 77,
+        "stack": [
+          15,
+          29,
+          28,
+          14,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 78,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 79,
+        "stack": [
+          15,
+          29,
+          28,
+          31
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 80,
+        "stack": [
+          28,
+          29,
+          15,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 81,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 82,
+        "stack": [
+          28,
+          29,
+          31
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 83,
+        "stack": [
+          29,
+          28,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 84,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 85,
+        "stack": [
+          29,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 86,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 87,
+        "stack": [
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 88,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 89,
+        "stack": [
+          33
+        ]
+      },
+      {
+        "f_idx": 7,
+        "f_name": "NftItemStorage.toCell",
+        "ir_return": [
+          33
+        ],
+        "kind": "leave_fun",
+        "mark_id": 90,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 91,
+        "range": [
+          3,
+          37,
+          5,
+          37,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 92,
+        "stack": []
+      },
+      {
+        "f_idx": 6,
+        "f_name": "NftItemStorage.save",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 93,
+        "range": [
+          3,
+          38,
+          1,
+          38,
+          2
+        ]
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 94,
+        "range": [
+          1,
+          108,
+          1,
+          108,
+          2
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 95,
+        "stack": [
+          0,
+          14,
+          15,
+          16
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 96,
+        "stack": [
+          0,
+          34,
+          35,
+          36
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "NftItemStorageLoader.endLoading",
+        "ir_import": [
+          34,
+          35,
+          36
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 97,
+        "range": [
+          1,
+          34,
+          27,
+          34,
+          37
+        ]
+      },
+      {
+        "ir_slots": [
+          34,
+          35,
+          36
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 98,
+        "ty_idx": 26,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 99,
+        "range": [
+          3,
+          29,
+          9,
+          29,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 100,
+        "range": [
+          3,
+          30,
+          9,
+          30,
+          50
+        ]
+      },
+      {
+        "f_idx": 9,
+        "f_name": "slice.loadAny<address>",
+        "ir_import": [
+          36,
+          44,
+          45
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 101,
+        "range": [
+          3,
+          31,
+          23,
+          31,
+          42
+        ]
+      },
+      {
+        "ir_slots": [
+          36
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 102,
+        "ty_idx": 2,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          44,
+          45
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 103,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 104,
+        "stack": [
+          0,
+          34,
+          35,
+          46
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 105,
+        "range": [
+          3,
+          31,
+          23,
+          31,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 106,
+        "stack": [
+          0,
+          34,
+          35,
+          47,
+          46
+        ]
+      },
+      {
+        "f_idx": 9,
+        "f_name": "slice.loadAny<address>",
+        "ir_return": [
+          46,
+          47
+        ],
+        "kind": "leave_fun",
+        "mark_id": 107,
+        "range": [
+          3,
+          31,
+          23,
+          31,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 108,
+        "stack": [
+          0,
+          34,
+          35,
+          47,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 109,
+        "range": [
+          3,
+          31,
+          9,
+          31,
+          42
+        ]
+      },
+      {
+        "f_idx": 10,
+        "f_name": "slice.loadAny<string>",
+        "ir_import": [
+          36,
+          48,
+          49
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 110,
+        "range": [
+          3,
+          32,
+          18,
+          32,
+          37
+        ]
+      },
+      {
+        "ir_slots": [
+          36
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 111,
+        "ty_idx": 2,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          48,
+          49
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 112,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 113,
+        "stack": [
+          0,
+          34,
+          35,
+          47,
+          50
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 114,
+        "range": [
+          3,
+          32,
+          18,
+          32,
+          37
+        ]
+      },
+      {
+        "f_idx": 10,
+        "f_name": "slice.loadAny<string>",
+        "ir_return": [
+          50,
+          51
+        ],
+        "kind": "leave_fun",
+        "mark_id": 115,
+        "range": [
+          3,
+          32,
+          18,
+          32,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 116,
+        "stack": [
+          0,
+          34,
+          35,
+          47,
+          51
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 117,
+        "range": [
+          3,
+          32,
+          9,
+          32,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 118,
+        "stack": [
+          0,
+          40,
+          41,
+          42,
+          43
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "NftItemStorageLoader.endLoading",
+        "ir_return": [
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43
+        ],
+        "kind": "leave_fun",
+        "mark_id": 119,
+        "range": [
+          3,
+          28,
+          5,
+          33,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 120,
+        "range": [
+          1,
+          34,
+          9,
+          34,
+          16
+        ]
+      },
+      {
+        "ir_slots": [
+          52,
+          53,
+          54,
+          55
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 121,
+        "ty_idx": 23,
+        "var_name": "storage"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 122,
+        "stack": [
+          0,
+          52,
+          53,
+          54,
+          55
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 123,
+        "stack": [
+          0,
+          52,
+          53,
+          54,
+          55,
+          56
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 124,
+        "range": [
+          1,
+          35,
+          9,
+          35,
+          12
+        ]
+      },
+      {
+        "ir_lazy_slice": 56,
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 125,
+        "ty_idx": 12,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 126,
+        "range": [
+          1,
+          36,
+          5,
+          107,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 127,
+        "stack": [
+          0,
+          52,
+          53,
+          54,
+          55,
+          56,
+          67
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 128,
+        "range": [
+          1,
+          36,
+          5,
+          107,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 129,
+        "stack": [
+          0,
+          52,
+          53,
+          54,
+          55,
+          56
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 130,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 131,
+        "range": [
+          1,
+          37,
+          33,
+          88,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 132,
+        "stack": [
+          56,
+          52,
+          53,
+          54,
+          55
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 133,
+        "range": [
+          1,
+          38,
+          21,
+          38,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 134,
+        "stack": [
+          56,
+          52,
+          53,
+          54,
+          55,
+          71
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 135,
+        "stack": [
+          56,
+          52,
+          53,
+          54,
+          55,
+          71,
+          54
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 136,
+        "range": [
+          1,
+          38,
+          21,
+          38,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 137,
+        "stack": [
+          56,
+          52,
+          53,
+          54,
+          55,
+          73
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 138,
+        "range": [
+          1,
+          38,
+          13,
+          38,
+          93
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 139,
+        "stack": [
+          56,
+          52,
+          53,
+          54,
+          55
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 140,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          56
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 141,
+        "range": [
+          1,
+          39,
+          13,
+          41,
+          53
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 142,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          75,
+          56
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 143,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          56
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 144,
+        "range": [
+          1,
+          39,
+          13,
+          41,
+          53
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 145,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          76,
+          56
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 146,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          56
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 147,
+        "range": [
+          1,
+          39,
+          13,
+          41,
+          53
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 148,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          77,
+          56
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 149,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          56
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 150,
+        "range": [
+          1,
+          39,
+          13,
+          41,
+          53
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 151,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          56
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 152,
+        "range": [
+          1,
+          39,
+          13,
+          41,
+          53
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 153,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          78,
+          56
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 154,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          56
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 155,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          79
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 156,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 157,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 158,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          61
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 159,
+        "range": [
+          1,
+          40,
+          37,
+          40,
+          49
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 160,
+        "range": [
+          1,
+          40,
+          37,
+          40,
+          49
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 161,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          81
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 162,
+        "range": [
+          1,
+          39,
+          13,
+          41,
+          53
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 163,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 164,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 165,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          65
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 166,
+        "range": [
+          1,
+          43,
+          65,
+          43,
+          90
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 167,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          84,
+          85
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 168,
+        "range": [
+          1,
+          43,
+          17,
+          43,
+          43
+        ]
+      },
+      {
+        "ir_slots": [
+          86
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 169,
+        "ty_idx": 1,
+        "var_name": "payloadBits"
+      },
+      {
+        "ir_slots": [
+          87
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 170,
+        "ty_idx": 1,
+        "var_name": "payloadRefs"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 171,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          86,
+          87
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 172,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          86,
+          87,
+          86
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 173,
+        "range": [
+          1,
+          44,
+          13,
+          44,
+          75
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 174,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          86,
+          87
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 175,
+        "range": [
+          1,
+          45,
+          13,
+          45,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 176,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 177,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          86,
+          87,
+          65
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 178,
+        "range": [
+          1,
+          45,
+          36,
+          45,
+          47
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 179,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          86,
+          87,
+          92
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 180,
+        "range": [
+          1,
+          45,
+          13,
+          47,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 181,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          86,
+          87
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 182,
+        "range": [
+          1,
+          45,
+          57,
+          47,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 183,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          87,
+          86
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 184,
+        "range": [
+          1,
+          46,
+          25,
+          46,
+          41
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 185,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          87,
+          97
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 186,
+        "range": [
+          1,
+          46,
+          25,
+          46,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 187,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          87
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 188,
+        "range": [
+          1,
+          46,
+          45,
+          46,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 189,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          100
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 190,
+        "range": [
+          1,
+          46,
+          25,
+          46,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 191,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          102
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 192,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          98
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 193,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          87
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 194,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 195,
+        "range": [
+          1,
+          46,
+          25,
+          46,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 196,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          103
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 197,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          98
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 198,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          98
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 199,
+        "range": [
+          1,
+          46,
+          17,
+          46,
+          99
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 200,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 201
+      },
+      {
+        "kind": "stack",
+        "mark_id": 202,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          86,
+          87
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 203,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 204,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 205,
+        "range": [
+          1,
+          49,
+          26,
+          49,
+          47
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 206,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          104
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 207,
+        "range": [
+          1,
+          49,
+          26,
+          49,
+          47
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 208,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          104,
+          106
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 209,
+        "range": [
+          1,
+          49,
+          26,
+          49,
+          47
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 210,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          104
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 211,
+        "range": [
+          1,
+          49,
+          17,
+          49,
+          23
+        ]
+      },
+      {
+        "ir_slots": [
+          107
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 212,
+        "ty_idx": 6,
+        "var_name": "fwdFee"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 213,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 214,
+        "range": [
+          1,
+          50,
+          24,
+          50,
+          53
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 215,
+        "range": [
+          1,
+          50,
+          24,
+          50,
+          53
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 216,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          108
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 217,
+        "range": [
+          1,
+          50,
+          56,
+          50,
+          80
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 218,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          108,
+          109
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 219,
+        "range": [
+          1,
+          50,
+          24,
+          50,
+          80
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 220,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          110
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 221,
+        "range": [
+          1,
+          50,
+          17,
+          50,
+          21
+        ]
+      },
+      {
+        "ir_slots": [
+          111
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 222,
+        "ty_idx": 6,
+        "var_name": "rest"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 223,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 224,
+        "range": [
+          1,
+          51,
+          13,
+          51,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 225,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 226,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111,
+          64
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 227,
+        "range": [
+          1,
+          51,
+          13,
+          53,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 228,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 229,
+        "range": [
+          1,
+          51,
+          44,
+          53,
+          14
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 230,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 231,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111,
+          64,
+          107
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 232,
+        "range": [
+          1,
+          52,
+          25,
+          52,
+          54
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 233,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111,
+          114
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 234,
+        "range": [
+          1,
+          52,
+          17,
+          52,
+          54
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 235,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          115
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 236,
+        "range": [
+          1,
+          52,
+          17,
+          52,
+          21
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 237,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 238
+      },
+      {
+        "kind": "stack",
+        "mark_id": 239,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 240,
+        "range": [
+          1,
+          54,
+          13,
+          54,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 241,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 242,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111,
+          62
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 243,
+        "range": [
+          1,
+          54,
+          17,
+          54,
+          43
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 244,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111,
+          116
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 245,
+        "range": [
+          1,
+          54,
+          13,
+          59,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 246,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 247,
+        "range": [
+          1,
+          54,
+          45,
+          59,
+          14
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 248,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 249,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111,
+          62
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 250,
+        "range": [
+          1,
+          56,
+          40,
+          56,
+          52
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 251,
+        "range": [
+          1,
+          56,
+          40,
+          56,
+          52
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 252,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111,
+          118
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 253,
+        "range": [
+          1,
+          55,
+          17,
+          57,
+          57
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 254,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 255,
+        "range": [
+          1,
+          58,
+          17,
+          58,
+          31
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 256,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          121
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 257,
+        "range": [
+          1,
+          58,
+          17,
+          58,
+          21
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 258,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 259
+      },
+      {
+        "kind": "stack",
+        "mark_id": 260,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          107,
+          111
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 261,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 262,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 263,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111,
+          111
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 264,
+        "range": [
+          1,
+          60,
+          21,
+          60,
+          30
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 265,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111,
+          124
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 266,
+        "range": [
+          1,
+          60,
+          13,
+          60,
+          71
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 267,
+        "stack": [
+          55,
+          52,
+          53,
+          54,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 268,
+        "range": [
+          1,
+          62,
+          17,
+          62,
+          30
+        ]
+      },
+      {
+        "ir_slots": [
+          125
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 269,
+        "ty_idx": 7,
+        "var_name": "previousOwner"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 270,
+        "stack": [
+          55,
+          52,
+          53,
+          125,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 271,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 272,
+        "range": [
+          1,
+          63,
+          13,
+          63,
+          33
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 273,
+        "stack": [
+          55,
+          52,
+          53,
+          125,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111,
+          54
+        ]
+      },
+      {
+        "f_idx": 6,
+        "f_name": "NftItemStorage.save",
+        "ir_import": [
+          52,
+          53,
+          54,
+          55
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 274,
+        "range": [
+          1,
+          64,
+          21,
+          64,
+          25
+        ]
+      },
+      {
+        "ir_slots": [
+          52,
+          53,
+          54,
+          55
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 275,
+        "ty_idx": 23,
+        "var_name": "self"
+      },
+      {
+        "f_idx": 7,
+        "f_name": "NftItemStorage.toCell",
+        "ir_import": [
+          52,
+          53,
+          54,
+          55,
+          126
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 276,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "ir_slots": [
+          52,
+          53,
+          54,
+          55
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 277,
+        "ty_idx": 23,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          126
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 278,
+        "ty_idx": 30,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 279,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 280,
+        "stack": [
+          55,
+          54,
+          53,
+          125,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111,
+          52,
+          127
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 281,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 282,
+        "stack": [
+          55,
+          54,
+          53,
+          125,
+          60,
+          61,
+          62,
+          64,
+          65,
+          111,
+          127
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 283,
+        "stack": [
+          55,
+          54,
+          111,
+          125,
+          60,
+          61,
+          62,
+          64,
+          65,
+          53,
+          127
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 284,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 285,
+        "stack": [
+          55,
+          54,
+          111,
+          125,
+          60,
+          61,
+          62,
+          64,
+          65,
+          127
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 286,
+        "stack": [
+          55,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          64,
+          54,
+          127
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 287,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 288,
+        "stack": [
+          55,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          64,
+          127
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 289,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          55,
+          127
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 290,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 291,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          127
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 292,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 293,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          129
+        ]
+      },
+      {
+        "f_idx": 7,
+        "f_name": "NftItemStorage.toCell",
+        "ir_return": [
+          129
+        ],
+        "kind": "leave_fun",
+        "mark_id": 294,
+        "range": [
+          3,
+          37,
+          22,
+          37,
+          35
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 295,
+        "range": [
+          3,
+          37,
+          5,
+          37,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 296,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62
+        ]
+      },
+      {
+        "f_idx": 6,
+        "f_name": "NftItemStorage.save",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 297,
+        "range": [
+          3,
+          38,
+          1,
+          38,
+          2
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 298,
+        "range": [
+          1,
+          66,
+          13,
+          66,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 299,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 300,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          64
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 301,
+        "range": [
+          1,
+          66,
+          13,
+          78,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 302,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 303,
+        "range": [
+          1,
+          66,
+          44,
+          78,
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 304,
+        "range": [
+          1,
+          68,
+          21,
+          68,
+          48
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 305,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 306,
+        "range": [
+          1,
+          70,
+          21,
+          70,
+          48
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 307,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 308,
+        "range": [
+          1,
+          69,
+          21,
+          69,
+          46
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 309,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 310,
+        "range": [
+          1,
+          72,
+          25,
+          72,
+          45
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 311,
+        "range": [
+          1,
+          73,
+          25,
+          73,
+          55
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 312,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 313,
+        "range": [
+          1,
+          74,
+          25,
+          74,
+          52
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 314,
+        "range": [
+          1,
+          71,
+          21,
+          75,
+          22
+        ]
+      },
+      {
+        "f_idx": 11,
+        "f_name": "createMessage<NotificationForNewOwner>",
+        "ir_import": [
+          132,
+          133,
+          134,
+          64,
+          135,
+          136,
+          137,
+          138,
+          139,
+          140,
+          141,
+          61,
+          142,
+          60,
+          125,
+          65
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 315,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "ir_slots": [
+          132,
+          133,
+          134,
+          64,
+          135,
+          136,
+          137,
+          138,
+          139,
+          140,
+          141,
+          61,
+          142,
+          60,
+          125,
+          65
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 316,
+        "ty_idx": 33,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 317,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 318,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          151
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 319,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 320,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          151
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 321,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          151,
+          60
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 322,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 323,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62,
+          151
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 324,
+        "stack": [
+          64,
+          65,
+          111,
+          62,
+          60,
+          61,
+          125,
+          151
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 325,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 326,
+        "stack": [
+          64,
+          65,
+          111,
+          62,
+          60,
+          61,
+          151
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 327,
+        "stack": [
+          64,
+          61,
+          111,
+          62,
+          60,
+          65,
+          151
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 328,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 329,
+        "stack": [
+          64,
+          61,
+          111,
+          62,
+          60,
+          151
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 330,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 331,
+        "stack": [
+          64,
+          61,
+          111,
+          62,
+          60,
+          157
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 332,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 333,
+        "stack": [
+          64,
+          61,
+          111,
+          62,
+          60,
+          157,
+          158
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 334,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 335,
+        "stack": [
+          64,
+          61,
+          111,
+          62,
+          60,
+          157,
+          158
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 336,
+        "stack": [
+          64,
+          157,
+          111,
+          62,
+          60,
+          61,
+          158
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 337,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 338,
+        "stack": [
+          64,
+          157,
+          111,
+          62,
+          60,
+          158
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 339,
+        "stack": [
+          60,
+          157,
+          111,
+          62,
+          158,
+          64
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 340,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 341,
+        "stack": [
+          60,
+          157,
+          111,
+          62,
+          158
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 342,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 343,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 344,
+        "stack": [
+          60,
+          157,
+          111,
+          62,
+          158
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 345,
+        "stack": [
+          60,
+          62,
+          111,
+          157,
+          158
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 346,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 347,
+        "stack": [
+          60,
+          62,
+          111,
+          158
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 348,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 349,
+        "stack": [
+          60,
+          62,
+          111,
+          213
+        ]
+      },
+      {
+        "f_idx": 11,
+        "f_name": "createMessage<NotificationForNewOwner>",
+        "ir_return": [
+          213
+        ],
+        "kind": "leave_fun",
+        "mark_id": 350,
+        "range": [
+          1,
+          67,
+          45,
+          76,
+          19
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 351,
+        "range": [
+          1,
+          67,
+          21,
+          67,
+          42
+        ]
+      },
+      {
+        "ir_slots": [
+          214
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 352,
+        "ty_idx": 31,
+        "var_name": "ownershipNotification"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 353,
+        "stack": [
+          60,
+          62,
+          111,
+          214
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 354,
+        "range": [
+          1,
+          77,
+          44,
+          77,
+          73
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 355,
+        "stack": [
+          60,
+          62,
+          111,
+          214,
+          215
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 356,
+        "range": [
+          1,
+          77,
+          39,
+          77,
+          43
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 357,
+        "stack": [
+          60,
+          62,
+          111
+        ]
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 358
+      },
+      {
+        "kind": "stack",
+        "mark_id": 359,
+        "stack": [
+          62,
+          60,
+          111
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 360,
+        "stack": [
+          64,
+          65,
+          111,
+          125,
+          60,
+          61,
+          62
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 361,
+        "stack": [
+          62,
+          60,
+          111,
+          125
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 362,
+        "stack": [
+          62,
+          60,
+          111
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 363,
+        "stack": [
+          62,
+          60,
+          111
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 364,
+        "range": [
+          1,
+          79,
+          13,
+          79,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 365,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 366,
+        "stack": [
+          62,
+          60,
+          111,
+          62
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 367,
+        "range": [
+          1,
+          79,
+          17,
+          79,
+          43
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 368,
+        "stack": [
+          62,
+          60,
+          111,
+          216
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 369,
+        "range": [
+          1,
+          79,
+          13,
+          87,
+          14
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 370,
+        "stack": [
+          62,
+          60,
+          111
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 371,
+        "range": [
+          1,
+          79,
+          45,
+          87,
+          14
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 372,
+        "range": [
+          1,
+          81,
+          21,
+          81,
+          48
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 373,
+        "range": [
+          1,
+          83,
+          21,
+          83,
+          32
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 374,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 375,
+        "range": [
+          1,
+          82,
+          21,
+          82,
+          45
+        ]
+      },
+      {
+        "ir_slots": [
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 376,
+        "ty_idx": 13,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 377,
+        "range": [
+          1,
+          84,
+          21,
+          84,
+          70
+        ]
+      },
+      {
+        "f_idx": 12,
+        "f_name": "createMessage<ReturnExcessesBack>",
+        "ir_import": [
+          217,
+          218,
+          219,
+          111,
+          220,
+          221,
+          222,
+          223,
+          224,
+          225,
+          226,
+          62,
+          227,
+          60
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 378,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "ir_slots": [
+          217,
+          218,
+          219,
+          111,
+          220,
+          221,
+          222,
+          223,
+          224,
+          225,
+          226,
+          62,
+          227,
+          60
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 379,
+        "ty_idx": 56,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 380,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 381,
+        "stack": [
+          62,
+          60,
+          111,
+          236
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 382,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 383,
+        "stack": [
+          62,
+          60,
+          111,
+          236
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 384,
+        "stack": [
+          111,
+          60,
+          62,
+          236
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 385,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 386,
+        "stack": [
+          111,
+          60,
+          236
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 387,
+        "stack": [
+          60,
+          236,
+          111
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 388,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 389,
+        "stack": [
+          60,
+          236
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 390,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 391,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 392,
+        "stack": [
+          60,
+          236
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 393,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 394,
+        "stack": [
+          236
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 395,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 396,
+        "stack": [
+          294
+        ]
+      },
+      {
+        "f_idx": 12,
+        "f_name": "createMessage<ReturnExcessesBack>",
+        "ir_return": [
+          294
+        ],
+        "kind": "leave_fun",
+        "mark_id": 397,
+        "range": [
+          1,
+          80,
+          39,
+          85,
+          19
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 398,
+        "range": [
+          1,
+          80,
+          21,
+          80,
+          36
+        ]
+      },
+      {
+        "ir_slots": [
+          295
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 399,
+        "ty_idx": 31,
+        "var_name": "excessesMessage"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 400,
+        "stack": [
+          295
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 401,
+        "range": [
+          1,
+          86,
+          38,
+          86,
+          67
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 402,
+        "stack": [
+          295,
+          296
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 403,
+        "range": [
+          1,
+          86,
+          33,
+          86,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 404,
+        "stack": []
+      },
+      {
+        "kind": "scope_end",
+        "mark_id": 405
+      },
+      {
+        "kind": "stack",
+        "mark_id": 406,
+        "stack": [
+          62,
+          60,
+          111
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 407,
+        "stack": []
+      },
+      {
+        "kind": "stack",
+        "mark_id": 408,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 409,
+        "range": [
+          1,
+          108,
+          1,
+          108,
+          2
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 410,
+        "stack": [
+          0,
+          52,
+          53,
+          54,
+          55,
+          56
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 411,
+        "stack": [
+          0,
+          52,
+          53,
+          56
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 412,
+        "range": [
+          1,
+          36,
+          5,
+          107,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 413,
+        "stack": [
+          0,
+          52,
+          53,
+          56,
+          67
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 414,
+        "range": [
+          1,
+          36,
+          5,
+          107,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 415,
+        "stack": [
+          0,
+          52,
+          53,
+          56
+        ]
+      },
+      {
+        "ir_slots": [
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 416,
+        "ty_idx": 21,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 417,
+        "range": [
+          1,
+          89,
+          30,
+          103,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 418,
+        "stack": [
+          56,
+          52,
+          53
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 419,
+        "stack": [
+          53,
+          52,
+          56
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 420,
+        "range": [
+          1,
+          90,
+          13,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 421,
+        "stack": [
+          53,
+          52,
+          300
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 422,
+        "stack": [
+          53,
+          52,
+          65
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 423,
+        "range": [
+          1,
+          91,
+          17,
+          91,
+          44
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 424,
+        "range": [
+          1,
+          93,
+          17,
+          93,
+          25
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 425,
+        "range": [
+          1,
+          92,
+          23,
+          92,
+          39
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 426,
+        "stack": [
+          53,
+          52,
+          65,
+          306
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 427,
+        "range": [
+          1,
+          92,
+          17,
+          92,
+          39
+        ]
+      },
+      {
+        "ir_slots": [
+          65
+        ],
+        "kind": "smart_cast",
+        "mark_id": 428,
+        "ty_idx": 21,
+        "var_name": "msg"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 429,
+        "range": [
+          1,
+          96,
+          25,
+          96,
+          45
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 430,
+        "range": [
+          1,
+          97,
+          25,
+          97,
+          64
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 431,
+        "range": [
+          1,
+          98,
+          25,
+          98,
+          69
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 432,
+        "range": [
+          1,
+          94,
+          17,
+          100,
+          18
+        ]
+      },
+      {
+        "f_idx": 13,
+        "f_name": "createMessage<UnsafeBodyNoRef<ResponseStaticData>>",
+        "ir_import": [
+          301,
+          302,
+          304,
+          303,
+          305,
+          308,
+          309,
+          310,
+          311,
+          312,
+          313,
+          306,
+          314,
+          65,
+          52,
+          53
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 433,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "ir_slots": [
+          301,
+          302,
+          304,
+          303,
+          305,
+          308,
+          309,
+          310,
+          311,
+          312,
+          313,
+          306,
+          314,
+          65,
+          52,
+          53
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 434,
+        "ty_idx": 61,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 435,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 436,
+        "stack": [
+          53,
+          52,
+          65,
+          306,
+          323
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 437,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 438,
+        "stack": [
+          53,
+          52,
+          65,
+          306,
+          323
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 439,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 440,
+        "stack": [
+          53,
+          52,
+          65,
+          323
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 441,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 442,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 443,
+        "stack": [
+          53,
+          52,
+          65,
+          323
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 444,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 445,
+        "stack": [
+          53,
+          52,
+          323
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 446,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 447,
+        "stack": [
+          53,
+          323
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 448,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 449,
+        "stack": [
+          323
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 450,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 451,
+        "stack": [
+          382
+        ]
+      },
+      {
+        "f_idx": 13,
+        "f_name": "createMessage<UnsafeBodyNoRef<ResponseStaticData>>",
+        "ir_return": [
+          382
+        ],
+        "kind": "leave_fun",
+        "mark_id": 452,
+        "range": [
+          1,
+          90,
+          38,
+          101,
+          15
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 453,
+        "range": [
+          1,
+          90,
+          17,
+          90,
+          35
+        ]
+      },
+      {
+        "ir_slots": [
+          383
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 454,
+        "ty_idx": 31,
+        "var_name": "staticDataResponse"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 455,
+        "stack": [
+          383
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 456,
+        "range": [
+          1,
+          102,
+          37,
+          102,
+          80
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 457,
+        "stack": [
+          383,
+          384
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 458,
+        "range": [
+          1,
+          102,
+          32,
+          102,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 459,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 460,
+        "range": [
+          1,
+          108,
+          1,
+          108,
+          2
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 461,
+        "stack": [
+          0,
+          52,
+          53,
+          56
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 462,
+        "stack": [
+          0
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 463,
+        "range": [
+          1,
+          105,
+          29,
+          105,
+          36
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 464,
+        "stack": [
+          386
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 465,
+        "range": [
+          1,
+          105,
+          13,
+          105,
+          72
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 466,
+        "stack": []
+      },
+      {
+        "f_idx": 0,
+        "f_name": "onInternalMessage",
+        "ir_return": [],
+        "kind": "leave_fun",
+        "mark_id": 467,
+        "range": [
+          1,
+          108,
+          1,
+          108,
+          2
+        ]
+      },
+      {
+        "f_idx": 14,
+        "f_name": "get_nft_data",
+        "ir_import": [],
+        "is_builtin": false,
+        "is_inlined": false,
+        "kind": "enter_fun",
+        "mark_id": 468,
+        "range": [
+          1,
+          112,
+          9,
+          112,
+          21
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 469,
+        "stack": []
+      },
+      {
+        "f_idx": 2,
+        "f_name": "NftItemStorage.startLoading",
+        "ir_import": [],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 470,
+        "range": [
+          1,
+          113,
+          19,
+          113,
+          48
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 471,
+        "range": [
+          3,
+          20,
+          42,
+          20,
+          60
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 472,
+        "stack": [
+          3
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "NftItemStorageLoader.fromCell",
+        "ir_import": [
+          3,
+          4,
+          5
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 473,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "ir_slots": [
+          3
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 474,
+        "ty_idx": 3,
+        "var_name": "packedCell"
+      },
+      {
+        "ir_slots": [
+          4,
+          5
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 475,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 476,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 477,
+        "stack": [
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 478,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 479,
+        "stack": [
+          8,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 480,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 481,
+        "stack": [
+          8,
+          9,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 482,
+        "stack": [
+          8,
+          9,
+          10
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 483,
+        "stack": [
+          8,
+          9,
+          10
+        ]
+      },
+      {
+        "f_idx": 3,
+        "f_name": "NftItemStorageLoader.fromCell",
+        "ir_return": [
+          8,
+          9,
+          10
+        ],
+        "kind": "leave_fun",
+        "mark_id": 484,
+        "range": [
+          3,
+          20,
+          12,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 485,
+        "stack": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "f_idx": 2,
+        "f_name": "NftItemStorage.startLoading",
+        "ir_return": [
+          0,
+          1,
+          2
+        ],
+        "kind": "leave_fun",
+        "mark_id": 486,
+        "range": [
+          3,
+          20,
+          5,
+          20,
+          61
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 487,
+        "range": [
+          1,
+          113,
+          9,
+          113,
+          16
+        ]
+      },
+      {
+        "ir_slots": [
+          11,
+          12,
+          13
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 488,
+        "ty_idx": 26,
+        "var_name": "loading"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 489,
+        "stack": [
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 490,
+        "range": [
+          1,
+          114,
+          5,
+          114,
+          7
+        ]
+      },
+      {
+        "f_idx": 4,
+        "f_name": "NftItemStorageLoader.isNotInitialized",
+        "ir_import": [
+          11,
+          12,
+          13
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 491,
+        "range": [
+          1,
+          114,
+          17,
+          114,
+          33
+        ]
+      },
+      {
+        "ir_slots": [
+          11,
+          12,
+          13
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 492,
+        "ty_idx": 26,
+        "var_name": "self"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 493,
+        "stack": [
+          11,
+          12,
+          13,
+          13
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 494,
+        "range": [
+          3,
+          24,
+          22,
+          24,
+          29
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 495,
+        "stack": [
+          11,
+          12,
+          13,
+          15
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 496,
+        "stack": [
+          11,
+          12,
+          13,
+          14
+        ]
+      },
+      {
+        "f_idx": 4,
+        "f_name": "NftItemStorageLoader.isNotInitialized",
+        "ir_return": [
+          14
+        ],
+        "kind": "leave_fun",
+        "mark_id": 497,
+        "range": [
+          3,
+          24,
+          5,
+          24,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 498,
+        "range": [
+          1,
+          114,
+          5,
+          116,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 499,
+        "stack": [
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "kind": "scope_start",
+        "mark_id": 500,
+        "range": [
+          1,
+          114,
+          37,
+          116,
+          6
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 501,
+        "stack": [
+          11,
+          12
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 502,
+        "range": [
+          1,
+          115,
+          17,
+          115,
+          22
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 503,
+        "stack": [
+          11,
+          12,
+          16
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 504,
+        "range": [
+          1,
+          115,
+          70,
+          115,
+          74
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 505,
+        "range": [
+          1,
+          115,
+          76,
+          115,
+          80
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 506,
+        "stack": [
+          16,
+          11,
+          12,
+          17,
+          18
+        ]
+      },
+      {
+        "f_idx": 14,
+        "f_name": "get_nft_data",
+        "ir_return": [
+          16,
+          11,
+          12,
+          17,
+          18
+        ],
+        "kind": "leave_fun",
+        "mark_id": 507,
+        "range": [
+          1,
+          115,
+          9,
+          115,
+          81
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 508,
+        "stack": [
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 509,
+        "stack": [
+          19,
+          20,
+          21
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "NftItemStorageLoader.endLoading",
+        "ir_import": [
+          19,
+          20,
+          21
+        ],
+        "is_builtin": false,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 510,
+        "range": [
+          1,
+          117,
+          27,
+          117,
+          37
+        ]
+      },
+      {
+        "ir_slots": [
+          19,
+          20,
+          21
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 511,
+        "ty_idx": 26,
+        "var_name": "self"
+      },
+      {
+        "kind": "loc",
+        "mark_id": 512,
+        "range": [
+          3,
+          29,
+          9,
+          29,
+          34
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 513,
+        "range": [
+          3,
+          30,
+          9,
+          30,
+          50
+        ]
+      },
+      {
+        "f_idx": 9,
+        "f_name": "slice.loadAny<address>",
+        "ir_import": [
+          21,
+          29,
+          30
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 514,
+        "range": [
+          3,
+          31,
+          23,
+          31,
+          42
+        ]
+      },
+      {
+        "ir_slots": [
+          21
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 515,
+        "ty_idx": 2,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          29,
+          30
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 516,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 517,
+        "stack": [
+          19,
+          20,
+          31
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 518,
+        "range": [
+          3,
+          31,
+          23,
+          31,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 519,
+        "stack": [
+          19,
+          20,
+          32,
+          31
+        ]
+      },
+      {
+        "f_idx": 9,
+        "f_name": "slice.loadAny<address>",
+        "ir_return": [
+          31,
+          32
+        ],
+        "kind": "leave_fun",
+        "mark_id": 520,
+        "range": [
+          3,
+          31,
+          23,
+          31,
+          42
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 521,
+        "stack": [
+          19,
+          20,
+          32,
+          21
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 522,
+        "range": [
+          3,
+          31,
+          9,
+          31,
+          42
+        ]
+      },
+      {
+        "f_idx": 10,
+        "f_name": "slice.loadAny<string>",
+        "ir_import": [
+          21,
+          33,
+          34
+        ],
+        "is_builtin": true,
+        "is_inlined": true,
+        "kind": "enter_fun",
+        "mark_id": 523,
+        "range": [
+          3,
+          32,
+          18,
+          32,
+          37
+        ]
+      },
+      {
+        "ir_slots": [
+          21
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 524,
+        "ty_idx": 2,
+        "var_name": "self"
+      },
+      {
+        "ir_slots": [
+          33,
+          34
+        ],
+        "is_parameter": true,
+        "kind": "var",
+        "mark_id": 525,
+        "ty_idx": 27,
+        "var_name": "options"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 526,
+        "stack": [
+          19,
+          20,
+          32,
+          35
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 527,
+        "range": [
+          3,
+          32,
+          18,
+          32,
+          37
+        ]
+      },
+      {
+        "f_idx": 10,
+        "f_name": "slice.loadAny<string>",
+        "ir_return": [
+          35,
+          36
+        ],
+        "kind": "leave_fun",
+        "mark_id": 528,
+        "range": [
+          3,
+          32,
+          18,
+          32,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 529,
+        "stack": [
+          19,
+          20,
+          32,
+          36
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 530,
+        "range": [
+          3,
+          32,
+          9,
+          32,
+          37
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 531,
+        "stack": [
+          25,
+          26,
+          27,
+          28
+        ]
+      },
+      {
+        "f_idx": 8,
+        "f_name": "NftItemStorageLoader.endLoading",
+        "ir_return": [
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28
+        ],
+        "kind": "leave_fun",
+        "mark_id": 532,
+        "range": [
+          3,
+          28,
+          5,
+          33,
+          6
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 533,
+        "range": [
+          1,
+          117,
+          9,
+          117,
+          16
+        ]
+      },
+      {
+        "ir_slots": [
+          37,
+          38,
+          39,
+          40
+        ],
+        "is_parameter": false,
+        "kind": "var",
+        "mark_id": 534,
+        "ty_idx": 23,
+        "var_name": "storage"
+      },
+      {
+        "kind": "stack",
+        "mark_id": 535,
+        "stack": [
+          37,
+          38,
+          39,
+          40
+        ]
+      },
+      {
+        "kind": "loc",
+        "mark_id": 536,
+        "range": [
+          1,
+          119,
+          9,
+          119,
+          13
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 537,
+        "stack": [
+          37,
+          38,
+          39,
+          40,
+          41
+        ]
+      },
+      {
+        "kind": "stack",
+        "mark_id": 538,
+        "stack": [
+          41,
+          37,
+          38,
+          39,
+          40
+        ]
+      },
+      {
+        "f_idx": 14,
+        "f_name": "get_nft_data",
+        "ir_return": [
+          41,
+          37,
+          38,
+          39,
+          40
+        ],
+        "kind": "leave_fun",
+        "mark_id": 539,
+        "range": [
+          1,
+          118,
+          5,
+          124,
+          6
+        ]
+      }
+    ],
+    "debug_marks_base64": "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vAFHAgEgAUcBRwEBIAFIAASooAIBIAFLAUwCASABUwFUAgEgAU0BTgIBIAFRAVICASABTwL6AgEgAvoCgAEBIAFQAASouAIBIAKAAwQCASADBAJiAgEgAmACYAIBIAFVAVYCASADDQMNAgEgAswCzAIBIAFZAVoCASABXQFeAgEgAsoBWwIBIAKPAVwCASACzgKSAgEgApMBYQIBIAFfAWACASABZQFmAgEgAWEBYwIBIAFjAWcBASABYgAEqUABASABZAAEqVACASABZwFpAgEgAWkBcQEBIAFoAASpWAEBIAFqAASpaAIBIAFtAW4CASABfQF+AgEgAW8BcAIBIAF3AXgCASABcQFyAgEgAXUBdQEBIAFzAQEgAXQABKl4AASpgAEBIAF2AASpiAIBIAF5AXkCASABewF7AQEgAXoABKmQAQEgAXwABKmYAgEgAX8BgAIBIAGHAYgCASABgQGBAgEgAYMBhAEBIAGCAASpsAEBIAGFAQEgAYYABKm4AASpwAIBIAGJAYkCASABiwGLAQEgAYoABKnIAQEgAYwABKnYAgEgAY8BkAIBIAGaAZsCASABkQGUAgEgAZQBlQIBIAGSAZIBASABkwAEqeACASABlgGWAgEgAZYBlwEBIAGYAQEgAZkABKnwAASqAAIBIAGcAZ0CASABpgGmAgEgAZ4BngIBIAGgAaABASABnwAEqhABASABoQAEqjgCASABpAGlAgEgAbABsQIBIAGmAacCASABrAGtAgEgAagBqAIBIAGqAaoBASABqQAEqkABASABqwAEqkgCASABrgGuAgEgAa4BtAEBIAGvAASqUAIBIAGyAbMCASABuAG5AgEgAbQBtgIBIAG2AboBASABtQAEqmABASABtwAEqmgCASABugG6AgEgAboBwgEBIAG7AASqcAIBIAG+Ab8CASABygHLAgEgAcABwQIBIAHGAccCASABwgHCAgEgAcQBxAEBIAHDAASqeAEBIAHFAASqgAIBIAHIAcgCASABzgHOAQEgAckABKqIAgEgAcwBzQIBIAHUAdUCASABzgHQAgEgAdAB0QEBIAHPAASqoAEBIAHSAQEgAdMABKqoAASquAIBIAHWAdYCASAB2AHYAQEgAdcABKrAAQEgAdkABKrYAgEgAdwB3QIBIAHpAeoCASAB3gHeAgEgAeEB4gIBIAHfAd8B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"
+  },
+  "files": [
+    {
+      "path": "contracts/src/errors.tolk",
+      "content_hash": "b955fe7be0bd6634f4ae4f4fb7f4e8a6adb44388a40debb508c786e0116a7714"
+    },
+    {
+      "path": "contracts/src/item-storage.tolk",
+      "content_hash": "010cf93fb61110825e916092d2204b895dbfa5e37fe8c6b8f6a4dff331b96149"
+    },
+    {
+      "path": "contracts/src/messages.tolk",
+      "content_hash": "6594539060e412a25f81beef7f4a34b6965084a6cb081b97ff0127cf49dd3567"
+    },
+    {
+      "path": "contracts/src/nft-item-contract.tolk",
+      "content_hash": "b0be503febc7ab9ddcdd2f6d868c47350a298482f899e7bd5d32fd1abde2d568"
+    },
+    {
+      "path": "contracts/src/quote-types.tolk",
+      "content_hash": "6b67bc4963764f2d1588831a1c2658f115b41993d48e558833df2cbf40ec718a"
+    },
+    {
+      "path": "output/nft-item-contract.abi.json",
+      "content_hash": "4738b0d24ccfe9d8ddf4c2c15a7fe68e9c86f69e25b4900daccf6ed6d544af63"
+    }
+  ]
+}
