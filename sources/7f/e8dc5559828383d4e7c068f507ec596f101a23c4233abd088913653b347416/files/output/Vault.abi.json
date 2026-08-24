@@ -1,0 +1,247 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "WorkSplitVault",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "AllowedMessage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Withdraw"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Participant"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VaultInfo"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FeeInfo"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "Participant",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "shares",
+          "ty_idx": 9
+        },
+        {
+          "name": "withdrawn",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "totalShares",
+          "ty_idx": 9
+        },
+        {
+          "name": "reserveFloor",
+          "ty_idx": 6
+        },
+        {
+          "name": "distributedCumulative",
+          "ty_idx": 6,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "participants",
+          "ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Withdraw",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1465079620,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "toAddress",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "AllowedMessage",
+      "ty_idx": 12,
+      "target_ty_idx": 13
+    },
+    {
+      "kind": "struct",
+      "name": "VaultInfo",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "totalShares",
+          "ty_idx": 9
+        },
+        {
+          "name": "reserveFloor",
+          "ty_idx": 6
+        },
+        {
+          "name": "distributedCumulative",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FeeInfo",
+      "ty_idx": 19,
+      "fields": [
+        {
+          "name": "depositGasAllowance",
+          "ty_idx": 6
+        },
+        {
+          "name": "payoutForwardFee",
+          "ty_idx": 6
+        },
+        {
+          "name": "minDeployValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "minWithdrawValue",
+          "ty_idx": 6
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 15
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 70202,
+      "name": "contractVersion",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 75713,
+      "name": "vaultInfo",
+      "parameters": [],
+      "return_ty_idx": 18
+    },
+    {
+      "tvm_method_id": 71145,
+      "name": "feeInfo",
+      "parameters": [],
+      "return_ty_idx": 19
+    },
+    {
+      "tvm_method_id": 111688,
+      "name": "entitlementOf",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 120141,
+      "name": "withdrawnOf",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 6
+    }
+  ],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
