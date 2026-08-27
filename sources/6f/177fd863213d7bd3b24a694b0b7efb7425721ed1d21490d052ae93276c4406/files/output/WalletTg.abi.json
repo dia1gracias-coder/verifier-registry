@@ -1,0 +1,581 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "WalletTg",
+  "author": "TON Core",
+  "version": "1.0",
+  "description": "Telegram wallet contract; bytecode stays in config and is updated by validator voting",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "AllowedInternalMsg"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SendOneMessageRequestI"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SeqnoHeader"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MessageToSend"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SendBulkMessagesRequestI"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "RawArrayOfMessagesToSend"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangePublicKeyRequestI"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 13,
+          "prefix_num": 1669951092,
+          "prefix_len": 32,
+          "stack_type_id": 129,
+          "stack_width": 5
+        },
+        {
+          "variant_ty_idx": 17,
+          "prefix_num": 1938386548,
+          "prefix_len": 32,
+          "stack_type_id": 130,
+          "stack_width": 4
+        },
+        {
+          "variant_ty_idx": 21,
+          "prefix_num": 4223310279,
+          "prefix_len": 32,
+          "stack_type_id": 131,
+          "stack_width": 5
+        }
+      ],
+      "stack_width": 6
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SignedRequest",
+      "type_args_ty_idx": [
+        12
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SignedRequest",
+      "type_args_ty_idx": [
+        27
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "AllowedExternalMsg"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SendOneMessageRequestE"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SendBulkMessagesRequestE"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangePublicKeyRequestE"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 30,
+          "prefix_num": 1669951093,
+          "prefix_len": 32,
+          "stack_type_id": 132,
+          "stack_width": 5
+        },
+        {
+          "variant_ty_idx": 31,
+          "prefix_num": 1938386549,
+          "prefix_len": 32,
+          "stack_type_id": 133,
+          "stack_width": 4
+        },
+        {
+          "variant_ty_idx": 32,
+          "prefix_num": 4223310280,
+          "prefix_len": 32,
+          "stack_type_id": 134,
+          "stack_width": 5
+        }
+      ],
+      "stack_width": 6
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SignedRequest",
+      "type_args_ty_idx": [
+        29
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Storage"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "Revision"
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 26,
+      "struct_name": "SignedRequest<AllowedInternalMsg>",
+      "monomorphic_fields_ty_idx": [
+        23,
+        12
+      ]
+    },
+    {
+      "ty_idx": 34,
+      "struct_name": "SignedRequest<AllowedExternalMsg>",
+      "monomorphic_fields_ty_idx": [
+        23,
+        29
+      ]
+    }
+  ],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "AllowedInternalMsg",
+      "ty_idx": 12,
+      "target_ty_idx": 25
+    },
+    {
+      "kind": "alias",
+      "name": "AllowedExternalMsg",
+      "ty_idx": 29,
+      "target_ty_idx": 33
+    },
+    {
+      "kind": "enum",
+      "name": "Revision",
+      "ty_idx": 36,
+      "encoded_as_ty_idx": 16,
+      "members": [
+        {
+          "name": "Rev00_Initial",
+          "value": "0"
+        }
+      ],
+      "description": "Every time the contract logic is updated,\nwe append a new revision and provide a new storage migration.\nRead `MIGRATION.md`."
+    },
+    {
+      "kind": "struct",
+      "name": "MessageToSend",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "sendMode",
+          "ty_idx": 16
+        },
+        {
+          "name": "messageCell",
+          "ty_idx": 3
+        }
+      ],
+      "description": "WalletTg can send up to 255 out messages.\nNote: in contrast with w5, which accepts a well-formed c5 register, WalletTg accepts messages.\nThis is a clearer API, although it costs more gas unless WalletTg is precompiled."
+    },
+    {
+      "kind": "alias",
+      "name": "RawArrayOfMessagesToSend",
+      "ty_idx": 18,
+      "target_ty_idx": 19,
+      "description": "Bulk requests carry `array<MessageToSend>`, a standard-encoded Tolk array.\nThe contract parses it manually as a raw slice to avoid materializing the array."
+    },
+    {
+      "kind": "struct",
+      "name": "SignedRequest",
+      "ty_idx": 28,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "signature",
+          "ty_idx": 23,
+          "description": "Signature of the body with the client's private key."
+        },
+        {
+          "name": "request",
+          "ty_idx": 27,
+          "description": "Body of the incoming message (with opcode and data)."
+        }
+      ],
+      "description": "Every internal/external message is signed by a private key and checked against `storage.publicKey`.\nThe client-side signing process has three steps.\n1. Compose some valid request (body).\n2. Sign it with their private key (derived from a mnemonic) — resulting in `signature`.\n3. Prepend the signature to the serialized request and send.\n\nNote that signing DIFFERS FROM WALLET V5, where signature lies at the end.\nW5 is ABI-unfriendly: we can't describe \"signature at the end\" after RemainingBitsAndRefs.\nCurrent (Telegram) version is Tolk-friendly, ABI-friendly, and client-friendly."
+    },
+    {
+      "kind": "struct",
+      "name": "SeqnoHeader",
+      "ty_idx": 14,
+      "fields": [
+        {
+          "name": "subwalletId",
+          "ty_idx": 9,
+          "description": "Must match `Storage.subwalletId`, so one key can control multiple wallets."
+        },
+        {
+          "name": "validUntil",
+          "ty_idx": 9,
+          "description": "Unix timestamp until which the message is valid. Must be greater than `blockchain.now`.\nProtects against replay after expiration."
+        },
+        {
+          "name": "seqno",
+          "ty_idx": 9,
+          "description": "Seqno protects against replay attacks. Must match `Storage.seqno`."
+        }
+      ],
+      "description": "Every internal/external request starts with a header.\nFor instance, it contains seqno to protect against replay attacks."
+    },
+    {
+      "kind": "struct",
+      "name": "SendOneMessageRequestI",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1669951092,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "header",
+          "ty_idx": 14,
+          "description": "Header protects against replay attacks."
+        },
+        {
+          "name": "msg",
+          "ty_idx": 15,
+          "description": "A message to send. The contract builds c5 itself."
+        }
+      ],
+      "description": "Check the signature and forward ONE message.\n`MessageToSend` is stored inline, reducing import fee and gas.\nInternal (not external) is used for gasless."
+    },
+    {
+      "kind": "struct",
+      "name": "SendOneMessageRequestE",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1669951093,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "header",
+          "ty_idx": 14,
+          "description": "Header protects against replay attacks."
+        },
+        {
+          "name": "msg",
+          "ty_idx": 15,
+          "description": "A message to send. The contract builds c5 itself."
+        }
+      ],
+      "description": "Check the signature and forward ONE message.\nDiffers from \"internal\" struct only in opcode to prevent cross-channel replay."
+    },
+    {
+      "kind": "struct",
+      "name": "SendBulkMessagesRequestI",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1938386548,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "header",
+          "ty_idx": 14,
+          "description": "Header protects against replay attacks."
+        },
+        {
+          "name": "msgArr",
+          "ty_idx": 18,
+          "client_ty_idx": 20,
+          "description": "Messages to send (1-255). The contract builds c5 itself."
+        }
+      ],
+      "description": "Check the signature and forward MANY messages (1-255).\nAnalogous to w5 \"internal signed request\".\nInternal (not external) is used for gasless."
+    },
+    {
+      "kind": "struct",
+      "name": "SendBulkMessagesRequestE",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1938386549,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "header",
+          "ty_idx": 14,
+          "description": "Header protects against replay attacks."
+        },
+        {
+          "name": "msgArr",
+          "ty_idx": 18,
+          "client_ty_idx": 20,
+          "description": "Messages to send (1-255). The contract builds c5 itself."
+        }
+      ],
+      "description": "Check the signature and forward MANY messages (1-255).\nAnalogous to w5 \"external signed request\".\nDiffers from \"internal\" struct only in opcode to prevent cross-channel replay."
+    },
+    {
+      "kind": "struct",
+      "name": "ChangePublicKeyRequestI",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 4223310279,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "header",
+          "ty_idx": 14,
+          "description": "Header protects against replay attacks."
+        },
+        {
+          "name": "newPublicKey",
+          "ty_idx": 22,
+          "description": "Resets `Storage.publicKey` to this value."
+        },
+        {
+          "name": "rotationSignature",
+          "ty_idx": 24,
+          "description": "Signed `KeyRotationProofPayload`. The \"change key\" request is signed twice.\nFirst, by the current key (SignedRequest, the incoming message itself).\nSecond, by the new key (rotation proof)."
+        }
+      ],
+      "description": "Change the wallet signing key.\nCan be repeated: each request is signed by the current key and proven by the new key.\nInternal (not external) is used for gasless."
+    },
+    {
+      "kind": "struct",
+      "name": "ChangePublicKeyRequestE",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 4223310280,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "header",
+          "ty_idx": 14,
+          "description": "Header protects against replay attacks."
+        },
+        {
+          "name": "newPublicKey",
+          "ty_idx": 22,
+          "description": "Resets `Storage.publicKey` to this value."
+        },
+        {
+          "name": "rotationSignature",
+          "ty_idx": 24,
+          "description": "Signed `KeyRotationProofPayload`. The \"change key\" request is signed twice.\nFirst, by the current key (SignedRequest, the incoming message itself).\nSecond, by the new key (rotation proof)."
+        }
+      ],
+      "description": "Change the wallet signing key.\nCan be repeated: each request is signed by the current key and proven by the new key.\nDiffers from \"internal\" struct only in opcode to prevent cross-channel replay."
+    },
+    {
+      "kind": "struct",
+      "name": "Storage",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "seqno",
+          "ty_idx": 9,
+          "description": "Seqno protects against replay attacks: every incoming message contains the expected seqno.\nOnce the contract accepts a message, it bumps storage seqno. Old messages can't be replayed."
+        },
+        {
+          "name": "subwalletId",
+          "ty_idx": 9,
+          "description": "SubwalletId allows creating multiple wallets for one private key.\nDefault for mainnet: 0x7FFF7F11; for testnet: 0x7FFF7FFD; for subwallets, consider docs."
+        },
+        {
+          "name": "publicKey",
+          "ty_idx": 22,
+          "description": "Public key used to check signatures of all incoming messages.\nIt can be replaced by a signed change-key request."
+        }
+      ],
+      "description": "Current storage schema of the contract.\nA new contract revision bumps its 0xXX prefix and may append new fields.\nSee `runMigrationAndUpdateC4` about migrations after bytecode upgrade."
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 35
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 26
+    }
+  ],
+  "incoming_external": [
+    {
+      "body_ty_idx": 34
+    }
+  ],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 116453,
+      "name": "revision",
+      "parameters": [],
+      "return_ty_idx": 36,
+      "description": "Returns current storage revision. It does not trigger migration.\nAfter bytecode upgrade, returns the old revision until the first valid incoming message migrates `c4`."
+    },
+    {
+      "tvm_method_id": 85143,
+      "name": "seqno",
+      "parameters": [],
+      "return_ty_idx": 9,
+      "description": "Returns current seqno from the storage. Bumped on every valid incoming message."
+    },
+    {
+      "tvm_method_id": 81467,
+      "name": "get_subwallet_id",
+      "parameters": [],
+      "return_ty_idx": 9,
+      "description": "Returns the subwallet id from the storage."
+    },
+    {
+      "tvm_method_id": 78748,
+      "name": "get_public_key",
+      "parameters": [],
+      "return_ty_idx": 22,
+      "description": "Returns the public key corresponding to the signer's private key."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSeqno",
+      "err_code": 133
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSubwalletId",
+      "err_code": 134
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSignature",
+      "err_code": 135
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.Expired",
+      "err_code": 136
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ExternalSendMessageMustHaveIgnoreErrorsSendMode",
+      "err_code": 137
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidOutArrayLen",
+      "err_code": 147
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NewKeyMustDiffer",
+      "err_code": 148
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NewKeySignatureIsInvalid",
+      "err_code": 149
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidOpcode",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}
