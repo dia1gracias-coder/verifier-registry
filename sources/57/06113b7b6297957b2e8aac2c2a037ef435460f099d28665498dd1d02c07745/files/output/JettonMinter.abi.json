@@ -1,0 +1,1242 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "JettonMinter",
+  "author": "Amir",
+  "version": "1.0.0",
+  "description": "Standard Jetton Minter. TEP-74 and TEP-89 compliant",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MintNewJettons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "InternalTransferStep"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 16
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 17,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 18,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 134,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimApeJettons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ApeClaimVoucher"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ApeClaimDetails"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimMintAcknowledged"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimAcknowledgementContext"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 30
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BurnNotificationForMinter"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestWalletAddress"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestTransferPolicy"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetApeServiceFee"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetApeClaimsPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetApeTransfersFrozen"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetApeTreasury"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetApeVoucherSigner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CloseApeMintingForever"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawApeTreasuryTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeMinterAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimMinterAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DropMinterAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeMinterMetadata"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UpgradeMinterCode"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUpTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MinterStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ApeJettonPolicy"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 49
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseWalletAddress"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 7
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 53
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ClaimInternalTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferPolicyDecision"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OnchainMetadataReply"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "string_prefixed0x"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 24,
+      "value_ty_idx": 59
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 58
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ApeJettonPolicyReply"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 15,
+      "target_ty_idx": 16
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "InternalTransferStep",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 395134233,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferInitiator",
+          "ty_idx": 14
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 14
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 15,
+          "client_ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 51,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BurnNotificationForMinter",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 2078119902,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "burnInitiator",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestWalletAddress",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 745978227,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "includeOwnerAddress",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseWalletAddress",
+      "ty_idx": 52,
+      "prefix": {
+        "prefix_num": 3513996288,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonWalletAddress",
+          "ty_idx": 14
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 54
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MintNewJettons",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1680571655,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "mintRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "internalTransferMsg",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeMinterAdmin",
+      "ty_idx": 42,
+      "prefix": {
+        "prefix_num": 1694626644,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newAdminAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimMinterAdmin",
+      "ty_idx": 43,
+      "prefix": {
+        "prefix_num": 4220051737,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DropMinterAdmin",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 1949430305,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UpgradeMinterCode",
+      "ty_idx": 46,
+      "prefix": {
+        "prefix_num": 621336170,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newData",
+          "ty_idx": 3
+        },
+        {
+          "name": "newCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeMinterMetadata",
+      "ty_idx": 45,
+      "prefix": {
+        "prefix_num": 3414567170,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newMetadata",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUpTons",
+      "ty_idx": 47,
+      "prefix": {
+        "prefix_num": 3547469196,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "ApeClaimDetails",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "recipientAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "claimSequence",
+          "ty_idx": 11
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Backend-signed withdrawal entitlement. The per-wallet monotonic sequence\nprovides replay protection without an ever-growing dictionary in the minter."
+    },
+    {
+      "kind": "struct",
+      "name": "ApeClaimVoucher",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1095779670,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "voucherDomain",
+          "ty_idx": 24
+        },
+        {
+          "name": "minterAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "details",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimApeJettons",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1095779651,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "voucher",
+          "ty_idx": 27
+        },
+        {
+          "name": "signature",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimInternalTransfer",
+      "ty_idx": 55,
+      "prefix": {
+        "prefix_num": 1095779657,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "claimSequence",
+          "ty_idx": 11
+        },
+        {
+          "name": "payerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "serviceFee",
+          "ty_idx": 6
+        },
+        {
+          "name": "overpayment",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimAcknowledgementContext",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "claimSequence",
+          "ty_idx": 11
+        },
+        {
+          "name": "recipientAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "payerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "serviceFee",
+          "ty_idx": 6
+        },
+        {
+          "name": "overpayment",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ClaimMintAcknowledged",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1095779649,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "context",
+          "ty_idx": 31
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestTransferPolicy",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 1095779664,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "walletOwnerAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferPolicyDecision",
+      "ty_idx": 56,
+      "prefix": {
+        "prefix_num": 1095779665,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "allowed",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetApeServiceFee",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 1095779841,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serviceFee",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetApeClaimsPaused",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 1095779842,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetApeTransfersFrozen",
+      "ty_idx": 37,
+      "prefix": {
+        "prefix_num": 1095779843,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "frozen",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetApeTreasury",
+      "ty_idx": 38,
+      "prefix": {
+        "prefix_num": 1095779844,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "treasuryAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetApeVoucherSigner",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 1095779845,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "signerPublicKey",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CloseApeMintingForever",
+      "ty_idx": 40,
+      "prefix": {
+        "prefix_num": 1095779846,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Irreversible. Admin remains available for transfer freeze and metadata."
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawApeTreasuryTons",
+      "ty_idx": 41,
+      "prefix": {
+        "prefix_num": 1095779847,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Admin-only withdrawal of an explicit amount of accumulated TON. The\ndestination is deliberately fixed to the configured APE treasury."
+    },
+    {
+      "kind": "struct",
+      "name": "ApeJettonPolicy",
+      "ty_idx": 49,
+      "fields": [
+        {
+          "name": "treasuryAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "voucherSignerPublicKey",
+          "ty_idx": 24
+        },
+        {
+          "name": "voucherDomain",
+          "ty_idx": 24
+        },
+        {
+          "name": "serviceFee",
+          "ty_idx": 6
+        },
+        {
+          "name": "claimsPaused",
+          "ty_idx": 5
+        },
+        {
+          "name": "transfersFrozen",
+          "ty_idx": 5
+        },
+        {
+          "name": "mintingClosed",
+          "ty_idx": 5
+        }
+      ],
+      "description": "Mutable policy is stored behind one reference so the TEP-74 root remains compact.\nClosing minting is irreversible, while claim pause and transfer freeze stay reversible."
+    },
+    {
+      "kind": "struct",
+      "name": "MinterStorage",
+      "ty_idx": 48,
+      "fields": [
+        {
+          "name": "totalSupply",
+          "ty_idx": 6
+        },
+        {
+          "name": "adminAddress",
+          "ty_idx": 14
+        },
+        {
+          "name": "nextAdminAddress",
+          "ty_idx": 14
+        },
+        {
+          "name": "metadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "policy",
+          "ty_idx": 50
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonDataReply",
+      "ty_idx": 57,
+      "fields": [
+        {
+          "name": "totalSupply",
+          "ty_idx": 1
+        },
+        {
+          "name": "mintable",
+          "ty_idx": 5
+        },
+        {
+          "name": "adminAddress",
+          "ty_idx": 14
+        },
+        {
+          "name": "jettonContent",
+          "ty_idx": 62
+        },
+        {
+          "name": "jettonWalletCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ApeJettonPolicyReply",
+      "ty_idx": 63,
+      "fields": [
+        {
+          "name": "adminAddress",
+          "ty_idx": 14
+        },
+        {
+          "name": "nextAdminAddress",
+          "ty_idx": 14
+        },
+        {
+          "name": "treasuryAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "voucherSignerPublicKey",
+          "ty_idx": 24
+        },
+        {
+          "name": "voucherDomain",
+          "ty_idx": 24
+        },
+        {
+          "name": "serviceFee",
+          "ty_idx": 6
+        },
+        {
+          "name": "claimsPaused",
+          "ty_idx": 5
+        },
+        {
+          "name": "transfersFrozen",
+          "ty_idx": 5
+        },
+        {
+          "name": "mintingClosed",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OnchainMetadataReply",
+      "ty_idx": 58,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "contentDict",
+          "ty_idx": 61
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "string_prefixed0x",
+      "ty_idx": 59,
+      "target_ty_idx": 60,
+      "description": "A string, which contents starts with 0x00/0x01 byte.\nBy standard, offchain explorers/APIs may treat contents of a string based on 0xXX prefixes:\n- 0x00 + \"str\" — means \"this is a regular snake-encoded string\"\n- 0x01 + \"str\" — means \"this is an off-chain content URL\"\nUsed in jettons and NFTs for responses from GET methods to comply with TEPs (token standards)."
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 48
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 36
+    },
+    {
+      "body_ty_idx": 37
+    },
+    {
+      "body_ty_idx": 38
+    },
+    {
+      "body_ty_idx": 39
+    },
+    {
+      "body_ty_idx": 40
+    },
+    {
+      "body_ty_idx": 41
+    },
+    {
+      "body_ty_idx": 42
+    },
+    {
+      "body_ty_idx": 43
+    },
+    {
+      "body_ty_idx": 44
+    },
+    {
+      "body_ty_idx": 45
+    },
+    {
+      "body_ty_idx": 46
+    },
+    {
+      "body_ty_idx": 47
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 51
+    },
+    {
+      "body_ty_idx": 52
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 55
+    },
+    {
+      "body_ty_idx": 56
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 106029,
+      "name": "get_jetton_data",
+      "parameters": [],
+      "return_ty_idx": 57
+    },
+    {
+      "tvm_method_id": 103289,
+      "name": "get_wallet_address",
+      "parameters": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 78683,
+      "name": "get_next_admin_address",
+      "parameters": [],
+      "return_ty_idx": 14
+    },
+    {
+      "tvm_method_id": 87245,
+      "name": "get_ape_jetton_policy",
+      "parameters": [],
+      "return_ty_idx": 63
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotEnoughGas",
+      "err_code": 48
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidOp",
+      "err_code": 72
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotOwner",
+      "err_code": 73
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotValidWallet",
+      "err_code": 74
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongWorkchain",
+      "err_code": 333
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.MintingClosed",
+      "err_code": 334
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ClaimsPaused",
+      "err_code": 335
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSignature",
+      "err_code": 337
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.VoucherExpired",
+      "err_code": 338
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongRecipient",
+      "err_code": 339
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongMinter",
+      "err_code": 340
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongVoucherDomain",
+      "err_code": 341
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidClaimSequence",
+      "err_code": 342
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.FeeBelowMinimum",
+      "err_code": 345
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWithdrawalAmount",
+      "err_code": 346
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientExcessTons",
+      "err_code": 347
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}

@@ -1,0 +1,23 @@
+enum Errors {
+    BalanceError = 47
+    NotEnoughGas = 48
+    InvalidMessage = 49
+    InvalidOp = 72
+    NotOwner = 73
+    NotValidWallet = 74
+    WrongWorkchain = 333
+    MintingClosed = 334
+    ClaimsPaused = 335
+    TransfersFrozen = 336
+    InvalidSignature = 337
+    VoucherExpired = 338
+    WrongRecipient = 339
+    WrongMinter = 340
+    WrongVoucherDomain = 341
+    InvalidClaimSequence = 342
+    PendingTransferExists = 343
+    NoPendingTransfer = 344
+    FeeBelowMinimum = 345
+    InvalidWithdrawalAmount = 346
+    InsufficientExcessTons = 347
+}
