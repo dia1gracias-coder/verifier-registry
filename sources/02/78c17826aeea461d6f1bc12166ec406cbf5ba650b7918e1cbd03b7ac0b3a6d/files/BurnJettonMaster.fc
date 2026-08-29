@@ -1,0 +1,1549 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; BurnJettonMaster_BurnJettonMaster.headers.fc
+;;
+;; Header files for BurnJettonMaster
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_store_address_opt
+builder __tact_store_address_opt(builder b, slice address) inline;
+
+;; __tact_not_null
+forall X -> X __tact_not_null(X x) impure inline;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $JettonTransferInternal$_store
+builder $JettonTransferInternal$_store(builder build_0, (int, int, slice, slice, int, slice) v) inline;
+
+;; $JettonTransferInternal$_store_cell
+cell $JettonTransferInternal$_store_cell((int, int, slice, slice, int, slice) v, builder b) inline;
+
+;; $JettonTransferInternal$_load
+(slice, ((int, int, slice, slice, int, slice))) $JettonTransferInternal$_load(slice sc_0) impure inline;
+
+;; $JettonTransferInternal$_load_bounced
+(slice, ((int, int))) $JettonTransferInternal$_load_bounced(slice sc_0) inline;
+
+;; $JettonExcesses$_store
+builder $JettonExcesses$_store(builder build_0, (int) v) inline;
+
+;; $JettonExcesses$_store_cell
+cell $JettonExcesses$_store_cell((int) v, builder b) inline;
+
+;; $CommitJettonTransfer$_store
+builder $CommitJettonTransfer$_store(builder build_0, (int, int, slice, slice, int, cell, int) v) inline;
+
+;; $CommitJettonTransfer$_store_cell
+cell $CommitJettonTransfer$_store_cell((int, int, slice, slice, int, cell, int) v, builder b) inline;
+
+;; $CommitJettonTransfer$_load_bounced
+(slice, ((int, int))) $CommitJettonTransfer$_load_bounced(slice sc_0) inline;
+
+;; $CommitJettonTransferBounced$_store
+builder $CommitJettonTransferBounced$_store(builder build_0, (int, int) v) inline;
+
+;; $CommitJettonTransferBounced$_store_cell
+cell $CommitJettonTransferBounced$_store_cell((int, int) v, builder b) inline;
+
+;; $JettonUpdateFeeConfig$_store
+builder $JettonUpdateFeeConfig$_store(builder build_0, (int, int, int, int, slice, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int) v) inline_ref;
+
+;; $JettonUpdateFeeConfig$_store_cell
+cell $JettonUpdateFeeConfig$_store_cell((int, int, int, int, slice, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int) v, builder b) inline;
+
+;; $BurnJettonMaster$_store
+builder $BurnJettonMaster$_store(builder build_0, (int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) v) inline;
+
+;; $BurnJettonMaster$_load
+(slice, ((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int))) $BurnJettonMaster$_load(slice sc_0) inline;
+
+;; $StdAddress$_get_workchain
+_ $StdAddress$_get_workchain((int, int) v) inline;
+
+;; $GasParamsView$_to_external
+(int, int, int, int, int, int) $GasParamsView$_to_external(((int, int, int, int, int, int)) v) inline;
+
+;; $BurnJettonMasterState$_to_external
+(int, int, slice, cell, cell) $BurnJettonMasterState$_to_external(((int, int, slice, cell, cell)) v) inline;
+
+;; $MasterFeeParamsView$_to_external
+(int, int, int, slice, slice, int) $MasterFeeParamsView$_to_external(((int, int, int, slice, slice, int)) v) inline;
+
+;; $EffectiveFeeParams$_to_external
+(int, int, int) $EffectiveFeeParams$_to_external(((int, int, int)) v) inline;
+
+;; $BurnJettonWallet$init$_store
+builder $BurnJettonWallet$init$_store(builder build_0, (slice, slice, int, cell) v) inline;
+
+;; $BurnJettonMaster$_contract_load
+(int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $BurnJettonMaster$_contract_load() impure inline;
+
+;; $BurnJettonMaster$_contract_store
+() $BurnJettonMaster$_contract_store((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) v) impure inline;
+
+;; $Cell$_fun_asSlice
+slice $Cell$_fun_asSlice(cell $self) impure inline;
+
+;; $global_newAddress
+slice $global_newAddress(int $chain, int $hash) impure inline;
+
+;; $global_contractAddressExt
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline;
+
+;; $global_contractAddress
+slice $global_contractAddress((cell, cell) $s) impure inline;
+
+;; $global_emit
+() $global_emit(cell $body) impure inline;
+
+;; $BasechainAddress$_constructor_hash
+((int)) $BasechainAddress$_constructor_hash(int $hash) inline;
+
+;; $global_newBasechainAddress
+(int) $global_newBasechainAddress(int $hash) impure inline;
+
+;; $global_contractBasechainAddress
+(int) $global_contractBasechainAddress((cell, cell) $s) impure inline;
+
+;; $global_jettonWalletEmptyFeeConfig
+cell $global_jettonWalletEmptyFeeConfig() impure inline;
+
+;; $GasParamsView$_constructor_minTonFeePath_perInternalDeployTon_poolForwardMin_treasuryForwardMin_burnNotifyTon_propagateTon
+((int, int, int, int, int, int)) $GasParamsView$_constructor_minTonFeePath_perInternalDeployTon_poolForwardMin_treasuryForwardMin_burnNotifyTon_propagateTon(int $minTonFeePath, int $perInternalDeployTon, int $poolForwardMin, int $treasuryForwardMin, int $burnNotifyTon, int $propagateTon) inline;
+
+;; $global_isValidGasParams
+int $global_isValidGasParams((int, int, int, int, int, int) $g) impure inline;
+
+;; $global_isExcludedChainEmpty
+int $global_isExcludedChainEmpty(cell $head) impure inline;
+
+;; $global_isInExcludedChain
+int $global_isInExcludedChain(slice $addr, cell $head) impure inline_ref;
+
+;; $global_excludedChainPrepend
+cell $global_excludedChainPrepend(cell $head, slice $addr) impure inline_ref;
+
+;; $global_excludedChainRemove
+cell $global_excludedChainRemove(slice $addr, cell $head) impure inline_ref;
+
+;; $JettonExcesses$_constructor_queryId
+((int)) $JettonExcesses$_constructor_queryId(int $queryId) inline;
+
+;; $global_checkEitherForwardPayload
+() $global_checkEitherForwardPayload(slice $forwardPayload) impure inline;
+
+;; $BurnJettonWallet$_init_child
+(cell, cell) $BurnJettonWallet$_init_child(slice $owner, slice $master, int $balance, cell $feeConfig) inline_ref;
+
+;; $global_getBurnJettonWalletInit
+(cell, cell) $global_getBurnJettonWalletInit(slice $address) impure inline;
+
+;; $global_getBurnJettonWalletByOwner
+slice $global_getBurnJettonWalletByOwner(slice $jettonWalletOwner) impure inline;
+
+;; $global_getBurnJettonBasechainWalletByOwner
+(int) $global_getBurnJettonBasechainWalletByOwner(slice $jettonWalletOwner) impure inline;
+
+;; $Builder$_fun_storeBasechainAddress
+builder $Builder$_fun_storeBasechainAddress(builder $self, (int) $address) impure inline_ref;
+
+;; $global_makeTep89TakeWalletAddressMsg
+cell $global_makeTep89TakeWalletAddressMsg(int $walletResolvable, (int, slice, int) $msg) impure inline;
+
+;; $BurnJettonWallet$_code_child
+cell $BurnJettonWallet$_code_child() inline;
+
+;; $DeployParameters$_constructor_value_bounce_mode_body_init
+((int, cell, int, int, (cell, cell))) $DeployParameters$_constructor_value_bounce_mode_body_init(int $value, int $bounce, int $mode, cell $body, (cell, cell) $init) inline;
+
+;; $JettonUpdateFeeConfig$_constructor_queryId_burn_rate_bps_staking_rate_bps_treasury_rate_bps_staking_pool_treasury_dynamic_burn_enabled_large_tx_threshold_activity_threshold_max_burn_rate_bps_tx_count_snapshot_activity_hour_bucket_low_supply_mode_excluded_count_excluded_head_gas_min_ton_fee_path_gas_per_internal_deploy_ton_gas_pool_forward_min_gas_treasury_forward_min_gas_burn_notify_ton_gas_propagate_ton
+((int, int, int, int, slice, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int)) $JettonUpdateFeeConfig$_constructor_queryId_burn_rate_bps_staking_rate_bps_treasury_rate_bps_staking_pool_treasury_dynamic_burn_enabled_large_tx_threshold_activity_threshold_max_burn_rate_bps_tx_count_snapshot_activity_hour_bucket_low_supply_mode_excluded_count_excluded_head_gas_min_ton_fee_path_gas_per_internal_deploy_ton_gas_pool_forward_min_gas_treasury_forward_min_gas_burn_notify_ton_gas_propagate_ton(int $queryId, int $burn_rate_bps, int $staking_rate_bps, int $treasury_rate_bps, slice $staking_pool, slice $treasury, int $dynamic_burn_enabled, int $large_tx_threshold, int $activity_threshold, int $max_burn_rate_bps, int $tx_count_snapshot, int $activity_hour_bucket, int $low_supply_mode, int $excluded_count, cell $excluded_head, int $gas_min_ton_fee_path, int $gas_per_internal_deploy_ton, int $gas_pool_forward_min, int $gas_treasury_forward_min, int $gas_burn_notify_ton, int $gas_propagate_ton) inline;
+
+;; $BurnJettonMaster$_fun_pushFeeConfigToOwner
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), ()) $BurnJettonMaster$_fun_pushFeeConfigToOwner((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self, int $queryId, slice $owner) impure inline;
+
+;; $BurnJettonMasterState$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode
+((int, int, slice, cell, cell)) $BurnJettonMasterState$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode(int $totalSupply, int $mintable, slice $adminAddress, cell $jettonContent, cell $jettonWalletCode) inline;
+
+;; $BurnJettonMaster$_fun_get_jetton_data
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), (int, int, slice, cell, cell)) $BurnJettonMaster$_fun_get_jetton_data((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $BurnJettonMaster$_fun_get_timelock_address
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), slice) $BurnJettonMaster$_fun_get_timelock_address((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $BurnJettonMaster$_fun_get_wallet_address
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), slice) $BurnJettonMaster$_fun_get_wallet_address((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self, slice $ownerAddress) impure inline_ref;
+
+;; $MasterFeeParamsView$_constructor_burnRateBps_stakingRateBps_treasuryRateBps_stakingPoolOwner_treasuryOwner_feeDestinationsActive
+((int, int, int, slice, slice, int)) $MasterFeeParamsView$_constructor_burnRateBps_stakingRateBps_treasuryRateBps_stakingPoolOwner_treasuryOwner_feeDestinationsActive(int $burnRateBps, int $stakingRateBps, int $treasuryRateBps, slice $stakingPoolOwner, slice $treasuryOwner, int $feeDestinationsActive) inline;
+
+;; $BurnJettonMaster$_fun_get_fee_params
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), (int, int, int, slice, slice, int)) $BurnJettonMaster$_fun_get_fee_params((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $EffectiveFeeParams$_constructor_burnBps_stakingBps_treasuryBps
+((int, int, int)) $EffectiveFeeParams$_constructor_burnBps_stakingBps_treasuryBps(int $burnBps, int $stakingBps, int $treasuryBps) inline;
+
+;; $BurnJettonMaster$_fun_get_effective_fee_params
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), (int, int, int)) $BurnJettonMaster$_fun_get_effective_fee_params((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $BurnJettonMaster$_fun_get_is_excluded
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), int) $BurnJettonMaster$_fun_get_is_excluded((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self, slice $holder) impure inline_ref;
+
+;; $BurnJettonMaster$_fun_get_gas_params
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), (int, int, int, int, int, int)) $BurnJettonMaster$_fun_get_gas_params((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $BurnJettonMaster$_fun_get_treasury_address
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), slice) $BurnJettonMaster$_fun_get_treasury_address((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $CommitJettonTransferBounced$_constructor_queryId_amount
+((int, int)) $CommitJettonTransferBounced$_constructor_queryId_amount(int $queryId, int $amount) inline;
+
+;; $MessageParameters$_constructor_body_to_value_mode
+((int, cell, int, slice, int)) $MessageParameters$_constructor_body_to_value_mode(cell $body, slice $to, int $value, int $mode) inline;
+
+;; $MessageParameters$_constructor_to_body_value_bounce_mode
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_body_value_bounce_mode(slice $to, cell $body, int $value, int $bounce, int $mode) inline;
+
+;; $MessageParameters$_constructor_body_to_value_bounce_mode
+((int, cell, int, slice, int)) $MessageParameters$_constructor_body_to_value_bounce_mode(cell $body, slice $to, int $value, int $bounce, int $mode) inline;
+
+;; $CommitJettonTransfer$_constructor_queryId_amount_destination_responseDestination_forwardTonAmount_forwardPayload_excludedTransfer
+((int, int, slice, slice, int, cell, int)) $CommitJettonTransfer$_constructor_queryId_amount_destination_responseDestination_forwardTonAmount_forwardPayload_excludedTransfer(int $queryId, int $amount, slice $destination, slice $responseDestination, int $forwardTonAmount, cell $forwardPayload, int $excludedTransfer) inline;
+
+
+;; BurnJettonMaster_BurnJettonMaster.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(slice, slice) __tact_load_address_opt(slice cs) asm """
+
+            b{00} SDBEGINSQ
+            IF:<{
+              PUSHNULL
+            }>ELSE<{
+              LDMSGADDR
+              SWAP
+            }>
+
+""";
+
+builder __tact_store_addr_none(builder b) asm "b{00} STSLICECONST";
+
+builder __tact_store_address_opt(builder b, slice address) inline {
+    if (null?(address)) {
+        return __tact_store_addr_none(b);
+    } else {
+        return b.store_slice(address);
+    }
+}
+
+forall X -> X __tact_not_null(X x) impure inline {
+    throw_if(128, null?(x)); return x;
+}
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_max(int $x, int $y) impure asm """
+    MAX
+""";
+
+int $global_contractHash(cell $code, cell $data) impure asm """
+    s0 PUSH HASHCU // `data` hash
+    s2 PUSH HASHCU // `code` hash
+    SWAP2
+    CDEPTH         // `data` depth
+    SWAP
+    CDEPTH         // `code` depth
+    131380 INT     // (2 << 16) | (1 << 8) | 0x34
+
+    // Group 2: Composition of the Builder
+    NEWC
+    24 STU  // store refs_descriptor | bits_descriptor | data
+    16 STU  // store depth_descriptor for `code`
+    16 STU  // store depth_descriptor for `data`
+    256 STU // store `code` hash
+    256 STU // store `data` hash
+
+    // Group 3: SHA256 hash of the resulting Builder
+    ONE HASHEXT_SHA256
+""";
+
+slice $Slice$_fun_asAddressUnsafe(slice $self) impure asm "NOP";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+slice $Cell$_fun_asSlice(cell $self) impure inline {
+    var ($self) = $self;
+    return $Cell$_fun_beginParse($self);
+}
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+slice $global_newAddress(int $chain, int $hash) impure inline {
+    return $Slice$_fun_asAddressUnsafe($Cell$_fun_asSlice($Builder$_fun_endCell(store_uint(store_int(store_uint($global_beginCell(), 4, 3), $chain, 8), $hash, 256))));
+}
+
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline {
+    int $hash = $global_contractHash($code, $data);
+    return $global_newAddress($chain, $hash);
+}
+
+slice $global_contractAddress((cell, cell) $s) impure inline {
+    var (($s'code, $s'data)) = $s;
+    return $global_contractAddressExt(0, $s'code, $s'data);
+}
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+int $global_getComputeFee(int $gasUsed, int $isMasterchain) impure asm """
+    GETGASFEE
+""";
+
+int $global_getForwardFee(int $cells, int $bits, int $isMasterchain) impure asm """
+    GETFORWARDFEE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_deploy((int, cell, int, int, (cell, cell)) $params) impure asm """
+    4 1 BLKPUSH // pushes 2 copies of `init.code` and `init.data`
+    HASHCU // `init.data` hash
+    SWAP
+    HASHCU // `init.code` hash
+    SWAP2
+    CDEPTH // `init.data` depth
+    SWAP
+    CDEPTH // `init.code` depth
+
+    // Group 2: Calculating destination address
+    // For almost identical logic and instructions,
+    // see comments inside `contractHash()` function in contract.tact
+    131380 INT // (2 << 16) | (1 << 8) | 0x34
+    NEWC
+    24 STU
+    16 STU
+    16 STU
+    256 STU
+    256 STU
+    ONE HASHEXT_SHA256 // obtains hash part (account id) of the address
+    // → Stack state
+    // s0: destAddr(hash part)
+    // s1: `init.data`
+    // s2: `init.code`
+    // s3 and below: `bounce`, `value`, `body`, `mode`
+
+    // Group 3: Building a message (CommonMsgInfoRelaxed)
+    s3 XCHG0           // swaps `bounce` with destAddr(hash part)
+    NEWC
+    b{01} STSLICECONST // store tag = $0 and ihr_disabled = true
+    1 STI              // store `bounce`
+    s1 s2 XCHG         // swap `init.data` with `init.code`, placing code on s1
+    STREF              // store `init.code`
+    STREF              // store `init.data`
+    // Inline StateInit:
+    b{00010000000000} STSLICECONST
+    // 0 + 00 + 10 + 0 + 00000000
+    // 1) 0 - bounced = false
+    // 2) 00 - src = addr_none
+    // 3) 10 - tag of addr_std (part of dest)
+    // 4) 0 - Maybe Anycast = false
+    // 5) 00000000 - workchain_id (part of dest)
+    //
+    256 STU     // store destAddr(hash part)
+    SWAP        // Builder on top, `value` below
+    STGRAMS     // store `value`
+    105 PUSHINT // 1 + 4 + 4 + 64 + 32
+    STZEROES    // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+
+    // Group 4: Continue building a message (CommonMsgInfoRelaxed into MessageRelaxed)
+    // Remaining bits of MessageRelaxed:
+    b{1000110} STSLICECONST
+    // 10 + 0 + 0 + 1 + 1 + 0
+    // 10 - Maybe (Either StateInit ^StateInit) = true false
+    // 0 - split_depth:(Maybe (## 5)) = false
+    // 0 = special:(Maybe TickTock) = false
+    // 1 = code:(Maybe ^Cell) = true
+    // 1 = data:(Maybe ^Cell) = true
+    // 0 = library:(Maybe ^Cell) = false
+    //
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC   // finalize the message
+    // → Stack state
+    // s0: Cell
+    // s1: params.`mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_cashback(slice $to) impure asm """
+    NEWC
+    x{42_} STSLICECONST // .storeUint(0x10, 6)
+    STSLICE          // .storeAddress(to)
+    0 PUSHINT        // 0
+    111 STUR         // .storeUint(0, 111)
+                     // 4 zeros for coins and 107 zeros for lt, fees, etc.
+    ENDC
+    66 PUSHINT       // SendRemainingValue | SendIgnoreErrors
+    SENDRAWMSG
+""";
+
+() $global_sendRawMessage(cell $msg, int $mode) impure asm """
+    SENDRAWMSG
+""";
+
+builder $Builder$_fun_storeRef(cell $cell, builder $self) impure asm """
+    STREF
+""";
+
+() $global_emit(cell $body) impure inline {
+    cell $c = $Builder$_fun_endCell($Builder$_fun_storeRef($body, store_uint($global_beginCell(), 15211807202738752817960438464513, 104)));
+    $global_sendRawMessage($c, 0);
+}
+
+(int, int) $global_parseStdAddress(slice $slice) impure asm """
+    REWRITESTDADDR
+""";
+
+(int) $global_newBasechainAddress(int $hash) impure inline {
+    return $BasechainAddress$_constructor_hash($hash);
+}
+
+(int) $global_contractBasechainAddress((cell, cell) $s) impure inline {
+    var (($s'code, $s'data)) = $s;
+    int $hash = $global_contractHash($s'code, $s'data);
+    return $global_newBasechainAddress($hash);
+}
+
+int $global_now() impure asm """
+    NOW
+""";
+
+int $Slice$_fun_bits(slice $self) impure asm """
+    SBITS
+""";
+
+int $Slice$_fun_refs(slice $self) impure asm """
+    SREFS
+""";
+
+(slice, slice) $Slice$_fun_loadAddress(slice $self) impure asm( -> 1 0) """
+    LDMSGADDR
+""";
+
+(slice, cell) $Slice$_fun_loadRef(slice $self) impure asm( -> 1 0) """
+    LDREF
+""";
+
+builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
+    STSLICER
+""";
+
+builder $Builder$_fun_storeBasechainAddress(builder $self, (int) $address) impure inline_ref {
+    var ($self) = $self;
+    var (($address'hash)) = $address;
+    if (null?($address'hash)) {
+        return store_uint($self, 0, 2);
+    }
+    return store_uint(store_uint($self, 1024, 11), __tact_not_null($address'hash), 256);
+}
+
+builder $Builder$_fun_storeMaybeRef(cell $cell, builder $self) impure asm """
+    STOPTREF
+""";
+
+slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
+
+int $Context$_fun_readForwardFee((int, slice, int, slice) $self) impure asm """
+    LDMSGADDR   // load dest:MsgAddressInt
+    LDGRAMS     // load value:CurrencyCollection
+    ONE
+    SDSKIPFIRST // skip extra currency collection
+    LDGRAMS     // load ihr_fee
+    LDGRAMS     // load fwd_fee, we'll be using this!
+    DROP        // drop remaining Slice (with created_lt and created_at)
+
+    // There are 7 entries on the stack — first 3 fields of Context plus 4 loaded ones.
+    // The topmost is fwd_fee, which is the only one we're after, so let's drop 6 entries below:
+    6 1 BLKDROP2 // drop the loaded values as well as the first 3 fields of Context
+
+    ZERO              // not masterchain
+    GETORIGINALFWDFEE // floor(fwd_fee * 2^16 / (2^16 - first_frac)), where
+                      // first_frac is a value listed in config param 25
+                      // of the blockchain: https://tonviewer.com/config#25
+                      // this instruction effectively multiplies the fwd_fee by 1.5,
+                      // at least for the current value of first_frac, which is 21845
+""";
+
+;; BurnJettonMaster_BurnJettonMaster.storage.fc
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_body_to_value_mode(cell $body, slice $to, int $value, int $mode) inline {
+    return ($mode, $body, $value, $to, true);
+}
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_to_body_value_bounce_mode(slice $to, cell $body, int $value, int $bounce, int $mode) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_body_to_value_bounce_mode(cell $body, slice $to, int $value, int $bounce, int $mode) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: DeployParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 bounce:bool init:StateInit{code:^cell,data:^cell} = DeployParameters
+;;
+
+((int, cell, int, int, (cell, cell))) $DeployParameters$_constructor_value_bounce_mode_body_init(int $value, int $bounce, int $mode, cell $body, (cell, cell) $init) inline {
+    return ($mode, $body, $value, $bounce, $init);
+}
+
+;;
+;; Type: StdAddress
+;; TLB: _ workchain:int8 address:uint256 = StdAddress
+;;
+
+_ $StdAddress$_get_workchain((int, int) v) inline {
+    var (v'workchain, v'address) = v;
+    return v'workchain;
+}
+
+;;
+;; Type: BasechainAddress
+;; TLB: _ hash:Maybe int257 = BasechainAddress
+;;
+
+((int)) $BasechainAddress$_constructor_hash(int $hash) inline {
+    return ($hash);
+}
+
+;;
+;; Type: JettonTransferInternal
+;; Header: 0x178d4519
+;; TLB: jetton_transfer_internal#178d4519 queryId:uint64 amount:coins sender:address responseDestination:address forwardTonAmount:coins forwardPayload:remainder<slice> = JettonTransferInternal
+;;
+
+builder $JettonTransferInternal$_store(builder build_0, (int, int, slice, slice, int, slice) v) inline {
+    var (v'queryId, v'amount, v'sender, v'responseDestination, v'forwardTonAmount, v'forwardPayload) = v;
+    build_0 = store_uint(build_0, 395134233, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    build_0 = build_0.store_varuint16(v'amount);
+    build_0 = build_0.store_slice(v'sender);
+    build_0 = __tact_store_address_opt(build_0, v'responseDestination);
+    build_0 = build_0.store_varuint16(v'forwardTonAmount);
+    build_0 = build_0.store_slice(v'forwardPayload);
+    return build_0;
+}
+
+cell $JettonTransferInternal$_store_cell((int, int, slice, slice, int, slice) v, builder b) inline {
+    return $JettonTransferInternal$_store(b, v).end_cell();
+}
+
+(slice, ((int, int, slice, slice, int, slice))) $JettonTransferInternal$_load(slice sc_0) impure inline {
+    throw_unless(129, sc_0~load_uint(32) == 395134233);
+    var v'queryId = sc_0~load_uint(64);
+    var v'amount = sc_0~load_varuint16();
+    var v'sender = sc_0~load_msg_addr();
+    var v'responseDestination = sc_0~__tact_load_address_opt();
+    var v'forwardTonAmount = sc_0~load_varuint16();
+    var v'forwardPayload = sc_0;
+    return (sc_0, (v'queryId, v'amount, v'sender, v'responseDestination, v'forwardTonAmount, v'forwardPayload));
+}
+
+(slice, ((int, int))) $JettonTransferInternal$_load_bounced(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'amount = sc_0~load_varuint16();
+    return (sc_0, (v'queryId, v'amount));
+}
+
+;;
+;; Type: JettonExcesses
+;; Header: 0xd53276db
+;; TLB: jetton_excesses#d53276db queryId:uint64 = JettonExcesses
+;;
+
+builder $JettonExcesses$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 3576854235, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $JettonExcesses$_store_cell((int) v, builder b) inline {
+    return $JettonExcesses$_store(b, v).end_cell();
+}
+
+((int)) $JettonExcesses$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: CommitJettonTransfer
+;; Header: 0x6a3b2c21
+;; TLB: commit_jetton_transfer#6a3b2c21 queryId:uint64 amount:coins destination:address responseDestination:address forwardTonAmount:coins forwardPayload:^cell excludedTransfer:bool = CommitJettonTransfer
+;;
+
+builder $CommitJettonTransfer$_store(builder build_0, (int, int, slice, slice, int, cell, int) v) inline {
+    var (v'queryId, v'amount, v'destination, v'responseDestination, v'forwardTonAmount, v'forwardPayload, v'excludedTransfer) = v;
+    build_0 = store_uint(build_0, 1782262817, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    build_0 = build_0.store_varuint16(v'amount);
+    build_0 = build_0.store_slice(v'destination);
+    build_0 = __tact_store_address_opt(build_0, v'responseDestination);
+    build_0 = build_0.store_varuint16(v'forwardTonAmount);
+    build_0 = build_0.store_ref(v'forwardPayload);
+    build_0 = build_0.store_int(v'excludedTransfer, 1);
+    return build_0;
+}
+
+cell $CommitJettonTransfer$_store_cell((int, int, slice, slice, int, cell, int) v, builder b) inline {
+    return $CommitJettonTransfer$_store(b, v).end_cell();
+}
+
+(slice, ((int, int))) $CommitJettonTransfer$_load_bounced(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'amount = sc_0~load_varuint16();
+    return (sc_0, (v'queryId, v'amount));
+}
+
+((int, int, slice, slice, int, cell, int)) $CommitJettonTransfer$_constructor_queryId_amount_destination_responseDestination_forwardTonAmount_forwardPayload_excludedTransfer(int $queryId, int $amount, slice $destination, slice $responseDestination, int $forwardTonAmount, cell $forwardPayload, int $excludedTransfer) inline {
+    return ($queryId, $amount, $destination, $responseDestination, $forwardTonAmount, $forwardPayload, $excludedTransfer);
+}
+
+;;
+;; Type: CommitJettonTransferBounced
+;; Header: 0x6a3b2c23
+;; TLB: commit_jetton_transfer_bounced#6a3b2c23 queryId:uint64 amount:coins = CommitJettonTransferBounced
+;;
+
+builder $CommitJettonTransferBounced$_store(builder build_0, (int, int) v) inline {
+    var (v'queryId, v'amount) = v;
+    build_0 = store_uint(build_0, 1782262819, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    build_0 = build_0.store_varuint16(v'amount);
+    return build_0;
+}
+
+cell $CommitJettonTransferBounced$_store_cell((int, int) v, builder b) inline {
+    return $CommitJettonTransferBounced$_store(b, v).end_cell();
+}
+
+((int, int)) $CommitJettonTransferBounced$_constructor_queryId_amount(int $queryId, int $amount) inline {
+    return ($queryId, $amount);
+}
+
+;;
+;; Type: JettonUpdateFeeConfig
+;; Header: 0x4d7e2bc4
+;; TLB: jetton_update_fee_config#4d7e2bc4 queryId:uint64 burn_rate_bps:int257 staking_rate_bps:int257 treasury_rate_bps:int257 staking_pool:address treasury:address dynamic_burn_enabled:bool large_tx_threshold:coins activity_threshold:int257 max_burn_rate_bps:int257 tx_count_snapshot:int257 activity_hour_bucket:int257 low_supply_mode:bool excluded_count:int257 excluded_head:^cell gas_min_ton_fee_path:coins gas_per_internal_deploy_ton:coins gas_pool_forward_min:coins gas_treasury_forward_min:coins gas_burn_notify_ton:coins gas_propagate_ton:coins = JettonUpdateFeeConfig
+;;
+
+builder $JettonUpdateFeeConfig$_store(builder build_0, (int, int, int, int, slice, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int) v) inline_ref {
+    var (v'queryId, v'burn_rate_bps, v'staking_rate_bps, v'treasury_rate_bps, v'staking_pool, v'treasury, v'dynamic_burn_enabled, v'large_tx_threshold, v'activity_threshold, v'max_burn_rate_bps, v'tx_count_snapshot, v'activity_hour_bucket, v'low_supply_mode, v'excluded_count, v'excluded_head, v'gas_min_ton_fee_path, v'gas_per_internal_deploy_ton, v'gas_pool_forward_min, v'gas_treasury_forward_min, v'gas_burn_notify_ton, v'gas_propagate_ton) = v;
+    build_0 = store_uint(build_0, 1300114372, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    build_0 = build_0.store_int(v'burn_rate_bps, 257);
+    build_0 = build_0.store_int(v'staking_rate_bps, 257);
+    build_0 = build_0.store_int(v'treasury_rate_bps, 257);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_slice(v'staking_pool);
+    build_1 = build_1.store_slice(v'treasury);
+    build_1 = build_1.store_int(v'dynamic_burn_enabled, 1);
+    build_1 = build_1.store_varuint16(v'large_tx_threshold);
+    build_1 = build_1.store_int(v'activity_threshold, 257);
+    var build_2 = begin_cell();
+    build_2 = build_2.store_int(v'max_burn_rate_bps, 257);
+    build_2 = build_2.store_int(v'tx_count_snapshot, 257);
+    build_2 = build_2.store_int(v'activity_hour_bucket, 257);
+    build_2 = build_2.store_int(v'low_supply_mode, 1);
+    var build_3 = begin_cell();
+    build_3 = build_3.store_int(v'excluded_count, 257);
+    build_3 = build_3.store_ref(v'excluded_head);
+    build_3 = build_3.store_varuint16(v'gas_min_ton_fee_path);
+    build_3 = build_3.store_varuint16(v'gas_per_internal_deploy_ton);
+    build_3 = build_3.store_varuint16(v'gas_pool_forward_min);
+    build_3 = build_3.store_varuint16(v'gas_treasury_forward_min);
+    build_3 = build_3.store_varuint16(v'gas_burn_notify_ton);
+    build_3 = build_3.store_varuint16(v'gas_propagate_ton);
+    build_2 = store_builder_ref(build_2, build_3);
+    build_1 = store_builder_ref(build_1, build_2);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+cell $JettonUpdateFeeConfig$_store_cell((int, int, int, int, slice, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int) v, builder b) inline {
+    return $JettonUpdateFeeConfig$_store(b, v).end_cell();
+}
+
+((int, int, int, int, slice, slice, int, int, int, int, int, int, int, int, cell, int, int, int, int, int, int)) $JettonUpdateFeeConfig$_constructor_queryId_burn_rate_bps_staking_rate_bps_treasury_rate_bps_staking_pool_treasury_dynamic_burn_enabled_large_tx_threshold_activity_threshold_max_burn_rate_bps_tx_count_snapshot_activity_hour_bucket_low_supply_mode_excluded_count_excluded_head_gas_min_ton_fee_path_gas_per_internal_deploy_ton_gas_pool_forward_min_gas_treasury_forward_min_gas_burn_notify_ton_gas_propagate_ton(int $queryId, int $burn_rate_bps, int $staking_rate_bps, int $treasury_rate_bps, slice $staking_pool, slice $treasury, int $dynamic_burn_enabled, int $large_tx_threshold, int $activity_threshold, int $max_burn_rate_bps, int $tx_count_snapshot, int $activity_hour_bucket, int $low_supply_mode, int $excluded_count, cell $excluded_head, int $gas_min_ton_fee_path, int $gas_per_internal_deploy_ton, int $gas_pool_forward_min, int $gas_treasury_forward_min, int $gas_burn_notify_ton, int $gas_propagate_ton) inline {
+    return ($queryId, $burn_rate_bps, $staking_rate_bps, $treasury_rate_bps, $staking_pool, $treasury, $dynamic_burn_enabled, $large_tx_threshold, $activity_threshold, $max_burn_rate_bps, $tx_count_snapshot, $activity_hour_bucket, $low_supply_mode, $excluded_count, $excluded_head, $gas_min_ton_fee_path, $gas_per_internal_deploy_ton, $gas_pool_forward_min, $gas_treasury_forward_min, $gas_burn_notify_ton, $gas_propagate_ton);
+}
+
+;;
+;; Type: GasParamsView
+;; TLB: _ minTonFeePath:int257 perInternalDeployTon:int257 poolForwardMin:int257 treasuryForwardMin:int257 burnNotifyTon:int257 propagateTon:int257 = GasParamsView
+;;
+
+(int, int, int, int, int, int) $GasParamsView$_to_external(((int, int, int, int, int, int)) v) inline {
+    var (v'minTonFeePath, v'perInternalDeployTon, v'poolForwardMin, v'treasuryForwardMin, v'burnNotifyTon, v'propagateTon) = v; 
+    return (v'minTonFeePath, v'perInternalDeployTon, v'poolForwardMin, v'treasuryForwardMin, v'burnNotifyTon, v'propagateTon);
+}
+
+((int, int, int, int, int, int)) $GasParamsView$_constructor_minTonFeePath_perInternalDeployTon_poolForwardMin_treasuryForwardMin_burnNotifyTon_propagateTon(int $minTonFeePath, int $perInternalDeployTon, int $poolForwardMin, int $treasuryForwardMin, int $burnNotifyTon, int $propagateTon) inline {
+    return ($minTonFeePath, $perInternalDeployTon, $poolForwardMin, $treasuryForwardMin, $burnNotifyTon, $propagateTon);
+}
+
+;;
+;; Type: BurnJettonMasterState
+;; TLB: _ totalSupply:coins mintable:bool adminAddress:address jettonContent:^cell jettonWalletCode:^cell = BurnJettonMasterState
+;;
+
+(int, int, slice, cell, cell) $BurnJettonMasterState$_to_external(((int, int, slice, cell, cell)) v) inline {
+    var (v'totalSupply, v'mintable, v'adminAddress, v'jettonContent, v'jettonWalletCode) = v; 
+    return (v'totalSupply, v'mintable, v'adminAddress, v'jettonContent, v'jettonWalletCode);
+}
+
+((int, int, slice, cell, cell)) $BurnJettonMasterState$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode(int $totalSupply, int $mintable, slice $adminAddress, cell $jettonContent, cell $jettonWalletCode) inline {
+    return ($totalSupply, $mintable, $adminAddress, $jettonContent, $jettonWalletCode);
+}
+
+;;
+;; Type: MasterFeeParamsView
+;; TLB: _ burnRateBps:int257 stakingRateBps:int257 treasuryRateBps:int257 stakingPoolOwner:address treasuryOwner:address feeDestinationsActive:bool = MasterFeeParamsView
+;;
+
+(int, int, int, slice, slice, int) $MasterFeeParamsView$_to_external(((int, int, int, slice, slice, int)) v) inline {
+    var (v'burnRateBps, v'stakingRateBps, v'treasuryRateBps, v'stakingPoolOwner, v'treasuryOwner, v'feeDestinationsActive) = v; 
+    return (v'burnRateBps, v'stakingRateBps, v'treasuryRateBps, v'stakingPoolOwner, v'treasuryOwner, v'feeDestinationsActive);
+}
+
+((int, int, int, slice, slice, int)) $MasterFeeParamsView$_constructor_burnRateBps_stakingRateBps_treasuryRateBps_stakingPoolOwner_treasuryOwner_feeDestinationsActive(int $burnRateBps, int $stakingRateBps, int $treasuryRateBps, slice $stakingPoolOwner, slice $treasuryOwner, int $feeDestinationsActive) inline {
+    return ($burnRateBps, $stakingRateBps, $treasuryRateBps, $stakingPoolOwner, $treasuryOwner, $feeDestinationsActive);
+}
+
+;;
+;; Type: EffectiveFeeParams
+;; TLB: _ burnBps:int257 stakingBps:int257 treasuryBps:int257 = EffectiveFeeParams
+;;
+
+(int, int, int) $EffectiveFeeParams$_to_external(((int, int, int)) v) inline {
+    var (v'burnBps, v'stakingBps, v'treasuryBps) = v; 
+    return (v'burnBps, v'stakingBps, v'treasuryBps);
+}
+
+((int, int, int)) $EffectiveFeeParams$_constructor_burnBps_stakingBps_treasuryBps(int $burnBps, int $stakingBps, int $treasuryBps) inline {
+    return ($burnBps, $stakingBps, $treasuryBps);
+}
+
+;;
+;; Type: BurnJettonWallet
+;; TLB: _ owner:address master:address balance:coins feeConfig:^cell = BurnJettonWallet
+;;
+
+builder $BurnJettonWallet$init$_store(builder build_0, (slice, slice, int, cell) v) inline {
+    var (v'owner, v'master, v'balance, v'feeConfig) = v;
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_slice(v'master);
+    build_0 = build_0.store_varuint16(v'balance);
+    build_0 = build_0.store_ref(v'feeConfig);
+    return build_0;
+}
+
+cell $BurnJettonWallet$_child_get_code() impure asm """
+    B{b5ee9c7201023301000eea00022cff008e88f4a413f4bcf2c80bed53208e8130e1ed43d901020201620304049601d072d721d200d200fa4021103450666f04f86102f862ed44d0fa40fa40fa00d455306c1405e30203d70d1ff2e0822182104d7e2bc4bae3022182100f8a7ea5bae3022182106a3b2c21ba0c0d0e0f0105a0005f14020148050602012007080129bbb02ed44d0fa40fa40fa00d455306c14db3c6c4480b0129b4a53da89a1f481f481f401a8aa60d829b678d8830090129b587dda89a1f481f481f401a8aa60d829b678d88d00a021620d020d749e30f5f0f5f051f20021220d020d749e30f6cf61f20000ef82a546250525000b6038020d7217021d749c21f9430d31f01de208210178d4519ba8e1a30d33ffa00596c2113a05003c855305034cece01fa02ccc9ed54e082107bdd97deba8e19d33ffa00596c2113a05003c855305034cece01fa02ccc9ed54e05f0501ea313403d33f31810101d700810101d700810101d700d430d0fa40fa40d200fa00810101d700d430d0810101d700810101d700810101d700d200d430d0810101d700d4fa00fa00fa00fa00fa00fa00308123fff8425618c705f2f4817e0e56145614a05613a08101f4bbf2f48200a3d45476545476541003de31d33ffa00fa40d72c01916d93fa4001e201f40431fa0023fa4430f2d08a8123fff84229c705f2f48200eecf25c200f2f429d020d749e30f5f056c63333535358154035006f2f4fa4430f2d08a03fa4430f2d08a2320d70b00c0019dd74bc00192c001923070e2f2899130e2547a201f20130336e302218210178d4519bae302018210595f07bcbae3025f05f2c08217181901e4258210389fd980b9917f982582112a05f200bce2935f0670e30ef2f4c85006fa025004fa0258fa0201fa0201fa0201fa02c9c81aca005008fa0216cb1f14cb0f12cb1fcb1fca00cb0fccccc9c87101cb0016cb0f14cb0f12cb0f01cf1601cf16ccc94330c855305034cece01fa02ccc9ed541101f624821020c85580b9917f982482103b9aca00bce2935f0670e0238210042c1d80b9917f982382103b9aca00bce2935f0670e0228208989680b9917f982282103b9aca00bce2935f0670e021820b938700b9917f982182103b9aca00bce2935f0670e020820afaf080b9917f982082103b9aca00bce2935f0670e00312007282100510ff40b6098208989680a08208989680a08209312d00a0028208989680a08208989680a08209312d00a05042a001a058a001a703a0be04fec000917f8e1020d020d749c00094d74ac000923070e2e2925b708e82db3ce2544740c000917f8e1020d020d749c00094d74ac000923070e2e2925b708e82db3ce2f8416f2443305230fa40fa0071d721fa00fa00306c6170f83a26b8a4817d7102a85270a05004a0bc12f2f40192307fde917f982182103b9aca00bee2e30214141516005420d020d749c00094d74ac000923070e2925b70e0d0fa405112c705925b7fe020d74a925b70e1d430f02f00fc81093e5395bef2f4820898968072fb02708100827f03c801cf16c92a106905104810374900c8556082106a3b2c205008cb1f16cb3f14ce58fa02ce01206e9430cf84809201cee2c858fa0212cccdc92444145033441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004003c855305034cece01fa02ccc9ed54012e10791068106770db3cc855305034cece01fa02ccc9ed541c04fe31d33ffa00fa40d72c01916d93fa4001e201fa00d4d200308123fff84229c705f2f401d02020d70b00c0019dd74bc00192c001923070e2f2899130e25395b98e985f05103510241023db3cc855305034cece01fa02ccc9ed54e02ad020d749e30f6cc6363636f8416f2443305230fa40fa0071d721fa00fa00306c6170f83a1e1f201a03fc31d33ffa00fa40d72c01916d93fa4001e201fa005184a070c8c925544930db3cf842fa44315920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400206ef2d08001ba9b8123fff8425280c705f2f4dff8416f2421f8276f1021a127c200963e1059385f06e30d068208989680b60972fb02256eb32f303101fad33ffa00d72c01916d93fa4001e2318123fff84226c705f2f45151a181093e21c2fff2f4f8416f2443305230fa40fa0071d721fa00fa00306c6170f83a817d71811a2c70f836aa0012a012bcf2f47080405414367f09c8553082107bdd97de5005cb1f13cb3f01fa02ce01206e9430cf84809201cee2c92404431350773203f010451034102347605467b03726a08208989680a08209312d00a015b609820b93870026a08208989680a082084c4b40a014b6095305a08208989680a08209312d00a05237a08208989680a08209312d00a05346a021a05003a005a70315a010356c4125933058a093316c12e2b9e302108a1079107801db3c1b1c1d01305f05103510241023db3cc855305034cece01fa02ccc9ed541e038827d020d749e30f8154035615f2f45610fa4430f2d08a2ffa4430f2d08ac8c9f8416f2443305230fa40fa0071d721fa00fa00306c6170f83a5468805468805468805620011f2021001cc855305034cece01fa02ccc9ed54009cf8276f10f8416f24135f03a18208989680b60972fb0270810082037003c85982106a3b2c225003cb1fcb3f01fa02c92744145033441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0001fcd30001c00101d30fd30fd30ffa40fa4020d74a8e3230708212540be40080642070207021c8c982103b9aca00821020c855808210042c1d808208989680820b938700820afaf080e1d430d0d200fa00d31fd30fd31fd31fd200d30fd482103b9aca00821020c855808210042c1d808208989680820b938700820afaf080262200f230707053008d08600000000000000000000000000000000000000000000000000000000000000000048d0860000000000000000000000000000000000000000000000000000000000000000004702380645470117021c8c982103b9aca00821020c855808210042c1d808208989680820b938700820afaf08002fa3726a08208989680a08209312d00a015b609820b93870026a08208989680a082084c4b40a014b6095305a08208989680a08209312d00a05237a08208989680a08209312d00a05346a021a05003a005a70315a01035111de3020e111b0e0d111a0d56190d56190d56190d56190d0c11190c0b11180b0a11170a091116092324003ed74ac2008e145f06d430d0fa00fa00fa00fa00fa00fa003055409136e2550402fe10455f056cf36c6351a7a181093e21c2fff2f47f712a4a132f54493819c855508210178d45195007cb1f15cb3f5003fa02ce01206e9430cf84809201cee201fa02cec97027544d0304db3c105b1048103b103510245f41f90001f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f9040003c8cf8580ca0012cccc2f2501fe08111508071114070611130605111f0504111e045619561956273a5f0837373a0492327f9202b3e29410675f078e2413bc9304a6199104e25055bc9303a60c9103e28101f458a15003a1b6085cbc91319130e2e256130341cb5233a8812710a9045232a8812710a9045233a8812710a9045131a122a123a1138200a65c53432802a089cf16cbff01fa028069cf40cf8634f400c901fb00265444305449087150437f03c8552082106a3b2c1d5004cb1f12cb3fcecec9441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb005135262700031002008e820898968072fb02216eb39630206ef2d0809131e2708100827004c8018210d53276db58cb1fcb3fc910344130441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0004f8a023a022a05616baf2f4058200d5be1110be1ff2f4011115011112a181093e21c2fff2f42756167026db3c2856187028db3c7f7156184913561d02561702011117011116c855508210178d45195007cb1f15cb3f5003fa02ce01206e9430cf84809201cee201fa02cec970561502561b400adb3c5e240311130310282f2f2f2901fc103510245f41f90001f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f9040003c8cf8580ca0012cccccf884008cbff01fa028069cf40cf8634f400c901fb000d705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d07f71c87001cb00c9d05613032a01aa02111302561802561240ccc855508210178d45195007cb1f15cb3f5003fa02ce01206e9430cf84809201cee201fa02cec91410381027011110014343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0050272b01fe705920f90022f9005ad76501d76582020134c8cb17cb0fcb0fcbffcbff71f90400c87401cb0212ca07cbffc9d07f71c87001cb00c9d02e49135613544d3a01c855508210178d45195007cb1f15cb3f5003fa02ce01206e9430cf84809201cee201fa02cec9144530164343c8cf8580ca00cf8440ce01fa02806acf40f400c92c01a001fb0071287f543ce7c8553082107bdd97de5005cb1f13cb3f01fa02ce01206e9430cf84809201cee2c92c04103950cc441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0054686052b62a2d01e27150437f03c8552082106a3b2c1d5004cb1f12cb3fcecec9441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0054675052a6297150437f03c8552082106a3b2c1d5004cb1f12cb3fcecec9441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00265444305449082e00f67150437f03c8552082106a3b2c1d5004cb1f12cb3fcecec9441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb005135820898968072fb02216eb39630206ef2d0809131e2708100827004c8018210d53276db58cb1fcb3fc910344130441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00001cf82ac855315034cece01fa02ccc900ae5531fa40fa0071d721fa00fa00306c6170f83a5240a012a17170294913508dc8553082107362d09c5005cb1f13cb3f01fa02cecec9290447135066441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00416000ac9320c2009170e28e3805206ef2d0808100827004c8018210d53276db58cb1fcb3fc91024103712441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0093303430e24003c855305034cece01fa02ccc9ed540054441359c8cf8580ca00cf8440ce01fa02806acf40f400c901fb004003c855305034cece01fa02ccc9ed54} B>boc PUSHREF
+""";
+
+(cell, cell) $BurnJettonWallet$_init_child(slice $owner, slice $master, int $balance, cell $feeConfig) inline_ref {
+    ;; Build init code cell
+
+    ;; Contract Code: BurnJettonWallet
+    cell init_code = $BurnJettonWallet$_child_get_code();
+
+
+    builder b = begin_cell();
+    b = $BurnJettonWallet$init$_store(b, ($owner, $master, $balance, $feeConfig));
+    return (init_code, b.end_cell());
+}
+
+cell $BurnJettonWallet$_code_child() inline {
+    return $BurnJettonWallet$_child_get_code();
+}
+
+;;
+;; Type: BurnJettonMaster
+;; TLB: _ totalSupply:coins admin:address timelock:address content:^cell mintable:bool burnRateBps:int257 stakingRateBps:int257 treasuryRateBps:int257 stakingPoolOwner:address treasuryOwner:address feeDestinationsActive:bool excludedHead:^cell excludedCount:int257 dynamicBurnEnabled:bool largeTxThreshold:coins activityThreshold:int257 maxBurnRateBps:int257 txCountLastHour:int257 activityHourBucket:int257 autoReduceThreshold:coins lowBurnBps:int257 lowStakingBps:int257 lowTreasuryBps:int257 gasMinTonFeePath:coins gasPerInternalDeployTon:coins gasPoolFwdMin:coins gasTreasuryFwdMin:coins gasBurnNotify:coins gasPropagate:coins = BurnJettonMaster
+;;
+
+builder $BurnJettonMaster$_store(builder build_0, (int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) v) inline {
+    var (v'totalSupply, v'admin, v'timelock, v'content, v'mintable, v'burnRateBps, v'stakingRateBps, v'treasuryRateBps, v'stakingPoolOwner, v'treasuryOwner, v'feeDestinationsActive, v'excludedHead, v'excludedCount, v'dynamicBurnEnabled, v'largeTxThreshold, v'activityThreshold, v'maxBurnRateBps, v'txCountLastHour, v'activityHourBucket, v'autoReduceThreshold, v'lowBurnBps, v'lowStakingBps, v'lowTreasuryBps, v'gasMinTonFeePath, v'gasPerInternalDeployTon, v'gasPoolFwdMin, v'gasTreasuryFwdMin, v'gasBurnNotify, v'gasPropagate) = v;
+    build_0 = build_0.store_varuint16(v'totalSupply);
+    build_0 = build_0.store_slice(v'admin);
+    build_0 = build_0.store_slice(v'timelock);
+    build_0 = build_0.store_ref(v'content);
+    build_0 = build_0.store_int(v'mintable, 1);
+    build_0 = build_0.store_int(v'burnRateBps, 257);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_int(v'stakingRateBps, 257);
+    build_1 = build_1.store_int(v'treasuryRateBps, 257);
+    build_1 = build_1.store_slice(v'stakingPoolOwner);
+    var build_2 = begin_cell();
+    build_2 = build_2.store_slice(v'treasuryOwner);
+    build_2 = build_2.store_int(v'feeDestinationsActive, 1);
+    build_2 = build_2.store_ref(v'excludedHead);
+    build_2 = build_2.store_int(v'excludedCount, 257);
+    build_2 = build_2.store_int(v'dynamicBurnEnabled, 1);
+    build_2 = build_2.store_varuint16(v'largeTxThreshold);
+    build_2 = build_2.store_int(v'activityThreshold, 257);
+    var build_3 = begin_cell();
+    build_3 = build_3.store_int(v'maxBurnRateBps, 257);
+    build_3 = build_3.store_int(v'txCountLastHour, 257);
+    build_3 = build_3.store_int(v'activityHourBucket, 257);
+    build_3 = build_3.store_varuint16(v'autoReduceThreshold);
+    var build_4 = begin_cell();
+    build_4 = build_4.store_int(v'lowBurnBps, 257);
+    build_4 = build_4.store_int(v'lowStakingBps, 257);
+    build_4 = build_4.store_int(v'lowTreasuryBps, 257);
+    build_4 = build_4.store_varuint16(v'gasMinTonFeePath);
+    build_4 = build_4.store_varuint16(v'gasPerInternalDeployTon);
+    var build_5 = begin_cell();
+    build_5 = build_5.store_varuint16(v'gasPoolFwdMin);
+    build_5 = build_5.store_varuint16(v'gasTreasuryFwdMin);
+    build_5 = build_5.store_varuint16(v'gasBurnNotify);
+    build_5 = build_5.store_varuint16(v'gasPropagate);
+    build_4 = store_builder_ref(build_4, build_5);
+    build_3 = store_builder_ref(build_3, build_4);
+    build_2 = store_builder_ref(build_2, build_3);
+    build_1 = store_builder_ref(build_1, build_2);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+(slice, ((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int))) $BurnJettonMaster$_load(slice sc_0) inline {
+    var v'totalSupply = sc_0~load_varuint16();
+    var v'admin = sc_0~load_msg_addr();
+    var v'timelock = sc_0~load_msg_addr();
+    var v'content = sc_0~load_ref();
+    var v'mintable = sc_0~load_int(1);
+    var v'burnRateBps = sc_0~load_int(257);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'stakingRateBps = sc_1~load_int(257);
+    var v'treasuryRateBps = sc_1~load_int(257);
+    var v'stakingPoolOwner = sc_1~load_msg_addr();
+    slice sc_2 = sc_1~load_ref().begin_parse();
+    var v'treasuryOwner = sc_2~load_msg_addr();
+    var v'feeDestinationsActive = sc_2~load_int(1);
+    var v'excludedHead = sc_2~load_ref();
+    var v'excludedCount = sc_2~load_int(257);
+    var v'dynamicBurnEnabled = sc_2~load_int(1);
+    var v'largeTxThreshold = sc_2~load_varuint16();
+    var v'activityThreshold = sc_2~load_int(257);
+    slice sc_3 = sc_2~load_ref().begin_parse();
+    var v'maxBurnRateBps = sc_3~load_int(257);
+    var v'txCountLastHour = sc_3~load_int(257);
+    var v'activityHourBucket = sc_3~load_int(257);
+    var v'autoReduceThreshold = sc_3~load_varuint16();
+    slice sc_4 = sc_3~load_ref().begin_parse();
+    var v'lowBurnBps = sc_4~load_int(257);
+    var v'lowStakingBps = sc_4~load_int(257);
+    var v'lowTreasuryBps = sc_4~load_int(257);
+    var v'gasMinTonFeePath = sc_4~load_varuint16();
+    var v'gasPerInternalDeployTon = sc_4~load_varuint16();
+    slice sc_5 = sc_4~load_ref().begin_parse();
+    var v'gasPoolFwdMin = sc_5~load_varuint16();
+    var v'gasTreasuryFwdMin = sc_5~load_varuint16();
+    var v'gasBurnNotify = sc_5~load_varuint16();
+    var v'gasPropagate = sc_5~load_varuint16();
+    return (sc_0, (v'totalSupply, v'admin, v'timelock, v'content, v'mintable, v'burnRateBps, v'stakingRateBps, v'treasuryRateBps, v'stakingPoolOwner, v'treasuryOwner, v'feeDestinationsActive, v'excludedHead, v'excludedCount, v'dynamicBurnEnabled, v'largeTxThreshold, v'activityThreshold, v'maxBurnRateBps, v'txCountLastHour, v'activityHourBucket, v'autoReduceThreshold, v'lowBurnBps, v'lowStakingBps, v'lowTreasuryBps, v'gasMinTonFeePath, v'gasPerInternalDeployTon, v'gasPoolFwdMin, v'gasTreasuryFwdMin, v'gasBurnNotify, v'gasPropagate));
+}
+
+(int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $BurnJettonMaster$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    return $sc~$BurnJettonMaster$_load();
+}
+
+() $BurnJettonMaster$_contract_store((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = $BurnJettonMaster$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract BurnJettonMaster functions
+;;
+
+cell $global_jettonWalletEmptyFeeConfig() impure inline {
+    return $Builder$_fun_endCell($global_beginCell());
+}
+
+int $global_isValidGasParams((int, int, int, int, int, int) $g) impure inline {
+    var (($g'minTonFeePath, $g'perInternalDeployTon, $g'poolForwardMin, $g'treasuryForwardMin, $g'burnNotifyTon, $g'propagateTon)) = $g;
+    if (( (($g'minTonFeePath < 950000000)) ? (true) : (($g'minTonFeePath > 5000000000)) )) {
+        return false;
+    }
+    if (( (($g'perInternalDeployTon < 550000000)) ? (true) : (($g'perInternalDeployTon > 1000000000)) )) {
+        return false;
+    }
+    if (( (($g'poolForwardMin < 70000000)) ? (true) : (($g'poolForwardMin > 1000000000)) )) {
+        return false;
+    }
+    if (( (($g'treasuryForwardMin < 10000000)) ? (true) : (($g'treasuryForwardMin > 1000000000)) )) {
+        return false;
+    }
+    if (( (($g'burnNotifyTon < 60000000)) ? (true) : (($g'burnNotifyTon > 1000000000)) )) {
+        return false;
+    }
+    if (( (($g'propagateTon < 50000000)) ? (true) : (($g'propagateTon > 1000000000)) )) {
+        return false;
+    }
+    int $worstPoolFwd = $global_max($g'poolForwardMin, 85000000);
+    int $worstPoolDeliver = ((($worstPoolFwd + 10000000) + 10000000) + 20000000);
+    int $worstTreasDeliver = ((($g'treasuryForwardMin + 10000000) + 10000000) + 20000000);
+    int $worstFanout = (((($g'perInternalDeployTon + $worstPoolDeliver) + $worstTreasDeliver) + $g'burnNotifyTon) + (3 * $g'propagateTon));
+    return ($g'minTonFeePath >= $worstFanout);
+}
+
+int $global_isExcludedChainEmpty(cell $head) impure inline {
+    slice $s = $Cell$_fun_beginParse($head);
+    return ( (($Slice$_fun_bits($s) == 0)) ? (($Slice$_fun_refs($s) == 0)) : (false) );
+}
+
+int $global_isInExcludedChain(slice $addr, cell $head) impure inline_ref {
+    if ($global_isExcludedChainEmpty($head)) {
+        return false;
+    }
+    slice $s = $Cell$_fun_beginParse($head);
+    slice $a = $s~$Slice$_fun_loadAddress();
+    if (( equal_slices_bits($a, $addr) )) {
+        return true;
+    }
+    ifnot ($Slice$_fun_refs($s)) {
+        return false;
+    }
+    return $global_isInExcludedChain($addr, $s~$Slice$_fun_loadRef());
+}
+
+cell $global_excludedChainPrepend(cell $head, slice $addr) impure inline_ref {
+    return $Builder$_fun_endCell($Builder$_fun_storeRef($head, $Builder$_fun_storeAddress($global_beginCell(), $addr)));
+}
+
+cell $global_excludedChainRemove(slice $addr, cell $head) impure inline_ref {
+    if ($global_isExcludedChainEmpty($head)) {
+        return $head;
+    }
+    slice $s = $Cell$_fun_beginParse($head);
+    slice $a = $s~$Slice$_fun_loadAddress();
+    cell $tail = $s~$Slice$_fun_loadRef();
+    if (( equal_slices_bits($a, $addr) )) {
+        return $tail;
+    }
+    cell $newTail = $global_excludedChainRemove($addr, $tail);
+    return $Builder$_fun_endCell($Builder$_fun_storeRef($newTail, $Builder$_fun_storeAddress($global_beginCell(), $a)));
+}
+
+(int, int) $global_calculateSliceBitsAndRefs(slice $slice) impure asm """
+    SBITREFS
+""";
+
+() $global_checkEitherForwardPayload(slice $forwardPayload) impure inline {
+    if ((preload_uint($forwardPayload, 1) == 1)) {
+        var ($bitsAndRefs'bits, $bitsAndRefs'refs) = $global_calculateSliceBitsAndRefs($forwardPayload);
+        throw_unless(9, ( (($bitsAndRefs'refs == 1)) ? (($bitsAndRefs'bits == 1)) : (false) ));
+    }
+}
+
+(cell, cell) $global_getBurnJettonWalletInit(slice $address) impure inline {
+    return $BurnJettonWallet$_init_child($address, $global_myAddress(), 0, $global_jettonWalletEmptyFeeConfig());
+}
+
+slice $global_getBurnJettonWalletByOwner(slice $jettonWalletOwner) impure inline {
+    return $global_contractAddress($global_getBurnJettonWalletInit($jettonWalletOwner));
+}
+
+(int) $global_getBurnJettonBasechainWalletByOwner(slice $jettonWalletOwner) impure inline {
+    return $global_contractBasechainAddress($global_getBurnJettonWalletInit($jettonWalletOwner));
+}
+
+cell $global_makeTep89TakeWalletAddressMsg(int $walletResolvable, (int, slice, int) $msg) impure inline {
+    var (($msg'queryId, $msg'ownerAddress, $msg'includeAddress)) = $msg;
+    builder $b = store_uint(store_uint($global_beginCell(), 0xd1735400, 32), $msg'queryId, 64);
+    if ($walletResolvable) {
+        $b = $Builder$_fun_storeBasechainAddress($b, $global_getBurnJettonBasechainWalletByOwner($msg'ownerAddress));
+    } else {
+        $b = store_uint($b, 0, 2);
+    }
+    return $Builder$_fun_endCell($Builder$_fun_storeMaybeRef(($msg'includeAddress ? $Builder$_fun_endCell($Builder$_fun_storeAddress($global_beginCell(), $msg'ownerAddress)) : null()), $b));
+}
+
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), ()) $BurnJettonMaster$_fun_pushFeeConfigToOwner((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self, int $queryId, slice $owner) impure inline {
+    var (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)) = $self;
+    int $low = ($self'totalSupply < $self'autoReduceThreshold);
+    int $effBurn = ($low ? $self'lowBurnBps : $self'burnRateBps);
+    int $effStake = ($low ? $self'lowStakingBps : $self'stakingRateBps);
+    int $effTreas = ($low ? $self'lowTreasuryBps : $self'treasuryRateBps);
+    var ($cfg'queryId, $cfg'burn_rate_bps, $cfg'staking_rate_bps, $cfg'treasury_rate_bps, $cfg'staking_pool, $cfg'treasury, $cfg'dynamic_burn_enabled, $cfg'large_tx_threshold, $cfg'activity_threshold, $cfg'max_burn_rate_bps, $cfg'tx_count_snapshot, $cfg'activity_hour_bucket, $cfg'low_supply_mode, $cfg'excluded_count, $cfg'excluded_head, $cfg'gas_min_ton_fee_path, $cfg'gas_per_internal_deploy_ton, $cfg'gas_pool_forward_min, $cfg'gas_treasury_forward_min, $cfg'gas_burn_notify_ton, $cfg'gas_propagate_ton) = $JettonUpdateFeeConfig$_constructor_queryId_burn_rate_bps_staking_rate_bps_treasury_rate_bps_staking_pool_treasury_dynamic_burn_enabled_large_tx_threshold_activity_threshold_max_burn_rate_bps_tx_count_snapshot_activity_hour_bucket_low_supply_mode_excluded_count_excluded_head_gas_min_ton_fee_path_gas_per_internal_deploy_ton_gas_pool_forward_min_gas_treasury_forward_min_gas_burn_notify_ton_gas_propagate_ton($queryId, $effBurn, $effStake, $effTreas, $self'stakingPoolOwner, $self'treasuryOwner, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $low, $self'excludedCount, $self'excludedHead, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate);
+    $global_deploy($DeployParameters$_constructor_value_bounce_mode_body_init(0, false, 66, $JettonUpdateFeeConfig$_store_cell(($cfg'queryId, $cfg'burn_rate_bps, $cfg'staking_rate_bps, $cfg'treasury_rate_bps, $cfg'staking_pool, $cfg'treasury, $cfg'dynamic_burn_enabled, $cfg'large_tx_threshold, $cfg'activity_threshold, $cfg'max_burn_rate_bps, $cfg'tx_count_snapshot, $cfg'activity_hour_bucket, $cfg'low_supply_mode, $cfg'excluded_count, $cfg'excluded_head, $cfg'gas_min_ton_fee_path, $cfg'gas_per_internal_deploy_ton, $cfg'gas_pool_forward_min, $cfg'gas_treasury_forward_min, $cfg'gas_burn_notify_ton, $cfg'gas_propagate_ton), begin_cell()), $global_getBurnJettonWalletInit($owner)));
+    return (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate), ());
+}
+
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), (int, int, slice, cell, cell)) $BurnJettonMaster$_fun_get_jetton_data((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)) = $self;
+    var $fresh$ret_14 = $BurnJettonMasterState$_constructor_totalSupply_mintable_adminAddress_jettonContent_jettonWalletCode($self'totalSupply, $self'mintable, $self'admin, $self'content, $BurnJettonWallet$_code_child());
+    return (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate), $fresh$ret_14);
+}
+
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), slice) $BurnJettonMaster$_fun_get_timelock_address((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)) = $self;
+    var $fresh$ret_15 = $self'timelock;
+    return (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate), $fresh$ret_15);
+}
+
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), slice) $BurnJettonMaster$_fun_get_wallet_address((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self, slice $ownerAddress) impure inline_ref {
+    var (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)) = $self;
+    var $fresh$ret_16 = $global_getBurnJettonWalletByOwner($ownerAddress);
+    return (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate), $fresh$ret_16);
+}
+
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), (int, int, int, slice, slice, int)) $BurnJettonMaster$_fun_get_fee_params((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)) = $self;
+    var $fresh$ret_17 = $MasterFeeParamsView$_constructor_burnRateBps_stakingRateBps_treasuryRateBps_stakingPoolOwner_treasuryOwner_feeDestinationsActive($self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive);
+    return (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate), $fresh$ret_17);
+}
+
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), (int, int, int)) $BurnJettonMaster$_fun_get_effective_fee_params((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)) = $self;
+    int $low = ($self'totalSupply < $self'autoReduceThreshold);
+    var $fresh$ret_18 = $EffectiveFeeParams$_constructor_burnBps_stakingBps_treasuryBps(($low ? $self'lowBurnBps : $self'burnRateBps), ($low ? $self'lowStakingBps : $self'stakingRateBps), ($low ? $self'lowTreasuryBps : $self'treasuryRateBps));
+    return (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate), $fresh$ret_18);
+}
+
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), int) $BurnJettonMaster$_fun_get_is_excluded((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self, slice $holder) impure inline_ref {
+    var (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)) = $self;
+    var $fresh$ret_19 = $global_isInExcludedChain($holder, $self'excludedHead);
+    return (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate), $fresh$ret_19);
+}
+
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), (int, int, int, int, int, int)) $BurnJettonMaster$_fun_get_gas_params((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)) = $self;
+    var $fresh$ret_20 = $GasParamsView$_constructor_minTonFeePath_perInternalDeployTon_poolForwardMin_treasuryForwardMin_burnNotifyTon_propagateTon($self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate);
+    return (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate), $fresh$ret_20);
+}
+
+((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int), slice) $BurnJettonMaster$_fun_get_treasury_address((int, slice, slice, cell, int, int, int, int, slice, slice, int, cell, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)) = $self;
+    var $fresh$ret_21 = $self'treasuryOwner;
+    return (($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate), $fresh$ret_21);
+}
+
+;;
+;; Get methods of a Contract BurnJettonMaster
+;;
+
+_ %get_jetton_data() method_id(106029) {
+    var self = $BurnJettonMaster$_contract_load();
+    var res = self~$BurnJettonMaster$_fun_get_jetton_data();
+    return $BurnJettonMasterState$_to_external(res);
+}
+
+_ %get_timelock_address() method_id(76502) {
+    var self = $BurnJettonMaster$_contract_load();
+    var res = self~$BurnJettonMaster$_fun_get_timelock_address();
+    return res;
+}
+
+_ %get_wallet_address(slice $ownerAddress) method_id(103289) {
+    slice $ownerAddress = $ownerAddress;
+    var self = $BurnJettonMaster$_contract_load();
+    var res = self~$BurnJettonMaster$_fun_get_wallet_address($ownerAddress);
+    return res;
+}
+
+_ %get_fee_params() method_id(79443) {
+    var self = $BurnJettonMaster$_contract_load();
+    var res = self~$BurnJettonMaster$_fun_get_fee_params();
+    return $MasterFeeParamsView$_to_external(res);
+}
+
+_ %get_effective_fee_params() method_id(69056) {
+    var self = $BurnJettonMaster$_contract_load();
+    var res = self~$BurnJettonMaster$_fun_get_effective_fee_params();
+    return $EffectiveFeeParams$_to_external(res);
+}
+
+_ %get_is_excluded(slice $holder) method_id(113818) {
+    slice $holder = $holder;
+    var self = $BurnJettonMaster$_contract_load();
+    var res = self~$BurnJettonMaster$_fun_get_is_excluded($holder);
+    return res;
+}
+
+_ %get_gas_params() method_id(96390) {
+    var self = $BurnJettonMaster$_contract_load();
+    var res = self~$BurnJettonMaster$_fun_get_gas_params();
+    return $GasParamsView$_to_external(res);
+}
+
+_ %get_treasury_address() method_id(86787) {
+    var self = $BurnJettonMaster$_contract_load();
+    var res = self~$BurnJettonMaster$_fun_get_treasury_address();
+    return res;
+}
+
+;;
+;; Routing of a Contract BurnJettonMaster
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate) = $BurnJettonMaster$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) {
+        ;; Skip 0xFFFFFFFF prefix of a bounced message
+        in_msg~skip_bits(32);
+        int op = 0;
+        if (slice_bits(in_msg) >= 32) {
+            op = in_msg~load_uint(32);
+        }
+        ;; Bounced handler for JettonTransferInternal message
+        if (op == 0x178d4519) {
+            var ($msg'queryId, $msg'amount) = in_msg~$JettonTransferInternal$_load_bounced();
+            $self'totalSupply = $self'totalSupply - $msg'amount;
+            $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+            return ();
+        }
+        
+        ;; Bounced handler for CommitJettonTransfer message
+        if (op == 0x6a3b2c21) {
+            var ($msg'queryId, $msg'amount) = in_msg~$CommitJettonTransfer$_load_bounced();
+            $global_emit($CommitJettonTransferBounced$_store_cell($CommitJettonTransferBounced$_constructor_queryId_amount($msg'queryId, $msg'amount), begin_cell()));
+            
+            return ();
+        }
+        
+        return ();
+    }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive ProvideWalletAddress message
+    if (op == 0x2c76b973) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'ownerAddress = in_msg~load_msg_addr();
+        var $msg'includeAddress = in_msg~load_int(1);
+        var ($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw) = __tact_context_get();
+        int $fwdFee = $Context$_fun_readForwardFee(($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw));
+        throw_unless(50281, ($ctx'value > ($fwdFee + 10000000)));
+        int $ownerWorkchain = $StdAddress$_get_workchain($global_parseStdAddress($Address$_fun_asSlice($msg'ownerAddress)));
+        int $walletResolvable = ($ownerWorkchain == 0);
+        $global_message($MessageParameters$_constructor_body_to_value_mode($global_makeTep89TakeWalletAddressMsg($walletResolvable, ($msg'queryId, $msg'ownerAddress, $msg'includeAddress)), __tact_context_get_sender(), 0, 64));
+        
+        return ();
+    }
+    
+    ;; Receive Mint message
+    if (op == 0x642b7d07) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'receiver = in_msg~load_msg_addr();
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var ($msg'mintMessage'queryId, $msg'mintMessage'amount, $msg'mintMessage'sender, $msg'mintMessage'responseDestination, $msg'mintMessage'forwardTonAmount, $msg'mintMessage'forwardPayload) = sc_1~$JettonTransferInternal$_load();
+        throw_unless(9215, ( equal_slices_bits(__tact_context_get_sender(), $self'admin) ));
+        throw_unless(51950, $self'mintable);
+        throw_unless(6461, (($self'totalSupply + $msg'mintMessage'amount) <= 1000000000000));
+        $global_checkEitherForwardPayload($msg'mintMessage'forwardPayload);
+        var ($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw) = __tact_context_get();
+        throw_unless(37629, ($ctx'value > ((((10000000 + $msg'mintMessage'forwardTonAmount) + $Context$_fun_readForwardFee(($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw))) + $global_getForwardFee(30, 20000, false)) + (2 * $global_getComputeFee(10500, false)))));
+        $self'totalSupply = $self'totalSupply + $msg'mintMessage'amount;
+        $global_deploy($DeployParameters$_constructor_value_bounce_mode_body_init(0, true, 80, $JettonTransferInternal$_store_cell(($msg'mintMessage'queryId, $msg'mintMessage'amount, $msg'mintMessage'sender, $msg'mintMessage'responseDestination, $msg'mintMessage'forwardTonAmount, $msg'mintMessage'forwardPayload), begin_cell()), $global_getBurnJettonWalletInit($msg'receiver)));
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive CloseMint message
+    if (op == 0x5a1ca001) {
+        var $msg'queryId = in_msg~load_uint(64);
+        throw_unless(9215, ( equal_slices_bits(__tact_context_get_sender(), $self'admin) ));
+        $self'mintable = false;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive JettonBurnNotification message
+    if (op == 0x7bdd97de) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'amount = in_msg~load_varuint16();
+        var $msg'sender = in_msg~load_msg_addr();
+        var $msg'responseDestination = in_msg~__tact_load_address_opt();
+        var ($s'workchain, $s'address) = $global_parseStdAddress($Address$_fun_asSlice(__tact_context_get_sender()));
+        var ($wallet'hash) = $global_getBurnJettonBasechainWalletByOwner($msg'sender);
+        throw_unless(10363, ( (($s'workchain == 0)) ? (($s'address == __tact_not_null($wallet'hash))) : (false) ));
+        int $hour = ($global_now() / 3600);
+        if (($hour != $self'activityHourBucket)) {
+            $self'activityHourBucket = $hour;
+            $self'txCountLastHour = 0;
+        }
+        $self'txCountLastHour = $self'txCountLastHour + 1;
+        $self'totalSupply = $self'totalSupply - $msg'amount;
+        if ((~ null?($msg'responseDestination))) {
+            $global_message($MessageParameters$_constructor_to_body_value_bounce_mode(__tact_not_null($msg'responseDestination), $JettonExcesses$_store_cell($JettonExcesses$_constructor_queryId($msg'queryId), begin_cell()), 0, false, 66));
+        }
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive JettonUpdateContent message
+    if (op == 4) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'content = in_msg~load_ref();
+        throw_unless(9215, ( equal_slices_bits(__tact_context_get_sender(), $self'admin) ));
+        $self'content = $msg'content;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive ChangeOwner message
+    if (op == 3) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'newOwner = in_msg~load_msg_addr();
+        throw_unless(9215, ( equal_slices_bits(__tact_context_get_sender(), $self'admin) ));
+        $self'admin = $msg'newOwner;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive SetFeeParams message
+    if (op == 0x1a72d4e2) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'burn_rate_bps = in_msg~load_int(257);
+        var $msg'staking_rate_bps = in_msg~load_int(257);
+        var $msg'treasury_rate_bps = in_msg~load_int(257);
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        throw_unless(32270, ( (( (( (($msg'burn_rate_bps >= 0)) ? (($msg'staking_rate_bps >= 0)) : (false) )) ? (($msg'treasury_rate_bps >= 0)) : (false) )) ? (((($msg'burn_rate_bps + $msg'staking_rate_bps) + $msg'treasury_rate_bps) <= 500)) : (false) ));
+        $self'burnRateBps = $msg'burn_rate_bps;
+        $self'stakingRateBps = $msg'staking_rate_bps;
+        $self'treasuryRateBps = $msg'treasury_rate_bps;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive SetFeeDestinations message
+    if (op == 0x2b59c1a7) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'staking_pool = in_msg~load_msg_addr();
+        var $msg'treasury = in_msg~load_msg_addr();
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        $self'stakingPoolOwner = $msg'staking_pool;
+        $self'treasuryOwner = $msg'treasury;
+        $self'feeDestinationsActive = true;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive AddExcluded message
+    if (op == 0x5a1c8f01) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'address = in_msg~load_msg_addr();
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        ifnot ($global_isInExcludedChain($msg'address, $self'excludedHead)) {
+            throw_unless(51036, ($self'excludedCount < 64));
+            $self'excludedHead = $global_excludedChainPrepend($self'excludedHead, $msg'address);
+            $self'excludedCount = $self'excludedCount + 1;
+        }
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive RemoveExcluded message
+    if (op == 0x5a1c8f02) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'address = in_msg~load_msg_addr();
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        if ($global_isInExcludedChain($msg'address, $self'excludedHead)) {
+            $self'excludedHead = $global_excludedChainRemove($msg'address, $self'excludedHead);
+            $self'excludedCount = $self'excludedCount - 1;
+        }
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive SetDynamicBurnEnabled message
+    if (op == 0x5a1c8f03) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'enabled = in_msg~load_int(1);
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        $self'dynamicBurnEnabled = $msg'enabled;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive SetDynamicBurnThresholds message
+    if (op == 0x5a1c8f04) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'large_tx_threshold = in_msg~load_varuint16();
+        var $msg'activity_threshold = in_msg~load_int(257);
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        $self'largeTxThreshold = $msg'large_tx_threshold;
+        $self'activityThreshold = $msg'activity_threshold;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive SetAutoReduceParams message
+    if (op == 0x5a1c8f05) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'threshold = in_msg~load_varuint16();
+        var $msg'low_burn_bps = in_msg~load_int(257);
+        var $msg'low_staking_bps = in_msg~load_int(257);
+        var $msg'low_treasury_bps = in_msg~load_int(257);
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        throw_unless(24220, ( (( (( (($msg'low_burn_bps >= 0)) ? (($msg'low_staking_bps >= 0)) : (false) )) ? (($msg'low_treasury_bps >= 0)) : (false) )) ? (((($msg'low_burn_bps + $msg'low_staking_bps) + $msg'low_treasury_bps) <= 500)) : (false) ));
+        $self'autoReduceThreshold = $msg'threshold;
+        $self'lowBurnBps = $msg'low_burn_bps;
+        $self'lowStakingBps = $msg'low_staking_bps;
+        $self'lowTreasuryBps = $msg'low_treasury_bps;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive SetTimelock message
+    if (op == 0x5a1c8f06) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'newTimelock = in_msg~load_msg_addr();
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        $self'timelock = $msg'newTimelock;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive SetGasParams message
+    if (op == 0x5a1c8f07) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'min_ton_fee_path = in_msg~load_varuint16();
+        var $msg'per_internal_deploy_ton = in_msg~load_varuint16();
+        var $msg'gas_pool_forward_min = in_msg~load_varuint16();
+        var $msg'gas_treasury_forward_min = in_msg~load_varuint16();
+        var $msg'gas_burn_notify_ton = in_msg~load_varuint16();
+        var $msg'gas_propagate_ton = in_msg~load_varuint16();
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        var ($gas'minTonFeePath, $gas'perInternalDeployTon, $gas'poolForwardMin, $gas'treasuryForwardMin, $gas'burnNotifyTon, $gas'propagateTon) = $GasParamsView$_constructor_minTonFeePath_perInternalDeployTon_poolForwardMin_treasuryForwardMin_burnNotifyTon_propagateTon($msg'min_ton_fee_path, $msg'per_internal_deploy_ton, $msg'gas_pool_forward_min, $msg'gas_treasury_forward_min, $msg'gas_burn_notify_ton, $msg'gas_propagate_ton);
+        throw_unless(41940, $global_isValidGasParams(($gas'minTonFeePath, $gas'perInternalDeployTon, $gas'poolForwardMin, $gas'treasuryForwardMin, $gas'burnNotifyTon, $gas'propagateTon)));
+        $self'gasMinTonFeePath = $msg'min_ton_fee_path;
+        $self'gasPerInternalDeployTon = $msg'per_internal_deploy_ton;
+        $self'gasPoolFwdMin = $msg'gas_pool_forward_min;
+        $self'gasTreasuryFwdMin = $msg'gas_treasury_forward_min;
+        $self'gasBurnNotify = $msg'gas_burn_notify_ton;
+        $self'gasPropagate = $msg'gas_propagate_ton;
+        $BurnJettonMaster$_contract_store(($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate));
+        return ();
+    }
+    
+    ;; Receive SyncFeeConfigToWallet message
+    if (op == 0x3c8f9013) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'owner = in_msg~load_msg_addr();
+        throw_unless(3095, ( equal_slices_bits(__tact_context_get_sender(), $self'timelock) ));
+        throw_unless(63727, $self'feeDestinationsActive);
+        var ($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw) = __tact_context_get();
+        throw_unless(44320, ($ctx'value > 30000000));
+        ($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)~$BurnJettonMaster$_fun_pushFeeConfigToOwner($msg'queryId, $msg'owner);
+        
+        return ();
+    }
+    
+    ;; Receive PropagateFeeConfigToOwner message
+    if (op == 0x6a3b2c1d) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'sender_owner = in_msg~load_msg_addr();
+        var $msg'recipient_owner = in_msg~load_msg_addr();
+        throw_unless(63727, $self'feeDestinationsActive);
+        throw_unless(50340, ( equal_slices_bits($global_getBurnJettonWalletByOwner($msg'sender_owner), __tact_context_get_sender()) ));
+        ($self'totalSupply, $self'admin, $self'timelock, $self'content, $self'mintable, $self'burnRateBps, $self'stakingRateBps, $self'treasuryRateBps, $self'stakingPoolOwner, $self'treasuryOwner, $self'feeDestinationsActive, $self'excludedHead, $self'excludedCount, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $self'autoReduceThreshold, $self'lowBurnBps, $self'lowStakingBps, $self'lowTreasuryBps, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate)~$BurnJettonMaster$_fun_pushFeeConfigToOwner($msg'queryId, $msg'recipient_owner);
+        
+        return ();
+    }
+    
+    ;; Receive ResolveJettonTransfer message
+    if (op == 0x6a3b2c20) {
+        var $msg'queryId = in_msg~load_uint(64);
+        var $msg'sender_owner = in_msg~load_msg_addr();
+        var $msg'amount = in_msg~load_varuint16();
+        var $msg'destination = in_msg~load_msg_addr();
+        var $msg'responseDestination = in_msg~__tact_load_address_opt();
+        slice sc_1 = in_msg~load_ref().begin_parse();
+        var $msg'forwardTonAmount = sc_1~load_varuint16();
+        var $msg'forwardPayload = sc_1~load_ref();
+        throw_unless(63727, $self'feeDestinationsActive);
+        throw_unless(50340, ( equal_slices_bits($global_getBurnJettonWalletByOwner($msg'sender_owner), __tact_context_get_sender()) ));
+        int $excludedTransfer = ( ($global_isInExcludedChain($msg'sender_owner, $self'excludedHead)) ? (true) : ($global_isInExcludedChain($msg'destination, $self'excludedHead)) );
+        var ($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw) = __tact_context_get();
+        int $cfgPushTon = 40000000;
+        throw_unless(33399, ($ctx'value > ($cfgPushTon + 50000000)));
+        int $low = ($self'totalSupply < $self'autoReduceThreshold);
+        int $effBurn = ($low ? $self'lowBurnBps : $self'burnRateBps);
+        int $effStake = ($low ? $self'lowStakingBps : $self'stakingRateBps);
+        int $effTreas = ($low ? $self'lowTreasuryBps : $self'treasuryRateBps);
+        var ($cfg'queryId, $cfg'burn_rate_bps, $cfg'staking_rate_bps, $cfg'treasury_rate_bps, $cfg'staking_pool, $cfg'treasury, $cfg'dynamic_burn_enabled, $cfg'large_tx_threshold, $cfg'activity_threshold, $cfg'max_burn_rate_bps, $cfg'tx_count_snapshot, $cfg'activity_hour_bucket, $cfg'low_supply_mode, $cfg'excluded_count, $cfg'excluded_head, $cfg'gas_min_ton_fee_path, $cfg'gas_per_internal_deploy_ton, $cfg'gas_pool_forward_min, $cfg'gas_treasury_forward_min, $cfg'gas_burn_notify_ton, $cfg'gas_propagate_ton) = $JettonUpdateFeeConfig$_constructor_queryId_burn_rate_bps_staking_rate_bps_treasury_rate_bps_staking_pool_treasury_dynamic_burn_enabled_large_tx_threshold_activity_threshold_max_burn_rate_bps_tx_count_snapshot_activity_hour_bucket_low_supply_mode_excluded_count_excluded_head_gas_min_ton_fee_path_gas_per_internal_deploy_ton_gas_pool_forward_min_gas_treasury_forward_min_gas_burn_notify_ton_gas_propagate_ton($msg'queryId, $effBurn, $effStake, $effTreas, $self'stakingPoolOwner, $self'treasuryOwner, $self'dynamicBurnEnabled, $self'largeTxThreshold, $self'activityThreshold, $self'maxBurnRateBps, $self'txCountLastHour, $self'activityHourBucket, $low, $self'excludedCount, $self'excludedHead, $self'gasMinTonFeePath, $self'gasPerInternalDeployTon, $self'gasPoolFwdMin, $self'gasTreasuryFwdMin, $self'gasBurnNotify, $self'gasPropagate);
+        $global_message($MessageParameters$_constructor_body_to_value_bounce_mode($JettonUpdateFeeConfig$_store_cell(($cfg'queryId, $cfg'burn_rate_bps, $cfg'staking_rate_bps, $cfg'treasury_rate_bps, $cfg'staking_pool, $cfg'treasury, $cfg'dynamic_burn_enabled, $cfg'large_tx_threshold, $cfg'activity_threshold, $cfg'max_burn_rate_bps, $cfg'tx_count_snapshot, $cfg'activity_hour_bucket, $cfg'low_supply_mode, $cfg'excluded_count, $cfg'excluded_head, $cfg'gas_min_ton_fee_path, $cfg'gas_per_internal_deploy_ton, $cfg'gas_pool_forward_min, $cfg'gas_treasury_forward_min, $cfg'gas_burn_notify_ton, $cfg'gas_propagate_ton), begin_cell()), $global_getBurnJettonWalletByOwner($msg'sender_owner), $cfgPushTon, false, 3));
+        $global_message($MessageParameters$_constructor_body_to_value_bounce_mode($CommitJettonTransfer$_store_cell($CommitJettonTransfer$_constructor_queryId_amount_destination_responseDestination_forwardTonAmount_forwardPayload_excludedTransfer($msg'queryId, $msg'amount, $msg'destination, $msg'responseDestination, $msg'forwardTonAmount, $msg'forwardPayload, $excludedTransfer), begin_cell()), $global_getBurnJettonWalletByOwner($msg'sender_owner), 0, true, 66));
+        
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        if (( ~ equal_slices_bits(__tact_context_get_sender(), $self'timelock) )) {
+            $global_cashback(__tact_context_get_sender());
+        }
+        
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}
+
+
+() __tact_selector_hack_asm() impure asm """
+@atend @ 1 {
+        execute current@ context@ current!
+        {
+            // The core idea of this function is to save gas by avoiding unnecessary dict jump, when recv_internal/recv_external is called
+            // We want to extract recv_internal/recv_external from the dict and select needed function
+            // not by jumping to the needed function by it's index, but by using usual IF statements.
+
+            }END> b> // Close previous builder, now we have a cell of previous code on top of the stack
+
+            <{ // Start of the new code builder
+                SETCP0
+                // Swap the new code builder with the previous code, now we have previous code on top of the stack
+                swap
+                // Transform cell to slice and load first ref from the previous code, now we have the dict on top of the stack
+                <s ref@
+
+                // Extract the recv_internal from the dict
+                dup 0 swap @procdictkeylen idict@ { "internal shortcut error" abort } ifnot
+                swap
+
+                // Delete the recv_internal from the dict
+                0 swap @procdictkeylen idict- drop
+                // Delete the recv_external from the dict (it's okay if it's not there)
+                -1 swap @procdictkeylen idict- drop
+                // Delete the __tact_selector_hack from the dict
+                65535 swap @procdictkeylen idict- drop
+
+                // Bring the code builder from the bottom of the stack
+                // because if recv_external extraction is optional, and the number of elements on the stack is not fixed
+                depth 1- roll
+                // Swap with the dict from which we extracted recv_internal and (maybe) recv_external
+                swap
+
+                // Check if the dict is empty
+                dup null?
+                // Store a copy of this flag in the bottom of the stack
+                dup depth 1- -roll
+                {
+                    // If the dict is empty, just drop it (it will be null if it's empty)
+                    drop
+                }
+                {
+                    // If the dict is not empty, prepare continuation to be stored in c3
+                    <{
+                        // Save this dict as first ref in this continuation, it will be pushed in runtime by DICTPUSHCONST
+                        swap @procdictkeylen DICTPUSHCONST
+                        // Jump to the needed function by it's index
+                        DICTIGETJMPZ
+                        // If such key is not found, throw 11 along with the key as an argument
+                        11 THROWARG
+                    }> PUSHCONT
+                    // Store the continuation in c3
+                    c3 POP
+                } cond
+
+                // Function id is on top of the (runtime) stack
+                DUP IFNOTJMP:<{
+                    // place recv_internal here
+                    DROP swap @addop
+                }>
+
+                // Bring back the flag, indicating if the dict is empty or not from the bottom of the stack
+                depth 1- roll
+                {
+                    // If the dict is empty, throw 11
+                    11 THROWARG
+                }
+                {
+                    // If the dict is not empty, jump to continuation from c3
+                    c3 PUSH JMPX
+                } cond
+            }> b>
+        } : }END>c
+        current@ context! current!
+    } does @atend !
+""";
+
+() __tact_selector_hack() method_id(65535) {
+    return __tact_selector_hack_asm();
+}
