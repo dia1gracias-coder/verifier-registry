@@ -1,0 +1,606 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "NftItem",
+  "author": "@Games Names",
+  "version": "1.5.0",
+  "description": "Permanent transferable @games name with one included deterministic pattern",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToChangeOwnership"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 16,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 17,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 134,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestStaticData"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestMintAcknowledgement"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftItemStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftNameDetails"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "SnakeString"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 26
+    },
+    {
+      "kind": "uintN",
+      "n": 2
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftItemStorageNotInitialized"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MintAcknowledged"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NotificationForNewOwner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseStaticData"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftDataReply"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NameDataReply"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "MintAcknowledged",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1313669123,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "nameHash",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestMintAcknowledgement",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1313669130,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "nameHash",
+          "ty_idx": 22
+        },
+        {
+          "name": "retryCaller",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestStaticData",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 801842850,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseStaticData",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 2339837749,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 22
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NotificationForNewOwner",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 85167505,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "oldOwnerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "payload",
+          "ty_idx": 15,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToChangeOwnership",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1607220500,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newOwnerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 13
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 14
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 15,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftNameDetails",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "name",
+          "ty_idx": 25
+        },
+        {
+          "name": "nameHash",
+          "ty_idx": 22
+        },
+        {
+          "name": "content",
+          "ty_idx": 27
+        },
+        {
+          "name": "category",
+          "ty_idx": 28
+        },
+        {
+          "name": "mintPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "mintedAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftItemStorage",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 22
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "details",
+          "ty_idx": 29
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftItemStorageNotInitialized",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 22
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftDataReply",
+      "ty_idx": 35,
+      "fields": [
+        {
+          "name": "isInitialized",
+          "ty_idx": 5
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 13,
+          "default_value": {
+            "kind": "null"
+          }
+        },
+        {
+          "name": "content",
+          "ty_idx": 36,
+          "default_value": {
+            "kind": "null"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NameDataReply",
+      "ty_idx": 37,
+      "fields": [
+        {
+          "name": "name",
+          "ty_idx": 25
+        },
+        {
+          "name": "nameHash",
+          "ty_idx": 22
+        },
+        {
+          "name": "length",
+          "ty_idx": 38
+        },
+        {
+          "name": "category",
+          "ty_idx": 28
+        },
+        {
+          "name": "mintPrice",
+          "ty_idx": 6
+        },
+        {
+          "name": "mintedAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "SnakeString",
+      "ty_idx": 26,
+      "target_ty_idx": 2,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      },
+      "description": "TEP-62/TEP-64 use a raw snake slice for item content, not the higher-level\n`string` ABI type. Keeping this explicit also makes the generated getter\nsignature identical to the canonical TON NFT implementation."
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 23,
+    "storage_at_deployment_ty_idx": 30
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 34
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102351,
+      "name": "get_nft_data",
+      "parameters": [],
+      "return_ty_idx": 35
+    },
+    {
+      "tvm_method_id": 108928,
+      "name": "get_name_data",
+      "parameters": [],
+      "return_ty_idx": 37
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.TooSmallRestAmount",
+      "err_code": 403
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromCollection",
+      "err_code": 405
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromOwner",
+      "err_code": 406
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.IncorrectForwardPayload",
+      "err_code": 408
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidNameLength",
+      "err_code": 421
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidNameEncoding",
+      "err_code": 422
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidNameCharacter",
+      "err_code": 423
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PendingMintNotFound",
+      "err_code": 435
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidRecipient",
+      "err_code": 437
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NameHashMismatch",
+      "err_code": 438
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
