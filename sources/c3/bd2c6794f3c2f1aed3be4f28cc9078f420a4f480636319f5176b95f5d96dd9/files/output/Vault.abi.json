@@ -1,0 +1,1094 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Vault",
+  "author": "lock-in-wallet",
+  "version": "0.1.0",
+  "description": "Lock-in Wallet vault: schedule, member registry, cauldron (tsTON) with acc counter",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Deposit"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StakeForfeits"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExitNotice"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TrancheCancelled"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TrancheActivated"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Forfeit"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExitReport"
+    },
+    {
+      "kind": "uintN",
+      "n": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransferNotification"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Excesses"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUp"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VaultStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AccountParams"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "uintN",
+      "n": 128
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolDeposit"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExitAck"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreditTranche"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ExitRejected"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "VaultConfigReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WindowState"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LogForfeitStaked"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LogTrancheCancelled"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LogDeposited"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LogExitRejected"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LogExitStarted"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LogTrancheActivated"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LogExited"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "VaultConfigReply",
+      "ty_idx": 37,
+      "fields": [
+        {
+          "name": "period",
+          "ty_idx": 9
+        },
+        {
+          "name": "windowLength",
+          "ty_idx": 9
+        },
+        {
+          "name": "epochStart",
+          "ty_idx": 9
+        },
+        {
+          "name": "pool",
+          "ty_idx": 7
+        },
+        {
+          "name": "tstonMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "vaultTstonWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "memberCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "totalPrincipal",
+          "ty_idx": 6
+        },
+        {
+          "name": "acc",
+          "ty_idx": 30
+        },
+        {
+          "name": "unallocated",
+          "ty_idx": 6
+        },
+        {
+          "name": "forfeitBuffer",
+          "ty_idx": 6
+        },
+        {
+          "name": "pendingStake",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Deposit",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 2514197817,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "deposit: внести `amount` TON; value ≥ amount + POOL_DEPOSIT_FEE + DEPOSIT_GAS."
+    },
+    {
+      "kind": "struct",
+      "name": "StakeForfeits",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 2510051646,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "stake_forfeits: ручной триггер стейка котла (любой отправитель)."
+    },
+    {
+      "kind": "struct",
+      "name": "CreditTranche",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 1558396783,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "principal",
+          "ty_idx": 6
+        },
+        {
+          "name": "acc0",
+          "ty_idx": 30
+        },
+        {
+          "name": "depositedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "description": "credit_tranche: новый транш (+stateInit при первом депозите)."
+    },
+    {
+      "kind": "struct",
+      "name": "ExitAck",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 1338820912,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "mode",
+          "ty_idx": 21
+        },
+        {
+          "name": "bonus",
+          "ty_idx": 6
+        }
+      ],
+      "description": "exit_ack: решение Vault по батчу (mode = MODE_EARLY | MODE_FULL, bonus = tsTON, уже отправленные аккаунту или 0)."
+    },
+    {
+      "kind": "struct",
+      "name": "ExitRejected",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 2688964689,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "nextWindowAt",
+          "ty_idx": 9
+        }
+      ],
+      "description": "exit_rejected: окно закрыто, force_early не задан."
+    },
+    {
+      "kind": "struct",
+      "name": "TrancheCancelled",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 3507580521,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "principal",
+          "ty_idx": 6
+        },
+        {
+          "name": "slot",
+          "ty_idx": 17
+        }
+      ],
+      "description": "tranche_cancelled: депозит в пул отбился (или нет свободного слота: slot = 255),\nтранш удалён, TON возвращён владельцу."
+    },
+    {
+      "kind": "struct",
+      "name": "TrancheActivated",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 417883699,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "slot",
+          "ty_idx": 17
+        },
+        {
+          "name": "principal",
+          "ty_idx": 6
+        },
+        {
+          "name": "tokens",
+          "ty_idx": 6
+        },
+        {
+          "name": "first",
+          "ty_idx": 5
+        }
+      ],
+      "description": "tranche_activated: транш подтверждён стейком; first = аккаунт стал участником."
+    },
+    {
+      "kind": "struct",
+      "name": "ExitNotice",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1527946064,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "slots",
+          "ty_idx": 11
+        },
+        {
+          "name": "principalSum",
+          "ty_idx": 6
+        },
+        {
+          "name": "debtSum",
+          "ty_idx": 15
+        },
+        {
+          "name": "forceEarly",
+          "ty_idx": 5
+        }
+      ],
+      "description": "exit_notice: аккаунт просит решение по батчу."
+    },
+    {
+      "kind": "struct",
+      "name": "Forfeit",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 3166465118,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "forfeit: TON в котёл (неатрибутированный TON при sweep); value ≥ amount + газ."
+    },
+    {
+      "kind": "struct",
+      "name": "ExitReport",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 3610290454,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "mode",
+          "ty_idx": 21
+        },
+        {
+          "name": "slots",
+          "ty_idx": 11
+        },
+        {
+          "name": "payout",
+          "ty_idx": 6
+        },
+        {
+          "name": "forfeit",
+          "ty_idx": 6
+        },
+        {
+          "name": "hasTranches",
+          "ty_idx": 5
+        }
+      ],
+      "description": "exit_report: выплата произведена; forfeit — TON в котёл (value ≥ forfeit + газ)."
+    },
+    {
+      "kind": "struct",
+      "name": "TopUp",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 880884598,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "top_up: пополнить баланс контракта (Vault или аккаунт); пустое тело тоже принимается."
+    },
+    {
+      "kind": "struct",
+      "name": "LogDeposited",
+      "ty_idx": 41,
+      "prefix": {
+        "prefix_num": 2243183434,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "account",
+          "ty_idx": 7
+        },
+        {
+          "name": "principal",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Депозит принят Vault'ом, транш ещё стейкается (слот назначит аккаунт)."
+    },
+    {
+      "kind": "struct",
+      "name": "LogTrancheActivated",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 3562614458,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "slot",
+          "ty_idx": 17
+        },
+        {
+          "name": "principal",
+          "ty_idx": 6
+        },
+        {
+          "name": "tokens",
+          "ty_idx": 6
+        },
+        {
+          "name": "memberJoined",
+          "ty_idx": 5
+        },
+        {
+          "name": "memberCount",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Транш подтверждён стейком: с этого момента он существует в слоте."
+    },
+    {
+      "kind": "struct",
+      "name": "LogTrancheCancelled",
+      "ty_idx": 40,
+      "prefix": {
+        "prefix_num": 497034976,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "principal",
+          "ty_idx": 6
+        },
+        {
+          "name": "slot",
+          "ty_idx": 17
+        }
+      ],
+      "description": "Депозит не удался (bounce пула или нет слота: slot = 255), principal снят с total_principal."
+    },
+    {
+      "kind": "struct",
+      "name": "LogExitStarted",
+      "ty_idx": 43,
+      "prefix": {
+        "prefix_num": 1926621642,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "mode",
+          "ty_idx": 21
+        },
+        {
+          "name": "slots",
+          "ty_idx": 11
+        },
+        {
+          "name": "principalSum",
+          "ty_idx": 6
+        },
+        {
+          "name": "bonus",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LogExitRejected",
+      "ty_idx": 42,
+      "prefix": {
+        "prefix_num": 2670399262,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "nextWindowAt",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LogExited",
+      "ty_idx": 45,
+      "prefix": {
+        "prefix_num": 1914733888,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "mode",
+          "ty_idx": 21
+        },
+        {
+          "name": "slots",
+          "ty_idx": 11
+        },
+        {
+          "name": "payout",
+          "ty_idx": 6
+        },
+        {
+          "name": "forfeit",
+          "ty_idx": 6
+        },
+        {
+          "name": "hasTranches",
+          "ty_idx": 5
+        },
+        {
+          "name": "memberCount",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LogForfeitStaked",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 877365742,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AccountParams",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "pool",
+          "ty_idx": 7
+        },
+        {
+          "name": "tstonMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "tstonWalletCode",
+          "ty_idx": 3
+        }
+      ],
+      "description": "Неизменяемые параметры протокола; одна ячейка, общая для Vault и всех аккаунтов (init-данные)."
+    },
+    {
+      "kind": "struct",
+      "name": "VaultStorage",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "period",
+          "ty_idx": 9
+        },
+        {
+          "name": "windowLength",
+          "ty_idx": 9
+        },
+        {
+          "name": "epochStart",
+          "ty_idx": 9
+        },
+        {
+          "name": "accountCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "accountParams",
+          "ty_idx": 29
+        },
+        {
+          "name": "memberCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "totalPrincipal",
+          "ty_idx": 6
+        },
+        {
+          "name": "acc",
+          "ty_idx": 30
+        },
+        {
+          "name": "unallocated",
+          "ty_idx": 6
+        },
+        {
+          "name": "forfeitBuffer",
+          "ty_idx": 6
+        },
+        {
+          "name": "pendingStake",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PoolDeposit",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1205158801,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "deposit#47d54391 query_id:uint64 — депозит TON в пул; пул удерживает 1 TON и возвращает excesses."
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransfer",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "destination",
+          "ty_idx": 7
+        },
+        {
+          "name": "responseDestination",
+          "ty_idx": 23
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 36
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransferNotification",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "from",
+          "ty_idx": 23
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Excesses",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WindowState",
+      "ty_idx": 38,
+      "fields": [
+        {
+          "name": "isOpen",
+          "ty_idx": 5
+        },
+        {
+          "name": "index",
+          "ty_idx": 9
+        },
+        {
+          "name": "openedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "closesAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "nextWindowAt",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Состояние расписания окон вывода (DESIGN §2.3): окно открыто,\nкогда (now − epoch_start) mod period < window_length."
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 27
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 39
+    },
+    {
+      "body_ty_idx": 40
+    },
+    {
+      "body_ty_idx": 41
+    },
+    {
+      "body_ty_idx": 42
+    },
+    {
+      "body_ty_idx": 43
+    },
+    {
+      "body_ty_idx": 44
+    },
+    {
+      "body_ty_idx": 45
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 103798,
+      "name": "get_config",
+      "parameters": [],
+      "return_ty_idx": 37
+    },
+    {
+      "tvm_method_id": 102945,
+      "name": "get_window",
+      "parameters": [],
+      "return_ty_idx": 38
+    },
+    {
+      "tvm_method_id": 68369,
+      "name": "get_account_address",
+      "parameters": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotTstonWallet",
+      "err_code": 103
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotMemberAccount",
+      "err_code": 104
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DepositTooSmall",
+      "err_code": 110
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotEnoughGas",
+      "err_code": 111
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BadConfig",
+      "err_code": 118
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PrincipalUnderflow",
+      "err_code": 119
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongWorkchain",
+      "err_code": 120
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
