@@ -1,0 +1,179 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        7,
+        6
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        1
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [],
+  "storage": {},
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 86520,
+      "name": "publicKey",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 101849,
+      "name": "paymentInfo",
+      "parameters": [],
+      "return_ty_idx": 12
+    },
+    {
+      "tvm_method_id": 129134,
+      "name": "commentLimits",
+      "parameters": [],
+      "return_ty_idx": 13
+    },
+    {
+      "tvm_method_id": 87531,
+      "name": "maxBatch",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 100093,
+      "name": "processed",
+      "parameters": [
+        {
+          "name": "queryId",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 5
+    },
+    {
+      "tvm_method_id": 78904,
+      "name": "windowParams",
+      "parameters": [],
+      "return_ty_idx": 14,
+      "description": "Параметры окна: (сколько живёт сообщение, допуск часов, период ротации).\nСервис читает их отсюда, а не хардкодит: от MESSAGE_TTL зависит, когда\nбезопасно переподписывать."
+    },
+    {
+      "tvm_method_id": 72741,
+      "name": "lastCleaned",
+      "parameters": [],
+      "return_ty_idx": 1,
+      "description": "Когда в последний раз крутили поколения. Для диагностики."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "constant",
+      "name": "ERROR_INVALID_SIGNATURE",
+      "description": "Подпись не прошла проверку ed25519 против нужного ключа. Нересторимо.",
+      "err_code": 35
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_EXPIRED",
+      "description": "createdAt вышел из окна валидности. Переподписать с ТЕМ ЖЕ query_id.",
+      "err_code": 36
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_CREATED_IN_FUTURE",
+      "description": "createdAt из будущего дальше CLOCK_SKEW. Нересторимо: врут часы подписанта.",
+      "err_code": 37
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_ALREADY_EXECUTED",
+      "description": "query_id уже исполнен. Ровно это защищает от двойной выплаты.",
+      "err_code": 38
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_COMMENT_TOO_LONG",
+      "description": "Комментарий не влезает в отведённый бюджет.",
+      "err_code": 40
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_COMMENT_MALFORMED",
+      "description": "Комментарий не линейная цепочка: у ячейки больше одного рефа.",
+      "err_code": 41
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_BATCH_TOO_LARGE",
+      "description": "В батче больше MAX_BATCH элементов.",
+      "err_code": 42
+    },
+    {
+      "kind": "constant",
+      "name": "ERROR_UNKNOWN_OP",
+      "description": "Неизвестный админский op-код.",
+      "err_code": 43
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}
