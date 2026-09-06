@@ -1,0 +1,182 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Stellar",
+  "author": "Prgnstctr",
+  "version": "1.0.0",
+  "description": "Append-only XLM investment calculation storage with owner-controlled updates",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StakingMessage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CalculationRecord"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 13
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "StakingMessage",
+      "ty_idx": 12,
+      "fields": [
+        {
+          "name": "principal",
+          "ty_idx": 11
+        },
+        {
+          "name": "apyBasisPoints",
+          "ty_idx": 9
+        },
+        {
+          "name": "dailyRate",
+          "ty_idx": 9
+        },
+        {
+          "name": "periodSeconds",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CalculationRecord",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "timestamp",
+          "ty_idx": 11
+        },
+        {
+          "name": "principal",
+          "ty_idx": 11
+        },
+        {
+          "name": "apyBasisPoints",
+          "ty_idx": 9
+        },
+        {
+          "name": "dailyRate",
+          "ty_idx": 9
+        },
+        {
+          "name": "periodSeconds",
+          "ty_idx": 9
+        },
+        {
+          "name": "stakingGains",
+          "ty_idx": 11
+        },
+        {
+          "name": "priceAppreciation",
+          "ty_idx": 11
+        },
+        {
+          "name": "totalGain",
+          "ty_idx": 11
+        },
+        {
+          "name": "finalValue",
+          "ty_idx": 11
+        },
+        {
+          "name": "netGainBps",
+          "ty_idx": 9
+        },
+        {
+          "name": "prevHead",
+          "ty_idx": 3
+        }
+      ]
+    }
+  ],
+  "storage": {},
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102025,
+      "name": "getOwner",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 123003,
+      "name": "getCalculations",
+      "parameters": [],
+      "return_ty_idx": 14
+    },
+    {
+      "tvm_method_id": 90859,
+      "name": "getLatestCalculation",
+      "parameters": [],
+      "return_ty_idx": 13
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotAuthorized",
+      "err_code": 100
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 101
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
