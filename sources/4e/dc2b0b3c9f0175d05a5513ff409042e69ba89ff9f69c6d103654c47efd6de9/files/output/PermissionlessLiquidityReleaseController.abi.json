@@ -1,0 +1,2539 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "PermissionlessLiquidityReleaseController",
+  "author": "Diamond Club",
+  "version": "3.0.0",
+  "description": "Immutable permissionless market-priced NEW/TON liquidity release controller with protocol fee",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BindPermissionlessReleaseAssets"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessBoundNewJetton"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessBoundDex"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferNotificationForRecipient"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 21,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 136,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 22,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 137,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransferFailed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StonPoolDataResponse"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseWalletAddress"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 7
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestSecondPriceObservation"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RetryPriceObservation"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RetryDiamondWalletDiscovery"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockIntentRegistered"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RetryLockIntentRegistration"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PtonTonTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PtonTonRefund"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockConfirmed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RetryReserveBootstrap"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReplayReserveReady"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReconcileExpiredRelease"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PruneTerminalRelease"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SweepDiamond"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FlushProtocolTonFees"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUpTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessLiquidityReleaseControllerStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessControllerConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessControllerAuthorities"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 50
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessAssetConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessAssetMasters"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 53
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessAssetWallets"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 55
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 52
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessDexConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessExecutionDexConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessExecutionRouterConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 60
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessExecutionLiquidityConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 62
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 59
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessPricePoolConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessPricePoolAddresses"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 66
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 65
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 58
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessLimitsConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleaseRules"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessProtocolFeeConfig"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 72
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessPoolDepthRules"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 75
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 71
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessGasConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessObservationGasConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 79
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessDexGasConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 81
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 78
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 70
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 49
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessControllerDynamic"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleaseOperation"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleaseParties"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleasePartiesPrimary"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 89
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleasePartiesRefund"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 91
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 88
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleaseAmounts"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 94
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleaseObservations"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessPoolSnapshot"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 97
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 98
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 96
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleaseLifecycle"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 101
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 87
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 103
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessDiamondSweepRecord"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 105
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 106
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessProtocolFeeAccounting"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 108
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 86
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestWalletAddress"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleaseAccepted"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RegisterLockIntent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockIntentParties"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 115
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockIntentTerms"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 117
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnTonPrincipal"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StonLpAccountRefund"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReserveReady"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProtocolTonFeePayout"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProtocolTonFeesFlushed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessControllerSummaryReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessReleaseOperationReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PermissionlessProtocolFeeQuoteReply"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 19,
+      "target_ty_idx": 20
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 112,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 18
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 37
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 19,
+          "client_ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferNotificationForRecipient",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferInitiator",
+          "ty_idx": 18
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 19,
+          "client_ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransferFailed",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1247035974,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 40,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestWalletAddress",
+      "ty_idx": 111,
+      "prefix": {
+        "prefix_num": 745978227,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "includeOwnerAddress",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseWalletAddress",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 3513996288,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonWalletAddress",
+          "ty_idx": 18
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 29
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReserveReady",
+      "ty_idx": 121,
+      "prefix": {
+        "prefix_num": 1205883903,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "reserveAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUpTons",
+      "ty_idx": 47,
+      "prefix": {
+        "prefix_num": 3547469196,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessBoundNewJetton",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "masterAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "expectedReserveSupply",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessBoundDex",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "newTonPoolAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "lpAccountAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "newWalletIsToken0",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BindPermissionlessReleaseAssets",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 2252523018,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "oldControllerWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "collectorDiamondWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "newJetton",
+          "ty_idx": 14
+        },
+        {
+          "name": "dex",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestSecondPriceObservation",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1369931009,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RetryPriceObservation",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1369931010,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        },
+        {
+          "name": "round",
+          "ty_idx": 32
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RetryDiamondWalletDiscovery",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 1369931011,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleaseAccepted",
+      "ty_idx": 113,
+      "prefix": {
+        "prefix_num": 1369931012,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "clientQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        },
+        {
+          "name": "protocolFeeTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "secondObservationAfter",
+          "ty_idx": 11
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FlushProtocolTonFees",
+      "ty_idx": 46,
+      "prefix": {
+        "prefix_num": 1369931014,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProtocolTonFeePayout",
+      "ty_idx": 122,
+      "prefix": {
+        "prefix_num": 1369931015,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "feeAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProtocolTonFeesFlushed",
+      "ty_idx": 123,
+      "prefix": {
+        "prefix_num": 1369931016,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "feeAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StonPoolDataResponse",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 652163580,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "isLocked",
+          "ty_idx": 5
+        },
+        {
+          "name": "reserve0",
+          "ty_idx": 6
+        },
+        {
+          "name": "reserve1",
+          "ty_idx": 6
+        },
+        {
+          "name": "token0Address",
+          "ty_idx": 7
+        },
+        {
+          "name": "token1Address",
+          "ty_idx": 7
+        },
+        {
+          "name": "additionalData",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessControllerAuthorities",
+      "ty_idx": 50,
+      "fields": [
+        {
+          "name": "bootstrapAdmin",
+          "ty_idx": 18
+        },
+        {
+          "name": "diamondCollector",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessAssetMasters",
+      "ty_idx": 53,
+      "fields": [
+        {
+          "name": "oldDiamondMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "newJettonMaster",
+          "ty_idx": 18
+        },
+        {
+          "name": "expectedReserveSupply",
+          "ty_idx": 6
+        },
+        {
+          "name": "standardNewWalletCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessAssetWallets",
+      "ty_idx": 55,
+      "fields": [
+        {
+          "name": "controllerDiamondWallet",
+          "ty_idx": 18
+        },
+        {
+          "name": "collectorDiamondWallet",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessAssetConfig",
+      "ty_idx": 52,
+      "fields": [
+        {
+          "name": "masters",
+          "ty_idx": 54
+        },
+        {
+          "name": "wallets",
+          "ty_idx": 56
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessExecutionRouterConfig",
+      "ty_idx": 60,
+      "fields": [
+        {
+          "name": "routerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "routerPtonWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "ptonMasterAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessExecutionLiquidityConfig",
+      "ty_idx": 62,
+      "fields": [
+        {
+          "name": "lockerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "newTonPoolAddress",
+          "ty_idx": 18
+        },
+        {
+          "name": "lpAccountAddress",
+          "ty_idx": 18
+        },
+        {
+          "name": "newWalletIsToken0",
+          "ty_idx": 5
+        },
+        {
+          "name": "stonLpWalletCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessExecutionDexConfig",
+      "ty_idx": 59,
+      "fields": [
+        {
+          "name": "router",
+          "ty_idx": 61
+        },
+        {
+          "name": "liquidity",
+          "ty_idx": 63
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessPricePoolAddresses",
+      "ty_idx": 66,
+      "fields": [
+        {
+          "name": "poolAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "assetRouterWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "ptonRouterWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessPricePoolConfig",
+      "ty_idx": 65,
+      "fields": [
+        {
+          "name": "addresses",
+          "ty_idx": 67
+        },
+        {
+          "name": "routerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "assetIsToken0",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessDexConfig",
+      "ty_idx": 58,
+      "fields": [
+        {
+          "name": "execution",
+          "ty_idx": 64
+        },
+        {
+          "name": "diamondPricePool",
+          "ty_idx": 68
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessPoolDepthRules",
+      "ty_idx": 75,
+      "fields": [
+        {
+          "name": "minDiamondPoolTonReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "minNewPoolTonReserve",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessProtocolFeeConfig",
+      "ty_idx": 72,
+      "fields": [
+        {
+          "name": "feeBps",
+          "ty_idx": 73
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleaseRules",
+      "ty_idx": 71,
+      "fields": [
+        {
+          "name": "minTonContribution",
+          "ty_idx": 6
+        },
+        {
+          "name": "protocolFee",
+          "ty_idx": 74
+        },
+        {
+          "name": "poolDepths",
+          "ty_idx": 76
+        },
+        {
+          "name": "bootstrapTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "bootstrapNewAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "bootstrapMinLpOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "bootstrapBeneficiary",
+          "ty_idx": 7
+        },
+        {
+          "name": "maxStoredOperations",
+          "ty_idx": 9
+        },
+        {
+          "name": "maxPendingSweeps",
+          "ty_idx": 9
+        },
+        {
+          "name": "observationWindowSeconds",
+          "ty_idx": 9
+        },
+        {
+          "name": "maxSnapshotSkewSeconds",
+          "ty_idx": 9
+        },
+        {
+          "name": "maxPriceDeviationBps",
+          "ty_idx": 73
+        },
+        {
+          "name": "maxInputImbalanceBps",
+          "ty_idx": 73
+        },
+        {
+          "name": "lpSlippageBps",
+          "ty_idx": 73
+        },
+        {
+          "name": "maxIntentLifetime",
+          "ty_idx": 9
+        },
+        {
+          "name": "terminalRetention",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessObservationGasConfig",
+      "ty_idx": 79,
+      "fields": [
+        {
+          "name": "operationGasDeposit",
+          "ty_idx": 6
+        },
+        {
+          "name": "feeFlushGasDeposit",
+          "ty_idx": 6
+        },
+        {
+          "name": "poolQueryMessageValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "walletDiscoveryMessageValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "lockIntentMessageValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "refundMessageValue",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessDexGasConfig",
+      "ty_idx": 81,
+      "fields": [
+        {
+          "name": "newWalletMessageValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "newForwardTonValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "ptonForwardTonValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "ptonFeeValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "dexPayloadForwardTonValue",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessGasConfig",
+      "ty_idx": 78,
+      "fields": [
+        {
+          "name": "observation",
+          "ty_idx": 80
+        },
+        {
+          "name": "dex",
+          "ty_idx": 82
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessLimitsConfig",
+      "ty_idx": 70,
+      "fields": [
+        {
+          "name": "rules",
+          "ty_idx": 77
+        },
+        {
+          "name": "gas",
+          "ty_idx": 83
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessControllerConfig",
+      "ty_idx": 49,
+      "fields": [
+        {
+          "name": "authorities",
+          "ty_idx": 51
+        },
+        {
+          "name": "assets",
+          "ty_idx": 57
+        },
+        {
+          "name": "dex",
+          "ty_idx": 69
+        },
+        {
+          "name": "limits",
+          "ty_idx": 84
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleasePartiesPrimary",
+      "ty_idx": 89,
+      "fields": [
+        {
+          "name": "clientQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "beneficiary",
+          "ty_idx": 7
+        },
+        {
+          "name": "beneficiaryLpWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleasePartiesRefund",
+      "ty_idx": 91,
+      "fields": [
+        {
+          "name": "tonRefundAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "diamondOwner",
+          "ty_idx": 7
+        },
+        {
+          "name": "diamondOwnerWallet",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleaseParties",
+      "ty_idx": 88,
+      "fields": [
+        {
+          "name": "primary",
+          "ty_idx": 90
+        },
+        {
+          "name": "refund",
+          "ty_idx": 92
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleaseAmounts",
+      "ty_idx": 94,
+      "fields": [
+        {
+          "name": "diamondAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "protocolFeeTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "newAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "minLpOut",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessPoolSnapshot",
+      "ty_idx": 97,
+      "fields": [
+        {
+          "name": "assetReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "tonReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalLpSupply",
+          "ty_idx": 6
+        },
+        {
+          "name": "observedAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleaseObservations",
+      "ty_idx": 96,
+      "fields": [
+        {
+          "name": "firstNew",
+          "ty_idx": 99
+        },
+        {
+          "name": "firstDiamond",
+          "ty_idx": 99
+        },
+        {
+          "name": "secondNew",
+          "ty_idx": 99
+        },
+        {
+          "name": "secondDiamond",
+          "ty_idx": 99
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleaseLifecycle",
+      "ty_idx": 101,
+      "fields": [
+        {
+          "name": "createdAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "firstCompletedAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "secondRequestedAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 11
+        },
+        {
+          "name": "terminalAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "refundRequestedAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "failureCode",
+          "ty_idx": 73
+        },
+        {
+          "name": "status",
+          "ty_idx": 32
+        },
+        {
+          "name": "bootstrap",
+          "ty_idx": 5
+        },
+        {
+          "name": "lockIntentRegistered",
+          "ty_idx": 5
+        },
+        {
+          "name": "newCommitted",
+          "ty_idx": 5
+        },
+        {
+          "name": "newRecovered",
+          "ty_idx": 5
+        },
+        {
+          "name": "tonRecovered",
+          "ty_idx": 5
+        },
+        {
+          "name": "diamondReturnPending",
+          "ty_idx": 5
+        },
+        {
+          "name": "diamondReturned",
+          "ty_idx": 5
+        },
+        {
+          "name": "tonReturned",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleaseOperation",
+      "ty_idx": 87,
+      "fields": [
+        {
+          "name": "parties",
+          "ty_idx": 93
+        },
+        {
+          "name": "amounts",
+          "ty_idx": 95
+        },
+        {
+          "name": "observations",
+          "ty_idx": 100
+        },
+        {
+          "name": "lifecycle",
+          "ty_idx": 102
+        },
+        {
+          "name": "lpAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessDiamondSweepRecord",
+      "ty_idx": 105,
+      "fields": [
+        {
+          "name": "diamondAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessProtocolFeeAccounting",
+      "ty_idx": 108,
+      "fields": [
+        {
+          "name": "accruedTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalAccruedTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalFlushedTon",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessControllerDynamic",
+      "ty_idx": 86,
+      "fields": [
+        {
+          "name": "operations",
+          "ty_idx": 104
+        },
+        {
+          "name": "pendingSweeps",
+          "ty_idx": 107
+        },
+        {
+          "name": "nextOperationId",
+          "ty_idx": 11
+        },
+        {
+          "name": "storedOperations",
+          "ty_idx": 9
+        },
+        {
+          "name": "pendingSweepsCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "bootstrapOperationId",
+          "ty_idx": 11
+        },
+        {
+          "name": "pendingReleasedNew",
+          "ty_idx": 6
+        },
+        {
+          "name": "sweepableDiamond",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalLockedDiamond",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalReleasedNew",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalLockedLp",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalRejectedDiamond",
+          "ty_idx": 6
+        },
+        {
+          "name": "protocolFees",
+          "ty_idx": 109
+        },
+        {
+          "name": "reserveReady",
+          "ty_idx": 5
+        },
+        {
+          "name": "initialLiquidityReady",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessLiquidityReleaseControllerStorage",
+      "ty_idx": 48,
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 85
+        },
+        {
+          "name": "dynamic",
+          "ty_idx": 110
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessControllerSummaryReply",
+      "ty_idx": 124,
+      "fields": [
+        {
+          "name": "bound",
+          "ty_idx": 5
+        },
+        {
+          "name": "permissionlessReady",
+          "ty_idx": 5
+        },
+        {
+          "name": "reserveReady",
+          "ty_idx": 5
+        },
+        {
+          "name": "initialLiquidityReady",
+          "ty_idx": 5
+        },
+        {
+          "name": "nextOperationId",
+          "ty_idx": 11
+        },
+        {
+          "name": "storedOperations",
+          "ty_idx": 9
+        },
+        {
+          "name": "pendingSweepsCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "bootstrapOperationId",
+          "ty_idx": 11
+        },
+        {
+          "name": "pendingReleasedNew",
+          "ty_idx": 6
+        },
+        {
+          "name": "remainingNew",
+          "ty_idx": 6
+        },
+        {
+          "name": "sweepableDiamond",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalLockedDiamond",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalReleasedNew",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalLockedLp",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalRejectedDiamond",
+          "ty_idx": 6
+        },
+        {
+          "name": "protocolFeeBps",
+          "ty_idx": 73
+        },
+        {
+          "name": "protocolFeeRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "accruedProtocolFeeTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalAccruedProtocolFeeTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalFlushedProtocolFeeTon",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessReleaseOperationReply",
+      "ty_idx": 125,
+      "fields": [
+        {
+          "name": "exists",
+          "ty_idx": 5
+        },
+        {
+          "name": "status",
+          "ty_idx": 32
+        },
+        {
+          "name": "bootstrap",
+          "ty_idx": 5
+        },
+        {
+          "name": "clientQueryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "beneficiary",
+          "ty_idx": 18
+        },
+        {
+          "name": "diamondOwner",
+          "ty_idx": 18
+        },
+        {
+          "name": "diamondOwnerWallet",
+          "ty_idx": 18
+        },
+        {
+          "name": "tonRefundAddress",
+          "ty_idx": 18
+        },
+        {
+          "name": "diamondAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "protocolFeeTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "newAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "minLpOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "firstCompletedAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "secondRequestedAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 11
+        },
+        {
+          "name": "terminalAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "failureCode",
+          "ty_idx": 73
+        },
+        {
+          "name": "lockIntentRegistered",
+          "ty_idx": 5
+        },
+        {
+          "name": "newCommitted",
+          "ty_idx": 5
+        },
+        {
+          "name": "newRecovered",
+          "ty_idx": 5
+        },
+        {
+          "name": "tonRecovered",
+          "ty_idx": 5
+        },
+        {
+          "name": "diamondReturnPending",
+          "ty_idx": 5
+        },
+        {
+          "name": "diamondReturned",
+          "ty_idx": 5
+        },
+        {
+          "name": "tonReturned",
+          "ty_idx": 5
+        },
+        {
+          "name": "refundRequestedAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "lpAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PermissionlessProtocolFeeQuoteReply",
+      "ty_idx": 126,
+      "fields": [
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "protocolFeeBps",
+          "ty_idx": 73
+        },
+        {
+          "name": "protocolFeeTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "operationGasDeposit",
+          "ty_idx": 6
+        },
+        {
+          "name": "requiredAttachedTon",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockIntentParties",
+      "ty_idx": 115,
+      "fields": [
+        {
+          "name": "beneficiary",
+          "ty_idx": 7
+        },
+        {
+          "name": "beneficiaryLpWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "controllerAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockIntentTerms",
+      "ty_idx": 117,
+      "fields": [
+        {
+          "name": "protocolVersion",
+          "ty_idx": 32
+        },
+        {
+          "name": "minLpOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 11
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "lockSeconds",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RegisterLockIntent",
+      "ty_idx": 114,
+      "prefix": {
+        "prefix_num": 1973967921,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parties",
+          "ty_idx": 116
+        },
+        {
+          "name": "terms",
+          "ty_idx": 118
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockIntentRegistered",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 788666000,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RetryLockIntentRegistration",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 1170870109,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockConfirmed",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 1226670717,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        },
+        {
+          "name": "lpAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "unlockAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReconcileExpiredRelease",
+      "ty_idx": 43,
+      "prefix": {
+        "prefix_num": 1698839506,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PruneTerminalRelease",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 3921966327,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SweepDiamond",
+      "ty_idx": 45,
+      "prefix": {
+        "prefix_num": 4044236170,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "diamondAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnTonPrincipal",
+      "ty_idx": 119,
+      "prefix": {
+        "prefix_num": 343806669,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReplayReserveReady",
+      "ty_idx": 42,
+      "prefix": {
+        "prefix_num": 1806357934,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RetryReserveBootstrap",
+      "ty_idx": 41,
+      "prefix": {
+        "prefix_num": 1436268449,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PtonTonTransfer",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 32736093,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "refundAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 37
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PtonTonRefund",
+      "ty_idx": 38,
+      "prefix": {
+        "prefix_num": 2921715614,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StonLpAccountRefund",
+      "ty_idx": 120,
+      "prefix": {
+        "prefix_num": 321624620,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "leftPayload",
+          "ty_idx": 37
+        },
+        {
+          "name": "rightPayload",
+          "ty_idx": 37
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 48
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 36
+    },
+    {
+      "body_ty_idx": 38
+    },
+    {
+      "body_ty_idx": 39
+    },
+    {
+      "body_ty_idx": 40
+    },
+    {
+      "body_ty_idx": 41
+    },
+    {
+      "body_ty_idx": 42
+    },
+    {
+      "body_ty_idx": 43
+    },
+    {
+      "body_ty_idx": 44
+    },
+    {
+      "body_ty_idx": 45
+    },
+    {
+      "body_ty_idx": 46
+    },
+    {
+      "body_ty_idx": 47
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 3
+    },
+    {
+      "body_ty_idx": 111
+    },
+    {
+      "body_ty_idx": 112
+    },
+    {
+      "body_ty_idx": 113
+    },
+    {
+      "body_ty_idx": 114
+    },
+    {
+      "body_ty_idx": 36
+    },
+    {
+      "body_ty_idx": 119
+    },
+    {
+      "body_ty_idx": 120
+    },
+    {
+      "body_ty_idx": 121
+    },
+    {
+      "body_ty_idx": 122
+    },
+    {
+      "body_ty_idx": 123
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 103210,
+      "name": "get_permissionless_controller_summary",
+      "parameters": [],
+      "return_ty_idx": 124
+    },
+    {
+      "tvm_method_id": 123507,
+      "name": "get_permissionless_release_operation",
+      "parameters": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 125
+    },
+    {
+      "tvm_method_id": 126302,
+      "name": "get_permissionless_controller_config",
+      "parameters": [],
+      "return_ty_idx": 49
+    },
+    {
+      "tvm_method_id": 119928,
+      "name": "get_permissionless_protocol_fee_quote",
+      "parameters": [
+        {
+          "name": "tonAmount",
+          "ty_idx": 6
+        }
+      ],
+      "return_ty_idx": 126
+    },
+    {
+      "tvm_method_id": 113385,
+      "name": "get_permissionless_reserve_wallet_address",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 86366,
+      "name": "get_permissionless_router_new_wallet_address",
+      "parameters": [],
+      "return_ty_idx": 7
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotEnoughGas",
+      "err_code": 48
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 49
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotValidWallet",
+      "err_code": 74
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSupply",
+      "err_code": 402
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadySealed",
+      "err_code": 405
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotSealed",
+      "err_code": 406
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotCollector",
+      "err_code": 421
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotBootstrapAdmin",
+      "err_code": 422
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidOperationId",
+      "err_code": 423
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OperationNotFound",
+      "err_code": 425
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidOperationState",
+      "err_code": 426
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.Expired",
+      "err_code": 427
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidAmount",
+      "err_code": 429
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.HardCap",
+      "err_code": 430
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DuplicateInput",
+      "err_code": 432
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongInputSource",
+      "err_code": 433
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotRefundable",
+      "err_code": 435
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotPrunable",
+      "err_code": 436
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SweepBalance",
+      "err_code": 437
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SweepPending",
+      "err_code": 438
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.UnexpectedConfirmation",
+      "err_code": 439
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidPoolSource",
+      "err_code": 452
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.LockIntentNotRegistered",
+      "err_code": 461
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ObservationTooEarly",
+      "err_code": 471
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidPoolResponse",
+      "err_code": 472
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PoolLocked",
+      "err_code": 473
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WalletDiscoveryPending",
+      "err_code": 477
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BootstrapComplete",
+      "err_code": 479
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PoolTooShallow",
+      "err_code": 480
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NoProtocolFees",
+      "err_code": 481
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.UnknownOp",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
