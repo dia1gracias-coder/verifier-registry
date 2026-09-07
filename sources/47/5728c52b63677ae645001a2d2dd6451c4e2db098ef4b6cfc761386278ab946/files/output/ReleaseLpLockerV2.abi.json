@@ -1,0 +1,1349 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "ReleaseLpLockerV2",
+  "author": "Diamond Club",
+  "version": "1.1.0",
+  "description": "Immutable LP locker with confirmed 180-day withdrawal and beneficiary-approved slot transfers",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BindLockerController"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BoundLockerAsset"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RegisterLockIntent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockIntentParties"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockIntentTerms"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferNotificationForRecipient"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 25,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 135,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 26,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 136,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposeSlotTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AcceptSlotTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelSlotTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PruneExpiredSlotTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawSlot"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReplayLockAck"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PruneExpiredLockIntent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUpTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReleaseLpLockerStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockerConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockerAuthorities"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 40
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockerAssetConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 42
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 39
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockerDynamicState"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockIntent"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 46
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 47
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockSlot"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingSlotTransfer"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 50
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 51
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 49
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 53
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingWithdrawal"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 55
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 56
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 45
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockConfirmed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockIntentRegistered"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawConfirmed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockerSummaryReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockIntentReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockerConfigReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LockSlotReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SlotTransferReply"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 23,
+      "target_ty_idx": 24
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 61,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 22
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 62
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 23,
+          "client_ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferNotificationForRecipient",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferInitiator",
+          "ty_idx": 22
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 23,
+          "client_ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUpTons",
+      "ty_idx": 37,
+      "prefix": {
+        "prefix_num": 3547469196,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "BindLockerController",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 2508427397,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "controllerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "asset",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BoundLockerAsset",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "lpJettonMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "poolAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "lockerLpWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockIntentParties",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "beneficiary",
+          "ty_idx": 7
+        },
+        {
+          "name": "beneficiaryLpWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "controllerAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockIntentTerms",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "protocolVersion",
+          "ty_idx": 19
+        },
+        {
+          "name": "minLpOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 11
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "lockSeconds",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RegisterLockIntent",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1973967921,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "parties",
+          "ty_idx": 17
+        },
+        {
+          "name": "terms",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockIntentRegistered",
+      "ty_idx": 60,
+      "prefix": {
+        "prefix_num": 788666000,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PruneExpiredLockIntent",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 1944784529,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockConfirmed",
+      "ty_idx": 59,
+      "prefix": {
+        "prefix_num": 1226670717,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        },
+        {
+          "name": "lpAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "unlockAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawSlot",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 513700036,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ProposeSlotTransfer",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 3885244686,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newBeneficiary",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AcceptSlotTransfer",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 150256974,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CancelSlotTransfer",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 3479732105,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PruneExpiredSlotTransfer",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 1573604400,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawConfirmed",
+      "ty_idx": 63,
+      "prefix": {
+        "prefix_num": 522994162,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        },
+        {
+          "name": "lpAmount",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReplayLockAck",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 80032153,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockerAuthorities",
+      "ty_idx": 40,
+      "fields": [
+        {
+          "name": "bootstrapAdmin",
+          "ty_idx": 22
+        },
+        {
+          "name": "controllerAddress",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockerAssetConfig",
+      "ty_idx": 42,
+      "fields": [
+        {
+          "name": "lpJettonMaster",
+          "ty_idx": 22
+        },
+        {
+          "name": "poolAddress",
+          "ty_idx": 22
+        },
+        {
+          "name": "lpWalletCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "lockerLpWallet",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockerConfig",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "authorities",
+          "ty_idx": 41
+        },
+        {
+          "name": "asset",
+          "ty_idx": 43
+        },
+        {
+          "name": "withdrawWalletMessageValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "slotTransferMessageValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "slotStorageDeposit",
+          "ty_idx": 6
+        },
+        {
+          "name": "maxSlots",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockSlot",
+      "ty_idx": 49,
+      "fields": [
+        {
+          "name": "originBeneficiary",
+          "ty_idx": 7
+        },
+        {
+          "name": "beneficiary",
+          "ty_idx": 7
+        },
+        {
+          "name": "lpAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "unlockAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "pendingTransfer",
+          "ty_idx": 52
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockIntent",
+      "ty_idx": 46,
+      "fields": [
+        {
+          "name": "beneficiary",
+          "ty_idx": 7
+        },
+        {
+          "name": "beneficiaryLpWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "minLpOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 11
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingWithdrawal",
+      "ty_idx": 55,
+      "fields": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        },
+        {
+          "name": "beneficiaryLpWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "lpAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "initiatedAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingSlotTransfer",
+      "ty_idx": 50,
+      "fields": [
+        {
+          "name": "newBeneficiary",
+          "ty_idx": 7
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockerDynamicState",
+      "ty_idx": 45,
+      "fields": [
+        {
+          "name": "lockIntents",
+          "ty_idx": 48
+        },
+        {
+          "name": "slots",
+          "ty_idx": 54
+        },
+        {
+          "name": "pendingWithdrawals",
+          "ty_idx": 57
+        },
+        {
+          "name": "lockIntentsCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "slotsCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "pendingSlotTransfersCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "totalLockedLp",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalWithdrawnLp",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReleaseLpLockerStorage",
+      "ty_idx": 38,
+      "fields": [
+        {
+          "name": "config",
+          "ty_idx": 44
+        },
+        {
+          "name": "dynamic",
+          "ty_idx": 58
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockerSummaryReply",
+      "ty_idx": 64,
+      "fields": [
+        {
+          "name": "sealed",
+          "ty_idx": 5
+        },
+        {
+          "name": "lockIntentsCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "slotsCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "pendingSlotTransfersCount",
+          "ty_idx": 9
+        },
+        {
+          "name": "totalLockedLp",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalWithdrawnLp",
+          "ty_idx": 6
+        },
+        {
+          "name": "lockSeconds",
+          "ty_idx": 9
+        },
+        {
+          "name": "slotTransferAcceptanceSeconds",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockIntentReply",
+      "ty_idx": 65,
+      "fields": [
+        {
+          "name": "exists",
+          "ty_idx": 5
+        },
+        {
+          "name": "beneficiary",
+          "ty_idx": 22
+        },
+        {
+          "name": "beneficiaryLpWallet",
+          "ty_idx": 22
+        },
+        {
+          "name": "minLpOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "deadline",
+          "ty_idx": 11
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockSlotReply",
+      "ty_idx": 67,
+      "fields": [
+        {
+          "name": "exists",
+          "ty_idx": 5
+        },
+        {
+          "name": "originBeneficiary",
+          "ty_idx": 22
+        },
+        {
+          "name": "beneficiary",
+          "ty_idx": 22
+        },
+        {
+          "name": "beneficiaryLpWallet",
+          "ty_idx": 22
+        },
+        {
+          "name": "lpAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "createdAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "unlockAt",
+          "ty_idx": 11
+        },
+        {
+          "name": "withdrawPending",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SlotTransferReply",
+      "ty_idx": 68,
+      "fields": [
+        {
+          "name": "exists",
+          "ty_idx": 5
+        },
+        {
+          "name": "newBeneficiary",
+          "ty_idx": 22
+        },
+        {
+          "name": "expiresAt",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LockerConfigReply",
+      "ty_idx": 66,
+      "fields": [
+        {
+          "name": "bootstrapAdmin",
+          "ty_idx": 22
+        },
+        {
+          "name": "controllerAddress",
+          "ty_idx": 22
+        },
+        {
+          "name": "lpJettonMaster",
+          "ty_idx": 22
+        },
+        {
+          "name": "poolAddress",
+          "ty_idx": 22
+        },
+        {
+          "name": "lpWalletCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "lockerLpWallet",
+          "ty_idx": 22
+        },
+        {
+          "name": "withdrawWalletMessageValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "slotTransferMessageValue",
+          "ty_idx": 6
+        },
+        {
+          "name": "slotStorageDeposit",
+          "ty_idx": 6
+        },
+        {
+          "name": "maxSlots",
+          "ty_idx": 9
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 38
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 36
+    },
+    {
+      "body_ty_idx": 37
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 59
+    },
+    {
+      "body_ty_idx": 60
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 61
+    },
+    {
+      "body_ty_idx": 63
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 128659,
+      "name": "get_locker_summary",
+      "parameters": [],
+      "return_ty_idx": 64
+    },
+    {
+      "tvm_method_id": 107267,
+      "name": "get_lock_intent",
+      "parameters": [
+        {
+          "name": "operationId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 65
+    },
+    {
+      "tvm_method_id": 97720,
+      "name": "get_locker_config",
+      "parameters": [],
+      "return_ty_idx": 66
+    },
+    {
+      "tvm_method_id": 120347,
+      "name": "get_lock_slot",
+      "parameters": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 67
+    },
+    {
+      "tvm_method_id": 99659,
+      "name": "get_slot_transfer",
+      "parameters": [
+        {
+          "name": "slotId",
+          "ty_idx": 11
+        }
+      ],
+      "return_ty_idx": 68
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotEnoughGas",
+      "err_code": 48
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessage",
+      "err_code": 49
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongWorkchain",
+      "err_code": 333
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadySealed",
+      "err_code": 405
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotBootstrapAdmin",
+      "err_code": 422
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.Expired",
+      "err_code": 427
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidAmount",
+      "err_code": 429
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.HardCap",
+      "err_code": 430
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongInputSource",
+      "err_code": 433
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.LockerNotBound",
+      "err_code": 450
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidLpSource",
+      "err_code": 451
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidPoolSource",
+      "err_code": 452
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidLockPayload",
+      "err_code": 453
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlotExists",
+      "err_code": 454
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlotNotFound",
+      "err_code": 455
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlotLocked",
+      "err_code": 456
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotBeneficiary",
+      "err_code": 457
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WithdrawPending",
+      "err_code": 458
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WithdrawNotPending",
+      "err_code": 459
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongConfirmationWallet",
+      "err_code": 460
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.LockIntentNotRegistered",
+      "err_code": 461
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.LockIntentMismatch",
+      "err_code": 462
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.LockIntentNotExpired",
+      "err_code": 463
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlotTransferNotPending",
+      "err_code": 464
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlotTransferExpired",
+      "err_code": 465
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlotTransferSameBeneficiary",
+      "err_code": 466
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotProposedBeneficiary",
+      "err_code": 467
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.UnknownOp",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
