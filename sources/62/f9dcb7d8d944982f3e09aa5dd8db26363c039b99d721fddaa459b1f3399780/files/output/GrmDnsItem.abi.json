@@ -1,0 +1,898 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "GrmDnsItem",
+  "author": "Grm DNS",
+  "version": "1.0.0",
+  "description": "Grm DNS domain. TEP-62, TEP-64 and TEP-81 compliant",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RelayBid"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransferNotification"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 16,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 135,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 17,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 136,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FinalizeAuction"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestStaticData"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToChangeOwnership"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeDnsRecord"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrmDnsItemStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AuctionInfo"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 29
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DomainWallet"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 31
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrmDnsItemStorageNotInitialized"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestFunds"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RejectBid"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonBurn"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NotificationForNewOwner"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseStaticData"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NftDataReply"
+    },
+    {
+      "kind": "addressAny"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AuctionInfoReply"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        24
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToChangeOwnership",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1607220500,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newOwnerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 23
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 24
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 15,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NotificationForNewOwner",
+      "ty_idx": 38,
+      "prefix": {
+        "prefix_num": 85167505,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "oldOwnerAddress",
+          "ty_idx": 23
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 15,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestStaticData",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 801842850,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseStaticData",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 2339837749,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 26
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeDnsRecord",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1320284409,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "key",
+          "ty_idx": 26
+        },
+        {
+          "name": "value",
+          "ty_idx": 24
+        }
+      ],
+      "description": "Deleting a record is the same message with no value reference."
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransfer",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "destination",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 23
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 24
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 15,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonBurn",
+      "ty_idx": 37,
+      "prefix": {
+        "prefix_num": 1499400124,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 23
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransferNotification",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "senderAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 15,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RelayBid",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1735552257,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "bidder",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "domain",
+          "ty_idx": 3
+        },
+        {
+          "name": "grmWallet",
+          "ty_idx": 7
+        }
+      ],
+      "description": "The collection relays the FIRST bid on a name, deploying the domain contract\non the way. Every later bid is paid straight into the domain's own GRM\nwallet and never passes through the collection.\n\n`grmWallet` is the domain's own jetton wallet address. The collection can\nderive it because it knows the GRM master and the wallet code; the domain\ncannot, so it is told once and remembers it."
+    },
+    {
+      "kind": "struct",
+      "name": "RequestFunds",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 1735552258,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 26
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "bidder",
+          "ty_idx": 7,
+          "description": "Where the leftover TON goes. A jetton wallet sends transfer change to\n`sendExcessesTo`, and it must reach whoever paid rather than pile up on\nthe domain as dead weight."
+        }
+      ],
+      "description": "The domain accepted the first bid and asks the collection to hand over the\nGRM that came with it."
+    },
+    {
+      "kind": "struct",
+      "name": "RejectBid",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 1735552259,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 26
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "bidder",
+          "ty_idx": 7
+        }
+      ],
+      "description": "The domain already exists, so this bid should have gone straight to it.\nThe collection gives the money back."
+    },
+    {
+      "kind": "struct",
+      "name": "FinalizeAuction",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1735552260,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Closes a finished auction. Anyone may send it."
+    },
+    {
+      "kind": "struct",
+      "name": "AuctionInfo",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "maxBidAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "maxBidAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "auctionEndTime",
+          "ty_idx": 11
+        },
+        {
+          "name": "isFunded",
+          "ty_idx": 5
+        }
+      ],
+      "description": "`isFunded` is false in the short window between a first bid being accepted\nand the GRM actually arriving from the collection. Competing bids are\nrefunded during that window: the domain cannot pay back a leader whose money\nis still in flight."
+    },
+    {
+      "kind": "struct",
+      "name": "GrmDnsItemStorageNotInitialized",
+      "ty_idx": 33,
+      "fields": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 26
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrmDnsItemStorage",
+      "ty_idx": 27,
+      "fields": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 26
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 23
+        },
+        {
+          "name": "content",
+          "ty_idx": 3
+        },
+        {
+          "name": "domain",
+          "ty_idx": 3
+        },
+        {
+          "name": "auction",
+          "ty_idx": 30
+        },
+        {
+          "name": "lastFillUpTime",
+          "ty_idx": 11
+        },
+        {
+          "name": "wallet",
+          "ty_idx": 32,
+          "description": "This domain's own GRM wallet. Every bid after the first one is paid\nstraight into it, and refunds and the final burn leave from it.\nKept behind a reference: index, collection, owner and wallet are four\naddresses' worth of bits and would not fit in one cell."
+        }
+      ],
+      "description": "`ownerAddress` is null while an auction is running: an unclaimed domain has\nno owner and resolves to nothing."
+    },
+    {
+      "kind": "struct",
+      "name": "DomainWallet",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "grmWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NftDataReply",
+      "ty_idx": 40,
+      "fields": [
+        {
+          "name": "isInitialized",
+          "ty_idx": 1,
+          "description": "TEP-62 описывает это поле как int, поэтому здесь int, а не bool."
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 41
+        },
+        {
+          "name": "content",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AuctionInfoReply",
+      "ty_idx": 42,
+      "fields": [
+        {
+          "name": "maxBidAddress",
+          "ty_idx": 41
+        },
+        {
+          "name": "maxBidAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "auctionEndTime",
+          "ty_idx": 1
+        },
+        {
+          "name": "isFunded",
+          "ty_idx": 5
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 27,
+    "storage_at_deployment_ty_idx": 33
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 25
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 36
+    },
+    {
+      "body_ty_idx": 37
+    },
+    {
+      "body_ty_idx": 38
+    },
+    {
+      "body_ty_idx": 39
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102351,
+      "name": "get_nft_data",
+      "parameters": [],
+      "return_ty_idx": 40
+    },
+    {
+      "tvm_method_id": 90228,
+      "name": "get_editor",
+      "parameters": [],
+      "return_ty_idx": 41
+    },
+    {
+      "tvm_method_id": 119378,
+      "name": "get_domain",
+      "parameters": [],
+      "return_ty_idx": 2,
+      "description": "\"alice\" — without the \".grm\" suffix, same as TON DNS."
+    },
+    {
+      "tvm_method_id": 80697,
+      "name": "get_auction_info",
+      "parameters": [],
+      "return_ty_idx": 42
+    },
+    {
+      "tvm_method_id": 91481,
+      "name": "get_last_fill_up_time",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 94010,
+      "name": "get_grm_wallet",
+      "parameters": [],
+      "return_ty_idx": 7,
+      "description": "This domain's own GRM wallet, where its live bid is held."
+    },
+    {
+      "tvm_method_id": 69440,
+      "name": "get_expiration_time",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 123660,
+      "name": "dnsresolve",
+      "parameters": [
+        {
+          "name": "subdomain",
+          "ty_idx": 2
+        },
+        {
+          "name": "category",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 43,
+      "description": "TEP-81. Returns the number of consumed bits and the matching record."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.DnsBadSubdomain",
+      "err_code": 70
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWorkchain",
+      "err_code": 333
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromOwner",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TooSmallRestAmount",
+      "err_code": 402
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromCollection",
+      "err_code": 403
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotInitialized",
+      "err_code": 405
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AuctionInProgress",
+      "err_code": 406
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AuctionNotStarted",
+      "err_code": 407
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AuctionNotFinished",
+      "err_code": 408
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DomainExpired",
+      "err_code": 409
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DnsBadContent",
+      "err_code": 412
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DnsNoZeroByte",
+      "err_code": 413
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ReservedRecord",
+      "err_code": 416
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongJettonWallet",
+      "err_code": 501
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
