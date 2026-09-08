@@ -1,0 +1,853 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "GrmDnsCollection",
+  "author": "Grm DNS",
+  "version": "2.0.0",
+  "description": "Grm DNS collection and .grm resolver. TEP-62, TEP-66 and TEP-81 compliant",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransferNotification"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 14,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 15,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 134,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestFunds"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RejectBid"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestRoyaltyParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RescueJettons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawTon"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeOwner"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeContent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeRoyalty"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoyaltyParams"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrmDnsCollectionStorage"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "dict"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 34
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RelayBid"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseRoyaltyParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionDataReply"
+    },
+    {
+      "kind": "addressAny"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrmConfigReply"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        33
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "dict",
+      "ty_idx": 32,
+      "target_ty_idx": 33,
+      "description": "Think of it as \"a map with unknown keys and unknown values\".\nPrefer using `map<K, V>`, not `dict`."
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestRoyaltyParams",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1765620048,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseRoyaltyParams",
+      "ty_idx": 38,
+      "prefix": {
+        "prefix_num": 2831876269,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "royaltyParams",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransfer",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "destination",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 25
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 33
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 13,
+          "client_ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransferNotification",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "senderAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 13,
+          "client_ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RelayBid",
+      "ty_idx": 37,
+      "prefix": {
+        "prefix_num": 1735552257,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "bidder",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "domain",
+          "ty_idx": 3
+        },
+        {
+          "name": "grmWallet",
+          "ty_idx": 7
+        }
+      ],
+      "description": "The collection relays the FIRST bid on a name, deploying the domain contract\non the way. Every later bid is paid straight into the domain's own GRM\nwallet and never passes through the collection.\n\n`grmWallet` is the domain's own jetton wallet address. The collection can\nderive it because it knows the GRM master and the wallet code; the domain\ncannot, so it is told once and remembers it."
+    },
+    {
+      "kind": "struct",
+      "name": "RequestFunds",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1735552258,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 19
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "bidder",
+          "ty_idx": 7,
+          "description": "Where the leftover TON goes. A jetton wallet sends transfer change to\n`sendExcessesTo`, and it must reach whoever paid rather than pile up on\nthe domain as dead weight."
+        }
+      ],
+      "description": "The domain accepted the first bid and asks the collection to hand over the\nGRM that came with it."
+    },
+    {
+      "kind": "struct",
+      "name": "RejectBid",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1735552259,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 19
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "bidder",
+          "ty_idx": 7
+        }
+      ],
+      "description": "The domain already exists, so this bid should have gone straight to it.\nThe collection gives the money back."
+    },
+    {
+      "kind": "struct",
+      "name": "RescueJettons",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1735552274,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "walletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Rescues foreign jettons sent to the collection by mistake. Refuses to touch\nthe GRM wallet, whose balance backs the live bids."
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawTon",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1735552275,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeOwner",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 1735552276,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newOwnerAddress",
+          "ty_idx": 25
+        }
+      ],
+      "description": "Passing null renounces ownership permanently."
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeContent",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1735552277,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newContent",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeRoyalty",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 1735552278,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newRoyalty",
+          "ty_idx": 30
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RoyaltyParams",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "numerator",
+          "ty_idx": 29
+        },
+        {
+          "name": "denominator",
+          "ty_idx": 29
+        },
+        {
+          "name": "royaltyAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonConfig",
+      "ty_idx": 34,
+      "fields": [
+        {
+          "name": "grmMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "grmWalletCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "royalty",
+          "ty_idx": 30,
+          "description": "Kept here rather than in the root: a root cell holds only four\nreferences and the domain registry took one of them."
+        }
+      ],
+      "description": "The collection stores the GRM master and the code of its jetton wallets,\nwhich is enough to derive the GRM wallet address of any owner — its own and\nevery domain's. Nothing has to be configured after deployment."
+    },
+    {
+      "kind": "struct",
+      "name": "GrmDnsCollectionStorage",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 25
+        },
+        {
+          "name": "mintedCount",
+          "ty_idx": 11,
+          "description": "Number of domains created. It grows exactly when a freshly deployed\ndomain confirms its first bid: a re-auction after expiry never goes\nthrough the collection and so never touches this counter."
+        },
+        {
+          "name": "domainIndex",
+          "ty_idx": 32,
+          "description": "Sequential number -> name hash. Makes `get_nft_address_by_index` behave\nthe way TEP-62 expects: by an index from 0 to mintedCount-1 rather than\nby a hash. Without it the count in `get_collection_data` would be a lie,\nbecause an indexer walking the numbers would get addresses of contracts\nthat do not exist."
+        },
+        {
+          "name": "content",
+          "ty_idx": 3
+        },
+        {
+          "name": "itemCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "jetton",
+          "ty_idx": 35
+        }
+      ],
+      "description": "`ownerAddress` is null once ownership has been renounced, after which no\nadministrative message can ever be accepted again."
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionDataReply",
+      "ty_idx": 40,
+      "fields": [
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "collectionContent",
+          "ty_idx": 3
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 41
+        }
+      ],
+      "description": "Ответы геттеров отдают `any_address`, а не `address?`. Пустое значение в\nTEP-62 это `addr_none` — slice из двух нулевых бит, а не TVM null: клиенты\nчитают эти поля как slice всегда, и null на стеке ломает их разбор."
+    },
+    {
+      "kind": "struct",
+      "name": "GrmConfigReply",
+      "ty_idx": 42,
+      "fields": [
+        {
+          "name": "grmMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "grmWallet",
+          "ty_idx": 7
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 31
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 36
+    },
+    {
+      "body_ty_idx": 37
+    },
+    {
+      "body_ty_idx": 38
+    },
+    {
+      "body_ty_idx": 39
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102491,
+      "name": "get_collection_data",
+      "parameters": [],
+      "return_ty_idx": 40
+    },
+    {
+      "tvm_method_id": 93393,
+      "name": "get_domains_count",
+      "parameters": [],
+      "return_ty_idx": 1,
+      "description": "Number of domains created. Same value as `next_item_index`, exposed\nseparately for convenience."
+    },
+    {
+      "tvm_method_id": 92067,
+      "name": "get_nft_address_by_index",
+      "parameters": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 7,
+      "description": "TEP-62: a sequential index from 0 to `next_item_index - 1`, not a name\nhash. To look a domain up by name use `get_domain_address`."
+    },
+    {
+      "tvm_method_id": 68445,
+      "name": "get_nft_content",
+      "parameters": [
+        {
+          "name": "_itemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "individualNftContent",
+          "ty_idx": 3
+        }
+      ],
+      "return_ty_idx": 3,
+      "description": "Domain metadata lives entirely on the domain contract."
+    },
+    {
+      "tvm_method_id": 85719,
+      "name": "royalty_params",
+      "parameters": [],
+      "return_ty_idx": 28
+    },
+    {
+      "tvm_method_id": 127265,
+      "name": "get_grm_config",
+      "parameters": [],
+      "return_ty_idx": 42
+    },
+    {
+      "tvm_method_id": 80015,
+      "name": "get_grm_wallet_of",
+      "parameters": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7,
+      "description": "The GRM wallet this contract believes any owner has.\n\nRun this against the real GRM master's `get_wallet_address` before going\nlive. If the two disagree, the stored wallet code is wrong and no bid would\never be recognised."
+    },
+    {
+      "tvm_method_id": 73417,
+      "name": "get_domain_price",
+      "parameters": [
+        {
+          "name": "charCount",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1,
+      "description": "Starting price of a domain of `charCount` characters, in nanoGRM."
+    },
+    {
+      "tvm_method_id": 77809,
+      "name": "get_domain_address",
+      "parameters": [
+        {
+          "name": "domain",
+          "ty_idx": 2
+        }
+      ],
+      "return_ty_idx": 7,
+      "description": "Address of the domain contract for a plain name such as \"vadvek\"."
+    },
+    {
+      "tvm_method_id": 123660,
+      "name": "dnsresolve",
+      "parameters": [
+        {
+          "name": "subdomain",
+          "ty_idx": 2
+        },
+        {
+          "name": "_category",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 43,
+      "description": "TEP-81. Hands resolution over to the domain contract."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.DnsBadSubdomain",
+      "err_code": 70
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWorkchain",
+      "err_code": 333
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromOwner",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromItem",
+      "err_code": 404
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DnsNoZeroByte",
+      "err_code": 413
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFound",
+      "err_code": 417
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongJettonWallet",
+      "err_code": 501
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.GrmWalletLocked",
+      "err_code": 503
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
