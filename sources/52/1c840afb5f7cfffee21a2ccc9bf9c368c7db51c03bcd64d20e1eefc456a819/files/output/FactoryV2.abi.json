@@ -1,0 +1,1060 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "FactoryV2",
+  "author": "GRAMDESKS",
+  "version": "2.0.0",
+  "description": "Launchpad factory: deploys RewardMaster, RewardVault, FeeSplitter and Curve for a new coin in one transaction, wires them, opens the curve and performs the creator's first buy. Codes and roles change through a 48 h timelock; an admin premint migrates an existing coin.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CreateLaunch"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 7
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FeeSplits"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 15,
+      "stack_type_id": 131,
+      "stack_width": 5
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Premint"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 6
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetFactoryPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetFactoryConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CurveDefaults"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ProposeFactoryChange"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ApplyFactoryChange"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUpTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryRoles"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 34
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryRoutes"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 36
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryGovernance"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryCodes"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryCodesMore"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 40
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 39
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryProposal"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 43
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 44
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 38
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WireMaster"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OpenCurve"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PremintCoins"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Buy"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryDataReply"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 43,
+      "stack_type_id": 137,
+      "stack_width": 4
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LaunchAddresses"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LaunchAddressesMore"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 55
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 57
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LaunchCreatedEvent"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 54
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FactoryChangedEvent"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUpTons",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 3547469196,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "CreateLaunch",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1178664961,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "metadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "rewards",
+          "ty_idx": 14
+        },
+        {
+          "name": "firstBuyTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "splits",
+          "ty_idx": 17,
+          "description": "Admin only: fee split of this launch. Null = factory default."
+        },
+        {
+          "name": "premint",
+          "ty_idx": 21,
+          "description": "Admin only: migration premint (see factory-types.Premint)."
+        }
+      ],
+      "description": "Creator -> Factory. `rewards` lists the reward jetton masters (0 = pending, 1 = single,\n2..5 = cycle), each one whitelisted in the config. `firstBuyTon` is spent on the curve for the\ncreator before anyone else can trade. Value must cover launchFee + firstBuyTon + LAUNCH_GAS\n(+ premint.seedTon + holders × PREMINT_VALUE for an admin premint)."
+    },
+    {
+      "kind": "struct",
+      "name": "SetFactoryPaused",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1178664976,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetFactoryConfig",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1178664977,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "config",
+          "ty_idx": 28
+        }
+      ],
+      "description": "Admin: applies right away (bounded by asserts; only future launches are affected)."
+    },
+    {
+      "kind": "struct",
+      "name": "ProposeFactoryChange",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1178664979,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "kind",
+          "ty_idx": 13
+        },
+        {
+          "name": "payload",
+          "ty_idx": 3
+        }
+      ],
+      "description": "Admin: propose new codes (kind = PROPOSAL_CODES, payload = Cell<FactoryCodes>) or new roles\n(kind = PROPOSAL_ROLES, payload = Cell<RolesProposal>); applicable after FACTORY_DELAY."
+    },
+    {
+      "kind": "struct",
+      "name": "ApplyFactoryChange",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1178664980,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Admin: apply the pending proposal once its delay elapsed."
+    },
+    {
+      "kind": "struct",
+      "name": "LaunchCreatedEvent",
+      "ty_idx": 59,
+      "fields": [
+        {
+          "name": "seq",
+          "ty_idx": 11
+        },
+        {
+          "name": "creator",
+          "ty_idx": 7
+        },
+        {
+          "name": "addresses",
+          "ty_idx": 60
+        },
+        {
+          "name": "rewardCount",
+          "ty_idx": 13
+        },
+        {
+          "name": "firstBuyTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "codeVersion",
+          "ty_idx": 16
+        },
+        {
+          "name": "preminted",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryChangedEvent",
+      "ty_idx": 61,
+      "fields": [
+        {
+          "name": "kind",
+          "ty_idx": 13
+        },
+        {
+          "name": "applied",
+          "ty_idx": 5
+        },
+        {
+          "name": "readyAt",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Emitted when a change is proposed (applied = false, readyAt = when it can be applied) and when it is applied."
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryRoles",
+      "ty_idx": 34,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "keeper",
+          "ty_idx": 7,
+          "description": "Keeper of every RewardVault created (bounded conversions)."
+        },
+        {
+          "name": "protocol",
+          "ty_idx": 7,
+          "description": "Protocol treasury: launch fees, graduation fees, protocol share of coin fees."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryRoutes",
+      "ty_idx": 36,
+      "fields": [
+        {
+          "name": "pot",
+          "ty_idx": 7
+        },
+        {
+          "name": "buyback",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CurveDefaults",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "feeBps",
+          "ty_idx": 16
+        },
+        {
+          "name": "curveSupply",
+          "ty_idx": 6
+        },
+        {
+          "name": "poolSupply",
+          "ty_idx": 6
+        },
+        {
+          "name": "graduationTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "graduationFee",
+          "ty_idx": 6
+        },
+        {
+          "name": "minBuy",
+          "ty_idx": 6
+        },
+        {
+          "name": "poolLpFeeBps",
+          "ty_idx": 16
+        },
+        {
+          "name": "poolProtocolFeeBps",
+          "ty_idx": 16
+        },
+        {
+          "name": "virtualTon0",
+          "ty_idx": 6
+        },
+        {
+          "name": "virtualToken0",
+          "ty_idx": 6
+        },
+        {
+          "name": "sellOutGraduation",
+          "ty_idx": 5,
+          "description": "D4-2: when true `graduationTon` may be unreachable (the curve graduates on sell-out, the UI says so)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryConfig",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "launchFee",
+          "ty_idx": 6,
+          "description": "Fixed fee paid to the protocol per launch."
+        },
+        {
+          "name": "vaultReserve",
+          "ty_idx": 6,
+          "description": "TON kept by each RewardVault (storage + gas headroom)."
+        },
+        {
+          "name": "vaultPendingTimeout",
+          "ty_idx": 9
+        },
+        {
+          "name": "minSplit",
+          "ty_idx": 6,
+          "description": "Minimum accrued fee before a FeeSplitter splits."
+        },
+        {
+          "name": "minProtocolBps",
+          "ty_idx": 16,
+          "description": "Floor of the protocol share in every FeeSplitter (default splits and later SetSplits)."
+        },
+        {
+          "name": "splits",
+          "ty_idx": 15
+        },
+        {
+          "name": "curve",
+          "ty_idx": 26
+        },
+        {
+          "name": "dexVault",
+          "ty_idx": 7,
+          "description": "DeDust native vault + pools whitelisted for every RewardVault (swap bodies are built on-chain)."
+        },
+        {
+          "name": "dexPools",
+          "ty_idx": 27
+        },
+        {
+          "name": "rewardWhitelist",
+          "ty_idx": 27,
+          "description": "Reward jetton masters a launch may pay dividends in (D4-4)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryCodes",
+      "ty_idx": 39,
+      "fields": [
+        {
+          "name": "master",
+          "ty_idx": 3
+        },
+        {
+          "name": "vault",
+          "ty_idx": 3
+        },
+        {
+          "name": "splitter",
+          "ty_idx": 3
+        },
+        {
+          "name": "more",
+          "ty_idx": 41
+        }
+      ],
+      "description": "Codes of the deployed contracts (4 refs) + the RewardWallet code handed to the vault."
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryCodesMore",
+      "ty_idx": 40,
+      "fields": [
+        {
+          "name": "curve",
+          "ty_idx": 3
+        },
+        {
+          "name": "wallet",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Premint",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "holders",
+          "ty_idx": 19
+        },
+        {
+          "name": "sold",
+          "ty_idx": 6
+        },
+        {
+          "name": "seedTon",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Admin-only launch option (migration of an existing coin): `holders` receive their coins outside the\ncurve, which starts as if `sold` coins had been bought for `seedTon` TON (attached by the admin)."
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryProposal",
+      "ty_idx": 43,
+      "fields": [
+        {
+          "name": "kind",
+          "ty_idx": 13
+        },
+        {
+          "name": "payload",
+          "ty_idx": 3
+        },
+        {
+          "name": "readyAt",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryGovernance",
+      "ty_idx": 38,
+      "fields": [
+        {
+          "name": "codes",
+          "ty_idx": 42
+        },
+        {
+          "name": "proposal",
+          "ty_idx": 45
+        }
+      ],
+      "description": "Sub-cell: what the timelock governs (the root cell is limited to 4 refs)."
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryStorage",
+      "ty_idx": 33,
+      "fields": [
+        {
+          "name": "seq",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "roles",
+          "ty_idx": 35
+        },
+        {
+          "name": "routes",
+          "ty_idx": 37
+        },
+        {
+          "name": "config",
+          "ty_idx": 28
+        },
+        {
+          "name": "gov",
+          "ty_idx": 46
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FactoryDataReply",
+      "ty_idx": 52,
+      "fields": [
+        {
+          "name": "seq",
+          "ty_idx": 1
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "roles",
+          "ty_idx": 34
+        },
+        {
+          "name": "routes",
+          "ty_idx": 36
+        },
+        {
+          "name": "config",
+          "ty_idx": 24
+        },
+        {
+          "name": "proposal",
+          "ty_idx": 53
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LaunchAddresses",
+      "ty_idx": 54,
+      "fields": [
+        {
+          "name": "master",
+          "ty_idx": 7
+        },
+        {
+          "name": "vault",
+          "ty_idx": 7
+        },
+        {
+          "name": "more",
+          "ty_idx": 56
+        }
+      ],
+      "description": "Addresses of the four contracts of launch `seq`."
+    },
+    {
+      "kind": "struct",
+      "name": "LaunchAddressesMore",
+      "ty_idx": 55,
+      "fields": [
+        {
+          "name": "splitter",
+          "ty_idx": 7
+        },
+        {
+          "name": "curve",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "FeeSplits",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "holdersBps",
+          "ty_idx": 16
+        },
+        {
+          "name": "protocolBps",
+          "ty_idx": 16
+        },
+        {
+          "name": "potBps",
+          "ty_idx": 16
+        },
+        {
+          "name": "buybackBps",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OpenCurve",
+      "ty_idx": 48,
+      "prefix": {
+        "prefix_num": 1129644033,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Factory -> Curve, once: start accepting trades."
+    },
+    {
+      "kind": "struct",
+      "name": "Buy",
+      "ty_idx": 50,
+      "prefix": {
+        "prefix_num": 1129644034,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "minOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 51
+        }
+      ],
+      "description": "Anyone -> Curve. Buy coin with the attached TON (minus BUY_GAS). Coins go to `recipient`\n(the sender when null — the Factory uses it for the creator's first buy)."
+    },
+    {
+      "kind": "struct",
+      "name": "WireMaster",
+      "ty_idx": 47,
+      "prefix": {
+        "prefix_num": 1381433360,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "curve",
+          "ty_idx": 7
+        },
+        {
+          "name": "vault",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Factory -> Master, once."
+    },
+    {
+      "kind": "struct",
+      "name": "PremintCoins",
+      "ty_idx": 49,
+      "prefix": {
+        "prefix_num": 1381433396,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Factory -> Master (admin premint at launch): mint `amount` to `to` outside the curve."
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 33
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 32
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 47
+    },
+    {
+      "body_ty_idx": 48
+    },
+    {
+      "body_ty_idx": 49
+    },
+    {
+      "body_ty_idx": 50
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 31
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 59
+    },
+    {
+      "body_ty_idx": 61
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 76063,
+      "name": "get_factory_data",
+      "parameters": [],
+      "return_ty_idx": 52
+    },
+    {
+      "tvm_method_id": 110230,
+      "name": "get_factory_codes",
+      "parameters": [],
+      "return_ty_idx": 39
+    },
+    {
+      "tvm_method_id": 111390,
+      "name": "get_launch_addresses",
+      "parameters": [
+        {
+          "name": "seq",
+          "ty_idx": 11
+        },
+        {
+          "name": "metadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "rewards",
+          "ty_idx": 14
+        },
+        {
+          "name": "splits",
+          "ty_idx": 58
+        },
+        {
+          "name": "premint",
+          "ty_idx": 21
+        }
+      ],
+      "return_ty_idx": 54,
+      "description": "Deterministic addresses of a launch, computable before it happens.\n`splits` / `premint` = null for a regular launch, or the admin overrides used for that launch."
+    },
+    {
+      "tvm_method_id": 107037,
+      "name": "get_code_version",
+      "parameters": [],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWorkchain",
+      "err_code": 333
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromAdmin",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NothingPending",
+      "err_code": 446
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DestNotWhitelisted",
+      "err_code": 449
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PendingNotExpired",
+      "err_code": 454
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidParams",
+      "err_code": 458
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSplits",
+      "err_code": 481
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.TooManyRewards",
+      "err_code": 484
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.FactoryPaused",
+      "err_code": 488
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.LaunchFeeUnpaid",
+      "err_code": 489
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
