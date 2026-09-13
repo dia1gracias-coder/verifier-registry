@@ -1,0 +1,687 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "DeskMinter",
+  "author": "GRAMDESKS",
+  "version": "0.1.0",
+  "description": "Public mint: burns a fixed $DESK deposit, splits the TON surcharge between Pot and protocol, and asks the Collection to deploy the desk.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferNotificationForRecipient"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 16,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 17,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 134,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeployDeskOk"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RetryDeploy"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RetryBurn"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetDeskMinterPaused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetDeskMinterConfig"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeskMinterConfig"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeDeskMinterAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeskMinterStorage"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 9,
+      "value_ty_idx": 7
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeployDesk"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToBurn"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PotTopUp"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeskMinterDataReply"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 14,
+      "target_ty_idx": 15
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 13
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 33
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 14,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferNotificationForRecipient",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferInitiator",
+          "ty_idx": 13
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 14,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToBurn",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 1499400124,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 13
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 33
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DeployDesk",
+      "ty_idx": 34,
+      "prefix": {
+        "prefix_num": 1147469825,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serial",
+          "ty_idx": 9
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Minter -> Collection. Deploys desk `serial` for `owner`. `serial <= nextSerial`;\nonly `serial == nextSerial` increments the counter and registers the desk in the Pot."
+    },
+    {
+      "kind": "struct",
+      "name": "DeployDeskOk",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1147469826,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serial",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Collection -> Minter. Emitted when a DeployDesk was accepted (first or retried deploy)."
+    },
+    {
+      "kind": "struct",
+      "name": "RetryDeploy",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1147469856,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serial",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Anyone -> Minter. Re-sends DeployDesk for a serial whose deploy has not been acknowledged."
+    },
+    {
+      "kind": "struct",
+      "name": "RetryBurn",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1147469860,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Anyone: burn the deposits whose burn bounced earlier (value ≥ BURN_VALUE)."
+    },
+    {
+      "kind": "struct",
+      "name": "SetDeskMinterPaused",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1147469857,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetDeskMinterConfig",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 1147469858,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "config",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeDeskMinterAdmin",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 1147469859,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DeskMinterConfig",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "deskJettonWallet",
+          "ty_idx": 13,
+          "description": "Minter's own $DESK jetton wallet; null until discovered (mint disabled until set)."
+        },
+        {
+          "name": "protocolWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "depositAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "surcharge",
+          "ty_idx": 6
+        },
+        {
+          "name": "protocolShareBps",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DeskMinterStorage",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "collection",
+          "ty_idx": 7
+        },
+        {
+          "name": "pot",
+          "ty_idx": 7
+        },
+        {
+          "name": "minted",
+          "ty_idx": 9
+        },
+        {
+          "name": "cap",
+          "ty_idx": 9
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "unburned",
+          "ty_idx": 6,
+          "description": "Deposits whose burn bounced (wallet busy / underfunded): still held by our wallet, burnable by anyone."
+        },
+        {
+          "name": "config",
+          "ty_idx": 27
+        },
+        {
+          "name": "pendingDeploys",
+          "ty_idx": 31
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DeskMinterDataReply",
+      "ty_idx": 38,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "collection",
+          "ty_idx": 7
+        },
+        {
+          "name": "pot",
+          "ty_idx": 7
+        },
+        {
+          "name": "minted",
+          "ty_idx": 1
+        },
+        {
+          "name": "cap",
+          "ty_idx": 1
+        },
+        {
+          "name": "paused",
+          "ty_idx": 5
+        },
+        {
+          "name": "unburned",
+          "ty_idx": 6
+        },
+        {
+          "name": "config",
+          "ty_idx": 25
+        },
+        {
+          "name": "pendingDeploys",
+          "ty_idx": 31
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PotTopUp",
+      "ty_idx": 36,
+      "prefix": {
+        "prefix_num": 1347682336,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "source",
+          "ty_idx": 37
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 30
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 34
+    },
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 36
+    },
+    {
+      "body_ty_idx": 29
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 69281,
+      "name": "get_minter_data",
+      "parameters": [],
+      "return_ty_idx": 38
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromAdmin",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 410
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromCollection",
+      "err_code": 430
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NothingPending",
+      "err_code": 446
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromDeskWallet",
+      "err_code": 462
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NoPendingDeploy",
+      "err_code": 463
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
