@@ -1,0 +1,713 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "GrmDnsCollection",
+  "author": "Grm DNS",
+  "version": "2.0.0",
+  "description": "Grm DNS collection and .grm resolver. TEP-62 and TEP-81 compliant",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransferNotification"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 14,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 15,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 134,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestFunds"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RejectBid"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RescueJettons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawTon"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeOwner"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeContent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrmDnsCollectionStorage"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 11,
+      "value_ty_idx": 19
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonConfig"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RelayBid"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionDataReply"
+    },
+    {
+      "kind": "addressAny"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GrmConfigReply"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        31
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 16
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 33,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransfer",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "destination",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 24
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 31
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 13,
+          "client_ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonTransferNotification",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "senderAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 13,
+          "client_ty_idx": 17
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RelayBid",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 1735552257,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "bidder",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "domain",
+          "ty_idx": 3
+        },
+        {
+          "name": "grmWallet",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestFunds",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1735552258,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 19
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "bidder",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RejectBid",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1735552259,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "itemIndex",
+          "ty_idx": 19
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "bidder",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RescueJettons",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1735552274,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "walletAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawTon",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1735552275,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeOwner",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1735552276,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newOwnerAddress",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeContent",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1735552277,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newContent",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JettonConfig",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "grmMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "grmWalletCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrmDnsCollectionStorage",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 24
+        },
+        {
+          "name": "mintedCount",
+          "ty_idx": 11
+        },
+        {
+          "name": "domainIndex",
+          "ty_idx": 27
+        },
+        {
+          "name": "content",
+          "ty_idx": 3
+        },
+        {
+          "name": "itemCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "jetton",
+          "ty_idx": 29
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionDataReply",
+      "ty_idx": 34,
+      "fields": [
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "collectionContent",
+          "ty_idx": 3
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 35
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GrmConfigReply",
+      "ty_idx": 36,
+      "fields": [
+        {
+          "name": "grmMaster",
+          "ty_idx": 7
+        },
+        {
+          "name": "grmWallet",
+          "ty_idx": 7
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 26
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 25
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 102491,
+      "name": "get_collection_data",
+      "parameters": [],
+      "return_ty_idx": 34
+    },
+    {
+      "tvm_method_id": 93393,
+      "name": "get_domains_count",
+      "parameters": [],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 92067,
+      "name": "get_nft_address_by_index",
+      "parameters": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 68445,
+      "name": "get_nft_content",
+      "parameters": [
+        {
+          "name": "_itemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "individualNftContent",
+          "ty_idx": 3
+        }
+      ],
+      "return_ty_idx": 3
+    },
+    {
+      "tvm_method_id": 127265,
+      "name": "get_grm_config",
+      "parameters": [],
+      "return_ty_idx": 36
+    },
+    {
+      "tvm_method_id": 80015,
+      "name": "get_grm_wallet_of",
+      "parameters": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 73417,
+      "name": "get_domain_price",
+      "parameters": [
+        {
+          "name": "charCount",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 77809,
+      "name": "get_domain_address",
+      "parameters": [
+        {
+          "name": "domain",
+          "ty_idx": 2
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 123660,
+      "name": "dnsresolve",
+      "parameters": [
+        {
+          "name": "subdomain",
+          "ty_idx": 2
+        },
+        {
+          "name": "_category",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 37
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.DnsBadSubdomain",
+      "err_code": 70
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWorkchain",
+      "err_code": 333
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromOwner",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromItem",
+      "err_code": 404
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DnsNoZeroByte",
+      "err_code": 413
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFound",
+      "err_code": 417
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.WrongJettonWallet",
+      "err_code": 501
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.GrmWalletLocked",
+      "err_code": 503
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
