@@ -1,0 +1,1223 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "RewardMasterV2",
+  "author": "GRAMDESKS",
+  "version": "2.0.0",
+  "description": "Jetton master of a launched coin (TEP-74/89 surface) and dividend hub: holds one cumulative reward index per reward id, acks wallet settles, mints for the Curve, owns the Pool reserve and forwards sells. Never spends its own balance.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Settle"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 6
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MintReward"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Remint"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PremintCoins"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolOut"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolCredit"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IndexBump"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CurveGraduated"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayRewardFailed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WireMaster"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestWalletAddress"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "QueryMarket"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUpTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RewardMasterStorage"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RewardMasterRoles"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 30
+    },
+    {
+      "kind": "uintN",
+      "n": 128
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 32
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 13,
+      "value_ty_idx": 6
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RewardTransferStep"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 37
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 38,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 150,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 39,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 151,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SellNotify"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SettleAck"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolDeliver"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IndexBumpRefused"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RestoreAccrued"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseWalletAddress"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 7
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 48
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MarketAnswer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PoolOutFailed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JettonDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OnchainMetadataReply"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "string_prefixed0x"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 54,
+      "value_ty_idx": 55
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 53
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RewardMasterDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IndexBumpedEvent"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 36,
+      "target_ty_idx": 37
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 38,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 37
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 40
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestWalletAddress",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 745978227,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "includeOwnerAddress",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseWalletAddress",
+      "ty_idx": 47,
+      "prefix": {
+        "prefix_num": 3513996288,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonWalletAddress",
+          "ty_idx": 29
+        },
+        {
+          "name": "ownerAddress",
+          "ty_idx": 49
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUpTons",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 3547469196,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "JettonDataReply",
+      "ty_idx": 52,
+      "fields": [
+        {
+          "name": "totalSupply",
+          "ty_idx": 1
+        },
+        {
+          "name": "mintable",
+          "ty_idx": 5
+        },
+        {
+          "name": "adminAddress",
+          "ty_idx": 29
+        },
+        {
+          "name": "jettonContent",
+          "ty_idx": 58
+        },
+        {
+          "name": "jettonWalletCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OnchainMetadataReply",
+      "ty_idx": 53,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "contentDict",
+          "ty_idx": 57
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Settle",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1381433345,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "action",
+          "ty_idx": 13
+        },
+        {
+          "name": "burnAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "sellMinTon",
+          "ty_idx": 14
+        }
+      ],
+      "description": "Wallet -> Master. Sent before any balance change. `action` tells the master what to do:\nACTION_SYNC: reply indices only (wallet then executes its pending transfer).\nACTION_CLAIM: reply indices (the wallet computes what it is owed and asks the vault itself).\nACTION_BURN: decrease supply by `burnAmount`; if `sellMinTon != null` forward a sell to the market."
+    },
+    {
+      "kind": "struct",
+      "name": "SettleAck",
+      "ty_idx": 43,
+      "prefix": {
+        "prefix_num": 1381433346,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "retry",
+          "ty_idx": 5
+        },
+        {
+          "name": "vault",
+          "ty_idx": 29
+        },
+        {
+          "name": "indices",
+          "ty_idx": 33
+        }
+      ],
+      "description": "Master -> Wallet. Current indices. `retry` is set when the first ack bounced: the wallet then\nfreezes conservatively (the lot in flight earns nothing for the retry window)."
+    },
+    {
+      "kind": "struct",
+      "name": "RewardTransferStep",
+      "ty_idx": 35,
+      "prefix": {
+        "prefix_num": 1381433347,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferInitiator",
+          "ty_idx": 29
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 29
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "indices",
+          "ty_idx": 33
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 36,
+          "client_ty_idx": 41
+        }
+      ],
+      "description": "Token movement into a wallet. Sender is the master (mint / remint) or a sibling wallet (transfer).\n`indices` lets the recipient freeze its position before crediting the tokens."
+    },
+    {
+      "kind": "struct",
+      "name": "PoolDeliver",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 1381433349,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "indices",
+          "ty_idx": 33
+        }
+      ],
+      "description": "Master -> Wallet. Same as RewardTransferStep, for coins bought from the Pool: a bounce of this\nopcode tells the master to restore `poolReserve` and warn the Pool."
+    },
+    {
+      "kind": "struct",
+      "name": "RestoreAccrued",
+      "ty_idx": 46,
+      "prefix": {
+        "prefix_num": 1381433351,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "rewardId",
+          "ty_idx": 13
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Master -> Wallet. A reward payout failed at the vault: `amount` of `rewardId` is claimable again."
+    },
+    {
+      "kind": "struct",
+      "name": "WireMaster",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 1381433360,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "curve",
+          "ty_idx": 7
+        },
+        {
+          "name": "vault",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Factory -> Master, once."
+    },
+    {
+      "kind": "struct",
+      "name": "MintReward",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1381433361,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 16
+        }
+      ],
+      "description": "Curve -> Master. Mint `amount` to `to` (buy)."
+    },
+    {
+      "kind": "struct",
+      "name": "CurveGraduated",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1381433362,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "pool",
+          "ty_idx": 7
+        },
+        {
+          "name": "poolSupply",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Curve -> Master. Registers the Pool, credits it `poolSupply` coins and closes the curve."
+    },
+    {
+      "kind": "struct",
+      "name": "IndexBump",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1381433364,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "rewardId",
+          "ty_idx": 13
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Vault -> Master. Reward jettons arrived: index[rewardId] += amount * SCALE / circulating."
+    },
+    {
+      "kind": "struct",
+      "name": "IndexBumpRefused",
+      "ty_idx": 45,
+      "prefix": {
+        "prefix_num": 1381433365,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "rewardId",
+          "ty_idx": 13
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Master -> Vault. Nobody could earn this bump (circulating == 0): keep it for later."
+    },
+    {
+      "kind": "struct",
+      "name": "SellNotify",
+      "ty_idx": 42,
+      "prefix": {
+        "prefix_num": 1381433367,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "minTon",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Master -> Curve / Pool. A holder burned `amount` to sell on the market."
+    },
+    {
+      "kind": "struct",
+      "name": "QueryMarket",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1381433369,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Anyone -> Master: \"where is your market?\". Used by the BuybackVault so that its market can only\never be the Curve / Pool the master itself knows."
+    },
+    {
+      "kind": "struct",
+      "name": "MarketAnswer",
+      "ty_idx": 50,
+      "prefix": {
+        "prefix_num": 1381433370,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "curveOpen",
+          "ty_idx": 5
+        },
+        {
+          "name": "curve",
+          "ty_idx": 29
+        },
+        {
+          "name": "pool",
+          "ty_idx": 29
+        }
+      ],
+      "description": "Master -> asker. `pool` is set after graduation; `curve` is the bonding curve while `curveOpen`."
+    },
+    {
+      "kind": "struct",
+      "name": "PayRewardFailed",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 1381433383,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "rewardId",
+          "ty_idx": 13
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Vault -> Master. The jetton transfer of a payout bounced: relay RestoreAccrued to the wallet."
+    },
+    {
+      "kind": "struct",
+      "name": "PoolOut",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1381433392,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Pool -> Master. Deliver `amount` coins from the pool reserve to `to` (a buy)."
+    },
+    {
+      "kind": "struct",
+      "name": "Remint",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1381433393,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Curve / Pool -> Master. Give coins back to `to` after a refused sell (they were burned by the Settle)."
+    },
+    {
+      "kind": "struct",
+      "name": "PoolOutFailed",
+      "ty_idx": 51,
+      "prefix": {
+        "prefix_num": 1381433394,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Master -> Pool. The delivery of `queryId` bounced: `amount` coins are back in the pool reserve."
+    },
+    {
+      "kind": "struct",
+      "name": "PoolCredit",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1381433395,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Pool -> Master. A sell was accepted: `amount` coins now belong to the pool."
+    },
+    {
+      "kind": "struct",
+      "name": "PremintCoins",
+      "ty_idx": 18,
+      "prefix": {
+        "prefix_num": 1381433396,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Factory -> Master (admin premint at launch): mint `amount` to `to` outside the curve."
+    },
+    {
+      "kind": "struct",
+      "name": "IndexBumpedEvent",
+      "ty_idx": 60,
+      "fields": [
+        {
+          "name": "rewardId",
+          "ty_idx": 13
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "circulating",
+          "ty_idx": 6
+        },
+        {
+          "name": "index",
+          "ty_idx": 32
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RewardMasterRoles",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "factory",
+          "ty_idx": 7
+        },
+        {
+          "name": "seq",
+          "ty_idx": 11,
+          "description": "Launch sequence number: makes the master address unique per launch."
+        },
+        {
+          "name": "curve",
+          "ty_idx": 29,
+          "description": "Only the Curve may mint (and it is the only party that learns of burns while the curve is open)."
+        },
+        {
+          "name": "vault",
+          "ty_idx": 29,
+          "description": "Only the RewardVault may bump indices."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RewardMasterStorage",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "totalSupply",
+          "ty_idx": 6,
+          "description": "Coins held by wallets or in flight towards a wallet: the reward-earning supply."
+        },
+        {
+          "name": "poolReserve",
+          "ty_idx": 6,
+          "description": "Coins owned by the Pool (no wallet, never earn). `totalSupply + poolReserve` is the jetton supply."
+        },
+        {
+          "name": "curveOpen",
+          "ty_idx": 5,
+          "description": "True while the bonding curve accepts sells."
+        },
+        {
+          "name": "pool",
+          "ty_idx": 29,
+          "description": "Pool (set at graduation): sells go there, buys come from `poolReserve`."
+        },
+        {
+          "name": "roles",
+          "ty_idx": 31
+        },
+        {
+          "name": "indices",
+          "ty_idx": 33
+        },
+        {
+          "name": "remainders",
+          "ty_idx": 34,
+          "description": "rewardId -> scaled units not yet reflected in the index (`< circulating`), carried to the next bump."
+        },
+        {
+          "name": "metadata",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RewardMasterDataReply",
+      "ty_idx": 59,
+      "fields": [
+        {
+          "name": "totalSupply",
+          "ty_idx": 6
+        },
+        {
+          "name": "poolReserve",
+          "ty_idx": 6
+        },
+        {
+          "name": "curveOpen",
+          "ty_idx": 5
+        },
+        {
+          "name": "pool",
+          "ty_idx": 29
+        },
+        {
+          "name": "roles",
+          "ty_idx": 30
+        },
+        {
+          "name": "indices",
+          "ty_idx": 33
+        },
+        {
+          "name": "remainders",
+          "ty_idx": 34
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "string_prefixed0x",
+      "ty_idx": 55,
+      "target_ty_idx": 56,
+      "description": "A string, which contents starts with 0x00/0x01 byte.\nBy standard, offchain explorers/APIs may treat contents of a string based on 0xXX prefixes:\n- 0x00 + \"str\" — means \"this is a regular snake-encoded string\"\n- 0x01 + \"str\" — means \"this is an off-chain content URL\"\nUsed in jettons and NFTs for responses from GET methods to comply with TEPs (token standards)."
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 28
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 18
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    },
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 35
+    },
+    {
+      "body_ty_idx": 42
+    },
+    {
+      "body_ty_idx": 43
+    },
+    {
+      "body_ty_idx": 44
+    },
+    {
+      "body_ty_idx": 45
+    },
+    {
+      "body_ty_idx": 46
+    },
+    {
+      "body_ty_idx": 47
+    },
+    {
+      "body_ty_idx": 50
+    },
+    {
+      "body_ty_idx": 51
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 60
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 106029,
+      "name": "get_jetton_data",
+      "parameters": [],
+      "return_ty_idx": 52
+    },
+    {
+      "tvm_method_id": 103289,
+      "name": "get_wallet_address",
+      "parameters": [
+        {
+          "name": "ownerAddress",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 74290,
+      "name": "get_reward_master_data",
+      "parameters": [],
+      "return_ty_idx": 59
+    },
+    {
+      "tvm_method_id": 107037,
+      "name": "get_code_version",
+      "parameters": [],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWorkchain",
+      "err_code": 333
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 410
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BudgetExceeded",
+      "err_code": 451
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromFactory",
+      "err_code": 470
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadyWired",
+      "err_code": 471
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromCurve",
+      "err_code": 472
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromVault",
+      "err_code": 474
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromPool",
+      "err_code": 475
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.CurveClosed",
+      "err_code": 477
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RewardUnknown",
+      "err_code": 483
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotWired",
+      "err_code": 486
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromRewardWallet",
+      "err_code": 487
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.IndexOverflow",
+      "err_code": 493
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_POOL_RESERVE",
+      "err_code": 496
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
