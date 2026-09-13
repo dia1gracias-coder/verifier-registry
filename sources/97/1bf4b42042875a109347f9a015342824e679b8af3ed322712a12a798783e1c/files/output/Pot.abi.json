@@ -1,0 +1,1674 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Pot",
+  "author": "GRAMDESKS",
+  "version": "0.1.0",
+  "description": "Protocol pot: receives TON (royalties, mint surcharge, launcher share), converts to USDT, buys stock in rounds through a whitelisted escrow, and accounts per-desk shares with cumulative counters.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RegisterDesk"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SweepRequest"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "uintN",
+      "n": 128
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawViaPot"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferNotificationForRecipient"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 21,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 140,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 22,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 141,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Convert"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Round"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CancelPending"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SkipSlot"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AddSlot"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetSlotEnabled"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetSlotFloor"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPotParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PotParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PotWhitelist"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 34
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 33
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetPotRoles"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PotRoles"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 40
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PotTopUp"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DedustPayout"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PotStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Slot"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 47
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Pending"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 49
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 50
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StampsInit"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 14,
+      "value_ty_idx": 15
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SweepAck"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithdrawOk"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DedustNativeSwap"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DedustSwapParams"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 58
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PotDataReply"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 49,
+      "stack_type_id": 135,
+      "stack_width": 7
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 47,
+      "stack_type_id": 136,
+      "stack_width": 6
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeskSweptEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeskWithdrawnEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ConvertSettledEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SlippageBreachEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoundRefundedEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PotInEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "UnallocatedEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoundSettledEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PendingCancelledEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SlotSkippedEvent"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "DedustSwapParams",
+      "ty_idx": 58,
+      "fields": [
+        {
+          "name": "deadline",
+          "ty_idx": 9
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "referral",
+          "ty_idx": 18,
+          "description": "addr_none: no referral."
+        },
+        {
+          "name": "fulfillPayload",
+          "ty_idx": 45
+        },
+        {
+          "name": "rejectPayload",
+          "ty_idx": 45
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DedustNativeSwap",
+      "ty_idx": 57,
+      "prefix": {
+        "prefix_num": 3926267997,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "pool",
+          "ty_idx": 7
+        },
+        {
+          "name": "kind",
+          "ty_idx": 5
+        },
+        {
+          "name": "limit",
+          "ty_idx": 6
+        },
+        {
+          "name": "next",
+          "ty_idx": 45
+        },
+        {
+          "name": "params",
+          "ty_idx": 59
+        }
+      ],
+      "description": "Single-hop swap of native TON through `pool`. `kind` = given_in$0."
+    },
+    {
+      "kind": "struct",
+      "name": "DedustPayout",
+      "ty_idx": 44,
+      "prefix": {
+        "prefix_num": 1196394191,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "payload",
+          "ty_idx": 45
+        }
+      ],
+      "description": "TON sent back by the vault: the whole `amount` when the swap is rejected (limit / deadline),\nor leftover gas after a successful one. Contracts accept it silently and reconcile on value."
+    },
+    {
+      "kind": "struct",
+      "name": "SweepRequest",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1147469841,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serial",
+          "ty_idx": 9
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "stamp",
+          "ty_idx": 15
+        }
+      ],
+      "description": "DeskItem -> Pot."
+    },
+    {
+      "kind": "struct",
+      "name": "SweepAck",
+      "ty_idx": 55,
+      "prefix": {
+        "prefix_num": 1147469842,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "newStamp",
+          "ty_idx": 15
+        }
+      ],
+      "description": "Pot -> DeskItem. `newStamp` = Pot counter for that slot at settlement time."
+    },
+    {
+      "kind": "struct",
+      "name": "StampsInit",
+      "ty_idx": 52,
+      "prefix": {
+        "prefix_num": 1147469843,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "stamps",
+          "ty_idx": 53
+        }
+      ],
+      "description": "Pot -> DeskItem, once, right after registration: counters snapshot at mint time."
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawViaPot",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 1147469845,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serial",
+          "ty_idx": 9
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "stamp",
+          "ty_idx": 15
+        },
+        {
+          "name": "jettonWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        }
+      ],
+      "description": "DeskItem -> Pot. Pot refuses (RoundOwed) if `stamp != counter[slot]`."
+    },
+    {
+      "kind": "struct",
+      "name": "WithdrawOk",
+      "ty_idx": 56,
+      "prefix": {
+        "prefix_num": 1147469846,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "jettonWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Pot -> DeskItem."
+    },
+    {
+      "kind": "struct",
+      "name": "RegisterDesk",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1147469847,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serial",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Collection -> Pot."
+    },
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 19,
+      "target_ty_idx": 20
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 54,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 18
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 45
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 19,
+          "client_ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferNotificationForRecipient",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferInitiator",
+          "ty_idx": 18
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 19,
+          "client_ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 43,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Convert",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1347682305,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "pool",
+          "ty_idx": 7
+        },
+        {
+          "name": "spend",
+          "ty_idx": 6
+        },
+        {
+          "name": "minUsdt",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Swap `spend` TON for USDT through a whitelisted DeDust pool. The swap body is built by the Pot\nitself (receiver = Pot, limit = `minUsdt`); the keeper only picks pool, amount and minimum,\nand `minUsdt` must respect the admin price floor (`floorUsdtPerTon`)."
+    },
+    {
+      "kind": "struct",
+      "name": "Round",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1347682306,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "spendUsdt",
+          "ty_idx": 6
+        },
+        {
+          "name": "minOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "advance",
+          "ty_idx": 5
+        },
+        {
+          "name": "escrowPayload",
+          "ty_idx": 3
+        }
+      ],
+      "description": "Open an Omniston escrow position: transfer `spendUsdt` from the Pot's USDT wallet to the\nwhitelisted escrow minter with `escrowPayload` as forward payload. The Pot checks that the\npayload names itself as position owner and carries a min-out >= `minOut`, itself >= the slot floor."
+    },
+    {
+      "kind": "struct",
+      "name": "CancelPending",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 1347682307,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Clear a pending operation after `pendingTimeout` seconds (funds were, or will be, returned)."
+    },
+    {
+      "kind": "struct",
+      "name": "SkipSlot",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 1347682308,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Advance the rotation without a round (slot not quotable)."
+    },
+    {
+      "kind": "struct",
+      "name": "AddSlot",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1347682320,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "master",
+          "ty_idx": 7
+        },
+        {
+          "name": "potWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "floorPerUsdt",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetSlotFloor",
+      "ty_idx": 31,
+      "prefix": {
+        "prefix_num": 1347682324,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "floorPerUsdt",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Update the Round price floor of a slot (stock units per 1 USDT). 0 disables rounds on that slot."
+    },
+    {
+      "kind": "struct",
+      "name": "SetSlotEnabled",
+      "ty_idx": 30,
+      "prefix": {
+        "prefix_num": 1347682321,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "enabled",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetPotParams",
+      "ty_idx": 32,
+      "prefix": {
+        "prefix_num": 1347682322,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "params",
+          "ty_idx": 38
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetPotRoles",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 1347682323,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "roles",
+          "ty_idx": 41
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PotTopUp",
+      "ty_idx": 42,
+      "prefix": {
+        "prefix_num": 1347682336,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "source",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PotInEvent",
+      "ty_idx": 68,
+      "fields": [
+        {
+          "name": "source",
+          "ty_idx": 14
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "from",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RoundSettledEvent",
+      "ty_idx": 70,
+      "fields": [
+        {
+          "name": "roundNo",
+          "ty_idx": 9
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "spendUsdt",
+          "ty_idx": 6
+        },
+        {
+          "name": "received",
+          "ty_idx": 6
+        },
+        {
+          "name": "liveDesks",
+          "ty_idx": 9
+        },
+        {
+          "name": "counter",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RoundRefundedEvent",
+      "ty_idx": 67,
+      "fields": [
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "spendUsdt",
+          "ty_idx": 6
+        },
+        {
+          "name": "refunded",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ConvertSettledEvent",
+      "ty_idx": 65,
+      "fields": [
+        {
+          "name": "spendTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "receivedUsdt",
+          "ty_idx": 6
+        },
+        {
+          "name": "minUsdt",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SlippageBreachEvent",
+      "ty_idx": 66,
+      "fields": [
+        {
+          "name": "kind",
+          "ty_idx": 14
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "expectedMin",
+          "ty_idx": 6
+        },
+        {
+          "name": "received",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PendingCancelledEvent",
+      "ty_idx": 71,
+      "fields": [
+        {
+          "name": "kind",
+          "ty_idx": 14
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "spend",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SlotSkippedEvent",
+      "ty_idx": 72,
+      "fields": [
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "next",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "UnallocatedEvent",
+      "ty_idx": 69,
+      "fields": [
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Stock arrived for a slot while no desk is live: stays in the Pot wallet, unallocated."
+    },
+    {
+      "kind": "struct",
+      "name": "DeskSweptEvent",
+      "ty_idx": 63,
+      "fields": [
+        {
+          "name": "serial",
+          "ty_idx": 9
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "owed",
+          "ty_idx": 6
+        },
+        {
+          "name": "newStamp",
+          "ty_idx": 15
+        }
+      ],
+      "description": "A desk swept a slot: `owed` stock sent to the desk, its stamp moves to `newStamp` (owed may be 0)."
+    },
+    {
+      "kind": "struct",
+      "name": "DeskWithdrawnEvent",
+      "ty_idx": 64,
+      "fields": [
+        {
+          "name": "serial",
+          "ty_idx": 9
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        }
+      ],
+      "description": "A desk withdrew `amount` of a slot's stock to `to` (only possible when nothing is owed)."
+    },
+    {
+      "kind": "struct",
+      "name": "PotRoles",
+      "ty_idx": 40,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "keeper",
+          "ty_idx": 7
+        },
+        {
+          "name": "collection",
+          "ty_idx": 7
+        },
+        {
+          "name": "deskItemCode",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PotWhitelist",
+      "ty_idx": 34,
+      "fields": [
+        {
+          "name": "dexVault",
+          "ty_idx": 7,
+          "description": "DeDust native (TON) vault: the only destination a Convert may send TON to."
+        },
+        {
+          "name": "dexPools",
+          "ty_idx": 35,
+          "description": "DeDust pools a Convert may route through (TON/USDT); the swap body is built on-chain."
+        },
+        {
+          "name": "escrowMinter",
+          "ty_idx": 7,
+          "description": "Omniston escrow minter: recipient of the USDT transfer that opens a position."
+        },
+        {
+          "name": "escrowOp",
+          "ty_idx": 9,
+          "description": "Expected opcode of the escrow forward payload."
+        },
+        {
+          "name": "escrowOwnerBitOffset",
+          "ty_idx": 36,
+          "description": "Bit offset (from the start of the forward payload) where the position owner address begins."
+        },
+        {
+          "name": "escrowMinOutRef",
+          "ty_idx": 14,
+          "description": "Where the escrow payload stores the minimum stock the resolver must deliver:\nindex of the payload ref holding it (255 = root cell) and bit offset inside that cell (Coins encoding)."
+        },
+        {
+          "name": "escrowMinOutBitOffset",
+          "ty_idx": 36
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PotParams",
+      "ty_idx": 33,
+      "fields": [
+        {
+          "name": "usdtWallet",
+          "ty_idx": 18,
+          "description": "Pot's own USDT jetton wallet. Round/Convert are disabled while null."
+        },
+        {
+          "name": "reserve",
+          "ty_idx": 6,
+          "description": "TON never spent (storage + gas headroom)."
+        },
+        {
+          "name": "threshold",
+          "ty_idx": 6,
+          "description": "Minimum TON (above reserve) before a Convert can run."
+        },
+        {
+          "name": "maxConvertTon",
+          "ty_idx": 6,
+          "description": "Maximum TON swapped by a single Convert."
+        },
+        {
+          "name": "floorUsdtPerTon",
+          "ty_idx": 6,
+          "description": "Price floor for Convert: micro-USDT the Pot must receive per 1 TON at minimum (0 = converts disabled)."
+        },
+        {
+          "name": "maxRoundUsdt",
+          "ty_idx": 6,
+          "description": "Maximum USDT spent per Round."
+        },
+        {
+          "name": "pendingTimeout",
+          "ty_idx": 9,
+          "description": "Seconds after which a pending operation may be cancelled by the keeper."
+        },
+        {
+          "name": "whitelist",
+          "ty_idx": 37
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Slot",
+      "ty_idx": 47,
+      "fields": [
+        {
+          "name": "master",
+          "ty_idx": 7
+        },
+        {
+          "name": "potWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "enabled",
+          "ty_idx": 5
+        },
+        {
+          "name": "counter",
+          "ty_idx": 15,
+          "description": "Cumulative per-desk share, COUNTER_SCALE fixed point."
+        },
+        {
+          "name": "floorPerUsdt",
+          "ty_idx": 6,
+          "description": "Price floor for Round: stock units the escrow must deliver per 1 USDT (1e6 units) at minimum (0 = rounds disabled)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Pending",
+      "ty_idx": 49,
+      "fields": [
+        {
+          "name": "kind",
+          "ty_idx": 14
+        },
+        {
+          "name": "slot",
+          "ty_idx": 14
+        },
+        {
+          "name": "spend",
+          "ty_idx": 6
+        },
+        {
+          "name": "minOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "startedAt",
+          "ty_idx": 9
+        },
+        {
+          "name": "advance",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PotStorage",
+      "ty_idx": 46,
+      "fields": [
+        {
+          "name": "liveDesks",
+          "ty_idx": 9
+        },
+        {
+          "name": "rotationNext",
+          "ty_idx": 14
+        },
+        {
+          "name": "slotCount",
+          "ty_idx": 14
+        },
+        {
+          "name": "roundNo",
+          "ty_idx": 9
+        },
+        {
+          "name": "totalTonIn",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalTonSpent",
+          "ty_idx": 6
+        },
+        {
+          "name": "usdtBudget",
+          "ty_idx": 6
+        },
+        {
+          "name": "roles",
+          "ty_idx": 41
+        },
+        {
+          "name": "params",
+          "ty_idx": 38
+        },
+        {
+          "name": "slots",
+          "ty_idx": 48
+        },
+        {
+          "name": "pending",
+          "ty_idx": 51
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PotDataReply",
+      "ty_idx": 60,
+      "fields": [
+        {
+          "name": "liveDesks",
+          "ty_idx": 1
+        },
+        {
+          "name": "rotationNext",
+          "ty_idx": 1
+        },
+        {
+          "name": "slotCount",
+          "ty_idx": 1
+        },
+        {
+          "name": "roundNo",
+          "ty_idx": 1
+        },
+        {
+          "name": "totalTonIn",
+          "ty_idx": 6
+        },
+        {
+          "name": "totalTonSpent",
+          "ty_idx": 6
+        },
+        {
+          "name": "usdtBudget",
+          "ty_idx": 6
+        },
+        {
+          "name": "pending",
+          "ty_idx": 61
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 46
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 17
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    },
+    {
+      "body_ty_idx": 30
+    },
+    {
+      "body_ty_idx": 31
+    },
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 39
+    },
+    {
+      "body_ty_idx": 42
+    },
+    {
+      "body_ty_idx": 43
+    },
+    {
+      "body_ty_idx": 44
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 52
+    },
+    {
+      "body_ty_idx": 54
+    },
+    {
+      "body_ty_idx": 55
+    },
+    {
+      "body_ty_idx": 56
+    },
+    {
+      "body_ty_idx": 57
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 63
+    },
+    {
+      "body_ty_idx": 64
+    },
+    {
+      "body_ty_idx": 65
+    },
+    {
+      "body_ty_idx": 66
+    },
+    {
+      "body_ty_idx": 67
+    },
+    {
+      "body_ty_idx": 68
+    },
+    {
+      "body_ty_idx": 69
+    },
+    {
+      "body_ty_idx": 70
+    },
+    {
+      "body_ty_idx": 71
+    },
+    {
+      "body_ty_idx": 72
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 67494,
+      "name": "get_pot_data",
+      "parameters": [],
+      "return_ty_idx": 60
+    },
+    {
+      "tvm_method_id": 106831,
+      "name": "get_slot",
+      "parameters": [
+        {
+          "name": "slotId",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 62
+    },
+    {
+      "tvm_method_id": 107583,
+      "name": "get_slots",
+      "parameters": [],
+      "return_ty_idx": 48
+    },
+    {
+      "tvm_method_id": 130208,
+      "name": "get_roles",
+      "parameters": [],
+      "return_ty_idx": 40
+    },
+    {
+      "tvm_method_id": 115150,
+      "name": "get_params",
+      "parameters": [],
+      "return_ty_idx": 33
+    },
+    {
+      "tvm_method_id": 113586,
+      "name": "get_owed",
+      "parameters": [
+        {
+          "name": "slotId",
+          "ty_idx": 1
+        },
+        {
+          "name": "stamp",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 1,
+      "description": "Amount of stock a desk with `stamp` for `slotId` can sweep right now."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromAdmin",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 410
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromCollection",
+      "err_code": 430
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromKeeper",
+      "err_code": 440
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PayloadMinOutMismatch",
+      "description": "Escrow payload min-out lower than the keeper's declared minimum.",
+      "err_code": 441
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromDesk",
+      "err_code": 442
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlotUnknown",
+      "err_code": 443
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlotDisabled",
+      "err_code": 444
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OperationInFlight",
+      "err_code": 445
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NothingPending",
+      "err_code": 446
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotRotationNext",
+      "err_code": 447
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BelowThreshold",
+      "err_code": 448
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DestNotWhitelisted",
+      "err_code": 449
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PayloadOwnerMismatch",
+      "err_code": 450
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BudgetExceeded",
+      "err_code": 451
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RoundOwed",
+      "err_code": 452
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.UnknownJettonWallet",
+      "err_code": 453
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PendingNotExpired",
+      "err_code": 454
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.UsdtWalletUnset",
+      "err_code": 455
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NoLiveDesks",
+      "err_code": 456
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlotExists",
+      "err_code": 457
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidParams",
+      "err_code": 458
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BelowFloor",
+      "description": "Keeper minimum output below the admin price floor (Convert / Round).",
+      "err_code": 459
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
