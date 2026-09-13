@@ -1,0 +1,541 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "DeskCollection",
+  "author": "GRAMDESKS",
+  "version": "0.1.0",
+  "description": "Desk collection. TEP-62/64/66. Deploys DeskItems on behalf of the Minter and registers them in the Pot.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeployDesk"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RequestRoyaltyParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ChangeCollectionAdmin"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetCollectionMinter"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionContent"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RoyaltyParams"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 20
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeskDeployedEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeskItemInit"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RegisterDesk"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DeployDeskOk"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResponseRoyaltyParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CollectionDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OffchainMetadataReply"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 29
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        7,
+        7,
+        1,
+        1
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "RoyaltyParams",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "numerator",
+          "ty_idx": 21
+        },
+        {
+          "name": "denominator",
+          "ty_idx": 21
+        },
+        {
+          "name": "royaltyAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RequestRoyaltyParams",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1765620048,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ResponseRoyaltyParams",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 2831876269,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "royaltyParams",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionDataReply",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "nextItemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "collectionMetadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "adminAddress",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OffchainMetadataReply",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "string",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DeployDesk",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1147469825,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serial",
+          "ty_idx": 9
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Minter -> Collection. Deploys desk `serial` for `owner`. `serial <= nextSerial`;\nonly `serial == nextSerial` increments the counter and registers the desk in the Pot."
+    },
+    {
+      "kind": "struct",
+      "name": "DeskDeployedEvent",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "serial",
+          "ty_idx": 9
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "item",
+          "ty_idx": 7
+        },
+        {
+          "name": "isNew",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DeployDeskOk",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1147469826,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serial",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Collection -> Minter. Emitted when a DeployDesk was accepted (first or retried deploy)."
+    },
+    {
+      "kind": "struct",
+      "name": "ChangeCollectionAdmin",
+      "ty_idx": 14,
+      "prefix": {
+        "prefix_num": 1147469827,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "newAdmin",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SetCollectionMinter",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1147469828,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "minter",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DeskItemInit",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "pot",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Collection -> DeskItem, body of the deploying message."
+    },
+    {
+      "kind": "struct",
+      "name": "RegisterDesk",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1147469847,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "serial",
+          "ty_idx": 9
+        }
+      ],
+      "description": "Collection -> Pot."
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionContent",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "collectionMetadata",
+          "ty_idx": 3
+        },
+        {
+          "name": "commonContent",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CollectionStorage",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "minter",
+          "ty_idx": 7
+        },
+        {
+          "name": "pot",
+          "ty_idx": 7
+        },
+        {
+          "name": "nextSerial",
+          "ty_idx": 9
+        },
+        {
+          "name": "cap",
+          "ty_idx": 9
+        },
+        {
+          "name": "content",
+          "ty_idx": 19
+        },
+        {
+          "name": "deskItemCode",
+          "ty_idx": 3
+        },
+        {
+          "name": "royalty",
+          "ty_idx": 22
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 16
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 14
+    },
+    {
+      "body_ty_idx": 15
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 27
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 23
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 102491,
+      "name": "get_collection_data",
+      "parameters": [],
+      "return_ty_idx": 28
+    },
+    {
+      "tvm_method_id": 92067,
+      "name": "get_nft_address_by_index",
+      "parameters": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 1
+        }
+      ],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 85719,
+      "name": "royalty_params",
+      "parameters": [],
+      "return_ty_idx": 20
+    },
+    {
+      "tvm_method_id": 68445,
+      "name": "get_nft_content",
+      "parameters": [
+        {
+          "name": "itemIndex",
+          "ty_idx": 1
+        },
+        {
+          "name": "_individualNftContent",
+          "ty_idx": 18
+        }
+      ],
+      "return_ty_idx": 30,
+      "description": "Off-chain metadata: `<commonContent><serial>.json`; the individual item content is ignored."
+    },
+    {
+      "tvm_method_id": 97144,
+      "name": "get_desk_config",
+      "parameters": [],
+      "return_ty_idx": 31
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWorkchain",
+      "err_code": 333
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromAdmin",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 410
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromMinter",
+      "err_code": 420
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.CapReached",
+      "err_code": 421
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSerial",
+      "err_code": 422
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
