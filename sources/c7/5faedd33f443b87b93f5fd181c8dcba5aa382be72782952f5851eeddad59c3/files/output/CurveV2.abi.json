@@ -1,0 +1,709 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "CurveV2",
+  "author": "GRAMDESKS",
+  "version": "2.0.0",
+  "description": "Virtual constant-product bonding curve for a launched coin. Buys mint through the RewardMaster, sells arrive as burns. Graduates once, atomically, into a locked-liquidity Pool credited by the master.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OpenCurve"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Buy"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SellNotify"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TopUpTons"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CurveStorage"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CurveRoles"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 19
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CurveParams"
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 21
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "FeeIn"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CurveGraduated"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MintReward"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Remint"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CurveDataReply"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Quote"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CurveGraduatedEvent"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CurveTradeEvent"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TopUpTons",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 3547469196,
+        "prefix_len": 32
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "FeeIn",
+      "ty_idx": 24,
+      "prefix": {
+        "prefix_num": 1179844609,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Fee deposit from a Curve or a Pool. `amount` is the fee; the rest of the value is gas that\nmay trigger a split right away."
+    },
+    {
+      "kind": "struct",
+      "name": "OpenCurve",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1129644033,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ],
+      "description": "Factory -> Curve, once: start accepting trades."
+    },
+    {
+      "kind": "struct",
+      "name": "Buy",
+      "ty_idx": 13,
+      "prefix": {
+        "prefix_num": 1129644034,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "minOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "recipient",
+          "ty_idx": 14
+        }
+      ],
+      "description": "Anyone -> Curve. Buy coin with the attached TON (minus BUY_GAS). Coins go to `recipient`\n(the sender when null — the Factory uses it for the creator's first buy)."
+    },
+    {
+      "kind": "struct",
+      "name": "CurveTradeEvent",
+      "ty_idx": 33,
+      "fields": [
+        {
+          "name": "isBuy",
+          "ty_idx": 5
+        },
+        {
+          "name": "trader",
+          "ty_idx": 7
+        },
+        {
+          "name": "ton",
+          "ty_idx": 6
+        },
+        {
+          "name": "coin",
+          "ty_idx": 6
+        },
+        {
+          "name": "fee",
+          "ty_idx": 6
+        },
+        {
+          "name": "virtualTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "virtualToken",
+          "ty_idx": 6
+        },
+        {
+          "name": "realTon",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CurveGraduatedEvent",
+      "ty_idx": 32,
+      "fields": [
+        {
+          "name": "pool",
+          "ty_idx": 7
+        },
+        {
+          "name": "liquidityTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "liquidityCoin",
+          "ty_idx": 6
+        },
+        {
+          "name": "protocolFee",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Quote",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "amountOut",
+          "ty_idx": 6
+        },
+        {
+          "name": "fee",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CurveRoles",
+      "ty_idx": 19,
+      "fields": [
+        {
+          "name": "factory",
+          "ty_idx": 7
+        },
+        {
+          "name": "master",
+          "ty_idx": 7
+        },
+        {
+          "name": "splitter",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CurveParams",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "protocol",
+          "ty_idx": 7,
+          "description": "Receives the graduation fee (minus gas)."
+        },
+        {
+          "name": "feeBps",
+          "ty_idx": 22,
+          "description": "Trade fee (bps of the TON side) sent to the FeeSplitter."
+        },
+        {
+          "name": "curveSupply",
+          "ty_idx": 6,
+          "description": "Coins sold through the curve before graduation."
+        },
+        {
+          "name": "poolSupply",
+          "ty_idx": 6,
+          "description": "Coins credited to the Pool at graduation."
+        },
+        {
+          "name": "graduationTon",
+          "ty_idx": 6,
+          "description": "Real TON collected that triggers graduation (the curve also graduates when sold out)."
+        },
+        {
+          "name": "graduationFee",
+          "ty_idx": 6,
+          "description": "Taken from the collected TON at graduation: covers pool deployment gas, rest to protocol."
+        },
+        {
+          "name": "minBuy",
+          "ty_idx": 6,
+          "description": "Smallest TON amount accepted for a buy."
+        },
+        {
+          "name": "poolLpFeeBps",
+          "ty_idx": 22,
+          "description": "Pool fee parameters passed at deployment."
+        },
+        {
+          "name": "poolProtocolFeeBps",
+          "ty_idx": 22
+        },
+        {
+          "name": "walletCode",
+          "ty_idx": 3,
+          "description": "RewardWallet code handed to the Pool (PoolRoles.walletCode)."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CurveStorage",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "state",
+          "ty_idx": 18
+        },
+        {
+          "name": "virtualTon",
+          "ty_idx": 6,
+          "description": "Virtual reserves (x·y = k). Real TON is a subset of `virtualTon`."
+        },
+        {
+          "name": "virtualToken",
+          "ty_idx": 6
+        },
+        {
+          "name": "realTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "sold",
+          "ty_idx": 6
+        },
+        {
+          "name": "pool",
+          "ty_idx": 14
+        },
+        {
+          "name": "roles",
+          "ty_idx": 20
+        },
+        {
+          "name": "params",
+          "ty_idx": 23
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CurveDataReply",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "state",
+          "ty_idx": 1
+        },
+        {
+          "name": "virtualTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "virtualToken",
+          "ty_idx": 6
+        },
+        {
+          "name": "realTon",
+          "ty_idx": 6
+        },
+        {
+          "name": "sold",
+          "ty_idx": 6
+        },
+        {
+          "name": "pool",
+          "ty_idx": 14
+        },
+        {
+          "name": "roles",
+          "ty_idx": 19
+        },
+        {
+          "name": "params",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MintReward",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 1381433361,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 27
+        }
+      ],
+      "description": "Curve -> Master. Mint `amount` to `to` (buy)."
+    },
+    {
+      "kind": "struct",
+      "name": "CurveGraduated",
+      "ty_idx": 25,
+      "prefix": {
+        "prefix_num": 1381433362,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "pool",
+          "ty_idx": 7
+        },
+        {
+          "name": "poolSupply",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Curve -> Master. Registers the Pool, credits it `poolSupply` coins and closes the curve."
+    },
+    {
+      "kind": "struct",
+      "name": "SellNotify",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1381433367,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "minTon",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Master -> Curve / Pool. A holder burned `amount` to sell on the market."
+    },
+    {
+      "kind": "struct",
+      "name": "Remint",
+      "ty_idx": 29,
+      "prefix": {
+        "prefix_num": 1381433393,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Curve / Pool -> Master. Give coins back to `to` after a refused sell (they were burned by the Settle)."
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 17
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 15
+    },
+    {
+      "body_ty_idx": 16
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 24
+    },
+    {
+      "body_ty_idx": 25
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 26
+    },
+    {
+      "body_ty_idx": 28
+    },
+    {
+      "body_ty_idx": 29
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 32
+    },
+    {
+      "body_ty_idx": 33
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 79150,
+      "name": "get_curve_data",
+      "parameters": [],
+      "return_ty_idx": 30
+    },
+    {
+      "tvm_method_id": 98544,
+      "name": "get_buy_quote",
+      "parameters": [
+        {
+          "name": "tonAttached",
+          "ty_idx": 6
+        }
+      ],
+      "return_ty_idx": 31,
+      "description": "Coins received for `tonAttached` TON (BUY_GAS is deducted here)."
+    },
+    {
+      "tvm_method_id": 118226,
+      "name": "get_sell_quote",
+      "parameters": [
+        {
+          "name": "coinIn",
+          "ty_idx": 6
+        }
+      ],
+      "return_ty_idx": 31,
+      "description": "Net TON received for selling `coinIn` coins."
+    },
+    {
+      "tvm_method_id": 109855,
+      "name": "get_sell_out_ton",
+      "parameters": [],
+      "return_ty_idx": 6,
+      "description": "TON (fee and gas included) that takes the whole `curveSupply` from a fresh curve — what the\nFactory compares to `graduationTon` (docs/10 §4, D4-2)."
+    },
+    {
+      "tvm_method_id": 115384,
+      "name": "get_buy_gas",
+      "parameters": [],
+      "return_ty_idx": 6
+    },
+    {
+      "tvm_method_id": 107037,
+      "name": "get_code_version",
+      "parameters": [],
+      "return_ty_idx": 1
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWorkchain",
+      "err_code": 333
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 410
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromFactory",
+      "err_code": 470
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AlreadyWired",
+      "err_code": 471
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromMaster",
+      "err_code": 473
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.CurveNotOpen",
+      "err_code": 478
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.SlippageExceeded",
+      "err_code": 479
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.BelowMinTrade",
+      "err_code": 480
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
