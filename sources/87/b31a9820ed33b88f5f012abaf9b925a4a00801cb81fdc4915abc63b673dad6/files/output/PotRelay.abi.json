@@ -1,0 +1,464 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "PotRelay",
+  "author": "GRAMDESKS",
+  "version": "0.1.0",
+  "description": "Escrow relay for the Pot: holds the Omniston position so the bought stock (delivered without forward TON) can be flushed to the Pot with a transfer notification. Only ever transfers to the Pot.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferNotificationForRecipient"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ForwardPayloadRemainder"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInline"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PayloadInRef"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 16,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 17,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 134,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Flush"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetRelayRoles"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SetUsdtWallet"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReturnExcessesBack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PotRelayStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RelayRoles"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "AskToTransfer"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "RelayDataReply"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "ForwardPayloadRemainder",
+      "ty_idx": 14,
+      "target_ty_idx": 15
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInline",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 15
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PayloadInRef",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "AskToTransfer",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 260734629,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferRecipient",
+          "ty_idx": 7
+        },
+        {
+          "name": "sendExcessesTo",
+          "ty_idx": 13
+        },
+        {
+          "name": "customPayload",
+          "ty_idx": 28
+        },
+        {
+          "name": "forwardTonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 14,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferNotificationForRecipient",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1935855772,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonAmount",
+          "ty_idx": 6
+        },
+        {
+          "name": "transferInitiator",
+          "ty_idx": 13
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 14,
+          "client_ty_idx": 19
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReturnExcessesBack",
+      "ty_idx": 23,
+      "prefix": {
+        "prefix_num": 3576854235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Flush",
+      "ty_idx": 20,
+      "prefix": {
+        "prefix_num": 1347551233,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "jettonWallet",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        }
+      ],
+      "description": "Move `amount` of the jetton held in `jettonWallet` (a wallet owned by the relay) to the Pot with forward TON.\nPermissionless for stock wallets; the relay's USDT wallet needs the keeper (see Flush guard)."
+    },
+    {
+      "kind": "struct",
+      "name": "SetRelayRoles",
+      "ty_idx": 21,
+      "prefix": {
+        "prefix_num": 1347551234,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "keeper",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Admin: rotate the admin / keeper."
+    },
+    {
+      "kind": "struct",
+      "name": "SetUsdtWallet",
+      "ty_idx": 22,
+      "prefix": {
+        "prefix_num": 1347551235,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11
+        },
+        {
+          "name": "usdtWallet",
+          "ty_idx": 7
+        }
+      ],
+      "description": "Admin: pin the relay's USDT jetton wallet (depends on the relay address, so it is set right after deploy)."
+    },
+    {
+      "kind": "struct",
+      "name": "PotRelayStorage",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "pot",
+          "ty_idx": 7,
+          "description": "Only recipient of everything the relay ever transfers out."
+        },
+        {
+          "name": "escrowMinter",
+          "ty_idx": 7,
+          "description": "Omniston escrow minter: destination of the relay's USDT transfer that opens a position."
+        },
+        {
+          "name": "usdtWallet",
+          "ty_idx": 13,
+          "description": "The relay's own USDT jetton wallet: the only notification source that triggers a swap. Null until pinned."
+        },
+        {
+          "name": "roles",
+          "ty_idx": 26,
+          "description": "admin + keeper (a cell: five addresses do not fit one cell)"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RelayRoles",
+      "ty_idx": 25,
+      "fields": [
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "keeper",
+          "ty_idx": 7,
+          "description": "May flush the USDT wallet (refunds); stock wallets are flushable by anyone."
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "RelayDataReply",
+      "ty_idx": 29,
+      "fields": [
+        {
+          "name": "pot",
+          "ty_idx": 7
+        },
+        {
+          "name": "escrowMinter",
+          "ty_idx": 7
+        },
+        {
+          "name": "usdtWallet",
+          "ty_idx": 13
+        },
+        {
+          "name": "admin",
+          "ty_idx": 7
+        },
+        {
+          "name": "keeper",
+          "ty_idx": 7
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 24
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 20
+    },
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 23
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 27
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 66046,
+      "name": "get_relay_data",
+      "parameters": [],
+      "return_ty_idx": 29
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromAdmin",
+      "err_code": 401
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InsufficientValue",
+      "err_code": 410
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.NotFromKeeper",
+      "err_code": 440
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.PayloadOwnerMismatch",
+      "err_code": 450
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.IncorrectForwardPayload",
+      "err_code": 708
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 65535
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}
